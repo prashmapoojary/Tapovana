@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useContext } from "react";
 import "./Workshops.css";
 import { apiFetch } from "../api/http";
+import { AllocationContext } from "../utils/AllocationContext";
 
 const CATEGORY_COLORS = {
   "Yoga":       { color: "#CDA751", bg: "rgba(205,167,81,0.1)"  },

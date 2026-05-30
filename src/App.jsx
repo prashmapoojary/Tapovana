@@ -14,6 +14,7 @@ import SetPassword from "./SignIn/SetPassword";
 
 import Membership from "./Membership/Membership";
 import Workshops from "./Workshops/Workshops";
+import { AllocationProvider } from "./utils/AllocationContext";
 
 const ProtectedRoute = ({ children }) => {
   const token = sessionStorage.getItem("access_token");
@@ -23,30 +24,32 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   return (
     <Router>
-      <Routes>
+      <AllocationProvider>
+        <Routes>
 
-        <Route path="/" element={<SignIn />} />
+          <Route path="/" element={<SignIn />} />
 
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Home />} />
-          <Route path="services" element={<Services />} />
-          <Route path="bookings" element={<Bookings />} />
-          <Route path="customers" element={<Customers />} />
-          <Route path="transactions" element={<Transactions />} />
-          <Route path="team" element={<Team />} />
-          <Route path="set-password" element={<SetPassword />} />
-          <Route path="membership" element={<Membership />} />
-          <Route path="workshops" element={<Workshops />} />
-        </Route>
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Home />} />
+            <Route path="services" element={<Services />} />
+            <Route path="bookings" element={<Bookings />} />
+            <Route path="customers" element={<Customers />} />
+            <Route path="transactions" element={<Transactions />} />
+            <Route path="team" element={<Team />} />
+            <Route path="set-password" element={<SetPassword />} />
+            <Route path="membership" element={<Membership />} />
+            <Route path="workshops" element={<Workshops />} />
+          </Route>
 
-      </Routes>
+        </Routes>
+      </AllocationProvider>
     </Router>
   );
 }

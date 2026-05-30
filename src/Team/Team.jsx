@@ -121,7 +121,7 @@
 
 // export default Team;
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import AddMemberDrawer from "./AddMemberDrawer";
 import AddUserIcon from "../assets/Add_userIcon.svg";
 import "./Team.css";
@@ -130,6 +130,7 @@ import DropdownIcon from "../assets/dropdownIcon.svg";
 import FilterIcon from "../assets/filterIcon.svg";
 import DefaultAvatar from "../assets/profileIcon.png";
 import ActionIcon from "../assets/Button.svg";
+import { AllocationContext } from "../utils/AllocationContext";
 
 import { apiFetch } from "../api/http";
 
@@ -254,6 +255,7 @@ const EditMemberDrawer = ({ user, onClose, onSaved }) => {
 function Team() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [users, setUsers] = useState([]);
+  const { allocations, bookings } = useContext(AllocationContext);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [search, setSearch] = useState("");
@@ -419,6 +421,7 @@ function Team() {
                 <th>USER</th>
                 <th>ROLE</th>
                 <th>SPECIALIZATION</th>
+                <th>ALLOCATION</th>
                 <th>MOBILE</th>
                 <th>LAST ACTIVE</th>
                 <th>STATUS</th>
@@ -429,6 +432,27 @@ function Team() {
             <tbody>
               {paginatedUsers.map((u) => {
                 const isActive = u.status === "ACTIVE";
+                const isStaff = u.role === "DOCTOR" || u.role === "THERAPIST";
+                
+                // First check centralized allocations context
+                let activeAllocation = isStaff ? allocations.find(a => 
+                  (a.id === u.user_id || a.id === u.id) && a.status === "active"
+                ) : null;
+
+                // Fallback to active bookings context if allocations context doesn't contain it yet
+                if (isStaff && !activeAllocation) {
+                  const activeBooking = bookings.find(b => 
+                    b.doctor_name === `${u.first_name} ${u.last_name}` && 
+                    b.status !== "COMPLETED" && 
+                    b.status !== "CANCELLED"
+                  );
+                  if (activeBooking) {
+                    activeAllocation = {
+                      service_name: activeBooking.service_name
+                    };
+                  }
+                }
+
                 return (
                   <tr key={u.user_id}>
                     <td className="user-cell">
@@ -445,6 +469,18 @@ function Team() {
 
                     <td>{u.role}</td>
                     <td>{u.specialization || "-"}</td>
+                    <td>
+                      {isStaff ? (
+                        activeAllocation ? (
+                          <div style={{ fontSize: 12 }}>
+                            <span style={{ color: "#e67e22", fontWeight: 700 }}>Allocated</span>
+                            <div style={{ fontSize: 10, color: "#7b8a9a" }}>{activeAllocation.service_name || activeAllocation.service || "Active Booking"}</div>
+                          </div>
+                        ) : (
+                          <span style={{ color: "#2ecc71", fontWeight: 700, fontSize: 12 }}>Available</span>
+                        )
+                      ) : "-"}
+                    </td>
                     <td>{u.phone || "-"}</td>
                     <td>{u.last_login_at ? new Date(u.last_login_at).toLocaleString() : "-"}</td>
 

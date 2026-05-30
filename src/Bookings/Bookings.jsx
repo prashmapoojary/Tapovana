@@ -1,36 +1,37 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useContext } from "react";
 import "./Bookings.css";
 import { apiFetch } from "../api/http";
-import { getUser } from "../utils/session";
+import { getUser, roleLabel } from "../utils/session";
 import SearchIcon from "../assets/searchIcon.svg";
 import ActionIcon from "../assets/Button.svg";
 import DefaultAvatar from "../assets/profileIconDefault.png";
+import { AllocationContext } from "../utils/AllocationContext";
 
 const DUMMY_BOOKINGS = [
-  { id: "1", booking_id: "BK-1001", customer_name: "Rahul Sharma", customer_phone: "+91 9876543210", service_name: "Ayurvedic Massage", doctor_name: "Dr. Kavitha", booking_date: "2026-06-15", booking_time: "10:00 AM", amount: "2500", payment_status: "PAID", status: "CONFIRMED" },
-  { id: "2", booking_id: "BK-1002", customer_name: "Priya Desai", customer_phone: "+91 8765432109", service_name: "Yoga Therapy", doctor_name: "Dr. Rekha", booking_date: "2026-06-16", booking_time: "07:00 AM", amount: "1200", payment_status: "PENDING", status: "PENDING" },
+  { id: "1", booking_id: "BK-1001", customer_name: "Rahul Sharma", customer_phone: "+91 9876543210", service_name: "Ayurvedic Massage", doctor_name: "Kavitha Rao", booking_date: "2026-06-15", booking_time: "10:00 AM", amount: "2500", payment_status: "PAID", status: "CONFIRMED" },
+  { id: "2", booking_id: "BK-1002", customer_name: "Priya Desai", customer_phone: "+91 8765432109", service_name: "Yoga Therapy", doctor_name: "Rekha Menon", booking_date: "2026-06-16", booking_time: "07:00 AM", amount: "1200", payment_status: "PENDING", status: "PENDING" },
   { id: "3", booking_id: "BK-1003", customer_name: "Vikram Singh", customer_phone: "+91 7654321098", service_name: "Panchakarma", doctor_name: "", booking_date: "2026-06-18", booking_time: "09:00 AM", amount: "5000", payment_status: "PAID", status: "CONFIRMED" },
-  { id: "4", booking_id: "BK-1004", customer_name: "Anita Nair", customer_phone: "+91 6543210987", service_name: "Meditation Session", doctor_name: "Dr. Arjun", booking_date: "2026-06-15", booking_time: "05:00 PM", amount: "800", payment_status: "PAID", status: "COMPLETED" },
-  { id: "5", booking_id: "BK-1005", customer_name: "Sanjay Kumar", customer_phone: "+91 5432109876", service_name: "Acupuncture", doctor_name: "Dr. Ramesh", booking_date: "2026-06-20", booking_time: "11:00 AM", amount: "1500", payment_status: "FAILED", status: "CANCELLED" }
+  { id: "4", booking_id: "BK-1004", customer_name: "Anita Nair", customer_phone: "+91 6543210987", service_name: "Meditation Session", doctor_name: "Arjun Nair", booking_date: "2026-06-15", booking_time: "05:00 PM", amount: "800", payment_status: "PAID", status: "COMPLETED" },
+  { id: "5", booking_id: "BK-1005", customer_name: "Sanjay Kumar", customer_phone: "+91 5432109876", service_name: "Acupuncture", doctor_name: "", booking_date: "2026-06-20", booking_time: "11:00 AM", amount: "1500", payment_status: "FAILED", status: "CANCELLED" }
 ];
 
 const DUMMY_DOCTORS = [
-  { id: "doc1", first_name: "Kavitha", last_name: "Rao", specialization: "Ayurveda" },
-  { id: "doc2", first_name: "Rekha", last_name: "Menon", specialization: "Yoga" },
-  { id: "doc3", first_name: "Arjun", last_name: "Nair", specialization: "Meditation" }
+  { user_id: "doc1", first_name: "Kavitha", last_name: "Rao", role: "DOCTOR", status: "ACTIVE", email: "kavitha@tapovana.com" },
+  { user_id: "doc2", first_name: "Rekha", last_name: "Menon", role: "THERAPIST", status: "ACTIVE", email: "rekha@tapovana.com" },
+  { user_id: "doc3", first_name: "Arjun", last_name: "Nair", role: "DOCTOR", status: "ACTIVE", email: "arjun@tapovana.com" }
 ];
 
 function Bookings() {
   const userRole = useMemo(() => getUser()?.role, []);
+  const { allocations, setAllocations, bookings, setBookings } = useContext(AllocationContext);
 
-  const [bookings, setBookings] = useState(DUMMY_BOOKINGS);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
-  const [doctors] = useState(DUMMY_DOCTORS);
+  const [doctors, setDoctors] = useState(DUMMY_DOCTORS);
 
   // Drawer state — same pattern as Team.jsx
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -38,7 +39,23 @@ function Bookings() {
   const [notes, setNotes] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Fetch from API, fall back to dummy data
+  // Fetch staff/doctors
+  useEffect(() => {
+    const fetchStaff = async () => {
+      try {
+        const res = await apiFetch("/api/teams/users?limit=100");
+        if (res.success && res.users) {
+          const staffOnly = res.users.filter(u => u.role === "DOCTOR" || u.role === "THERAPIST");
+          if (staffOnly.length > 0) setDoctors(staffOnly);
+        }
+      } catch (e) {
+        // Fallback to dummy doctors
+      }
+    };
+    fetchStaff();
+  }, []);
+
+  // Fetch from API, update context bookings if available
   useEffect(() => {
     const load = async () => {
       try {
@@ -48,10 +65,12 @@ function Bookings() {
         if (dateFrom) q += `&date_from=${dateFrom}`;
         if (dateTo) q += `&date_to=${dateTo}`;
         const res = await apiFetch(q);
-        if (res.success) setBookings(res.bookings || []);
-        else setBookings(DUMMY_BOOKINGS);
+        if (res.success && res.bookings && res.bookings.length > 0) {
+          setBookings(res.bookings);
+        }
+        // else: keep context seeded SEED_BOOKINGS (already set in AllocationContext)
       } catch {
-        setBookings(DUMMY_BOOKINGS);
+        // API unavailable — keep context seeded data, no action needed
       } finally {
         setLoading(false);
       }
@@ -62,10 +81,11 @@ function Bookings() {
   // When a booking is selected, pre-fill form state
   useEffect(() => {
     if (selectedBooking) {
-      setAllocatedDoctorId(selectedBooking.doctor_name ? "doc1" : "");
+      const matchedDoc = doctors.find(d => `${d.first_name} ${d.last_name}` === selectedBooking.doctor_name);
+      setAllocatedDoctorId(matchedDoc ? (matchedDoc.user_id || matchedDoc.id) : "");
       setNotes("");
     }
-  }, [selectedBooking]);
+  }, [selectedBooking, doctors]);
 
   const filtered = useMemo(() => {
     if (!search) return bookings;
@@ -81,7 +101,12 @@ function Bookings() {
   const handleUpdateStatus = (newStatus) => {
     setActionLoading(true);
     setTimeout(() => {
+      // Update the booking status in shared context
       setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, status: newStatus } : b));
+      // Release allocation when session is completed or cancelled
+      if (newStatus === "COMPLETED" || newStatus === "CANCELLED") {
+        setAllocations(prev => prev.map(a => a.bookingId === selectedBooking.id ? { ...a, status: "completed" } : a));
+      }
       setSelectedBooking(prev => ({ ...prev, status: newStatus }));
       setActionLoading(false);
     }, 300);
@@ -160,13 +185,49 @@ function Bookings() {
                     onChange={(e) => setAllocatedDoctorId(e.target.value)}
                     style={{ flex: 1, height: 42, border: "1px solid #e3e7ed", borderRadius: 8, padding: "0 12px", fontSize: 14, outline: "none" }}
                   >
-                    <option value="">Choose Doctor...</option>
-                    {doctors.map(d => (
-                      <option key={d.id} value={d.id}>{d.first_name} {d.last_name} ({d.specialization})</option>
-                    ))}
+                    <option value="">Choose Doctor/Therapist...</option>
+                    {doctors
+                      .filter(d => {
+                        // Filter out already allocated active therapists/doctors (unless they are allocated to this current booking)
+                        const isAllocated = bookings.some(b => 
+                          b.doctor_name === `${d.first_name} ${d.last_name}` && 
+                          b.status !== "COMPLETED" && 
+                          b.status !== "CANCELLED" && 
+                          b.id !== selectedBooking.id
+                        );
+                        return d.status === "ACTIVE" && !isAllocated;
+                      })
+                      .map(d => (
+                        <option key={d.user_id || d.id} value={d.user_id || d.id}>
+                          {d.first_name} {d.last_name} ({roleLabel(d.role)})
+                        </option>
+                      ))
+                    }
                   </select>
                   <button
-                    onClick={() => { setActionLoading(true); setTimeout(() => { alert("Doctor allocated!"); setActionLoading(false); }, 300); }}
+                    onClick={() => {
+                      setActionLoading(true);
+                      const selectedDoc = doctors.find(d => (d.user_id || d.id) === allocatedDoctorId);
+                      if (selectedDoc) {
+                        const docName = `${selectedDoc.first_name} ${selectedDoc.last_name}`;
+                        setTimeout(() => {
+                          setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, doctor_name: docName } : b));
+                          setAllocations(prev => [
+                            ...prev.filter(a => a.bookingId !== selectedBooking.id),
+                            {
+                              id: selectedDoc.user_id || selectedDoc.id,
+                              name: docName,
+                              service: selectedBooking.service_name,
+                              bookingId: selectedBooking.id,
+                              status: "active"
+                            }
+                          ]);
+                          setSelectedBooking(prev => ({ ...prev, doctor_name: docName }));
+                          alert(`Email sent to ${selectedDoc.email || "staff@tapovana.com"}: You have been allocated to ${selectedBooking.service_name} on ${selectedBooking.booking_date}`);
+                          setActionLoading(false);
+                        }, 300);
+                      }
+                    }}
                     disabled={!allocatedDoctorId || actionLoading}
                     style={{ padding: "0 20px", height: 42, background: "#cda751", color: "white", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}
                   >
