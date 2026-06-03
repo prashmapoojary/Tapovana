@@ -1,0 +1,73 @@
+/* AddService.css */
+@import './EditService.css';
+
+/* ── Media & Gallery Overrides (if any) ─────────────────────────────── */
+/* AddService specific overrides can go here, but base styles are in EditService.css */
+
+/* ── Responsive: 1024px ───────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .es-sticky-top {
+    padding: 12px 0;
+  }
+
+  .es-body {
+    grid-template-columns: 1fr 300px;
+    gap: 16px;
+  }
+
+  .es-card {
+    padding: 16px;
+  }
+
+  .es-media-grid {
+    gap: 8px;
+  }
+
+  .es-title {
+    font-size: 22px;
+  }
+
+  .es-input,
+  .es-textarea,
+  .es-select-wrap {
+    font-size: 13px;
+  }
+
+  .es-spec-divider {
+    margin: 0 12px;
+  }
+}
+
+/* ── Responsive: 1440px+ ─────────────────────────────────────────────────── */
+@media (min-width: 1440px) {
+  .es-sticky-top {
+    padding-bottom: 20px;
+  }
+
+  .es-body {
+    grid-template-columns: 1fr 480px;
+    gap: 28px;
+  }
+
+  .es-card,
+  .es-col-right .es-card {
+    padding: 28px;
+  }
+
+  .es-media-grid {
+    gap: 16px;
+  }
+
+  .es-title {
+    font-size: 32px;
+  }
+
+  .es-input {
+    padding: 12px 14px;
+  }
+
+  .es-media-upload-slot svg {
+    width: 36px;
+    height: 36px;
+  }
+}
