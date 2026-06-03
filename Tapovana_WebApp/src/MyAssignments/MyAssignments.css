@@ -1,0 +1,451 @@
+/* MyAssignments.css - Premium Wellness Dashboard Styling */
+
+.my-assignments-container {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  color: #1a202c;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: calc(100vh - 100px);
+  background-color: #f8fafc;
+}
+
+/* Hero Header */
+.ma-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 20px;
+}
+
+.ma-header-title h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 6px;
+  background: linear-gradient(135deg, #0f172a, #cda751);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.ma-header-title p {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+}
+
+/* User Selection for Admin View */
+.ma-staff-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.ma-staff-selector label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.ma-select {
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  padding-right: 8px;
+}
+
+/* Stats Cards Grid */
+.ma-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.ma-stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.ma-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 20px -8px rgba(205, 167, 81, 0.15);
+  border-color: #cda75166;
+}
+
+.ma-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ma-stat-icon.total {
+  background: rgba(205, 167, 81, 0.1);
+  color: #cda751;
+}
+
+.ma-stat-icon.active {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.ma-stat-icon.expired {
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748b;
+}
+
+.ma-stat-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.ma-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.ma-stat-label {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* Filters & Search Control Bar */
+.ma-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.ma-search-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  flex: 1;
+  max-width: 400px;
+  transition: all 0.2s ease;
+}
+
+.ma-search-wrapper:focus-within {
+  border-color: #cda751;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(205, 167, 81, 0.15);
+}
+
+.ma-search-wrapper input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
+  color: #0f172a;
+  width: 100%;
+}
+
+.ma-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ma-filter-select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.ma-filter-select:focus {
+  border-color: #cda751;
+}
+
+/* Assignments Grid & Layout */
+.ma-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 20px;
+}
+
+.ma-card {
+  background: white;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.ma-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+}
+
+.ma-card.workshop::before {
+  background: #3b82f6; /* Blue for Workshops */
+}
+
+.ma-card.vedic_program::before {
+  background: #cda751; /* Gold for Vedic Programs */
+}
+
+.ma-card.service::before {
+  background: #10b981; /* Green for Services */
+}
+
+.ma-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 24px -10px rgba(0, 0, 0, 0.08);
+  border-color: #e2e8f0;
+}
+
+.ma-card-header {
+  padding: 20px 20px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ma-card-type-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ma-card-type-tag.workshop {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.ma-card-type-tag.vedic_program {
+  background: rgba(205, 167, 81, 0.1);
+  color: #cda751;
+}
+
+.ma-card-type-tag.service {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.ma-status-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.ma-status-badge.active {
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+}
+
+.ma-status-badge.expired {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.ma-card-body {
+  padding: 0 20px 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ma-session-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.ma-details-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ma-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.ma-detail-item svg {
+  flex-shrink: 0;
+  color: #94a3b8;
+}
+
+.ma-detail-label {
+  font-weight: 500;
+}
+
+.ma-detail-value {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.ma-card-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #f1f5f9;
+  background: #fafafa;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ma-assigned-date {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.ma-action-btn {
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ma-action-btn:hover {
+  border-color: #cda751;
+  color: #cda751;
+  background: #faf8f5;
+}
+
+.ma-action-btn.disabled-btn {
+  background: #a0aec0 !important;
+  color: white !important;
+  border-color: #a0aec0 !important;
+  cursor: not-allowed !important;
+  opacity: 0.7;
+}
+
+.ma-action-btn.disabled-btn:hover {
+  background: #a0aec0 !important;
+  color: white !important;
+  border-color: #a0aec0 !important;
+  transform: none;
+}
+
+/* Empty State */
+.ma-empty-state {
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  padding: 60px 40px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  max-width: 500px;
+  margin: 40px auto;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.ma-empty-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #fefcf6;
+  color: #cda751;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+}
+
+.ma-empty-state h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.ma-empty-state p {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .my-assignments-container {
+    padding: 16px;
+  }
+  
+  .ma-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .ma-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .ma-filter-group {
+    flex-wrap: wrap;
+  }
+  
+  .ma-grid {
+    grid-template-columns: 1fr;
+  }
+}
