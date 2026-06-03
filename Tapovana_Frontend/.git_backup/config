@@ -1,0 +1,22 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = false
+	logallrefupdates = true
+	symlinks = false
+	ignorecase = true
+[remote "origin"]
+	url = https://github.com/RosetteAdmin/Tapovana_WebApp.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "four"]
+	remote = origin
+	merge = refs/heads/four
+	vscode-merge-base = origin/nothing
+[branch "dummy"]
+	vscode-merge-base = origin/four
+[branch "college"]
+	vscode-merge-base = origin/nothing
+[branch "collegemgm"]
+	vscode-merge-base = origin/nothing
+	remote = origin
+	merge = refs/heads/collegemgm
