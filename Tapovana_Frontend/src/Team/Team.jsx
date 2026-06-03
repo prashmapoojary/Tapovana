@@ -11,6 +11,8 @@ import ActionIcon from "../assets/Button.svg";
 import { apiFetch } from "../api/http";
 import { useAllocations } from "../utils/AllocationContext";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 const EditMemberDrawer = ({ user, onClose, onSaved }) => {
   const { isStaffAllocated } = useAllocations();
   const [form, setForm] = useState({
@@ -369,10 +371,18 @@ function Team() {
             <tbody>
               {paginatedUsers.map((u) => {
                 const isActive = u.status === "active";
+                let avatarSrc = DefaultAvatar;
+                if (u.profile_photo_source === "upload" && u.profile_photo_url) {
+                  avatarSrc = `${API_BASE}${u.profile_photo_url}`;
+                } else if (u.profile_photo_source === "local" && u.profile_photo_url) {
+                  avatarSrc = `/avatars/${u.profile_photo_url}`;
+                } else if (u.avatar_url) {
+                  avatarSrc = u.avatar_url.startsWith("http") || u.avatar_url.startsWith("/") ? u.avatar_url : `${API_BASE}${u.avatar_url}`;
+                }
                 return (
                   <tr key={u.user_id}>
                     <td className="user-cell">
-                      <img src={u.avatar_url || DefaultAvatar} className="user-avatar" alt="" />
+                      <img src={avatarSrc} className="user-avatar" alt="" />
                       <div className="user-info">
                         <div className="user-name">{`${u.first_name || ""} ${u.last_name || ""}`.trim()}</div>
                         <div className="user-email">{u.email}</div>

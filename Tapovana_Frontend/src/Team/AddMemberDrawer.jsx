@@ -19,12 +19,25 @@ const initialForm = {
 
 const AddMemberDrawer = ({ isOpen, onClose, onSaved }) => {
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [photoSource, setPhotoSource] = useState("default");
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [photoBase64, setPhotoBase64] = useState("");
+  const [showPresets, setShowPresets] = useState(false);
   const [formData, setFormData] = useState(initialForm);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const fileInputRef = useRef(null);
+
+  const presets = [
+    "avatar1.svg",
+    "avatar2.svg",
+    "avatar3.svg",
+    "avatar4.svg",
+    "avatar5.svg",
+    "avatar6.svg"
+  ];
 
   useEffect(() => {
     if (isOpen) {
@@ -41,6 +54,10 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved }) => {
 
   const resetForm = () => {
     setPhotoPreview(null);
+    setPhotoSource("default");
+    setPhotoUrl("");
+    setPhotoBase64("");
+    setShowPresets(false);
     setFormData(initialForm);
     setError("");
   };
@@ -48,7 +65,6 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved }) => {
   const handleClose = () => {
     if (!saving) {
       onClose();
-      // If you want to reset each time drawer closes:
       resetForm();
     }
   };
@@ -70,10 +86,23 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved }) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Preview only. (Upload integration can be added when backend supports it.)
     const reader = new FileReader();
-    reader.onloadend = () => setPhotoPreview(reader.result);
+    reader.onloadend = () => {
+      setPhotoPreview(reader.result);
+      setPhotoSource("upload");
+      setPhotoBase64(reader.result);
+      setPhotoUrl("");
+      setShowPresets(false);
+    };
     reader.readAsDataURL(file);
+  };
+
+  const handleSelectPreset = (presetName) => {
+    setPhotoSource("local");
+    setPhotoUrl(presetName);
+    setPhotoBase64("");
+    setPhotoPreview(`/avatars/${presetName}`);
+    setShowPresets(false);
   };
 
   const validate = () => {
@@ -84,14 +113,12 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved }) => {
     if (!formData.email.trim()) return "Work email is required";
     if (!/\S+@\S+\.\S+/.test(formData.email.trim())) return "Please enter a valid email";
     if (!formData.role) return "Please select a role";
-    // Phone: optional but if provided must be digits only and 10 to 15 characters
     if (formData.phone && formData.phone.trim()) {
       const phoneVal = formData.phone.trim();
       if (!/^\d{10,15}$/.test(phoneVal)) {
         return "Phone number must be digits only and between 10 to 15 characters long";
       }
     }
-    // Specialization required for clinical roles
     if ((formData.role === "DOCTOR" || formData.role === "THERAPIST") && !formData.specialization?.trim()) {
       return "Specialization is required for Doctors and Therapists";
     }
@@ -113,19 +140,18 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved }) => {
       return;
     }
 
-    // Map frontend keys to backend expected keys
     const payload = {
       email: formData.email.trim().toLowerCase(),
-      role: formData.role, // 'SUPER_ADMIN' | 'CO_ADMIN' | 'DOCTOR' | 'THERAPIST'
+      role: formData.role,
       first_name: formData.firstName.trim(),
       last_name: formData.lastName.trim(),
       phone: formData.phone?.trim() || null,
       specialization: formData.specialization?.trim() || null,
 
-      // image not uploaded yet
-      avatar_url: null,
+      profile_photo_source: photoSource,
+      profile_photo_url: photoUrl,
+      profile_photo_base64: photoBase64,
 
-      // toggles (must match backend)
       auto_generate_password: Boolean(formData.autoGeneratePassword),
       send_invite_email: Boolean(formData.sendEmailInvitation)
     };
@@ -149,7 +175,6 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved }) => {
         return;
       }
 
-      // success
       onClose();
       resetForm();
       if (onSaved) onSaved();
@@ -219,6 +244,62 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved }) => {
               onChange={handlePhotoChange}
             />
             <div className="profile-upload-label">Upload profile photo</div>
+
+            <button 
+              type="button" 
+              className="btn-select-preset" 
+              onClick={() => setShowPresets(!showPresets)}
+              style={{
+                background: "transparent",
+                border: "1px solid #cda751",
+                borderRadius: "4px",
+                color: "#cda751",
+                fontSize: "12px",
+                padding: "4px 10px",
+                marginTop: "8px",
+                cursor: "pointer",
+                fontWeight: "600",
+                fontFamily: "inherit"
+              }}
+            >
+              Or Choose Preset Avatar
+            </button>
+
+            {showPresets && (
+              <div className="preset-avatar-grid" style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(6, 1fr)",
+                gap: "8px",
+                marginTop: "12px",
+                width: "100%",
+                maxWidth: "280px"
+              }}>
+                {presets.map((preset) => (
+                  <div 
+                    key={preset}
+                    onClick={() => handleSelectPreset(preset)}
+                    style={{
+                      cursor: "pointer",
+                      border: photoUrl === preset ? "2px solid #cda751" : "2px solid transparent",
+                      borderRadius: "8px",
+                      padding: "2px",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    <img 
+                      src={`/avatars/${preset}`} 
+                      alt={preset} 
+                      style={{
+                        width: "100%",
+                        aspectRatio: "1/1",
+                        display: "block",
+                        borderRadius: "6px"
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="form-grid">

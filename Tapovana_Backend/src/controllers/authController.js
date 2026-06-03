@@ -97,6 +97,7 @@ const verifyOtp = async (req, res) => {
 
         const memberResult = await client.query(
             `SELECT tm.id, tm.first_name, tm.last_name, tm.email, tm.avatar_url, tm.status,
+              tm.profile_photo_url, tm.profile_photo_source, tm.availability_status, tm.allocation_details,
               r.name AS role, r.access
        FROM team_members tm
        JOIN roles r ON r.id = tm.role_id
@@ -175,6 +176,10 @@ const verifyOtp = async (req, res) => {
                 email: member.email,
                 role: member.role,
                 avatar_url: member.avatar_url,
+                profile_photo_url: member.profile_photo_url,
+                profile_photo_source: member.profile_photo_source,
+                availability_status: member.availability_status,
+                allocation_details: member.allocation_details,
             },
             access: accessMap,
         });

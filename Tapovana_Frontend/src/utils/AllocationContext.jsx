@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { apiFetch } from "../api/http";
 
 const AllocationContext = createContext();
 
@@ -84,6 +85,22 @@ export const AllocationProvider = ({ children }) => {
 
     setAllocations((prev) => [...prev, newAllocation]);
 
+    // Sync to database
+    apiFetch(`/api/teams/users/${staffId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        availability_status: "Allocated",
+        allocation_details: {
+          id: allocationId,
+          type: sessionType,
+          sessionTitle: session.title,
+          sessionId: session.id || session.session_id,
+          startDate: session.startDate || session.date || session.start_date,
+          endDate: session.endDate || session.end_date || session.date,
+        }
+      })
+    }).catch(err => console.error("Error syncing allocation to database:", err));
+
     // Simulate email notification
     simulateEmailNotification(staff, session, sessionType);
 
@@ -94,15 +111,35 @@ export const AllocationProvider = ({ children }) => {
    * Deallocate staff from a session
    */
   const deallocateStaff = useCallback((allocationId) => {
+    const alloc = allocations.find((a) => a.id === allocationId);
+    if (alloc) {
+      apiFetch(`/api/teams/users/${alloc.staffId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          availability_status: "Available",
+          allocation_details: null
+        })
+      }).catch(err => console.error("Error syncing deallocation to database:", err));
+    }
     setAllocations((prev) => prev.filter((a) => a.id !== allocationId));
-  }, []);
+  }, [allocations]);
 
   /**
    * Deallocate all staff from a session
    */
   const deallocateFromSession = useCallback((sessionId) => {
+    const sessionAllocations = allocations.filter((a) => a.sessionId === sessionId);
+    sessionAllocations.forEach((a) => {
+      apiFetch(`/api/teams/users/${a.staffId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          availability_status: "Available",
+          allocation_details: null
+        })
+      }).catch(err => console.error("Error syncing deallocation to database:", err));
+    });
     setAllocations((prev) => prev.filter((a) => a.sessionId !== sessionId));
-  }, []);
+  }, [allocations]);
 
   /**
    * Get all allocated staff for a session
@@ -170,6 +207,13 @@ export const AllocationProvider = ({ children }) => {
       prev.map((a) => {
         const endDate = new Date(a.endDate);
         if (endDate <= now && a.status === "active") {
+          apiFetch(`/api/teams/users/${a.staffId}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              availability_status: "Available",
+              allocation_details: null
+            })
+          }).catch(err => console.error("Error syncing expired allocation to database:", err));
           return { ...a, status: "expired" };
         }
         return a;
@@ -237,6 +281,16 @@ Tapovana Admin Team
    * Mark an allocation as complete (expired)
    */
   const completeAllocation = useCallback((allocationId) => {
+    const alloc = allocations.find((a) => a.id === allocationId);
+    if (alloc) {
+      apiFetch(`/api/teams/users/${alloc.staffId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          availability_status: "Available",
+          allocation_details: null
+        })
+      }).catch(err => console.error("Error syncing completed allocation to database:", err));
+    }
     setAllocations((prev) =>
       prev.map((a) => {
         if (a.id === allocationId) {
@@ -245,7 +299,7 @@ Tapovana Admin Team
         return a;
       })
     );
-  }, []);
+  }, [allocations]);
 
   // ── Auto-cleanup: mark expired allocations on mount ──
   useEffect(() => {
