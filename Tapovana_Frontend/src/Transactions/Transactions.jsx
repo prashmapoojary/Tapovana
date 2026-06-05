@@ -3,6 +3,7 @@ import "./Transactions.css";
 import { apiFetch } from "../api/http";
 import SearchIcon from "../assets/searchIcon.svg";
 import DropdownIcon from "../assets/dropdownIcon.svg";
+import { useAllocations } from "../utils/AllocationContext";
 
 const DUMMY_TRANSACTIONS = [
   { id: "1", transaction_id: "TXN-10001", booking_id: "BK-1001", customer_name: "Rahul Sharma",    amount: 2500,  currency: "INR", status: "COMPLETED", payment_method: "UPI",        payment_gateway: "RAZORPAY", gateway_transaction_id: "pay_Ox9aAbCd123", created_at: "2026-06-15T10:00:00Z" },
@@ -23,6 +24,7 @@ const DUMMY_SUMMARY = {
 };
 
 function Transactions() {
+  const { triggerAlert } = useAllocations();
   // Transactions list states
   const [transactions, setTransactions] = useState([]);
   const [summary, setSummary] = useState({ total_collected: 0, pending_amount: 0, failed_amount: 0, refunded_amount: 0 });
@@ -89,7 +91,7 @@ function Transactions() {
   // Export client-side CSV downloads
   const handleExportCSV = () => {
     if (transactions.length === 0) {
-      alert("No transaction records available to export.");
+      triggerAlert("No transaction records available to export.");
       return;
     }
 
@@ -292,7 +294,7 @@ function Transactions() {
                     ) : (
                       <span 
                         style={{ color: "#7b8a9a", fontStyle: "italic", fontSize: "12px", cursor: "pointer" }}
-                        onClick={() => alert(`Receipt Audit: Gateway Reference ID is [ ${t.gateway_transaction_id || "None"} ]`)}
+                        onClick={() => triggerAlert(`Receipt Audit: Gateway Reference ID is [ ${t.gateway_transaction_id || "None"} ]`)}
                         title="Click to view reference"
                       >
                         Ref ID

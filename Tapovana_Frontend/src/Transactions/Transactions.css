@@ -72,44 +72,48 @@
 
 .revenue-metric-card {
   background: white;
-  border: 1px solid #eceff3;
-  border-radius: 16px;
-  padding: 20px 24px;
+  border: 1px solid #CDA751 !important;
+  border-radius: 8px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.01);
-  transition: all 0.25s ease;
+  gap: 4px;
+  box-shadow: none;
 }
 
 .revenue-metric-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.02);
+  border-color: #CDA751;
 }
 
 .revenue-card-label {
   font-size: 12px;
-  font-weight: 700;
-  color: #7b8a9a;
+  color: #718096;
+  margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  font-weight: 600;
 }
 
 .revenue-card-value {
   font-size: 24px;
   font-weight: 700;
-  color: #2d3748;
+  color: #1a202c !important;
+  margin: 0;
 }
 
-.revenue-metric-card.collected { border-left: 4px solid #2ecc71; }
-.revenue-metric-card.pending { border-left: 4px solid #e67e22; }
-.revenue-metric-card.failed { border-left: 4px solid #e74c3c; }
-.revenue-metric-card.refunded { border-left: 4px solid #3498db; }
+.revenue-metric-card.collected,
+.revenue-metric-card.pending,
+.revenue-metric-card.failed,
+.revenue-metric-card.refunded {
+  border-left: 1px solid #CDA751 !important;
+}
 
-.revenue-metric-card.collected .revenue-card-value { color: #2ecc71; }
-.revenue-metric-card.pending .revenue-card-value { color: #e67e22; }
-.revenue-metric-card.failed .revenue-card-value { color: #e74c3c; }
-.revenue-metric-card.refunded .revenue-card-value { color: #3498db; }
+.revenue-metric-card.collected .revenue-card-value,
+.revenue-metric-card.pending .revenue-card-value,
+.revenue-metric-card.failed .revenue-card-value,
+.revenue-metric-card.refunded .revenue-card-value {
+  color: #1a202c !important;
+}
 
 /* Table and ledger structures */
 .ledger-table-card {
@@ -171,32 +175,30 @@
 .method-badge {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
-  border-radius: 6px;
+  padding: 4px 0;
   font-size: 11px;
   font-weight: 700;
-  border: 1px solid #e2e8f0;
-  background: #fafbfc;
-  color: #4a5568;
+  border: none !important;
+  background: transparent !important;
 }
 
-.method-badge.upi { background: rgba(24, 138, 148, 0.08); color: #188A94; border-color: rgba(24, 138, 148, 0.15); }
-.method-badge.card { background: rgba(52, 152, 219, 0.08); color: #3498db; border-color: rgba(52, 152, 219, 0.15); }
-.method-badge.netbanking { background: rgba(155, 89, 182, 0.08); color: #9b59b6; border-color: rgba(155, 89, 182, 0.15); }
+.method-badge.upi { color: #CDA751; }
+.method-badge.card { color: #3498db; }
+.method-badge.netbanking { color: #9b59b6; }
 
 /* External links styling */
 .receipt-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #188A94;
+  color: #CDA751;
   text-decoration: none;
   font-weight: 600;
   font-size: 12px;
 }
 
 .receipt-link:hover {
-  color: #0d636b;
+  color: #b59243;
   text-decoration: underline;
 }
 
@@ -250,7 +252,8 @@
 }
 
 .page-btn:hover:not(:disabled):not(.active) {
-  background: rgba(205, 167, 81, 0.08);
+  background: #CDA751;
+  color: #FFFFFF;
   border-color: rgba(205, 167, 81, 0.35);
 }
 

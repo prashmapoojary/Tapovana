@@ -27,9 +27,6 @@
   font-weight: 700;
   color: #0f172a;
   margin: 0 0 6px;
-  background: linear-gradient(135deg, #0f172a, #cda751);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
 
 .ma-header-title p {
@@ -107,8 +104,8 @@
 }
 
 .ma-stat-icon.active {
-  background: rgba(34, 197, 94, 0.1);
-  color: #22c55e;
+  background: rgba(205, 167, 81, 0.1);
+  color: #cda751;
 }
 
 .ma-stat-icon.expired {
@@ -226,15 +223,15 @@
 }
 
 .ma-card.workshop::before {
-  background: #3b82f6; /* Blue for Workshops */
+  background: #cda751; /* Gold */
 }
 
 .ma-card.vedic_program::before {
-  background: #cda751; /* Gold for Vedic Programs */
+  background: #cda751; /* Gold */
 }
 
 .ma-card.service::before {
-  background: #10b981; /* Green for Services */
+  background: #cda751; /* Gold */
 }
 
 .ma-card:hover {
@@ -261,8 +258,8 @@
 }
 
 .ma-card-type-tag.workshop {
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
+  background: rgba(205, 167, 81, 0.1);
+  color: #cda751;
 }
 
 .ma-card-type-tag.vedic_program {
@@ -271,8 +268,8 @@
 }
 
 .ma-card-type-tag.service {
-  background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
+  background: rgba(205, 167, 81, 0.1);
+  color: #cda751;
 }
 
 .ma-status-badge {
@@ -283,8 +280,8 @@
 }
 
 .ma-status-badge.active {
-  background: rgba(34, 197, 94, 0.1);
-  color: #16a34a;
+  background: rgba(205, 167, 81, 0.1);
+  color: #cda751;
 }
 
 .ma-status-badge.expired {

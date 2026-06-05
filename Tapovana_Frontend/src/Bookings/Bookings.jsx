@@ -5,6 +5,7 @@ import { getUser } from "../utils/session";
 import SearchIcon from "../assets/searchIcon.svg";
 import ActionIcon from "../assets/Button.svg";
 import DefaultAvatar from "../assets/profileIconDefault.png";
+import { useAllocations } from "../utils/AllocationContext";
 
 const DUMMY_BOOKINGS = [
   { id: "1", booking_id: "BK-1001", customer_name: "Rahul Sharma", customer_phone: "+91 9876543210", service_name: "Ayurvedic Massage", doctor_name: "Dr. Kavitha", booking_date: "2026-06-15", booking_time: "10:00 AM", amount: "2500", payment_status: "PAID", status: "CONFIRMED" },
@@ -21,8 +22,9 @@ const DUMMY_DOCTORS = [
 ];
 
 function Bookings() {
+  const { triggerAlert, triggerConfirm } = useAllocations();
   const userRole = useMemo(() => getUser()?.role, []);
-  const isTherapist = (userRole || "").toUpperCase() === "THERAPIST";
+  const canEdit = ["SUPER_ADMIN", "CO_ADMIN"].includes((userRole || "").toUpperCase());
 
   const [bookings, setBookings] = useState(DUMMY_BOOKINGS);
   const [loading, setLoading] = useState(false);
@@ -82,19 +84,19 @@ function Bookings() {
   const handleUpdateStatus = (newStatus) => {
     if (newStatus === "COMPLETED") {
       if (selectedBooking.payment_status !== "PAID") {
-        alert(`Cannot mark booking as Completed because the payment status is ${selectedBooking.payment_status}. Only bookings with PAID status can be completed.`);
+        triggerAlert(`Cannot mark booking as Completed because the payment status is ${selectedBooking.payment_status}. Only bookings with PAID status can be completed.`);
         return;
       }
       // Cannot mark as Completed before booking date/time has passed
       const bookingDateTime = new Date(`${selectedBooking.booking_date} ${selectedBooking.booking_time}`);
       if (!isNaN(bookingDateTime.getTime()) && bookingDateTime > new Date()) {
-        alert("Cannot mark booking as Completed before the scheduled date and time has passed.");
+        triggerAlert("Cannot mark booking as Completed before the scheduled date and time has passed.");
         return;
       }
     }
 
     if (newStatus === "CONFIRMED" && !selectedBooking.doctor_name && !allocatedDoctorId) {
-      alert("Must allocate a doctor/therapist before confirming a booking.");
+      triggerAlert("Must allocate a doctor/therapist before confirming a booking.");
       return;
     }
 
@@ -109,6 +111,7 @@ function Bookings() {
       setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, status: newStatus, doctor_name: docName } : b));
       setSelectedBooking(prev => ({ ...prev, status: newStatus, doctor_name: docName }));
       setActionLoading(false);
+      triggerAlert(`Booking successfully updated to: ${newStatus}`, true);
     }, 300);
   };
 
@@ -122,7 +125,7 @@ function Bookings() {
     setTimeout(() => {
       setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, doctor_name: docName } : b));
       setSelectedBooking(prev => ({ ...prev, doctor_name: docName }));
-      alert(`Successfully allocated ${docName}!`);
+      triggerAlert(`Successfully allocated ${docName}!`, true);
       setActionLoading(false);
     }, 300);
   };
@@ -131,14 +134,14 @@ function Bookings() {
     setDateFrom(val);
     if (dateTo && val && new Date(dateTo) < new Date(val)) {
       setDateTo("");
-      alert('"To" date cannot be before "From" date.');
+      triggerAlert('"To" date cannot be before "From" date.');
     }
     setPage(1);
   };
 
   const handleDateToChange = (val) => {
     if (dateFrom && val && new Date(val) < new Date(dateFrom)) {
-      alert('"To" date cannot be before "From" date.');
+      triggerAlert('"To" date cannot be before "From" date.');
       return;
     }
     setDateTo(val);
@@ -209,54 +212,84 @@ function Bookings() {
                 </div>
               </div>
 
-              {/* Doctor — hidden for therapists */}
-              {!isTherapist && (
-                <div className="bk-drawer-section">
-                  <h4 className="bk-section-title">Assign Doctor / Therapist</h4>
-                  <div style={{ display: "flex", gap: "10px" }}>
-                    <select
-                      value={allocatedDoctorId}
-                      onChange={(e) => setAllocatedDoctorId(e.target.value)}
-                      style={{ flex: 1, height: 42, border: "1px solid #e3e7ed", borderRadius: 8, padding: "0 12px", fontSize: 14, outline: "none" }}
-                    >
-                      <option value="">Choose Doctor...</option>
-                      {doctors.map(d => (
-                        <option key={d.id} value={d.id}>{d.first_name} {d.last_name} ({d.specialization})</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={handleAllocateDoctorLocal}
-                      disabled={!allocatedDoctorId || actionLoading}
-                      style={{ padding: "0 20px", height: 42, background: "#cda751", color: "white", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}
-                    >
-                      Allocate
-                    </button>
-                  </div>
+              {/* Doctor / Therapist Assignment — visible to everyone, but editable only by admins */}
+              <div className="bk-drawer-section">
+                <h4 className="bk-section-title">Assign Doctor / Therapist</h4>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <select
+                    value={allocatedDoctorId}
+                    onChange={(e) => canEdit && setAllocatedDoctorId(e.target.value)}
+                    disabled={!canEdit}
+                    style={{
+                      flex: 1,
+                      height: 42,
+                      border: "1px solid #e3e7ed",
+                      borderRadius: 8,
+                      padding: "0 12px",
+                      fontSize: 14,
+                      outline: "none",
+                      background: !canEdit ? "#f5f5f5" : "#fff",
+                      cursor: !canEdit ? "default" : "text"
+                    }}
+                  >
+                    <option value="">Choose Doctor...</option>
+                    {doctors.map(d => (
+                      <option key={d.id} value={d.id}>{d.first_name} {d.last_name} ({d.specialization})</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleAllocateDoctorLocal}
+                    disabled={!canEdit || !allocatedDoctorId || actionLoading}
+                    style={{
+                      padding: "0 20px",
+                      height: 42,
+                      background: canEdit ? "#cda751" : "#e0e0e0",
+                      color: canEdit ? "white" : "#888",
+                      border: "none",
+                      borderRadius: 8,
+                      fontWeight: 600,
+                      cursor: !canEdit ? "not-allowed" : "pointer"
+                    }}
+                  >
+                    Allocate
+                  </button>
                 </div>
-              )}
+              </div>
 
-              {/* Notes — read-only for therapists */}
+              {/* Notes — read-only for non-admins */}
               <div className="bk-drawer-section">
                 <h4 className="bk-section-title">Consultation Notes</h4>
                 <textarea
                   value={notes}
-                  onChange={(e) => !isTherapist && setNotes(e.target.value)}
-                  readOnly={isTherapist}
-                  placeholder={isTherapist ? "No notes added." : "Add notes about this session..."}
-                  style={{ width: "100%", height: 80, border: "1px solid #e3e7ed", borderRadius: 8, padding: 12, fontSize: 14, resize: "none", outline: "none", boxSizing: "border-box", background: isTherapist ? "#f5f5f5" : "#fff", cursor: isTherapist ? "default" : "text" }}
+                  onChange={(e) => canEdit && setNotes(e.target.value)}
+                  readOnly={!canEdit}
+                  placeholder={!canEdit ? "No notes added." : "Add notes about this session..."}
+                  style={{
+                    width: "100%",
+                    height: 80,
+                    border: "1px solid #e3e7ed",
+                    borderRadius: 8,
+                    padding: 12,
+                    fontSize: 14,
+                    resize: "none",
+                    outline: "none",
+                    boxSizing: "border-box",
+                    background: !canEdit ? "#f5f5f5" : "#fff",
+                    cursor: !canEdit ? "default" : "text"
+                  }}
                 />
               </div>
             </div>
 
-            {/* Footer Actions — only Close button for therapists */}
+            {/* Footer Actions — only Close button for non-admins */}
             <div className="bk-drawer-footer">
-              {!isTherapist && selectedBooking.status === "PENDING" && (
+              {canEdit && selectedBooking.status === "PENDING" && (
                 <button className="bk-btn-primary" disabled={actionLoading} onClick={() => handleUpdateStatus("CONFIRMED")}>Confirm Booking</button>
               )}
-              {!isTherapist && selectedBooking.status === "CONFIRMED" && (
+              {canEdit && selectedBooking.status === "CONFIRMED" && (
                 <button className="bk-btn-green" disabled={actionLoading} onClick={() => handleUpdateStatus("COMPLETED")}>Complete Session</button>
               )}
-              {!isTherapist && selectedBooking.status !== "CANCELLED" && selectedBooking.status !== "COMPLETED" && (
+              {canEdit && selectedBooking.status !== "CANCELLED" && selectedBooking.status !== "COMPLETED" && (
                 <button className="bk-btn-danger" disabled={actionLoading} onClick={() => handleUpdateStatus("CANCELLED")}>Cancel Booking</button>
               )}
               <button className="bk-btn-secondary" onClick={() => setSelectedBooking(null)}>Close</button>

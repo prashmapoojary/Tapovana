@@ -107,7 +107,7 @@
   letter-spacing: 0.3px;
 }
 
-.tier-badge.platinum { background: rgba(24, 138, 148, 0.12); color: #188A94; border: 1px solid rgba(24, 138, 148, 0.2); }
+.tier-badge.platinum { background: rgba(205, 167, 81, 0.12); color: #cda751; border: 1px solid rgba(205, 167, 81, 0.2); }
 .tier-badge.gold { background: rgba(205, 167, 81, 0.12); color: #cda751; border: 1px solid rgba(205, 167, 81, 0.2); }
 .tier-badge.silver { background: rgba(142, 159, 167, 0.12); color: #6b7c85; border: 1px solid rgba(142, 159, 167, 0.2); }
 .tier-badge.none { background: #f1f3f7; color: #718096; }
@@ -207,7 +207,7 @@
   height: 80px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid #188A94;
+  border: 3px solid #cda751;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
@@ -287,7 +287,8 @@
 }
 
 .page-btn:hover:not(:disabled):not(.active) {
-  background: rgba(205, 167, 81, 0.08);
+  background: #cda751;
+  color: white;
   border-color: rgba(205, 167, 81, 0.35);
 }
 
@@ -534,7 +535,7 @@
   height: 56px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #188A94;
+  border: 2px solid #cda751;
   flex-shrink: 0;
 }
 
@@ -590,34 +591,36 @@
   flex-shrink: 0;
 }
 
-.cust-btn-danger {
-  flex: 1;
-  height: 42px;
-  background: #fff1f0;
-  color: #cf1322;
-  border: 1px solid #ffa39e;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.cust-btn-danger:hover { background: #ffccc7; }
-
+.cust-btn-danger,
 .cust-btn-secondary {
   flex: 1;
   height: 42px;
   background: white;
-  color: #4a5568;
-  border: 1px solid #e2e8f0;
+  color: grey;
+  border: 1px solid #cda751;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
-.cust-btn-secondary:hover { background: #f7fafc; }
-.cust-btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.cust-btn-danger:hover:not(:disabled),
+.cust-btn-secondary:hover:not(:disabled) {
+  background: #cda751;
+  color: white;
+  border-color: #cda751;
+}
+
+.cust-btn-danger:disabled,
+.cust-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .action-icon {
   width: 20px;

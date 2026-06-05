@@ -251,49 +251,20 @@ export default function Membership() {
           <div
             key={key}
             className="mem-tier-card"
-            style={{ borderColor: cfg.border, background: cfg.bg, cursor: "pointer" }}
+            style={{ borderColor: "rgba(205,167,81,0.35)", background: "rgba(205,167,81,0.12)", cursor: "pointer" }}
             onClick={() => handleOpenTierEdit(key)}
           >
             <div className="mem-tier-card-top">
-              <span className="mem-tier-icon">{cfg.icon}</span>
-              <div className="mem-tier-badge" style={{ background: cfg.color, color: "white" }}>{cfg.label}</div>
+              <div className="mem-tier-badge" style={{ background: "#cda751", color: "white" }}>{cfg.label}</div>
             </div>
-            <div className="mem-tier-count" style={{ color: cfg.color }}>{tierStats[key]}</div>
+            <div className="mem-tier-count" style={{ color: "#cda751" }}>{tierStats[key]}</div>
             <div className="mem-tier-label">Active Members</div>
             <div className="mem-tier-price">₹{cfg.price.toLocaleString("en-IN")}/year</div>
-            <div className="mem-tier-benefits">
-              {cfg.benefits.slice(0, 2).map((b, i) => (
-                <div key={i} className="mem-tier-benefit-item">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={cfg.color} strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-                  <span>{b}</span>
-                </div>
-              ))}
-              <div className="mem-tier-more">+{cfg.benefits.length - 2} more benefits</div>
+            <div className="mem-tier-benefits-link">
+              +{cfg.benefits.length} benefits
             </div>
           </div>
         ))}
-
-        <div className="mem-tier-card mem-revenue-card">
-          <div className="mem-tier-card-top">
-            <span className="mem-tier-icon">💰</span>
-            <div className="mem-tier-badge" style={{ background: "#2d3748", color: "white" }}>Revenue</div>
-          </div>
-          <div className="mem-tier-count" style={{ color: "#2d3748", fontSize: "22px" }}>
-            ₹{(tierStats.TOTAL_REVENUE / 1000).toFixed(0)}K
-          </div>
-          <div className="mem-tier-label">Total Member LTV</div>
-          <div className="mem-tier-price">{members.length} total enrolled</div>
-          <div className="mem-tier-benefits">
-            <div className="mem-tier-benefit-item">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-              <span>{tierStats.EXPIRED} expired memberships</span>
-            </div>
-            <div className="mem-tier-benefit-item">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2ecc71" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-              <span>{members.length - tierStats.EXPIRED} active members</span>
-            </div>
-          </div>
-        </div>
       </section>
 
       {/* ══════════════════════════════════════════════════════════════════
@@ -348,7 +319,7 @@ export default function Membership() {
                   ))}
                   <button
                     onClick={() => setTierEditBenefits(prev => [...prev, ""])}
-                    style={{ padding: "8px 14px", borderRadius: 8, border: `1.5px dashed ${tierConfig[editingTier].color}`, background: "transparent", color: tierConfig[editingTier].color, fontSize: 13, fontWeight: 600, cursor: "pointer", marginTop: 4 }}
+                    style={{ padding: "8px 14px", borderRadius: 8, border: "1.5px dashed #CDA751", background: "transparent", color: "#CDA751", fontSize: 13, fontWeight: 600, cursor: "pointer", marginTop: 4 }}
                   >
                     + Add Benefit
                   </button>
@@ -360,12 +331,12 @@ export default function Membership() {
             <div style={{ borderTop: "1px solid #f1f3f6", padding: "20px 0 0 0", display: "flex", gap: 12, marginTop: "auto" }}>
               <button
                 onClick={() => setEditingTier(null)}
-                style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #e2e8f0", background: "white", color: "#4a5568", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #CDA751", background: "white", color: "#CDA751", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
               >Cancel</button>
               <button
                 onClick={handleSaveTier}
                 disabled={tierSaving}
-                style={{ flex: 2, padding: 10, borderRadius: 8, border: "none", background: tierConfig[editingTier].color, color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+                style={{ flex: 2, padding: 10, borderRadius: 8, border: "none", background: "#CDA751", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
               >{tierSaving ? "Saving..." : "Save Changes"}</button>
             </div>
           </div>
@@ -393,7 +364,7 @@ export default function Membership() {
                 style={tierFilter === t && t !== "ALL" ? { background: tierConfig[t]?.color, borderColor: tierConfig[t]?.color, color: "white" } : {}}
                 onClick={() => setTierFilter(t)}
               >
-                {t === "ALL" ? "All Tiers" : tierConfig[t].icon + " " + tierConfig[t].label}
+                {t === "ALL" ? "All Tiers" : tierConfig[t].label}
               </button>
             ))}
           </div>
@@ -455,7 +426,6 @@ export default function Membership() {
                       style={newTier === key ? { borderColor: cfg.color, background: cfg.bg } : {}}
                       onClick={() => setNewTier(key)}
                     >
-                      <span>{cfg.icon}</span>
                       <span style={{ color: newTier === key ? cfg.color : "#4a5568", fontWeight: 600 }}>{cfg.label}</span>
                       <span style={{ fontSize: "11px", color: "#a0aec0" }}>₹{cfg.price.toLocaleString("en-IN")}/yr</span>
                     </div>
@@ -535,8 +505,8 @@ export default function Membership() {
                         </div>
                       </td>
                       <td>
-                        <span className="mem-tier-pill" style={{ background: cfg?.bg, color: cfg?.color, border: `1px solid ${cfg?.border}` }}>
-                          {cfg?.icon} {cfg?.label}
+                        <span className="mem-tier-pill" style={{ color: cfg?.color }}>
+                          {cfg?.label}
                         </span>
                       </td>
                       <td><span className="mem-sessions">{m.sessions}</span></td>
@@ -623,15 +593,14 @@ export default function Membership() {
                     key={key}
                     onClick={() => setEnrollForm(p => ({ ...p, tier: key }))}
                     style={{
-                      flex: 1, padding: "10px 8px", borderRadius: 10, textAlign: "center", cursor: "pointer",
+                      flex: 1, padding: "12px 8px", borderRadius: 10, textAlign: "center", cursor: "pointer",
                       border: `2px solid ${enrollForm.tier === key ? cfg.color : "#e2e8f0"}`,
                       background: enrollForm.tier === key ? cfg.bg : "white",
                       transition: "all 0.2s",
                     }}
                   >
-                    <div style={{ fontSize: 18 }}>{cfg.icon}</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: enrollForm.tier === key ? cfg.color : "#4a5568", marginTop: 2 }}>{cfg.label}</div>
-                    <div style={{ fontSize: 10, color: "#a0aec0", marginTop: 1 }}>₹{cfg.price.toLocaleString("en-IN")}/yr</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: enrollForm.tier === key ? cfg.color : "#4a5568" }}>{cfg.label}</div>
+                    <div style={{ fontSize: 10, color: "#a0aec0", marginTop: 2 }}>₹{cfg.price.toLocaleString("en-IN")}/yr</div>
                   </div>
                 ))}
               </div>
@@ -642,7 +611,7 @@ export default function Membership() {
             <div style={{ display: "flex", gap: 12 }}>
               <button
                 onClick={() => setShowEnrollModal(false)}
-                style={{ flex: 1, padding: 11, borderRadius: 10, border: "1.5px solid #e2e8f0", background: "white", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#4a5568" }}
+                style={{ flex: 1, padding: 11, borderRadius: 10, border: "1.5px solid #CDA751", background: "white", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#CDA751" }}
               >Cancel</button>
               <button
                 onClick={handleEnroll}

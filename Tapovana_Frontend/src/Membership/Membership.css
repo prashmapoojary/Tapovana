@@ -71,70 +71,93 @@
 /* Tier Overview Cards */
 .mem-tier-cards {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(3, minmax(220px, 280px));
+  gap: 16px;
   margin-bottom: 28px;
 }
 
-@media (max-width: 1200px) { .mem-tier-cards { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 600px) { .mem-tier-cards { grid-template-columns: 1fr; } }
+@media (max-width: 768px) {
+  .mem-tier-cards {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
 
 .mem-tier-card {
-  border-radius: 16px;
-  padding: 22px;
-  border: 1.5px solid;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #CDA751 !important;
+  background: white !important;
+  box-shadow: none;
   transition: all 0.25s ease;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
 
 .mem-tier-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.07);
+  border-color: #CDA751;
 }
 
 .mem-revenue-card {
-  background: rgba(45,55,72,0.05) !important;
-  border-color: rgba(45,55,72,0.2) !important;
+  background: white !important;
+  border-color: #CDA751 !important;
 }
 
 .mem-tier-card-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
-.mem-tier-icon { font-size: 22px; }
+.mem-tier-icon { font-size: 18px; }
 
 .mem-tier-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 20px;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  color: #718096 !important;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  border-radius: 0 !important;
 }
 
 .mem-tier-count {
-  font-size: 32px;
-  font-weight: 800;
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  color: #1a202c !important;
   line-height: 1;
-  margin: 4px 0;
+  margin: 4px 0 0 0 !important;
 }
 
 .mem-tier-label {
-  font-size: 12px;
+  font-size: 11px;
   color: #7b8a9a;
   font-weight: 500;
 }
 
 .mem-tier-price {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  color: #4a5568;
-  margin-top: 4px;
+  color: #718096;
+  margin-top: 2px;
+}
+
+.mem-tier-benefits-link {
+  margin-top: 6px;
+  border-top: 1px dashed rgba(205, 167, 81, 0.25);
+  padding-top: 4px;
+  color: #cda751;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.mem-tier-benefits-link:hover {
+  text-decoration: underline;
+  color: #b59243;
 }
 
 .mem-tier-benefits {
@@ -313,13 +336,14 @@
 .mem-email { font-size: 13px; color: #a0aec0; margin-top: 2px; }
 
 .mem-tier-pill {
-  padding: 6px 14px;
-  border-radius: 20px;
+  padding: 6px 0;
   font-size: 14px;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  background: transparent !important;
+  border: none !important;
 }
 
 .mem-sessions { font-weight: 700; color: #0F172A; }
@@ -329,16 +353,17 @@
 .mem-expiry-warn { font-size: 11px; color: #e67e22; font-weight: 600; }
 
 .mem-status-pill {
-  padding: 5px 12px;
-  border-radius: 20px;
+  padding: 5px 0;
   font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.4px;
+  background: transparent !important;
+  border: none !important;
 }
 
-.mem-status-pill.active { background: rgba(46,204,113,0.12); color: #27ae60; }
-.mem-status-pill.expired { background: rgba(231,76,60,0.1); color: #e74c3c; }
+.mem-status-pill.active { color: #27ae60; background: transparent !important; }
+.mem-status-pill.expired { color: #e74c3c; background: transparent !important; }
 
 /* Detail Panel — slide-out drawer below topbar, right of sidebar (matches Team page) */
 .mem-detail-overlay {
@@ -526,8 +551,9 @@
 .mem-upgrade-btn:disabled { opacity: 0.5; cursor: not-allowed; background: #a0aec0 !important; }
 
 .mem-success-msg {
-  background: rgba(46,204,113,0.12);
-  color: #27ae60;
+  background: rgba(205, 167, 81, 0.12);
+  color: #CDA751;
+  border: 1px solid rgba(205, 167, 81, 0.35);
   border-radius: 10px;
   padding: 12px;
   text-align: center;

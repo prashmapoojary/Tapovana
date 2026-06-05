@@ -45,6 +45,7 @@ function App() {
         <Routes>
 
           <Route path="/" element={<SignIn />} />
+          <Route path="/set-password" element={<SetPassword />} />
 
           <Route
             path="/dashboard"
@@ -56,7 +57,6 @@ function App() {
           >
             {/* Accessible to all logged-in roles */}
             <Route index element={<Home />} />
-            <Route path="set-password" element={<SetPassword />} />
             <Route path="blogs" element={<Blogs />} />
             <Route path="blogs/:id" element={<Blogs />} />
             <Route path="my-assignments" element={<MyAssignments />} />

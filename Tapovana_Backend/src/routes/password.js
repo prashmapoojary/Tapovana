@@ -1,15 +1,14 @@
 const router = require('express').Router();
 const { authenticate } = require('../middleware/auth');
 const {
-    setPasswordViaToken,
+    requestPasswordResetOtp,
+    verifyPasswordResetOtpAndSetPassword,
     changePassword,
-    validateResetToken,
 } = require('../controllers/passwordController');
 
-// Public routes — no login needed
-// Used when new member clicks the link in their invite email
-router.get('/validate-token', validateResetToken);
-router.post('/set', setPasswordViaToken);
+// Public routes for OTP-based password resets
+router.post('/forgot/request', requestPasswordResetOtp);
+router.post('/forgot/verify', verifyPasswordResetOtpAndSetPassword);
 
 // Protected route — must be logged in
 // Used from the dashboard set-password page

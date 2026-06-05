@@ -22,9 +22,9 @@ async function run() {
         WHEN undefined_object THEN NULL;
       END $$;
 
-      ALTER TABLE team_members ADD COLUMN IF NOT EXISTS profile_photo_source VARCHAR(20) DEFAULT 'default';
-      ALTER TABLE team_members ADD CONSTRAINT team_members_profile_photo_source_check 
-        CHECK (profile_photo_source IN ('local', 'upload', 'default'));
+      ALTER TABLE team_members ADD COLUMN IF NOT EXISTS profile_photo_source VARCHAR(50) DEFAULT 'default';
+      -- Check constraint dropped to allow any custom source string (e.g., google, avatar, local, upload, default)
+
 
       DO $$
       BEGIN

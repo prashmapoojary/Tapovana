@@ -43,77 +43,52 @@ const InfoIcon = () => (
   </svg>
 );
 
-// Prepopulated beautiful mock assignments for demonstration
-const FALLBACK_ASSIGNMENTS = [
-  {
-    id: "alloc-mock-1",
-    type: "workshop",
-    staffId: "user-doctor-1",
-    staffName: "Dr. Ananya Rao",
-    staffRole: "DOCTOR",
-    sessionTitle: "Advanced Chakra Balancing & Sound Resonance Therapy",
-    sessionId: "WS-001",
-    startDate: "2026-06-01",
-    endDate: "2026-06-05",
-    status: "active",
-    createdAt: "2026-05-28T09:00:00Z"
-  },
-  {
-    id: "alloc-mock-2",
-    type: "vedic_program",
-    staffId: "user-doctor-1",
-    staffName: "Dr. Ananya Rao",
-    staffRole: "DOCTOR",
-    sessionTitle: "Panchakarma Deep Cleansing & Rejuvenation Retreat",
-    sessionId: "VP-001",
-    startDate: "2026-06-12",
-    endDate: "2026-06-20",
-    status: "active",
-    createdAt: "2026-05-29T10:30:00Z"
-  },
-  {
-    id: "alloc-mock-3",
-    type: "service",
-    staffId: "user-therapist-1",
-    staffName: "Arjun Das",
-    staffRole: "THERAPIST",
-    sessionTitle: "Traditional Abhyanga Warm Herbal Oil Therapy",
-    sessionId: "SRV-003",
-    startDate: "2026-06-02",
-    endDate: "2026-06-02",
-    status: "active",
-    createdAt: "2026-05-30T14:15:00Z"
-  },
-  {
-    id: "alloc-mock-4",
-    type: "workshop",
-    staffId: "user-therapist-1",
-    staffName: "Arjun Das",
-    staffRole: "THERAPIST",
-    sessionTitle: "Vedic Pranayama and Breathing Mechanics Workshop",
-    sessionId: "WS-004",
-    startDate: "2026-05-20",
-    endDate: "2026-05-22",
-    status: "expired",
-    createdAt: "2026-05-18T08:00:00Z"
-  }
-];
-
 function MyAssignments() {
   const loggedInUser = useMemo(() => getUser(), []);
-  const { getStaffAllocations, allocations: contextAllocations, completeAllocation } = useAllocations();
-  
+  const { allocations: contextAllocations, completeAllocation, triggerAlert } = useAllocations();
+
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [staffList, setStaffList] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [completedMockIds, setCompletedMockIds] = useState(new Set());
-  const [validationError, setValidationError] = useState(null); // { id, message }
+  const [validationError, setValidationError] = useState(null);
+  const [backendAssignments, setBackendAssignments] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const isStaffUser = loggedInUser?.role === 'DOCTOR' || loggedInUser?.role === 'THERAPIST';
 
-  // Determine current active staff target ID
+  // ─── Fetch real assignments from backend API ───
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      try {
+        setLoading(true);
+        const data = await apiFetch('/api/services/my/assignments');
+        if (data.success && data.assignments) {
+          setBackendAssignments(data.assignments);
+        }
+      } catch (err) {
+        console.error("Failed to fetch assignments:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAssignments();
+  }, []);
+
+  // ─── Refresh assignments after marking complete ───
+  const refreshAssignments = async () => {
+    try {
+      const data = await apiFetch('/api/services/my/assignments');
+      if (data.success && data.assignments) {
+        setBackendAssignments(data.assignments);
+      }
+    } catch (err) {
+      console.error("Failed to refresh assignments:", err);
+    }
+  };
+
+  // Determine active staff ID
   const activeStaffId = useMemo(() => {
     if (isStaffUser) {
       return loggedInUser?.user_id || loggedInUser?.id || '';
@@ -121,7 +96,7 @@ function MyAssignments() {
     return selectedStaffId;
   }, [isStaffUser, loggedInUser, selectedStaffId]);
 
-  // Fetch doctors and therapists list if current user is Admin
+  // Fetch staff list for admin view
   useEffect(() => {
     if (!isStaffUser) {
       const fetchStaff = async () => {
@@ -142,51 +117,35 @@ function MyAssignments() {
     }
   }, [isStaffUser]);
 
-  // Combine context-based and mock allocations
+  // Merge backend + context allocations
   const activeAssignments = useMemo(() => {
-    // 1. Get allocations from the single source of truth context
-    const fromContext = contextAllocations.map(a => {
-      const endDate = new Date(a.endDate);
-      const now = new Date();
-      return {
+    const fromContext = contextAllocations
+      .filter(a => a.staffId === activeStaffId)
+      .map(a => ({
         ...a,
-        status: a.status === "expired" ? "expired" : (endDate < now ? "expired" : "active")
-      };
-    });
+        status: a.status === "expired" ? "expired" : "active"
+      }));
 
-    // 2. Map fallbacks to match correct doctor/therapist ID dynamically for presentation
-    const adjustedFallbacks = FALLBACK_ASSIGNMENTS.map(a => {
-      const isCompleted = completedMockIds.has(a.id);
-      const status = isCompleted ? "expired" : a.status;
-      if (isStaffUser) {
-        return {
-          ...a,
-          staffId: loggedInUser?.user_id || loggedInUser?.id || '',
-          staffName: `${loggedInUser?.first_name || ''} ${loggedInUser?.last_name || ''}`.trim(),
-          staffRole: loggedInUser?.role || 'DOCTOR',
-          status
-        };
-      } else {
-        // Map to whichever staff admin is currently viewing
-        const currentStaffObj = staffList.find(s => s.user_id === activeStaffId || s.id === activeStaffId);
-        return {
-          ...a,
-          staffId: activeStaffId,
-          staffName: currentStaffObj ? `${currentStaffObj.first_name || ''} ${currentStaffObj.last_name || ''}`.trim() : a.staffName,
-          staffRole: currentStaffObj ? currentStaffObj.role : a.staffRole,
-          status
-        };
+    const fromBackend = backendAssignments
+      .filter(a => a.staffId === activeStaffId)
+      .map(a => ({
+        ...a,
+        status: a.status === "expired" ? "expired" : "active"
+      }));
+
+    // Merge: deduplicate by sessionId
+    const merged = [...fromContext];
+    for (const b of fromBackend) {
+      const exists = merged.find(m => m.sessionId === b.sessionId);
+      if (!exists) {
+        merged.push(b);
       }
-    });
+    }
 
-    // Merge both, prioritize context
-    const merged = [...fromContext, ...adjustedFallbacks];
+    return merged;
+  }, [contextAllocations, backendAssignments, activeStaffId]);
 
-    // Filter to only match the currently inspected staffId
-    return merged.filter(a => a.staffId === activeStaffId);
-  }, [contextAllocations, activeStaffId, isStaffUser, loggedInUser, staffList, completedMockIds]);
-
-  // Stats calculation
+  // Stats
   const stats = useMemo(() => {
     const total = activeAssignments.length;
     const active = activeAssignments.filter(a => a.status === 'active').length;
@@ -194,49 +153,53 @@ function MyAssignments() {
     return { total, active, expired };
   }, [activeAssignments]);
 
-  // Final filtered list for display
+  // Filtered assignments
   const filteredAssignments = useMemo(() => {
     return activeAssignments.filter(a => {
-      // Type Match
       const matchesType = filterType === 'all' || a.type === filterType;
-      
-      // Status Match
       const matchesStatus = filterStatus === 'all' || a.status === filterStatus;
-
-      // Search Query Match (Title or Session ID)
-      const matchesQuery = !searchQuery || 
+      const matchesQuery = !searchQuery ||
         a.sessionTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (a.sessionId || '').toLowerCase().includes(searchQuery.toLowerCase());
-
       return matchesType && matchesStatus && matchesQuery;
     });
   }, [activeAssignments, filterType, filterStatus, searchQuery]);
 
-  const handleMarkAsComplete = (id, endDate) => {
-    // Validate: can only mark done AFTER the end date has passed
+  // ─── Handle Mark as Done ───
+  const handleMarkAsComplete = async (id, sessionId, endDate, type) => {
+    // Validate date
     const now = new Date();
-    const end = new Date(endDate);
-    // If endDate is a date-only string (YYYY-MM-DD), treat as end of that day
+    const end = endDate ? new Date(endDate) : now;
     if (endDate && endDate.length <= 10) {
       end.setHours(23, 59, 59, 999);
     }
     if (end > now) {
       const formattedEnd = end.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
       setValidationError({ id, message: `You can mark this session as done only after the end date (${formattedEnd}).` });
-      // Auto-dismiss after 5 seconds
       setTimeout(() => setValidationError(null), 5000);
       return;
     }
 
     setValidationError(null);
-    if (id.startsWith('alloc-mock')) {
-      setCompletedMockIds(prev => {
-        const next = new Set(prev);
-        next.add(id);
-        return next;
-      });
-    } else {
+
+    try {
+      if (type === 'service' && sessionId) {
+        // Call backend API to remove staff from service
+        await apiFetch(`/api/services/${sessionId}/complete`, {
+          method: 'PATCH',
+          body: JSON.stringify({ staff_id: activeStaffId })
+        });
+      }
+
+      // Also update context
       completeAllocation(id);
+
+      // Refresh from backend
+      await refreshAssignments();
+
+      await triggerAlert("Session marked as Done! You are now Available.", true);
+    } catch (err) {
+      await triggerAlert("Error completing assignment: " + err.message);
     }
   };
 
@@ -260,23 +223,22 @@ function MyAssignments() {
 
   return (
     <div className="my-assignments-container">
-      
-      {/* Header section */}
+
+      {/* Header */}
       <div className="ma-header">
         <div className="ma-header-title">
           <h1>{isStaffUser ? "My Allocations & Schedule" : "Staff Schedule & Assignments"}</h1>
           <p>
-            {isStaffUser 
-              ? `Real-time active session assignments and workshop scheduler for ${currentViewingName}.` 
-              : "Review and inspect clinical and session assignments across all wellness doctors and therapists."}
+            {isStaffUser
+              ? `Real-time session assignments for ${currentViewingName}.`
+              : "Review assignments across all wellness doctors and therapists."}
           </p>
         </div>
 
-        {/* Admin staff switcher */}
         {!isStaffUser && staffList.length > 0 && (
           <div className="ma-staff-selector">
             <label htmlFor="staff-select">Viewing Schedule For:</label>
-            <select 
+            <select
               id="staff-select"
               className="ma-select"
               value={selectedStaffId}
@@ -292,7 +254,7 @@ function MyAssignments() {
         )}
       </div>
 
-      {/* Dynamic In-App Notifications Banner */}
+      {/* Notification banner */}
       {isStaffUser && stats.active > 0 && (
         <div style={{
           background: "linear-gradient(135deg, rgba(205,167,81,0.1) 0%, rgba(205,167,81,0.15) 100%)",
@@ -302,81 +264,62 @@ function MyAssignments() {
           marginBottom: "24px",
           display: "flex",
           alignItems: "center",
-          gap: "16px",
-          boxShadow: "0 2px 8px rgba(205,167,81,0.05)"
+          gap: "16px"
         }}>
           <span style={{ fontSize: "24px" }}>🔔</span>
           <div>
             <div style={{ fontWeight: 700, color: "#1a202c", fontSize: "14px", marginBottom: "2px" }}>In-App Notifications</div>
             <div style={{ fontSize: "13px", color: "#4a5568" }}>
-              You have <strong>{stats.active}</strong> active/upcoming session allocations waiting for participation. Mark them as completed when done!
+              You have <strong>{stats.active}</strong> active session(s). Mark them as completed when done!
             </div>
           </div>
         </div>
       )}
 
-      {/* Stats counter panel */}
+      {/* Stats */}
       <div className="ma-stats-grid">
         <div className="ma-stat-card">
-          <div className="ma-stat-icon total">
-            <TagIcon />
-          </div>
+          <div className="ma-stat-icon total"><TagIcon /></div>
           <div className="ma-stat-details">
             <span className="ma-stat-value">{stats.total}</span>
             <span className="ma-stat-label">Total Assigned Sessions</span>
           </div>
         </div>
-
         <div className="ma-stat-card">
-          <div className="ma-stat-icon active">
-            <CalendarIcon />
-          </div>
+          <div className="ma-stat-icon active"><CalendarIcon /></div>
           <div className="ma-stat-details">
             <span className="ma-stat-value">{stats.active}</span>
-            <span className="ma-stat-label">Active / Upcoming Allocations</span>
+            <span className="ma-stat-label">Active / Upcoming</span>
           </div>
         </div>
-
         <div className="ma-stat-card">
-          <div className="ma-stat-icon expired">
-            <UserIcon />
-          </div>
+          <div className="ma-stat-icon expired"><UserIcon /></div>
           <div className="ma-stat-details">
             <span className="ma-stat-value">{stats.expired}</span>
-            <span className="ma-stat-label">Completed Sessions</span>
+            <span className="ma-stat-label">Completed</span>
           </div>
         </div>
       </div>
 
-      {/* Filter and search panel */}
+      {/* Filters */}
       <div className="ma-controls">
         <div className="ma-search-wrapper">
           <SearchIcon />
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Search by session title or ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-
         <div className="ma-filter-group">
-          <select 
-            className="ma-filter-select"
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-          >
-            <option value="all">All Allocation Types</option>
+          <select className="ma-filter-select" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+            <option value="all">All Types</option>
+            <option value="service">Services</option>
             <option value="workshop">Workshops</option>
             <option value="vedic_program">Vedic Programs</option>
-            <option value="service">Services</option>
           </select>
-
-          <select 
-            className="ma-filter-select"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          >
+          <select className="ma-filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
             <option value="all">All Statuses</option>
             <option value="active">Active & Upcoming</option>
             <option value="expired">Completed</option>
@@ -384,16 +327,14 @@ function MyAssignments() {
         </div>
       </div>
 
-      {/* Grid of assignments */}
-      {filteredAssignments.length === 0 ? (
+      {/* Loading */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: '#64748B' }}>Loading assignments...</div>
+      ) : filteredAssignments.length === 0 ? (
         <div className="ma-empty-state">
-          <div className="ma-empty-icon">
-            <InfoIcon />
-          </div>
+          <div className="ma-empty-icon"><InfoIcon /></div>
           <h3>No Assignments Found</h3>
-          <p>
-            There are currently no active or completed assignments matching your selected filter criteria for this specialist.
-          </p>
+          <p>There are currently no active or completed assignments for this staff member.</p>
         </div>
       ) : (
         <div className="ma-grid">
@@ -410,79 +351,52 @@ function MyAssignments() {
 
               <div className="ma-card-body">
                 <h3 className="ma-session-title">{a.sessionTitle}</h3>
-
                 <div className="ma-details-list">
                   <div className="ma-detail-item">
                     <CalendarIcon />
                     <span className="ma-detail-label">Timeline:</span>
                     <span className="ma-detail-value">
-                      {getFormatDate(a.startDate)} {a.endDate && a.endDate !== a.startDate ? ` - ${getFormatDate(a.endDate)}` : ''}
+                      {getFormatDate(a.startDate)}{a.endDate && a.endDate !== a.startDate ? ` - ${getFormatDate(a.endDate)}` : ''}
                     </span>
                   </div>
-
                   <div className="ma-detail-item">
                     <UserIcon />
-                    <span className="ma-detail-label">Staff Specialist:</span>
+                    <span className="ma-detail-label">Staff:</span>
                     <span className="ma-detail-value">{a.staffName} ({a.staffRole})</span>
                   </div>
-
                   <div className="ma-detail-item">
                     <TagIcon />
-                    <span className="ma-detail-label">Session Code:</span>
+                    <span className="ma-detail-label">Code:</span>
                     <span className="ma-detail-value">{a.sessionId || a.id}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Validation error for this specific card */}
               {validationError?.id === a.id && (
                 <div style={{
-                  background: "rgba(231,76,60,0.08)",
-                  border: "1px solid rgba(231,76,60,0.3)",
-                  borderRadius: "6px",
-                  padding: "10px 14px",
-                  margin: "0 0 8px",
-                  fontSize: "12px",
-                  color: "#c0392b",
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: "8px",
-                  lineHeight: "1.5"
+                  background: "rgba(231,76,60,0.08)", border: "1px solid rgba(231,76,60,0.3)",
+                  borderRadius: "6px", padding: "10px 14px", margin: "0 0 8px",
+                  fontSize: "12px", color: "#c0392b", display: "flex", gap: "8px"
                 }}>
-                  <span style={{ fontSize: "16px", flexShrink: 0 }}>⏳</span>
-                  <span>{validationError.message}</span>
+                  <span></span><span>{validationError.message}</span>
                 </div>
               )}
+
               <div className="ma-card-footer">
-                <span className="ma-assigned-date">
-                  Assigned on: {getFormatDate(a.createdAt)}
-                </span>
-                {a.status === 'active' && (() => {
-                  const now = new Date();
-                  const end = new Date(a.endDate);
-                  if (a.endDate && a.endDate.length <= 10) end.setHours(23, 59, 59, 999);
-                  const isPastEndDate = end <= now;
-                  return (
-                    <button
-                      className={`ma-action-btn${isPastEndDate ? '' : ' disabled-btn'}`}
-                      onClick={() => handleMarkAsComplete(a.id, a.endDate)}
-                      title={isPastEndDate ? 'Mark this session as complete' : `Available after ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`}
-                      style={!isPastEndDate ? {
-                        background: "#a0aec0",
-                        cursor: "not-allowed",
-                        opacity: 0.65,
-                      } : {}}
-                    >
-                      {isPastEndDate ? 'Mark as Done' : '⏳ Mark as Done'}
-                    </button>
-                  );
-                })()}
+                <span className="ma-assigned-date">Assigned: {getFormatDate(a.createdAt)}</span>
+                {a.status === 'active' && (
+                  <button
+                    className="ma-action-btn"
+                    onClick={() => handleMarkAsComplete(a.id, a.sessionId, a.endDate, a.type)}
+                  >
+                    Mark as Done
+                  </button>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
-
     </div>
   );
 }

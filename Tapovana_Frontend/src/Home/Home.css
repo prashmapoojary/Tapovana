@@ -169,91 +169,73 @@
 .stat-card {
   position: relative;
   background: white;
-  border: 1px solid #eceff3;
-  border-radius: 14px;
-  padding: 18px 20px;
+  border: 1px solid #CDA751;
+  border-radius: 8px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.015);
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  min-height: 110px;
+  justify-content: center;
+  min-height: auto;
 }
 
 .stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 30px rgba(24, 138, 148, 0.06);
-  border-color: rgba(24, 138, 148, 0.25);
+  border-color: #CDA751;
 }
 
-/* Stat card radial glow background effects */
+/* Stat card radial glow background effects - disabled to match Vedic Program stats style */
 .stat-card::after {
-  content: '';
-  position: absolute;
-  top: -50px;
-  right: -50px;
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  filter: blur(40px);
-  opacity: 0.15;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
+  display: none !important;
 }
 
-.stat-card.bookings::after { background: #188A94; }
+.stat-card.bookings::after { background: #cda751; }
 .stat-card.revenue::after { background: #cda751; }
-.stat-card.customers::after { background: #2ecc71; }
-.stat-card.pending::after { background: #e67e22; }
+.stat-card.customers::after { background: #cda751; }
+.stat-card.pending::after { background: #cda751; }
 
 .stat-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 4px;
 }
 
 .stat-card-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: #7b8a9a;
+  font-size: 12px;
+  color: #718096;
+  margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  font-weight: 600;
 }
 
+/* Hide icons to match Vedic Program stats card style */
 .stat-card-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
+  display: none !important;
 }
 
-.stat-card.bookings .stat-card-icon { background: rgba(24, 138, 148, 0.1); color: #188A94; }
+.stat-card.bookings .stat-card-icon { background: rgba(205, 167, 81, 0.1); color: #cda751; }
 .stat-card.revenue .stat-card-icon { background: rgba(205, 167, 81, 0.1); color: #cda751; }
-.stat-card.customers .stat-card-icon { background: rgba(46, 204, 113, 0.1); color: #2ecc71; }
-.stat-card.pending .stat-card-icon { background: rgba(230, 126, 34, 0.1); color: #e67e22; }
+.stat-card.customers .stat-card-icon { background: rgba(205, 167, 81, 0.1); color: #cda751; }
+.stat-card.pending .stat-card-icon { background: rgba(205, 167, 81, 0.1); color: #cda751; }
 
 .stat-card-value {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 700;
-  color: #2d3748;
-  margin-bottom: 6px;
+  color: #1a202c !important;
+  margin: 0 0 4px 0;
 }
 
 .stat-card-trend {
-  font-size: 13px;
+  font-size: 12px;
   display: flex;
   align-items: center;
   gap: 4px;
   font-weight: 500;
+  color: #718096 !important;
 }
 
-.trend-up { color: #2ecc71; }
-.trend-down { color: #e74c3c; }
+.trend-up { color: #718096 !important; }
+.trend-down { color: #718096 !important; }
 
 /* Charts Layout Grid */
 .charts-grid {
@@ -329,7 +311,7 @@
 
 .chart-line-path {
   fill: none;
-  stroke: #188A94;
+  stroke: #cda751;
   stroke-width: 3px;
   stroke-linecap: round;
   transition: all 0.3s ease;
@@ -354,7 +336,7 @@
 
 .chart-node-circle {
   fill: white;
-  stroke: #188A94;
+  stroke: #cda751;
   stroke-width: 2.5px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -363,13 +345,13 @@
 .chart-node-circle:hover,
 .chart-node-circle.active {
   r: 6.5;
-  fill: #188A94;
+  fill: #cda751;
   stroke: white;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .chart-vertical-guideline {
-  stroke: rgba(24, 138, 148, 0.25);
+  stroke: rgba(205, 167, 81, 0.25);
   stroke-dasharray: 4,4;
   stroke-width: 1px;
 }
@@ -477,7 +459,7 @@
 
 .demand-progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #188A94 0%, #3bc0c5 100%);
+  background: linear-gradient(90deg, #cda751 0%, #b59243 100%);
   border-radius: 3px;
   transition: width 0.8s ease-out;
 }
@@ -492,7 +474,7 @@
 .demand-count {
   font-size: 14px;
   font-weight: 700;
-  color: #188A94;
+  color: #cda751;
 }
 
 .demand-label {

@@ -44,9 +44,10 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
             borderRadius: "20px",
             fontSize: "11px",
             fontWeight: 700,
-            color: "white",
-            background: isPublished ? "#a4c1b0ff" : isPending ? "#3498db" : isDraft ? "#f1c40f" : "#e74c3c",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            color: isPublished || isPending ? "#cda751" : isDraft ? "#d4ac0d" : "#c0392b",
+            background: isPublished || isPending ? "rgba(205, 167, 81, 0.15)" : isDraft ? "rgba(241, 196, 15, 0.15)" : "rgba(231, 76, 60, 0.15)",
+            border: isPublished || isPending ? "1px solid rgba(205, 167, 81, 0.3)" : isDraft ? "1px solid rgba(241, 196, 15, 0.3)" : "1px solid rgba(231, 76, 60, 0.3)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
             textTransform: "uppercase",
             letterSpacing: "0.5px"
           }}>
@@ -102,22 +103,22 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
                 <button
                   onClick={() => onEdit(blog)}
                   style={{
-                    flex: 1, padding: "6px 12px", background: "#edf2f7", border: "none", borderRadius: "4px",
-                    color: "#a0a1a4ff", fontSize: "11px", fontWeight: 700, cursor: "pointer"
+                    flex: 1, padding: "6px 12px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
+                    color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
                   }}
                 >
-                  ✏️ Edit Draft
+                  Edit Draft
                 </button>
               )}
               {(isDraft || isPending || isRemoved) && (
                 <button
                   onClick={() => onDelete(blog.id)}
                   style={{
-                    padding: "6px 10px", background: "rgba(231,76,60,0.1)", border: "1px solid #fca5a5", borderRadius: "4px",
-                    color: "#e8857aff", fontSize: "11px", fontWeight: 700, cursor: "pointer"
+                    padding: "6px 10px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
+                    color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
                   }}
                 >
-                  🗑️ Delete
+                  Delete
                 </button>
               )}
             </div>
@@ -131,29 +132,29 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
                   <button
                     onClick={() => onApprove(blog.id)}
                     style={{
-                      flex: 2, padding: "8px 12px", background: "#9de1baff", border: "none", borderRadius: "4px",
+                      flex: 2, padding: "8px 12px", background: "#cda751", border: "none", borderRadius: "4px",
                       color: "white", fontSize: "11px", fontWeight: 700, cursor: "pointer"
                     }}
                   >
-                    ✓ Approve &amp; Publish
+                    Approve &amp; Publish
                   </button>
                   <button
                     onClick={() => onEdit(blog)}
                     style={{
-                      flex: 1, padding: "8px 12px", background: "#edf2f7", border: "none", borderRadius: "4px",
-                      color: "#aec2e4ff", fontSize: "11px", fontWeight: 700, cursor: "pointer"
+                      flex: 1, padding: "8px 12px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
+                      color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
                     }}
                   >
-                    ✏️ Edit
+                    Edit
                   </button>
                   <button
                     onClick={() => onReject(blog.id)}
                     style={{
-                      padding: "8px 10px", background: "#e8b3adff", border: "none", borderRadius: "4px",
-                      color: "white", fontSize: "11px", fontWeight: 700, cursor: "pointer"
+                      padding: "8px 10px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
+                      color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
                     }}
                   >
-                    ✕ Reject
+                    Reject
                   </button>
                 </div>
               )}
@@ -162,29 +163,29 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
                   <button
                     onClick={() => onEdit(blog)}
                     style={{
-                      flex: 1, padding: "8px 12px", background: "#edf2f7", border: "none", borderRadius: "4px",
-                      color: "#4a5568", fontSize: "11px", fontWeight: 700, cursor: "pointer"
+                      flex: 1, padding: "8px 12px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
+                      color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
                     }}
                   >
-                    ✏️ Edit
+                    Edit
                   </button>
                   <button
                     onClick={() => onReject(blog.id)}
                     style={{
-                      flex: 2, padding: "8px 12px", background: "transparent", border: "1px solid #fca5a5",
-                      borderRadius: "4px", color: "#b48b86ff", fontSize: "11px", fontWeight: 700, cursor: "pointer"
+                      flex: 2, padding: "8px 12px", background: "white", border: "1px solid #cda751",
+                      borderRadius: "4px", color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
                     }}
                   >
-                    ⚠️ Remove / Reject
+                    Remove / Reject
                   </button>
                   <button
                     onClick={() => onDelete(blog.id)}
                     style={{
-                      padding: "8px 10px", background: "rgba(231,76,60,0.1)", border: "1px solid #fca5a5", borderRadius: "4px",
-                      color: "#ba827cff", fontSize: "11px", fontWeight: 700, cursor: "pointer"
+                      padding: "8px 10px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
+                      color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
                     }}
                   >
-                    🗑️ Delete
+                    Delete
                   </button>
                 </div>
               )}
@@ -193,29 +194,29 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
                   <button
                     onClick={() => onApprove(blog.id)}
                     style={{
-                      flex: 2, padding: "8px 12px", background: "#7ca88eff", border: "none", borderRadius: "4px",
+                      flex: 2, padding: "8px 12px", background: "#cda751", border: "none", borderRadius: "4px",
                       color: "white", fontSize: "11px", fontWeight: 700, cursor: "pointer"
                     }}
                   >
-                    ✓ Publish / Restore
+                    Publish / Restore
                   </button>
                   <button
                     onClick={() => onEdit(blog)}
                     style={{
-                      flex: 1, padding: "8px 12px", background: "#edf2f7", border: "none", borderRadius: "4px",
-                      color: "#4a5568", fontSize: "11px", fontWeight: 700, cursor: "pointer"
+                      flex: 1, padding: "8px 12px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
+                      color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
                     }}
                   >
-                    ✏️ Edit
+                    Edit
                   </button>
                   <button
                     onClick={() => onDelete(blog.id)}
                     style={{
-                      padding: "8px 10px", background: "rgba(231,76,60,0.1)", border: "1px solid #fca5a5", borderRadius: "4px",
-                      color: "#c8867fff", fontSize: "11px", fontWeight: 700, cursor: "pointer"
+                      padding: "8px 10px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
+                      color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
                     }}
                   >
-                    🗑️ Delete
+                    Delete
                   </button>
                 </div>
               )}
@@ -236,7 +237,7 @@ function RelatedBlogs({ currentBlogId, blogs, onClick }) {
 
   return (
     <div className="blog-related">
-      <h3 className="blog-related-title">🌿 Recommended Readings</h3>
+      <h3 className="blog-related-title">Recommended Readings</h3>
       <div className="blog-related-grid">
         {related.map((blog) => (
           <div
@@ -346,7 +347,7 @@ function CreateOrEditBlogModal({ blogToEdit, staffProfile, onClose, onSave }) {
       <div className="vedic-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "700px" }}>
         <div className="vedic-modal-header">
           <h2 className="vedic-modal-title">
-            {blogToEdit ? "✏️ Edit Blog Article" : "✍️ Create New Blog Article"}
+            {blogToEdit ? "Edit Blog Article" : "Create New Blog Article"}
           </h2>
           <button className="vedic-modal-close" onClick={onClose}>✕</button>
         </div>
@@ -361,7 +362,7 @@ function CreateOrEditBlogModal({ blogToEdit, staffProfile, onClose, onSave }) {
               value={formData.title}
               onChange={handleChange}
               placeholder="e.g., The Sacred Rhythms of Ayurvedic Dinacharya"
-              style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e0", borderRadius: "6px", fontSize: "14px", marginTop: "4px" }}
+              className="vedic-form-input"
             />
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: (formData.title.length < 10 || formData.title.length > 100) ? "#e74c3c" : "#2ecc71", marginTop: "2px" }}>
               <span>Required length: 10 - 100 characters</span>
@@ -376,7 +377,7 @@ function CreateOrEditBlogModal({ blogToEdit, staffProfile, onClose, onSave }) {
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
-                style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e0", borderRadius: "6px", fontSize: "14px", marginTop: "4px" }}
+                className="vedic-form-select"
               >
                 <option value="AYURVEDA">Ayurveda</option>
                 <option value="YOGA">Yoga</option>
@@ -391,14 +392,15 @@ function CreateOrEditBlogModal({ blogToEdit, staffProfile, onClose, onSave }) {
                 type="file"
                 accept="image/*"
                 onChange={handleImageChange}
-                style={{ width: "100%", padding: "6px", fontSize: "13px", marginTop: "4px" }}
+                className="vedic-form-file-input"
+                style={{ marginTop: "4px" }}
               />
             </div>
           </div>
 
           {coverImage && (
             <div style={{ marginTop: "4px", textAlign: "center" }}>
-              <img src={coverImage} alt="Cover Preview" style={{ width: "100%", maxHeight: "180px", objectFit: "cover", borderRadius: "6px", border: "1px solid #cbd5e0" }} />
+              <img src={coverImage} alt="Cover Preview" style={{ width: "100%", maxHeight: "180px", objectFit: "cover", borderRadius: "6px", border: "1px solid rgba(205, 167, 81, 0.2)" }} />
             </div>
           )}
 
@@ -411,7 +413,7 @@ function CreateOrEditBlogModal({ blogToEdit, staffProfile, onClose, onSave }) {
               onChange={handleChange}
               placeholder="Provide a brief, catchy 1-2 sentence hook..."
               maxLength={200}
-              style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e0", borderRadius: "6px", fontSize: "14px", marginTop: "4px" }}
+              className="vedic-form-input"
             />
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: (formData.summary.length < 50 || formData.summary.length > 200) ? "#e74c3c" : "#2ecc71", marginTop: "2px" }}>
               <span>Required length: 50 - 200 characters</span>
@@ -427,7 +429,7 @@ function CreateOrEditBlogModal({ blogToEdit, staffProfile, onClose, onSave }) {
               onChange={handleChange}
               placeholder="Write your comprehensive wellness insights here. You can use standard HTML like <p>, <h2>, <ul> to format..."
               rows="8"
-              style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e0", borderRadius: "6px", fontSize: "14px", marginTop: "4px", resize: "vertical", fontFamily: "inherit" }}
+              className="vedic-form-textarea"
             />
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: (formData.body.length < 100) ? "#e74c3c" : "#2ecc71", marginTop: "2px" }}>
               <span>Required length: minimum 100 characters</span>
@@ -437,7 +439,7 @@ function CreateOrEditBlogModal({ blogToEdit, staffProfile, onClose, onSave }) {
 
         </div>
 
-        <div className="vedic-modal-footer" style={{ borderTop: "1px solid #cbd5e0", paddingTop: "12px", display: "flex", justifyContent: "space-between", gap: "12px" }}>
+        <div className="vedic-modal-footer" style={{ borderTop: "1px solid #E8E2D9", paddingTop: "12px", display: "flex", justifyContent: "space-between", gap: "12px" }}>
           <button type="button" className="vedic-btn-cancel" onClick={onClose} style={{ marginRight: "auto" }}>
             Cancel
           </button>
@@ -451,17 +453,14 @@ function CreateOrEditBlogModal({ blogToEdit, staffProfile, onClose, onSave }) {
                 fontWeight: 600, cursor: "pointer", fontSize: "13px"
               }}
             >
-              💾 Save as Draft
+              Save as Draft
             </button>
             <button
               type="button"
+              className="vedic-btn-allocate"
               onClick={() => handleAction("pending")}
-              style={{
-                padding: "10px 18px", background: "#cda751", color: "white", border: "none", borderRadius: "6px",
-                fontWeight: 600, cursor: "pointer", fontSize: "13px"
-              }}
             >
-              🚀 Submit for Review
+              Submit for Review
             </button>
           </div>
         </div>
@@ -524,7 +523,7 @@ function AdminEditBlogModal({ blogToEdit, onClose, onSave }) {
     <div className="vedic-modal-overlay" onClick={onClose}>
       <div className="vedic-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "700px" }}>
         <div className="vedic-modal-header">
-          <h2 className="vedic-modal-title">✏️ Admin formatting &amp; Corrections</h2>
+          <h2 className="vedic-modal-title">Admin formatting &amp; Corrections</h2>
           <button className="vedic-modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -537,7 +536,7 @@ function AdminEditBlogModal({ blogToEdit, onClose, onSave }) {
               name="title"
               value={formData.title}
               onChange={handleChange}
-              style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e0", borderRadius: "6px", fontSize: "14px", marginTop: "4px" }}
+              className="vedic-form-input"
             />
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: (formData.title.length < 10 || formData.title.length > 100) ? "#e74c3c" : "#2ecc71", marginTop: "2px" }}>
               <span>Required length: 10 - 100 characters</span>
@@ -551,7 +550,7 @@ function AdminEditBlogModal({ blogToEdit, onClose, onSave }) {
               name="category"
               value={formData.category}
               onChange={handleChange}
-              style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e0", borderRadius: "6px", fontSize: "14px", marginTop: "4px" }}
+              className="vedic-form-select"
             >
               <option value="AYURVEDA">Ayurveda</option>
               <option value="YOGA">Yoga</option>
@@ -567,7 +566,7 @@ function AdminEditBlogModal({ blogToEdit, onClose, onSave }) {
               name="summary"
               value={formData.summary}
               onChange={handleChange}
-              style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e0", borderRadius: "6px", fontSize: "14px", marginTop: "4px" }}
+              className="vedic-form-input"
             />
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: (formData.summary.length < 50 || formData.summary.length > 200) ? "#e74c3c" : "#2ecc71", marginTop: "2px" }}>
               <span>Required length: 50 - 200 characters</span>
@@ -582,7 +581,7 @@ function AdminEditBlogModal({ blogToEdit, onClose, onSave }) {
               value={formData.body}
               onChange={handleChange}
               rows="8"
-              style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e0", borderRadius: "6px", fontSize: "14px", marginTop: "4px", resize: "vertical", fontFamily: "inherit" }}
+              className="vedic-form-textarea"
             />
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: (formData.body.length < 100) ? "#e74c3c" : "#2ecc71", marginTop: "2px" }}>
               <span>Required length: minimum 100 characters</span>
@@ -592,19 +591,16 @@ function AdminEditBlogModal({ blogToEdit, onClose, onSave }) {
 
         </div>
 
-        <div className="vedic-modal-footer">
+        <div className="vedic-modal-footer" style={{ borderTop: "1px solid #E8E2D9" }}>
           <button type="button" className="vedic-btn-cancel" onClick={onClose}>
             Cancel
           </button>
           <button
             type="button"
+            className="vedic-btn-allocate"
             onClick={handleSave}
-            style={{
-              padding: "10px 18px", background: "#cda751", color: "white", border: "none", borderRadius: "6px",
-              fontWeight: 600, cursor: "pointer", fontSize: "13px"
-            }}
           >
-            ✓ Save Corrections
+            Save Corrections
           </button>
         </div>
       </div>
@@ -684,7 +680,7 @@ export default function Blogs() {
         : b
     );
     persistBlogs(updated);
-    showToastMsg("Blog post approved and published successfully! 🚀");
+    showToastMsg("Blog post approved and published successfully!");
   };
 
   const handleReject = (blogId) => {
@@ -698,14 +694,14 @@ export default function Blogs() {
       b.id === blogId ? { ...b, status: "removed" } : b
     );
     persistBlogs(updated);
-    showToastMsg("Article rejected and set to Removed. ❌");
+    showToastMsg("Article rejected and set to Removed.");
   };
 
   const handleDelete = (blogId) => {
     if (!window.confirm("Are you sure you want to permanently delete this article?")) return;
     const updated = blogs.filter((b) => b.id !== blogId);
     persistBlogs(updated);
-    showToastMsg("Article permanently deleted. 🗑️");
+    showToastMsg("Article permanently deleted.");
   };
 
   const handleSaveBlog = (savedBlog) => {
@@ -729,7 +725,7 @@ export default function Blogs() {
   const handleAdminCorrection = (correctedBlog) => {
     const updated = blogs.map((b) => (b.id === correctedBlog.id ? correctedBlog : b));
     persistBlogs(updated);
-    showToastMsg("Formatted corrections saved! ✓");
+    showToastMsg("Formatted corrections saved!");
   };
 
   // Filter & Display Logic
@@ -797,7 +793,7 @@ export default function Blogs() {
             ← Back to Blogs
           </div>
           <div className="blog-empty">
-            <div className="blog-empty-icon">⚠️</div>
+            <div className="blog-empty-icon"></div>
             <p className="blog-empty-text">Article Not Found</p>
             <p className="blog-empty-subtext">The article you are looking for does not exist, has been removed, or requires approval.</p>
           </div>
@@ -882,12 +878,11 @@ export default function Blogs() {
           position: "fixed",
           bottom: "24px",
           right: "24px",
-          background: "#2d3748",
-          color: "#CDA751",
-          border: "1.5px solid #CDA751",
+          background: "#cda751",
+          color: "white",
           padding: "16px 24px",
           borderRadius: "8px",
-          boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
           zIndex: 999999,
           fontWeight: 600,
           fontSize: "14px",
@@ -895,21 +890,21 @@ export default function Blogs() {
           alignItems: "center",
           gap: "8px"
         }}>
-          ✨ {toast}
+          {toast}
         </div>
       )}
 
       {/* Header */}
       <div className="blog-header" style={{ alignItems: "center" }}>
         <div className="blog-title">
-          <h1>🌿 Vedic &amp; Ayurvedic Blogs</h1>
+          <h1>Vedic &amp; Ayurvedic Blogs</h1>
           <p>Read about authentic Ayurveda, Yoga routines, dietary habits, and healthy lifestyles</p>
         </div>
 
         {/* Create Blog Button shown only to Doctors/Therapists on their My Blogs tab */}
         {isStaff && activeTab === "my_blogs" && (
           <button className="blog-add-btn" onClick={() => { setSelectedBlog(null); setShowCreateModal(true); }}>
-            <span>✍️ Create Blog</span>
+            <span>Create Blog</span>
           </button>
         )}
       </div>
@@ -931,7 +926,7 @@ export default function Blogs() {
                   marginBottom: "-2px", transition: "all 0.2s"
                 }}
               >
-                ✍️ My Blogs
+                My Blogs
               </button>
               <button
                 onClick={() => setActiveTab("published")}
@@ -943,7 +938,7 @@ export default function Blogs() {
                   marginBottom: "-2px", transition: "all 0.2s"
                 }}
               >
-                👥 Other Blogs
+                Other Blogs
               </button>
             </>
           )}
@@ -961,24 +956,24 @@ export default function Blogs() {
                   marginBottom: "-2px", transition: "all 0.2s"
                 }}
               >
-                🌐 Published Articles
+                 Published Articles
               </button>
               <button
                 onClick={() => setActiveTab("pending")}
                 style={{
                   padding: "12px 8px", border: "none", background: "none",
                   fontFamily: "Manrope, sans-serif", fontSize: "14px", fontWeight: 700, cursor: "pointer",
-                  color: activeTab === "pending" ? "#3498db" : "#718096",
-                  borderBottom: activeTab === "pending" ? "3px solid #3498db" : "3px solid transparent",
+                  color: activeTab === "pending" ? "#cda751" : "#718096",
+                  borderBottom: activeTab === "pending" ? "3px solid #cda751" : "3px solid transparent",
                   marginBottom: "-2px", transition: "all 0.2s",
                   display: "flex", alignItems: "center", gap: "6px"
                 }}
               >
-                📥 Pending Review
+                 Pending Review
                 {blogs.filter(b => b.status === "pending").length > 0 && (
                   <span style={{
-                    padding: "1px 6px", background: "#3498db", color: "white", fontSize: "11px",
-                    borderRadius: "10px", fontWeight: 700
+                    padding: "1px 6px", background: "rgba(205, 167, 81, 0.15)", color: "#cda751", fontSize: "11px",
+                    border: "1px solid rgba(205, 167, 81, 0.3)", borderRadius: "10px", fontWeight: 700
                   }}>
                     {blogs.filter(b => b.status === "pending").length}
                   </span>
@@ -994,7 +989,7 @@ export default function Blogs() {
                   marginBottom: "-2px", transition: "all 0.2s"
                 }}
               >
-                📁 All Blogs
+                 All Blogs
               </button>
             </>
           )}
@@ -1044,7 +1039,7 @@ export default function Blogs() {
       {/* Articles Grid rendering */}
       {filteredBlogs.length === 0 ? (
         <div className="blog-empty">
-          <div className="blog-empty-icon">🍃</div>
+          <div className="blog-empty-icon"></div>
           <p className="blog-empty-text">No articles found</p>
           <p className="blog-empty-subtext">
             {activeTab === "pending"

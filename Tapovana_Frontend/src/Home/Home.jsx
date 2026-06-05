@@ -309,7 +309,7 @@ function Home() {
         <header className="home-header" style={{ marginBottom: "28px" }}>
           <div className="home-title">
             <h1 style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              Welcome back, {role === "DOCTOR" ? "Dr. " : ""}{fullName || "Specialist"} 🌿
+              Welcome back, {role === "DOCTOR" ? "Dr. " : ""}{fullName || "Specialist"}
             </h1>
             <p>{formattedDate} • Your Dedicated Specialist Portal</p>
           </div>
@@ -320,13 +320,10 @@ function Home() {
           <div className="stat-card bookings">
             <div className="stat-card-header">
               <span className="stat-card-title">Active Assignments</span>
-              <div className="stat-card-icon" style={{ background: "rgba(24, 138, 148, 0.1)", color: "#188A94", fontSize: "18px", fontWeight: "bold" }}>
-                🎯
-              </div>
             </div>
             <div>
-              <div className="stat-card-value">{activeAllocations.length}</div>
-              <div className="stat-card-trend trend-up">
+              <div className="stat-card-value" style={{ color: "#cda751" }}>{activeAllocations.length}</div>
+              <div className="stat-card-trend trend-up" style={{ color: "#cda751" }}>
                 <span>Active sessions in progress</span>
               </div>
             </div>
@@ -335,13 +332,10 @@ function Home() {
           <div className="stat-card customers">
             <div className="stat-card-header">
               <span className="stat-card-title">Sessions Completed</span>
-              <div className="stat-card-icon" style={{ background: "rgba(46, 204, 113, 0.1)", color: "#2ecc71", fontSize: "18px", fontWeight: "bold" }}>
-                ✓
-              </div>
             </div>
             <div>
-              <div className="stat-card-value">{completedAllocations.length}</div>
-              <div className="stat-card-trend trend-up" style={{ color: "#2ecc71" }}>
+              <div className="stat-card-value" style={{ color: "#cda751" }}>{completedAllocations.length}</div>
+              <div className="stat-card-trend trend-up" style={{ color: "#cda751" }}>
                 <span>Program allocations fulfilled</span>
               </div>
             </div>
@@ -350,12 +344,9 @@ function Home() {
           <div className="stat-card revenue">
             <div className="stat-card-header">
               <span className="stat-card-title">My Published Articles</span>
-              <div className="stat-card-icon" style={{ background: "rgba(205, 167, 81, 0.1)", color: "#cda751", fontSize: "18px", fontWeight: "bold" }}>
-                ✍️
-              </div>
             </div>
             <div>
-              <div className="stat-card-value">{publishedBlogsCount}</div>
+              <div className="stat-card-value" style={{ color: "#cda751" }}>{publishedBlogsCount}</div>
               <div className="stat-card-trend trend-up" style={{ color: "#cda751" }}>
                 <span>Live public articles</span>
               </div>
@@ -365,13 +356,10 @@ function Home() {
           <div className="stat-card pending">
             <div className="stat-card-header">
               <span className="stat-card-title">Draft &amp; Pending Blogs</span>
-              <div className="stat-card-icon" style={{ background: "rgba(230, 126, 34, 0.1)", color: "#e67e22", fontSize: "18px", fontWeight: "bold" }}>
-                ⏳
-              </div>
             </div>
             <div>
-              <div className="stat-card-value">{pendingBlogsCount + draftBlogsCount}</div>
-              <div className="stat-card-trend trend-down" style={{ color: "#7b8a9a" }}>
+              <div className="stat-card-value" style={{ color: "#cda751" }}>{pendingBlogsCount + draftBlogsCount}</div>
+              <div className="stat-card-trend trend-down" style={{ color: "#cda751" }}>
                 <span>{pendingBlogsCount} pending review · {draftBlogsCount} drafts</span>
               </div>
             </div>
@@ -384,7 +372,7 @@ function Home() {
           <div className="chart-card">
             <div className="chart-card-header" style={{ marginBottom: "14px" }}>
               <div>
-                <h3 className="chart-card-title">📅 My Upcoming Sessions &amp; Programs</h3>
+                <h3 className="chart-card-title">My Upcoming Sessions &amp; Programs</h3>
                 <div className="chart-card-subtitle">Active client allocations committed to your schedule</div>
               </div>
             </div>
@@ -392,7 +380,7 @@ function Home() {
             <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "8px" }}>
               {activeAllocations.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "40px 16px", color: "#7b8a9a", background: "#f8fafc", borderRadius: "8px", border: "1px dashed #cbd5e0" }}>
-                  <span style={{ fontSize: "36px" }}>🌿</span>
+                  <span style={{ fontSize: "36px" }}></span>
                   <h4 style={{ margin: "12px 0 4px", fontSize: "14px", fontWeight: 700, color: "#2d3748" }}>No active sessions scheduled</h4>
                   <p style={{ margin: 0, fontSize: "12px" }}>Enjoy your day of meditation and personal care!</p>
                 </div>
@@ -407,21 +395,21 @@ function Home() {
                   >
                     <div>
                       <span style={{
-                        display: "inline-block", padding: "2px 8px", background: alloc.type === "workshop" ? "#eeb93322" : "#188a9422",
-                        color: alloc.type === "workshop" ? "#b59243" : "#188a94", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
+                        display: "inline-block", padding: "2px 8px", background: alloc.type === "workshop" ? "#eeb93322" : "rgba(205, 167, 81, 0.12)",
+                        color: alloc.type === "workshop" ? "#b59243" : "#cda751", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
                         textTransform: "uppercase", marginBottom: "6px"
                       }}>
                         {alloc.type === "workshop" ? "Workshop" : "Vedic Program"}
                       </span>
                       <h4 style={{ margin: "0 0 4px 0", fontSize: "14px", fontWeight: 700, color: "#2d3748" }}>{alloc.sessionTitle}</h4>
                       <p style={{ margin: 0, fontSize: "12px", color: "#7b8a9a" }}>
-                        ⏱️ {new Date(alloc.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} to {new Date(alloc.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                        {new Date(alloc.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} to {new Date(alloc.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                       </p>
                     </div>
                     <span style={{
                       padding: "4px 10px", background: "#2ecc7122", color: "#2ecc71", borderRadius: "20px", fontSize: "11px", fontWeight: 700
                     }}>
-                      🟢 In Progress
+                      In Progress
                     </span>
                   </div>
                 ))
@@ -433,7 +421,7 @@ function Home() {
           <div className="chart-card">
             <div className="chart-card-header" style={{ marginBottom: "14px" }}>
               <div>
-                <h3 className="chart-card-title">✍️ Content Creation</h3>
+                <h3 className="chart-card-title">Content Creation</h3>
                 <div className="chart-card-subtitle">Manage drafts and submitted articles</div>
               </div>
             </div>
@@ -481,13 +469,13 @@ function Home() {
         {/* Quote of the Day Panel */}
         <section 
           style={{
-            background: "linear-gradient(135deg, rgba(205,167,81,0.06) 0%, rgba(24,138,148,0.06) 100%)",
+            background: "linear-gradient(135deg, rgba(205,167,81,0.06) 0%, rgba(205, 167, 81, 0.15) 100%)",
             border: "1px solid rgba(205,167,81,0.2)", borderRadius: "16px", padding: "24px", textAlign: "center",
             marginTop: "12px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px"
           }}
         >
           <span style={{ fontSize: "28px" }}>🧘✨</span>
-          <h4 style={{ fontStyle: "italic", fontSize: "16px", fontWeight: 500, color: "#188a94", margin: "4px 0", fontFamily: "'Poppins', sans-serif" }}>
+          <h4 style={{ fontStyle: "italic", fontSize: "16px", fontWeight: 500, color: "#cda751", margin: "4px 0", fontFamily: "'Poppins', sans-serif" }}>
             "{dailyQuote}"
           </h4>
           <span style={{ fontSize: "11px", color: "#7b8a9a", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 700 }}>
@@ -536,7 +524,7 @@ function Home() {
                 className={`home-date-btn ${dateFilter === "custom" ? "active" : ""}`}
                 onClick={() => { setDateFilter("custom"); setShowCustomPicker(p => !p); }}
               >
-                📅 Custom
+                Custom
               </button>
               {showCustomPicker && (
                 <div className="home-date-picker-popup">
@@ -572,7 +560,7 @@ function Home() {
 
       {error && (
         <div style={{ background: "#FEF2F2", border: "1px solid #FCA5A5", color: "#B91C1C", borderRadius: "12px", padding: "16px", marginBottom: "24px", fontSize: "14px", fontWeight: 500 }}>
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
@@ -656,7 +644,7 @@ function Home() {
               alignItems: "center"
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <span style={{ fontSize: "24px" }}>📥</span>
+                <span style={{ fontSize: "24px" }}></span>
                 <div>
                   <h4 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#2d3748" }}>
                     Pending Blog Submissions Waiting Review
@@ -703,8 +691,8 @@ function Home() {
             <svg className="svg-chart" viewBox={`0 0 ${lineChartData.width} ${lineChartData.height}`}>
               <defs>
                 <linearGradient id="bookingAreaGradientWorkspace" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#188A94" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#188A94" stopOpacity="0.00" />
+                  <stop offset="0%" stopColor="#cda751" stopOpacity="0.25" />
+                  <stop offset="100%" stopColor="#cda751" stopOpacity="0.00" />
                 </linearGradient>
               </defs>
 

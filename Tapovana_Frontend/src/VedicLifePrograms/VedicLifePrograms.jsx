@@ -10,16 +10,16 @@ import { getImageUrl } from "../utils/image";
 
 const PROGRAM_COLORS = {
   "Retreat": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
-  "Treatment": { color: "#8b5cf6", bg: "rgba(139,92,246,0.1)" },
-  "Consultation": { color: "#2ecc71", bg: "rgba(46,204,113,0.1)" },
-  "Accommodation": { color: "#e67e22", bg: "rgba(230,126,34,0.1)" },
+  "Treatment": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
+  "Consultation": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
+  "Accommodation": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
 };
 
 const DURATION_COLORS = {
   "7-days": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
-  "14-days": { color: "#8b5cf6", bg: "rgba(139,92,246,0.1)" },
-  "30-days": { color: "#2ecc71", bg: "rgba(46,204,113,0.1)" },
-  "custom": { color: "#e67e22", bg: "rgba(230,126,34,0.1)" },
+  "14-days": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
+  "30-days": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
+  "custom": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
 };
 
 const DUMMY_PROGRAMS = [
@@ -280,7 +280,7 @@ function ProgramCard({ program, onClick }) {
             zIndex: 1
           }}>
             <span style={{ fontSize: "56px", opacity: 0.7 }}>
-              {program.type === "Retreat" ? "🌴" : program.type === "Treatment" ? "💆" : program.type === "Consultation" ? "👨‍⚕️" : "🏨"}
+              {program.type === "Retreat" ? "" : program.type === "Treatment" ? "" : program.type === "Consultation" ? "" : ""}
             </span>
           </div>
         )}
@@ -326,11 +326,11 @@ function ProgramCard({ program, onClick }) {
           </div>
 
           <div style={{ width: "100%", height: "8px", background: "#e2e8f0", borderRadius: "4px", overflow: "hidden", marginTop: "8px" }}>
-            <div style={{ width: `${pct}%`, height: "100%", background: pct >= 100 ? "#e74c3c" : pct >= 80 ? "#e67e22" : typeColor.color }} />
+            <div style={{ width: `${pct}%`, height: "100%", background: "#cda751" }} />
           </div>
           <div style={{ fontSize: "12px", color: "#718096", display: "flex", justifyContent: "space-between" }}>
             <span>{program.enrolled}/{program.capacity} enrolled</span>
-            <span style={{ color: pct >= 100 ? "#e74c3c" : typeColor.color, fontWeight: 700 }}>{pct}%</span>
+            <span style={{ color: "#cda751", fontWeight: 700 }}>{pct}%</span>
           </div>
         </div>
 
@@ -344,7 +344,7 @@ function ProgramCard({ program, onClick }) {
 }
 
 function AllocationModal({ program, staff, onClose, onAllocate, isAdmin, onEdit }) {
-  const { allocateStaff, getAllocatedStaffIds } = useAllocations();
+  const { allocateStaff, getAllocatedStaffIds, triggerAlert } = useAllocations();
   const [selectedStaff, setSelectedStaff] = useState(new Set());
   const [allocating, setAllocating] = useState(false);
   const allocatedIds = getAllocatedStaffIds();
@@ -368,32 +368,41 @@ function AllocationModal({ program, staff, onClose, onAllocate, isAdmin, onEdit 
 
   const handleAllocate = async () => {
     if (isCompleted) {
-      alert("Cannot allocate staff: This program is already completed.");
+      triggerAlert("Cannot allocate staff: This program is already completed.");
       return;
     }
     if (selectedStaff.size === 0) {
-      alert("Please select at least one staff member");
+      triggerAlert("Please select at least one staff member");
       return;
     }
 
     setAllocating(true);
     try {
-      let successCount = 0;
+      let successfulStaffIds = [];
       selectedStaff.forEach((staffId) => {
         const staffMember = staff.find((s) => (s.user_id || s.id) === staffId);
         if (staffMember) {
           const allocatedId = allocateStaff(staffMember, program, "vedic_program");
-          if (allocatedId) successCount++;
+          if (allocatedId) {
+            successfulStaffIds.push(staffId);
+          }
         }
       });
 
-      if (successCount > 0) {
-        onAllocate(Array.from(selectedStaff));
+      if (successfulStaffIds.length > 0) {
+        onAllocate(successfulStaffIds);
+        setSelectedStaff((prev) => {
+          const next = new Set(prev);
+          successfulStaffIds.forEach(id => next.delete(id));
+          return next;
+        });
       }
-      setSelectedStaff(new Set());
-      onClose();
+
+      if (successfulStaffIds.length === selectedStaff.size) {
+        onClose();
+      }
     } catch (error) {
-      alert("Error allocating staff: " + error.message);
+      triggerAlert("Error allocating staff: " + error.message);
     } finally {
       setAllocating(false);
     }
@@ -411,7 +420,7 @@ function AllocationModal({ program, staff, onClose, onAllocate, isAdmin, onEdit 
       <div className="vedic-modal" onClick={(e) => e.stopPropagation()}>
         {isCompleted && (
           <div style={{ background: "#fff5f5", borderBottom: "1px solid #fed7d7", padding: "12px 24px", color: "#c53030", fontSize: "13px", fontWeight: 600 }}>
-            🔒 Allocation locked: This program has already ended and cannot have new staff allocated.
+            Allocation locked: This program has already ended and cannot have new staff allocated.
           </div>
         )}
         <div className="vedic-modal-header">
@@ -439,7 +448,7 @@ function AllocationModal({ program, staff, onClose, onAllocate, isAdmin, onEdit 
                     fontFamily: "Manrope, sans-serif"
                   }}
                 >
-                  ✏️ Edit details
+                  Edit details
                 </button>
               )}
             </div>
@@ -456,7 +465,7 @@ function AllocationModal({ program, staff, onClose, onAllocate, isAdmin, onEdit 
             <div className="vedic-staff-list" style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "250px", overflowY: "auto", padding: "4px" }}>
               {availableStaff.length === 0 ? (
                 <div style={{ color: "#a0aec0", fontSize: "13px", padding: "12px 0", textAlign: "center" }}>
-                  🍃 No available doctors or therapists found at this time.
+                  No available doctors or therapists found at this time.
                 </div>
               ) : (
                 availableStaff.map((s) => {
@@ -513,6 +522,7 @@ function AllocationModal({ program, staff, onClose, onAllocate, isAdmin, onEdit 
 }
 
 function CreatePackageModal({ staff, onClose, onCreate }) {
+  const { triggerAlert } = useAllocations();
   const [formData, setFormData] = useState({
     title: "",
     type: "Retreat",
@@ -548,7 +558,7 @@ function CreatePackageModal({ staff, onClose, onCreate }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.title || !formData.startDate || !formData.endDate || !formData.price || !formData.consultant) {
-      alert("Please fill in all required fields (Title, Start Date, End Date, Price, and Consultant)");
+      triggerAlert("Please fill in all required fields (Title, Start Date, End Date, Price, and Consultant)");
       return;
     }
 
@@ -556,28 +566,28 @@ function CreatePackageModal({ staff, onClose, onCreate }) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const start = new Date(formData.startDate);
     if (start < today) {
-      alert("Start date cannot be set in the past for new programs.");
+      triggerAlert("Start date cannot be set in the past for new programs.");
       return;
     }
 
     // End date must be after start date
     const end = new Date(formData.endDate);
     if (end < start) {
-      alert("End date must be after start date.");
+      triggerAlert("End date must be after start date.");
       return;
     }
 
     // Price must be > 0
     const priceVal = parseFloat(formData.price);
     if (isNaN(priceVal) || priceVal <= 0) {
-      alert("Price must be greater than 0.");
+      triggerAlert("Price must be greater than 0.");
       return;
     }
 
     // Capacity must be >= 1
     const capacityVal = parseInt(formData.capacity);
     if (isNaN(capacityVal) || capacityVal < 1) {
-      alert("Capacity must be at least 1.");
+      triggerAlert("Capacity must be at least 1.");
       return;
     }
 
@@ -609,7 +619,7 @@ function CreatePackageModal({ staff, onClose, onCreate }) {
     <div className="vedic-modal-overlay" onClick={onClose}>
       <div className="vedic-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "700px" }}>
         <div className="vedic-modal-header">
-          <h2 className="vedic-modal-title">✨ Create New Vedic Program Package</h2>
+          <h2 className="vedic-modal-title">Create New Vedic Program Package</h2>
           <button className="vedic-modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -810,6 +820,7 @@ function CreatePackageModal({ staff, onClose, onCreate }) {
 }
 
 function EditPackageModal({ program, staff, onClose, onSave }) {
+  const { triggerAlert } = useAllocations();
   const [formData, setFormData] = useState({
     title: program.title || "",
     type: program.type || "Retreat",
@@ -845,32 +856,32 @@ function EditPackageModal({ program, staff, onClose, onSave }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.title || !formData.startDate || !formData.endDate || !formData.price || !formData.consultant) {
-      alert("Please fill in all required fields (Title, Start Date, End Date, Price, and Consultant)");
+      triggerAlert("Please fill in all required fields (Title, Start Date, End Date, Price, and Consultant)");
       return;
     }
 
     const start = new Date(formData.startDate);
     const end = new Date(formData.endDate);
     if (end < start) {
-      alert("End date must be after start date.");
+      triggerAlert("End date must be after start date.");
       return;
     }
 
     const priceVal = parseFloat(formData.price);
     if (isNaN(priceVal) || priceVal <= 0) {
-      alert("Price must be greater than 0.");
+      triggerAlert("Price must be greater than 0.");
       return;
     }
 
     const capacityVal = parseInt(formData.capacity);
     if (isNaN(capacityVal) || capacityVal < 1) {
-      alert("Capacity must be at least 1.");
+      triggerAlert("Capacity must be at least 1.");
       return;
     }
 
     const currentEnrolled = program.enrolled || 0;
     if (capacityVal < currentEnrolled) {
-      alert(`Capacity cannot be less than current enrolment (${currentEnrolled} enrolled). Reduce enrolment first.`);
+      triggerAlert(`Capacity cannot be less than current enrolment (${currentEnrolled} enrolled). Reduce enrolment first.`);
       return;
     }
 
@@ -901,7 +912,7 @@ function EditPackageModal({ program, staff, onClose, onSave }) {
     <div className="vedic-modal-overlay" onClick={onClose}>
       <div className="vedic-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "700px" }}>
         <div className="vedic-modal-header">
-          <h2 className="vedic-modal-title">✏️ Edit Vedic Program Package</h2>
+          <h2 className="vedic-modal-title">Edit Vedic Program Package</h2>
           <button className="vedic-modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -1202,7 +1213,7 @@ export default function VedicLifePrograms() {
           position: 'fixed',
           bottom: '24px',
           right: '24px',
-          background: '#2ecc71',
+          background: '#cda751',
           color: 'white',
           padding: '16px 24px',
           borderRadius: '8px',
@@ -1212,14 +1223,14 @@ export default function VedicLifePrograms() {
           flexDirection: 'column',
           gap: '4px',
         }}>
-          <div style={{ fontWeight: 700, fontSize: '14px' }}>✨ Staff Allocated Successfully!</div>
+          <div style={{ fontWeight: 700, fontSize: '14px' }}>Staff Allocated Successfully!</div>
           <div style={{ fontSize: '12px', opacity: 0.9 }}>{toast}</div>
         </div>
       )}
 
       <div className="vedic-header">
         <div className="vedic-title">
-          <h1>🌍 Vedic Life Programs</h1>
+          <h1>Vedic Life Programs</h1>
           <p>Manage international programs, retreats, and consultation offerings</p>
         </div>
         {isAdmin && (
@@ -1239,36 +1250,24 @@ export default function VedicLifePrograms() {
 
       <div className="vedic-stats">
         <div className="vedic-stat-card">
-          <div className="vedic-stat-icon" style={{ background: "rgba(205,167,81,0.1)", color: "#cda751" }}>
-            📊
-          </div>
           <div className="vedic-stat-content">
             <h3>Total Programs</h3>
             <p>{stats.total}</p>
           </div>
         </div>
         <div className="vedic-stat-card">
-          <div className="vedic-stat-icon" style={{ background: "rgba(46,204,113,0.1)", color: "#2ecc71" }}>
-            📅
-          </div>
           <div className="vedic-stat-content">
             <h3>Active Programs</h3>
             <p>{stats.activePrograms}</p>
           </div>
         </div>
         <div className="vedic-stat-card">
-          <div className="vedic-stat-icon" style={{ background: "rgba(139,92,246,0.1)", color: "#8b5cf6" }}>
-            👥
-          </div>
           <div className="vedic-stat-content">
             <h3>Total Enrolled</h3>
             <p>{stats.totalEnrolled}</p>
           </div>
         </div>
         <div className="vedic-stat-card">
-          <div className="vedic-stat-icon" style={{ background: "rgba(230,126,34,0.1)", color: "#e67e22" }}>
-            💰
-          </div>
           <div className="vedic-stat-content">
             <h3>Revenue</h3>
             <p>₹{(stats.revenue / 100000).toFixed(1)}L</p>
@@ -1336,7 +1335,7 @@ export default function VedicLifePrograms() {
         <div className="vedic-loading">Loading programs...</div>
       ) : filtered.length === 0 ? (
         <div className="vedic-empty">
-          <div className="vedic-empty-icon">🌿</div>
+          <div className="vedic-empty-icon"></div>
           <p className="vedic-empty-text">No programs found</p>
           <p className="vedic-empty-subtext">Try adjusting your filters or search criteria</p>
         </div>

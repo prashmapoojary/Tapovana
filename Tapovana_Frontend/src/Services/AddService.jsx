@@ -21,7 +21,7 @@ const ChevronDownIcon = () => (
 
 const FilterIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
   </svg>
 );
 
@@ -87,7 +87,7 @@ const CameraPlusIcon = () => (
 );
 
 function AddService({ onBack }) {
-  const { isStaffAllocated, allocateStaff, deallocateStaff, allocations } = useAllocations();
+  const { isStaffAllocated, allocateStaff, deallocateStaff, allocations, triggerAlert } = useAllocations();
   const [tempServiceId] = useState(() => `srv-${Date.now()}`);
   // General Info
   const [serviceName, setServiceName] = useState('');
@@ -144,23 +144,23 @@ function AddService({ onBack }) {
   const toggleStaff = (id) => {
     const isCurrentlyAssigned = assignedStaff.includes(id);
     if (isCurrentlyAssigned) {
-      // Unassigning
       setAssignedStaff(prev => prev.filter(x => x !== id));
       const alloc = allocations.find(a => a.staffId === id && a.sessionId === tempServiceId && a.type === 'service');
       if (alloc) {
         deallocateStaff(alloc.id);
       }
     } else {
-      // Assigning
-      setAssignedStaff(prev => [...prev, id]);
       const staffMember = availableStaff.find(s => s.user_id === id);
       if (staffMember) {
-        allocateStaff(staffMember, {
+        const allocatedId = allocateStaff(staffMember, {
           id: tempServiceId,
           title: serviceName || 'Wellness Service',
           startDate: new Date().toISOString().split('T')[0],
           endDate: new Date().toISOString().split('T')[0]
         }, 'service');
+        if (allocatedId) {
+          setAssignedStaff(prev => [...prev, id]);
+        }
       }
     }
   };
@@ -196,34 +196,38 @@ function AddService({ onBack }) {
 
   const handleSaveService = async (statusOverride = 'ACTIVE') => {
     if (!serviceName || !category || !subCategory || !basePrice || !duration) {
-      alert("Please fill all required fields.");
+      triggerAlert("Please fill all required fields.");
       return;
     }
 
     if (serviceName.trim().length < 3) {
-      alert("Service name must be at least 3 characters long.");
+      triggerAlert("Service name must be at least 3 characters long.");
       return;
     }
 
     const parsedPrice = parseFloat(basePrice);
     if (isNaN(parsedPrice) || parsedPrice <= 0) {
-      alert("Service price must be a positive number greater than 0.");
+      triggerAlert("Service price must be a positive number greater than 0.");
       return;
     }
 
     const parsedDuration = parseInt(duration);
     if (isNaN(parsedDuration) || parsedDuration <= 0) {
-      alert("Duration must be a positive number of minutes.");
+      triggerAlert("Duration must be a positive number of minutes.");
       return;
     }
 
     if (statusOverride === 'ACTIVE') setIsSaving(true);
     else setIsDrafting(true);
+
     try {
       const selectedCerts = Object.entries(certifications)
         .filter(([_, checked]) => checked)
         .map(([name]) => name)
         .join('\n');
+
+      // ★ The image is sent as base64 in image_url — backend handles saving it to disk
+      const firstImage = galleryImages.length > 0 ? galleryImages[0] : null;
 
       const body = {
         name: serviceName,
@@ -237,7 +241,8 @@ function AddService({ onBack }) {
         required_certification: selectedCerts,
         experience_level: experienceLevel,
         assigned_staff_ids: assignedStaff,
-        status: statusOverride // Use the status passed from buttons
+        image_url: firstImage, // ← backend handles both base64 and URL
+        status: statusOverride
       };
 
       const data = await apiFetch('/api/services', {
@@ -246,37 +251,13 @@ function AddService({ onBack }) {
       });
 
       console.log('Create service response:', data);
-      const newId = data.id || data.service?.id || data.data?.id;
-
-      if (data.success && newId && galleryImages.length > 0) {
-        // Upload the first image (main image)
-        try {
-          const firstImage = galleryImages[0];
-          // If it's a data URL, convert to blob
-          if (firstImage.startsWith('data:')) {
-            const response = await fetch(firstImage);
-            const blob = await response.blob();
-            const formData = new FormData();
-            formData.append('image', blob, 'service_image.jpg');
-
-            await apiFetch(`/api/services/${newId}/image`, {
-              method: 'POST',
-              body: formData,
-              headers: { 'Content-Type': 'undefined' } // Let browser set it with boundary
-            });
-          }
-        } catch (imgErr) {
-          console.error("Image upload failed:", imgErr);
-          alert("Service created, but image upload failed: " + imgErr.message);
-        }
-      }
 
       if (data.success) {
-        alert("Service created successfully!");
+        triggerAlert("Service created successfully!");
         onBack();
       }
     } catch (err) {
-      alert("Error creating service: " + err.message);
+      triggerAlert("Error creating service: " + err.message);
     } finally {
       setIsSaving(false);
       setIsDrafting(false);
@@ -326,11 +307,11 @@ function AddService({ onBack }) {
     const valid = [];
     for (const f of files) {
       if (f.type !== 'image/jpeg' && f.type !== 'image/png' && f.type !== 'image/webp') {
-        alert(`File ${f.name} has unsupported file type. Please upload only JPG, PNG or WEBP images.`);
+        triggerAlert(`File ${f.name} has unsupported file type. Please upload only JPG, PNG or WEBP images.`);
         continue;
       }
       if (f.size > 5 * 1024 * 1024) {
-        alert(`File ${f.name} exceeds the 5MB size limit.`);
+        triggerAlert(`File ${f.name} exceeds the 5MB size limit.`);
         continue;
       }
       valid.push(f);
@@ -355,9 +336,6 @@ function AddService({ onBack }) {
   const removeImage = (index) => {
     setGalleryImages(prev => prev.filter((_, i) => i !== index));
   };
-
-  const mainImage = galleryImages[0] || null;
-  const thumbnails = galleryImages.slice(1, 5);
 
   return (
     <div className="edit-service-page">
@@ -641,7 +619,7 @@ function AddService({ onBack }) {
 
             {/* Manual Staff Assignment */}
             <div className="es-spec-col">
-              <label className="es-spec-col-label">Assign Doctors & Therapists</label>
+              <label className="es-spec-col-label">Assign Doctors &amp; Therapists</label>
               <div className="es-cert-list" style={{ maxHeight: '180px', overflowY: 'auto' }}>
                 {availableStaff.length === 0 ? (
                   <span style={{ fontSize: 13, color: '#7b8a9a' }}>No doctors or therapists found.</span>
@@ -649,23 +627,23 @@ function AddService({ onBack }) {
                   availableStaff
                     .filter(staff => !isStaffAllocated(staff.user_id) || assignedStaff.includes(staff.user_id))
                     .map(staff => (
-                    <label key={staff.user_id} className="es-cert-row">
-                      <input
-                        type="checkbox"
-                        checked={assignedStaff.includes(staff.user_id)}
-                        onChange={() => toggleStaff(staff.user_id)}
-                        className="es-checkbox-hidden"
-                      />
-                      <span className={`es-custom-checkbox ${assignedStaff.includes(staff.user_id) ? 'checked' : ''}`}>
-                        {assignedStaff.includes(staff.user_id) && (
-                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="4 8 7 11 12 5" />
-                          </svg>
-                        )}
-                      </span>
-                      <span>{`${staff.first_name || ''} ${staff.last_name || ''} (${staff.role})`.trim()}</span>
-                    </label>
-                  ))
+                      <label key={staff.user_id} className="es-cert-row">
+                        <input
+                          type="checkbox"
+                          checked={assignedStaff.includes(staff.user_id)}
+                          onChange={() => toggleStaff(staff.user_id)}
+                          className="es-checkbox-hidden"
+                        />
+                        <span className={`es-custom-checkbox ${assignedStaff.includes(staff.user_id) ? 'checked' : ''}`}>
+                          {assignedStaff.includes(staff.user_id) && (
+                            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="4 8 7 11 12 5" />
+                            </svg>
+                          )}
+                        </span>
+                        <span>{`${staff.first_name || ''} ${staff.last_name || ''} (${staff.role})`.trim()}</span>
+                      </label>
+                    ))
                 )}
               </div>
             </div>

@@ -21,7 +21,7 @@ const ChevronDownIcon = () => (
 
 const FilterIcon = () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
     </svg>
 );
 
@@ -86,11 +86,10 @@ const CameraPlusIcon = () => (
     </svg>
 );
 
-
 // ── Main Component ─────────────────────────────────────────────────────────
 
 function EditService({ service, onBack }) {
-    const { isStaffAllocated, allocateStaff, deallocateStaff, allocations } = useAllocations();
+    const { isStaffAllocated, allocateStaff, deallocateStaff, allocations, triggerAlert } = useAllocations();
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
 
@@ -165,24 +164,23 @@ function EditService({ service, onBack }) {
     const toggleStaff = (id) => {
         const isCurrentlyAssigned = assignedStaff.includes(id);
         if (isCurrentlyAssigned) {
-            // Unassigning
             setAssignedStaff(prev => prev.filter(x => x !== id));
-            // Find allocation in context
             const alloc = allocations.find(a => a.staffId === id && a.sessionId === service.id && a.type === 'service');
             if (alloc) {
                 deallocateStaff(alloc.id);
             }
         } else {
-            // Assigning
-            setAssignedStaff(prev => [...prev, id]);
             const staffMember = availableStaff.find(s => s.user_id === id);
             if (staffMember) {
-                allocateStaff(staffMember, {
+                const allocatedId = allocateStaff(staffMember, {
                     id: service.id,
                     title: serviceName || service.name || 'Wellness Service',
                     startDate: new Date().toISOString().split('T')[0],
                     endDate: new Date().toISOString().split('T')[0]
                 }, 'service');
+                if (allocatedId) {
+                    setAssignedStaff(prev => [...prev, id]);
+                }
             }
         }
     };
@@ -242,32 +240,33 @@ function EditService({ service, onBack }) {
                 }
             }
         } catch (err) {
-            alert("Failed to load service details: " + err.message);
+            triggerAlert("Failed to load service details: " + err.message);
         } finally {
             setLoading(false);
         }
     };
 
+    // ★ FIXED: Image is sent in JSON body — no separate /image endpoint call
     const handleUpdateService = async () => {
         if (!serviceName || !category || !subCategory || !basePrice || !duration) {
-            alert("Please fill all required fields.");
+            triggerAlert("Please fill all required fields.");
             return;
         }
 
         if (serviceName.trim().length < 3) {
-            alert("Service name must be at least 3 characters long.");
+            triggerAlert("Service name must be at least 3 characters long.");
             return;
         }
 
         const parsedPrice = parseFloat(basePrice);
         if (isNaN(parsedPrice) || parsedPrice <= 0) {
-            alert("Service price must be a positive number greater than 0.");
+            triggerAlert("Service price must be a positive number greater than 0.");
             return;
         }
 
         const parsedDuration = parseInt(duration);
         if (isNaN(parsedDuration) || parsedDuration <= 0) {
-            alert("Duration must be a positive number of minutes.");
+            triggerAlert("Duration must be a positive number of minutes.");
             return;
         }
 
@@ -277,6 +276,9 @@ function EditService({ service, onBack }) {
                 .filter(([_, checked]) => checked)
                 .map(([name]) => name)
                 .join('\n');
+
+            // Send image as part of JSON body — backend handles base64 or URL
+            const firstImage = galleryImages.length > 0 ? galleryImages[0] : undefined;
 
             const body = {
                 name: serviceName,
@@ -289,7 +291,8 @@ function EditService({ service, onBack }) {
                 duration_minutes: parseInt(duration),
                 required_certification: selectedCerts,
                 experience_level: experienceLevel,
-                assigned_staff_ids: assignedStaff
+                assigned_staff_ids: assignedStaff,
+                image_url: firstImage
             };
 
             const data = await apiFetch(`/api/services/${service.id}`, {
@@ -297,34 +300,12 @@ function EditService({ service, onBack }) {
                 body: JSON.stringify(body)
             });
 
-            if (data.success && galleryImages.length > 0) {
-                const firstImage = galleryImages[0];
-                // Only upload if it's a new image (data URL)
-                if (firstImage.startsWith('data:')) {
-                    try {
-                        const response = await fetch(firstImage);
-                        const blob = await response.blob();
-                        const formData = new FormData();
-                        formData.append('image', blob, 'service_image.jpg');
-
-                        await apiFetch(`/api/services/${service.id}/image`, {
-                            method: 'POST',
-                            body: formData,
-                            headers: { 'Content-Type': 'undefined' }
-                        });
-                    } catch (imgErr) {
-                        console.error("Image update failed:", imgErr);
-                        alert("Service updated, but image upload failed: " + imgErr.message);
-                    }
-                }
-            }
-
             if (data.success) {
-                alert("Service updated successfully!");
+                triggerAlert("Service updated successfully!");
                 onBack();
             }
         } catch (err) {
-            alert("Error updating service: " + err.message);
+            triggerAlert("Error updating service: " + err.message);
         } finally {
             setUpdating(false);
         }
@@ -361,11 +342,11 @@ function EditService({ service, onBack }) {
         const valid = [];
         for (const f of files) {
             if (f.type !== 'image/jpeg' && f.type !== 'image/png' && f.type !== 'image/webp') {
-                alert(`File ${f.name} has unsupported file type. Please upload only JPG, PNG or WEBP images.`);
+                triggerAlert(`File ${f.name} has unsupported file type. Please upload only JPG, PNG or WEBP images.`);
                 continue;
             }
             if (f.size > 5 * 1024 * 1024) {
-                alert(`File ${f.name} exceeds the 5MB size limit.`);
+                triggerAlert(`File ${f.name} exceeds the 5MB size limit.`);
                 continue;
             }
             valid.push(f);
@@ -656,7 +637,7 @@ function EditService({ service, onBack }) {
 
                                 {/* Manual Staff Assignment */}
                                 <div className="es-spec-col">
-                                    <label className="es-spec-col-label">Assign Doctors & Therapists</label>
+                                    <label className="es-spec-col-label">Assign Doctors &amp; Therapists</label>
                                     <div className="es-cert-list" style={{ maxHeight: '180px', overflowY: 'auto' }}>
                                         {availableStaff.length === 0 ? (
                                             <span style={{ fontSize: 13, color: '#7b8a9a' }}>No doctors or therapists found.</span>
@@ -664,23 +645,23 @@ function EditService({ service, onBack }) {
                                             availableStaff
                                                 .filter(staff => !isStaffAllocated(staff.user_id) || assignedStaff.includes(staff.user_id))
                                                 .map(staff => (
-                                                <label key={staff.user_id} className="es-cert-row">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={assignedStaff.includes(staff.user_id)}
-                                                        onChange={() => toggleStaff(staff.user_id)}
-                                                        className="es-checkbox-hidden"
-                                                    />
-                                                    <span className={`es-custom-checkbox ${assignedStaff.includes(staff.user_id) ? 'checked' : ''}`}>
-                                                        {assignedStaff.includes(staff.user_id) && (
-                                                            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                                <polyline points="4 8 7 11 12 5" />
-                                                            </svg>
-                                                        )}
-                                                    </span>
-                                                    <span>{`${staff.first_name || ''} ${staff.last_name || ''} (${staff.role})`.trim()}</span>
-                                                </label>
-                                            ))
+                                                    <label key={staff.user_id} className="es-cert-row">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={assignedStaff.includes(staff.user_id)}
+                                                            onChange={() => toggleStaff(staff.user_id)}
+                                                            className="es-checkbox-hidden"
+                                                        />
+                                                        <span className={`es-custom-checkbox ${assignedStaff.includes(staff.user_id) ? 'checked' : ''}`}>
+                                                            {assignedStaff.includes(staff.user_id) && (
+                                                                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <polyline points="4 8 7 11 12 5" />
+                                                                </svg>
+                                                            )}
+                                                        </span>
+                                                        <span>{`${staff.first_name || ''} ${staff.last_name || ''} (${staff.role})`.trim()}</span>
+                                                    </label>
+                                                ))
                                         )}
                                     </div>
                                 </div>

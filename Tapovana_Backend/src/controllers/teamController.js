@@ -6,42 +6,83 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-const handleProfilePhotoSave = (source, url, base64) => {
-    if (source === 'upload' && base64) {
-        const matches = base64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-        if (matches && matches.length === 3) {
-            const extMap = {
-                'image/jpeg': '.jpg',
-                'image/png': '.png',
-                'image/gif': '.gif',
-                'image/webp': '.webp'
-            };
-            const ext = extMap[matches[1]] || '.png';
-            const buffer = Buffer.from(matches[2], 'base64');
-            const filename = `${uuidv4()}${ext}`;
-            const uploadsDir = path.join(__dirname, '../../uploads');
-            if (!fs.existsSync(uploadsDir)) {
-                fs.mkdirSync(uploadsDir, { recursive: true });
-            }
-            const filepath = path.join(uploadsDir, filename);
-            fs.writeFileSync(filepath, buffer);
-            return {
-                url: `/uploads/${filename}`,
-                source: 'upload'
-            };
-        }
-    } else if (source === 'local' && url) {
-        return {
-            url: url,
-            source: 'local'
-        };
+const UPLOADS_DIR = path.join(__dirname, '../../uploads');
+
+const ensureUploadsDir = () => {
+    if (!fs.existsSync(UPLOADS_DIR)) {
+        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
     }
-    return {
-        url: null,
-        source: 'default'
-    };
 };
 
+const normalizeDbStatus = (status) => {
+    if (!status) return null;
+    const s = String(status).toUpperCase();
+    if (s === 'ACTIVE') return 'active';
+    if (s === 'INACTIVE') return 'inactive';
+    if (s === 'PENDING') return 'pending';
+    return String(status).toLowerCase();
+};
+
+// ─── Handle profile photo save ────────────────────────────────────────────────
+const handleProfilePhotoSave = (source, url, base64) => {
+    const normalizedSource = source ? String(source).toLowerCase().trim() : 'default';
+    const normalizedUrl = typeof url === 'string' ? url.trim() : '';
+
+    if (normalizedSource === 'default') {
+        return { url: null, source: 'default' };
+    }
+
+    if (normalizedSource === 'local') {
+        return normalizedUrl ? { url: normalizedUrl, source: 'local' } : { url: null, source: 'default' };
+    }
+
+    if (normalizedSource === 'external') {
+        if (/^https?:\/\/.+/i.test(normalizedUrl)) {
+            return { url: normalizedUrl, source: 'external' };
+        }
+        return { url: null, source: 'default' };
+    }
+
+    if (normalizedSource === 'upload' && base64) {
+        const matches = base64.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+            const mime = matches[1];
+            const extMap = {
+                'image/jpeg': '.jpg',
+                'image/jpg': '.jpg',
+                'image/png': '.png',
+                'image/gif': '.gif',
+                'image/webp': '.webp',
+                'image/svg+xml': '.svg'
+            };
+            const ext = extMap[mime] || '.png';
+            const buffer = Buffer.from(matches[2], 'base64');
+            const filename = `${uuidv4()}${ext}`;
+
+            ensureUploadsDir();
+            fs.writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
+
+            return { url: `/uploads/${filename}`, source: 'upload' };
+        }
+    }
+
+    if (normalizedSource === 'upload' && normalizedUrl) {
+        if (normalizedUrl.startsWith('/uploads/')) {
+            return { url: normalizedUrl, source: 'upload' };
+        }
+        if (normalizedUrl.startsWith('uploads/')) {
+            return { url: `/${normalizedUrl}`, source: 'upload' };
+        }
+        if (/^https?:\/\/.+/i.test(normalizedUrl)) {
+            return { url: normalizedUrl, source: 'upload' };
+        }
+        return { url: `/uploads/${path.basename(normalizedUrl)}`, source: 'upload' };
+    }
+
+    return { url: null, source: 'default' };
+};
+
+// ─── Generate temp password ───────────────────────────────────────────────────
 const generateTempPassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
     return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
@@ -52,14 +93,15 @@ const getTeam = async (req, res) => {
     try {
         const result = await query(
             `SELECT tm.id AS user_id, tm.first_name, tm.last_name, tm.email, tm.phone,
-              tm.avatar_url, tm.status, tm.created_at,
-              tm.profile_photo_url, tm.profile_photo_source, tm.availability_status, tm.allocation_details,
-              r.name AS role, r.label AS role_label,
-              lc.last_login, lc.must_change
-       FROM team_members tm
-       JOIN roles r ON r.id = tm.role_id
-       LEFT JOIN login_credentials lc ON lc.member_id = tm.id
-       ORDER BY tm.created_at DESC`
+                    tm.avatar_url, tm.status, tm.created_at,
+                    tm.profile_photo_url, tm.profile_photo_source,
+                    tm.availability_status, tm.allocation_details,
+                    r.name AS role, r.label AS role_label,
+                    lc.last_login, lc.must_change
+             FROM team_members tm
+             JOIN roles r ON r.id = tm.role_id
+             LEFT JOIN login_credentials lc ON lc.member_id = tm.id
+             ORDER BY tm.created_at DESC`
         );
         return res.json({ success: true, team: result.rows });
     } catch (err) {
@@ -73,17 +115,20 @@ const getTeamMember = async (req, res) => {
     try {
         const result = await query(
             `SELECT tm.id AS user_id, tm.first_name, tm.last_name, tm.email, tm.phone,
-              tm.avatar_url, tm.status, tm.created_at,
-              tm.profile_photo_url, tm.profile_photo_source, tm.availability_status, tm.allocation_details,
-              r.name AS role, r.label AS role_label, r.access
-       FROM team_members tm
-       JOIN roles r ON r.id = tm.role_id
-       WHERE tm.id = $1`,
+                    tm.avatar_url, tm.status, tm.created_at,
+                    tm.profile_photo_url, tm.profile_photo_source,
+                    tm.availability_status, tm.allocation_details,
+                    r.name AS role, r.label AS role_label, r.access
+             FROM team_members tm
+             JOIN roles r ON r.id = tm.role_id
+             WHERE tm.id = $1`,
             [req.params.id]
         );
+
         if (!result.rows.length) {
             return res.status(404).json({ success: false, message: 'Member not found.' });
         }
+
         return res.json({ success: true, member: result.rows[0] });
     } catch (err) {
         console.error('getTeamMember error:', err);
@@ -93,15 +138,30 @@ const getTeamMember = async (req, res) => {
 
 // ─── ADD team member (Postman) ────────────────────────────────────────────────
 const addTeamMember = async (req, res) => {
-    const { first_name, last_name, email, phone, role, profile_photo_source, profile_photo_url, profile_photo_base64 } = req.body;
+    const {
+        first_name,
+        last_name,
+        email,
+        phone,
+        role,
+        profile_photo_source,
+        profile_photo_url,
+        profile_photo_base64
+    } = req.body;
 
     if (!first_name || !last_name || !email || !role) {
-        return res.status(400).json({ success: false, message: 'first_name, last_name, email, and role are required.' });
+        return res.status(400).json({
+            success: false,
+            message: 'first_name, last_name, email, and role are required.'
+        });
     }
 
     const ALLOWED_ROLES = ['SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR', 'THERAPIST'];
     if (!ALLOWED_ROLES.includes(role)) {
-        return res.status(400).json({ success: false, message: `Role must be one of: ${ALLOWED_ROLES.join(', ')}` });
+        return res.status(400).json({
+            success: false,
+            message: `Role must be one of: ${ALLOWED_ROLES.join(', ')}`
+        });
     }
 
     const client = await getClient();
@@ -109,7 +169,8 @@ const addTeamMember = async (req, res) => {
         await client.query('BEGIN');
 
         const existing = await client.query(
-            'SELECT id FROM team_members WHERE LOWER(email) = LOWER($1)', [email]
+            'SELECT id FROM team_members WHERE LOWER(email) = LOWER($1)',
+            [email]
         );
         if (existing.rows.length) {
             await client.query('ROLLBACK');
@@ -121,36 +182,47 @@ const addTeamMember = async (req, res) => {
             await client.query('ROLLBACK');
             return res.status(400).json({ success: false, message: 'Invalid role.' });
         }
-        const roleId = roleResult.rows[0].id;
 
-        const photoResult = handleProfilePhotoSave(profile_photo_source, profile_photo_url, profile_photo_base64);
+        const roleId = roleResult.rows[0].id;
+        const photoResult = handleProfilePhotoSave(
+            profile_photo_source,
+            profile_photo_url,
+            profile_photo_base64
+        );
 
         const memberResult = await client.query(
-            `INSERT INTO team_members (first_name, last_name, email, phone, role_id, status, created_by, profile_photo_url, profile_photo_source, avatar_url)
-       VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9)
-       RETURNING id`,
+            `INSERT INTO team_members (
+                first_name, last_name, email, phone, role_id, status, created_by,
+                profile_photo_url, profile_photo_source, avatar_url
+             )
+             VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9)
+             RETURNING id`,
             [
-                first_name, 
-                last_name, 
-                email.toLowerCase(), 
-                phone || null, 
-                roleId, 
+                first_name.trim(),
+                last_name.trim(),
+                email.toLowerCase().trim(),
+                phone?.trim() || null,
+                roleId,
                 req.user.id,
                 photoResult.url,
                 photoResult.source,
                 photoResult.url
             ]
         );
-        const memberId = memberResult.rows[0].id;
 
+        const memberId = memberResult.rows[0].id;
         const tempPassword = generateTempPassword();
         const tempHash = await bcrypt.hash(tempPassword, 12);
         const resetToken = uuidv4().replace(/-/g, '');
-        const tokenExpiry = new Date(Date.now() + parseInt(process.env.RESET_TOKEN_EXPIRES_HOURS || '48', 10) * 3600000);
+        const tokenExpiry = new Date(
+            Date.now() + parseInt(process.env.RESET_TOKEN_EXPIRES_HOURS || '48', 10) * 3600000
+        );
 
         await client.query(
-            `INSERT INTO login_credentials (member_id, temp_password_hash, reset_token, reset_token_expiry, must_change)
-       VALUES ($1, $2, $3, $4, TRUE)`,
+            `INSERT INTO login_credentials (
+                member_id, temp_password_hash, reset_token, reset_token_expiry, must_change
+             )
+             VALUES ($1, $2, $3, $4, TRUE)`,
             [memberId, tempHash, resetToken, tokenExpiry]
         );
 
@@ -162,7 +234,7 @@ const addTeamMember = async (req, res) => {
         return res.status(201).json({
             success: true,
             message: 'Team member added. Invite email sent.',
-            member_id: memberId,
+            member_id: memberId
         });
     } catch (err) {
         await client.query('ROLLBACK');
@@ -175,21 +247,52 @@ const addTeamMember = async (req, res) => {
 
 // ─── UPDATE team member (Postman) ─────────────────────────────────────────────
 const updateTeamMember = async (req, res) => {
-    const { first_name, last_name, phone, role, status, avatar_url, profile_photo_source, profile_photo_url, profile_photo_base64, availability_status, allocation_details } = req.body;
+    const {
+        first_name,
+        last_name,
+        phone,
+        role,
+        status,
+        avatar_url,
+        profile_photo_source,
+        profile_photo_url,
+        profile_photo_base64,
+        availability_status,
+        allocation_details
+    } = req.body;
 
     try {
         const fields = [];
         const values = [];
         let idx = 1;
 
-        if (first_name) { fields.push(`first_name = $${idx++}`); values.push(first_name); }
-        if (last_name) { fields.push(`last_name = $${idx++}`); values.push(last_name); }
-        if (phone) { fields.push(`phone = $${idx++}`); values.push(phone); }
-        if (status) { fields.push(`status = $${idx++}`); values.push(status); }
-        if (avatar_url) { fields.push(`avatar_url = $${idx++}`); values.push(avatar_url); }
+        if (first_name !== undefined) {
+            fields.push(`first_name = $${idx++}`);
+            values.push(first_name?.trim() || null);
+        }
+        if (last_name !== undefined) {
+            fields.push(`last_name = $${idx++}`);
+            values.push(last_name?.trim() || null);
+        }
+        if (phone !== undefined) {
+            fields.push(`phone = $${idx++}`);
+            values.push(phone?.trim() || null);
+        }
+        if (status !== undefined) {
+            fields.push(`status = $${idx++}`);
+            values.push(normalizeDbStatus(status));
+        }
+        if (avatar_url !== undefined) {
+            fields.push(`avatar_url = $${idx++}`);
+            values.push(avatar_url?.trim() || null);
+        }
 
-        if (profile_photo_source) {
-            const photoResult = handleProfilePhotoSave(profile_photo_source, profile_photo_url, profile_photo_base64);
+        if (profile_photo_source !== undefined) {
+            const photoResult = handleProfilePhotoSave(
+                profile_photo_source,
+                profile_photo_url,
+                profile_photo_base64
+            );
             fields.push(`profile_photo_source = $${idx++}`);
             values.push(photoResult.source);
             fields.push(`profile_photo_url = $${idx++}`);
@@ -197,16 +300,18 @@ const updateTeamMember = async (req, res) => {
             fields.push(`avatar_url = $${idx++}`);
             values.push(photoResult.url);
         }
-        if (availability_status) {
+
+        if (availability_status !== undefined) {
             fields.push(`availability_status = $${idx++}`);
             values.push(availability_status);
         }
+
         if (allocation_details !== undefined) {
             fields.push(`allocation_details = $${idx++}`);
             values.push(allocation_details ? JSON.stringify(allocation_details) : null);
         }
 
-        if (role) {
+        if (role !== undefined) {
             const roleResult = await query('SELECT id FROM roles WHERE name = $1', [role]);
             if (!roleResult.rows.length) {
                 return res.status(400).json({ success: false, message: 'Invalid role.' });
@@ -221,8 +326,10 @@ const updateTeamMember = async (req, res) => {
 
         values.push(req.params.id);
         const result = await query(
-            `UPDATE team_members SET ${fields.join(', ')}, updated_at = NOW()
-       WHERE id = $${idx} RETURNING id`,
+            `UPDATE team_members
+             SET ${fields.join(', ')}, updated_at = NOW()
+             WHERE id = $${idx}
+             RETURNING id`,
             values
         );
 
@@ -245,8 +352,10 @@ const deleteTeamMember = async (req, res) => {
         }
 
         const result = await query(
-            `UPDATE team_members SET status = 'inactive', updated_at = NOW()
-       WHERE id = $1 RETURNING id`,
+            `UPDATE team_members
+             SET status = 'inactive', updated_at = NOW()
+             WHERE id = $1
+             RETURNING id`,
             [req.params.id]
         );
 
@@ -269,9 +378,9 @@ const resendInvite = async (req, res) => {
 
         const result = await client.query(
             `SELECT tm.first_name, tm.email, lc.id AS cred_id
-       FROM team_members tm
-       JOIN login_credentials lc ON lc.member_id = tm.id
-       WHERE tm.id = $1 AND tm.status = 'pending'`,
+             FROM team_members tm
+             JOIN login_credentials lc ON lc.member_id = tm.id
+             WHERE tm.id = $1 AND tm.status = 'pending'`,
             [req.params.id]
         );
 
@@ -288,8 +397,8 @@ const resendInvite = async (req, res) => {
 
         await client.query(
             `UPDATE login_credentials
-       SET temp_password_hash = $1, reset_token = $2, reset_token_expiry = $3, updated_at = NOW()
-       WHERE id = $4`,
+             SET temp_password_hash = $1, reset_token = $2, reset_token_expiry = $3, updated_at = NOW()
+             WHERE id = $4`,
             [tempHash, resetToken, tokenExpiry, cred_id]
         );
 
@@ -318,20 +427,20 @@ const getRoles = async (req, res) => {
     }
 };
 
-// ─── FRONTEND ROUTES (/api/teams/users) ──────────────────────────────────────
-
+// ─── FRONTEND: GET all team members ──────────────────────────────────────────
 const getTeamFrontend = async (req, res) => {
     try {
         const result = await query(
             `SELECT tm.id AS user_id, tm.first_name, tm.last_name, tm.email, tm.phone,
-              tm.avatar_url, tm.status, tm.specialization, tm.created_at,
-              tm.profile_photo_url, tm.profile_photo_source, tm.availability_status, tm.allocation_details,
-              r.name AS role, r.label AS role_label,
-              lc.last_login AS last_login_at, lc.must_change
-       FROM team_members tm
-       JOIN roles r ON r.id = tm.role_id
-       LEFT JOIN login_credentials lc ON lc.member_id = tm.id
-       ORDER BY tm.created_at DESC`
+                    tm.avatar_url, tm.status, tm.specialization, tm.created_at,
+                    tm.profile_photo_url, tm.profile_photo_source,
+                    tm.availability_status, tm.allocation_details,
+                    r.name AS role, r.label AS role_label,
+                    lc.last_login AS last_login_at, lc.must_change
+             FROM team_members tm
+             JOIN roles r ON r.id = tm.role_id
+             LEFT JOIN login_credentials lc ON lc.member_id = tm.id
+             ORDER BY tm.created_at DESC`
         );
         return res.json({ success: true, users: result.rows });
     } catch (err) {
@@ -340,17 +449,34 @@ const getTeamFrontend = async (req, res) => {
     }
 };
 
+// ─── FRONTEND: ADD team member ────────────────────────────────────────────────
 const addTeamMemberFrontend = async (req, res) => {
-    const { first_name, last_name, email, phone, role, specialization,
-        send_invite_email, profile_photo_source, profile_photo_url, profile_photo_base64 } = req.body;
+    const {
+        first_name,
+        last_name,
+        email,
+        phone,
+        role,
+        specialization,
+        send_invite_email,
+        profile_photo_source,
+        profile_photo_url,
+        profile_photo_base64
+    } = req.body;
 
     if (!first_name || !last_name || !email || !role) {
-        return res.status(400).json({ success: false, message: 'first_name, last_name, email, and role are required.' });
+        return res.status(400).json({
+            success: false,
+            message: 'first_name, last_name, email, and role are required.'
+        });
     }
 
     const ALLOWED_ROLES = ['SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR', 'THERAPIST'];
     if (!ALLOWED_ROLES.includes(role)) {
-        return res.status(400).json({ success: false, message: `Role must be one of: ${ALLOWED_ROLES.join(', ')}` });
+        return res.status(400).json({
+            success: false,
+            message: `Role must be one of: ${ALLOWED_ROLES.join(', ')}`
+        });
     }
 
     const client = await getClient();
@@ -358,7 +484,8 @@ const addTeamMemberFrontend = async (req, res) => {
         await client.query('BEGIN');
 
         const existing = await client.query(
-            'SELECT id FROM team_members WHERE LOWER(email) = LOWER($1)', [email]
+            'SELECT id FROM team_members WHERE LOWER(email) = LOWER($1)',
+            [email]
         );
         if (existing.rows.length) {
             await client.query('ROLLBACK');
@@ -370,37 +497,46 @@ const addTeamMemberFrontend = async (req, res) => {
             await client.query('ROLLBACK');
             return res.status(400).json({ success: false, message: 'Invalid role.' });
         }
-        const roleId = roleResult.rows[0].id;
 
-        const photoResult = handleProfilePhotoSave(profile_photo_source, profile_photo_url, profile_photo_base64);
+        const roleId = roleResult.rows[0].id;
+        const photoResult = handleProfilePhotoSave(
+            profile_photo_source,
+            profile_photo_url,
+            profile_photo_base64
+        );
 
         const memberResult = await client.query(
-            `INSERT INTO team_members (first_name, last_name, email, phone, role_id, specialization, status, created_by, profile_photo_url, profile_photo_source, avatar_url)
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10)
-       RETURNING id`,
+            `INSERT INTO team_members (
+                first_name, last_name, email, phone, role_id, specialization,
+                status, created_by, profile_photo_url, profile_photo_source, avatar_url
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10)
+             RETURNING id`,
             [
-                first_name, 
-                last_name, 
-                email.toLowerCase(), 
-                phone || null,
-                roleId, 
-                specialization || null, 
+                first_name.trim(),
+                last_name.trim(),
+                email.toLowerCase().trim(),
+                phone?.trim() || null,
+                roleId,
+                specialization?.trim() || null,
                 req.user.id,
                 photoResult.url,
                 photoResult.source,
                 photoResult.url
             ]
         );
-        const memberId = memberResult.rows[0].id;
 
+        const memberId = memberResult.rows[0].id;
         const tempPassword = generateTempPassword();
         const tempHash = await bcrypt.hash(tempPassword, 12);
         const resetToken = uuidv4().replace(/-/g, '');
         const tokenExpiry = new Date(Date.now() + 48 * 3600000);
 
         await client.query(
-            `INSERT INTO login_credentials (member_id, temp_password_hash, reset_token, reset_token_expiry, must_change)
-       VALUES ($1, $2, $3, $4, TRUE)`,
+            `INSERT INTO login_credentials (
+                member_id, temp_password_hash, reset_token, reset_token_expiry, must_change
+             )
+             VALUES ($1, $2, $3, $4, TRUE)`,
             [memberId, tempHash, resetToken, tokenExpiry]
         );
 
@@ -414,7 +550,7 @@ const addTeamMemberFrontend = async (req, res) => {
         return res.status(201).json({
             success: true,
             message: 'Team member added. Invite email sent.',
-            user_id: memberId,
+            user_id: memberId
         });
     } catch (err) {
         await client.query('ROLLBACK');
@@ -425,22 +561,55 @@ const addTeamMemberFrontend = async (req, res) => {
     }
 };
 
+// ─── FRONTEND: UPDATE team member ─────────────────────────────────────────────
 const updateTeamMemberFrontend = async (req, res) => {
-    const { first_name, last_name, phone, role, status, specialization, avatar_url, profile_photo_source, profile_photo_url, profile_photo_base64, availability_status, allocation_details } = req.body;
+    const {
+        first_name,
+        last_name,
+        phone,
+        role,
+        status,
+        specialization,
+        avatar_url,
+        profile_photo_source,
+        profile_photo_url,
+        profile_photo_base64,
+        availability_status,
+        allocation_details
+    } = req.body;
 
     try {
         const fields = [];
         const values = [];
         let idx = 1;
 
-        if (first_name) { fields.push(`first_name = $${idx++}`); values.push(first_name); }
-        if (last_name) { fields.push(`last_name = $${idx++}`); values.push(last_name); }
-        if (phone) { fields.push(`phone = $${idx++}`); values.push(phone); }
-        if (specialization !== undefined) { fields.push(`specialization = $${idx++}`); values.push(specialization); }
-        if (avatar_url) { fields.push(`avatar_url = $${idx++}`); values.push(avatar_url); }
+        if (first_name !== undefined) {
+            fields.push(`first_name = $${idx++}`);
+            values.push(first_name?.trim() || null);
+        }
+        if (last_name !== undefined) {
+            fields.push(`last_name = $${idx++}`);
+            values.push(last_name?.trim() || null);
+        }
+        if (phone !== undefined) {
+            fields.push(`phone = $${idx++}`);
+            values.push(phone?.trim() || null);
+        }
+        if (specialization !== undefined) {
+            fields.push(`specialization = $${idx++}`);
+            values.push(specialization?.trim() || null);
+        }
+        if (avatar_url !== undefined) {
+            fields.push(`avatar_url = $${idx++}`);
+            values.push(avatar_url?.trim() || null);
+        }
 
-        if (profile_photo_source) {
-            const photoResult = handleProfilePhotoSave(profile_photo_source, profile_photo_url, profile_photo_base64);
+        if (profile_photo_source !== undefined) {
+            const photoResult = handleProfilePhotoSave(
+                profile_photo_source,
+                profile_photo_url,
+                profile_photo_base64
+            );
             fields.push(`profile_photo_source = $${idx++}`);
             values.push(photoResult.source);
             fields.push(`profile_photo_url = $${idx++}`);
@@ -448,22 +617,23 @@ const updateTeamMemberFrontend = async (req, res) => {
             fields.push(`avatar_url = $${idx++}`);
             values.push(photoResult.url);
         }
-        if (availability_status) {
+
+        if (availability_status !== undefined) {
             fields.push(`availability_status = $${idx++}`);
             values.push(availability_status);
         }
+
         if (allocation_details !== undefined) {
             fields.push(`allocation_details = $${idx++}`);
             values.push(allocation_details ? JSON.stringify(allocation_details) : null);
         }
 
-        if (status) {
-            const dbStatus = status === 'ACTIVE' ? 'active' : 'inactive';
+        if (status !== undefined) {
             fields.push(`status = $${idx++}`);
-            values.push(dbStatus);
+            values.push(normalizeDbStatus(status));
         }
 
-        if (role) {
+        if (role !== undefined) {
             const roleResult = await query('SELECT id FROM roles WHERE name = $1', [role]);
             if (!roleResult.rows.length) {
                 return res.status(400).json({ success: false, message: 'Invalid role.' });
@@ -478,8 +648,10 @@ const updateTeamMemberFrontend = async (req, res) => {
 
         values.push(req.params.id);
         const result = await query(
-            `UPDATE team_members SET ${fields.join(', ')}, updated_at = NOW()
-       WHERE id = $${idx} RETURNING id`,
+            `UPDATE team_members
+             SET ${fields.join(', ')}, updated_at = NOW()
+             WHERE id = $${idx}
+             RETURNING id`,
             values
         );
 
@@ -494,19 +666,24 @@ const updateTeamMemberFrontend = async (req, res) => {
     }
 };
 
+// ─── FRONTEND: TOGGLE status ──────────────────────────────────────────────────
 const toggleStatusFrontend = async (req, res) => {
     const { status } = req.body;
 
     if (!status || !['ACTIVE', 'INACTIVE'].includes(status)) {
-        return res.status(400).json({ success: false, message: 'Status must be ACTIVE or INACTIVE.' });
+        return res.status(400).json({
+            success: false,
+            message: 'Status must be ACTIVE or INACTIVE.'
+        });
     }
 
     try {
-        const dbStatus = status === 'ACTIVE' ? 'active' : 'inactive';
         const result = await query(
-            `UPDATE team_members SET status = $1, updated_at = NOW()
-       WHERE id = $2 RETURNING id`,
-            [dbStatus, req.params.id]
+            `UPDATE team_members
+             SET status = $1, updated_at = NOW()
+             WHERE id = $2
+             RETURNING id`,
+            [normalizeDbStatus(status), req.params.id]
         );
 
         if (!result.rows.length) {
@@ -520,9 +697,17 @@ const toggleStatusFrontend = async (req, res) => {
     }
 };
 
-// ─── UPDATE self profile (Frontend) ───────────────────────────────────────────
+// ─── FRONTEND: UPDATE self profile ────────────────────────────────────────────
 const updateSelfProfile = async (req, res) => {
-    const { first_name, last_name, phone, profile_photo_source, profile_photo_url, profile_photo_base64 } = req.body;
+    const {
+        first_name,
+        last_name,
+        phone,
+        profile_photo_source,
+        profile_photo_url,
+        profile_photo_base64
+    } = req.body;
+
     const userId = req.user.id;
 
     try {
@@ -530,12 +715,25 @@ const updateSelfProfile = async (req, res) => {
         const values = [];
         let idx = 1;
 
-        if (first_name) { fields.push(`first_name = $${idx++}`); values.push(first_name); }
-        if (last_name) { fields.push(`last_name = $${idx++}`); values.push(last_name); }
-        if (phone !== undefined) { fields.push(`phone = $${idx++}`); values.push(phone); }
+        if (first_name !== undefined) {
+            fields.push(`first_name = $${idx++}`);
+            values.push(first_name?.trim() || null);
+        }
+        if (last_name !== undefined) {
+            fields.push(`last_name = $${idx++}`);
+            values.push(last_name?.trim() || null);
+        }
+        if (phone !== undefined) {
+            fields.push(`phone = $${idx++}`);
+            values.push(phone?.trim() || null);
+        }
 
-        if (profile_photo_source) {
-            const photoResult = handleProfilePhotoSave(profile_photo_source, profile_photo_url, profile_photo_base64);
+        if (profile_photo_source !== undefined) {
+            const photoResult = handleProfilePhotoSave(
+                profile_photo_source,
+                profile_photo_url,
+                profile_photo_base64
+            );
             fields.push(`profile_photo_source = $${idx++}`);
             values.push(photoResult.source);
             fields.push(`profile_photo_url = $${idx++}`);
@@ -550,10 +748,11 @@ const updateSelfProfile = async (req, res) => {
 
         values.push(userId);
         const result = await query(
-            `UPDATE team_members SET ${fields.join(', ')}, updated_at = NOW()
+            `UPDATE team_members
+             SET ${fields.join(', ')}, updated_at = NOW()
              WHERE id = $${idx}
-             RETURNING id, first_name, last_name, email, phone, role_id, status,
-                       profile_photo_url, profile_photo_source, availability_status, allocation_details`,
+             RETURNING id, first_name, last_name, email, phone, role_id,
+                       status, profile_photo_url, profile_photo_source, avatar_url`,
             values
         );
 
@@ -563,7 +762,6 @@ const updateSelfProfile = async (req, res) => {
 
         const member = result.rows[0];
         const roleResult = await query('SELECT name FROM roles WHERE id = $1', [member.role_id]);
-        const roleName = roleResult.rows[0]?.name || '';
 
         return res.json({
             success: true,
@@ -574,11 +772,11 @@ const updateSelfProfile = async (req, res) => {
                 last_name: member.last_name,
                 email: member.email,
                 phone: member.phone,
-                role: roleName,
+                role: roleResult.rows[0]?.name || '',
+                status: member.status,
                 profile_photo_url: member.profile_photo_url,
                 profile_photo_source: member.profile_photo_source,
-                availability_status: member.availability_status,
-                allocation_details: member.allocation_details,
+                avatar_url: member.avatar_url
             }
         });
     } catch (err) {
@@ -587,7 +785,7 @@ const updateSelfProfile = async (req, res) => {
     }
 };
 
-// ─── DELETE team member (Frontend - hard delete) ──────────────────────────────
+// ─── FRONTEND: DELETE team member (hard delete) ───────────────────────────────
 const deleteTeamMemberFrontend = async (req, res) => {
     try {
         if (req.params.id === req.user.id) {
@@ -611,9 +809,17 @@ const deleteTeamMemberFrontend = async (req, res) => {
 };
 
 module.exports = {
-    getTeam, getTeamMember, addTeamMember, updateTeamMember,
-    deleteTeamMember, resendInvite, getRoles,
-    getTeamFrontend, addTeamMemberFrontend,
-    updateTeamMemberFrontend, toggleStatusFrontend,
-    deleteTeamMemberFrontend, updateSelfProfile,
+    getTeam,
+    getTeamMember,
+    addTeamMember,
+    updateTeamMember,
+    deleteTeamMember,
+    resendInvite,
+    getRoles,
+    getTeamFrontend,
+    addTeamMemberFrontend,
+    updateTeamMemberFrontend,
+    toggleStatusFrontend,
+    deleteTeamMemberFrontend,
+    updateSelfProfile,
 };

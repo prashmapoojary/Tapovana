@@ -4,6 +4,7 @@ import { apiFetch } from '../api/http';
 import { getImageUrl } from '../utils/image';
 import EditService from './EditService';
 import AddService from './AddService';
+import { useAllocations } from '../utils/AllocationContext';
 
 const subCategoriesMap = {
   'Body Care': ['Massages', 'Facials', 'Scrubs', 'Hydrotherapy'],
@@ -52,6 +53,7 @@ const TrashIcon = () => (
 );
 
 function Services() {
+  const { triggerConfirm, triggerAlert } = useAllocations();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -141,7 +143,7 @@ function Services() {
           b.service_name === serviceName && (b.status === 'PENDING' || b.status === 'CONFIRMED')
         );
         if (hasActiveBookings) {
-          alert(`Cannot delete service "${serviceName}" because it has active bookings.`);
+          triggerAlert(`Cannot delete service "${serviceName}" because it has active bookings.`);
           return;
         }
       }
@@ -149,12 +151,13 @@ function Services() {
       console.warn("Could not check bookings:", err);
     }
 
-    if (!window.confirm(`Are you sure you want to delete this service "${serviceName}"?`)) return;
+    const confirmed = await triggerConfirm(`Are you sure you want to delete this service "${serviceName}"?`, true);
+    if (!confirmed) return;
     try {
       await apiFetch(`/api/services/${id}`, { method: 'DELETE' });
       fetchServices();
     } catch (err) {
-      alert("Failed to delete service: " + err.message);
+      triggerAlert("Failed to delete service: " + err.message);
     }
   };
 
