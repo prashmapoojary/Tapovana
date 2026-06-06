@@ -35,3 +35,7 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Backups and Uploads
+uploads/
+*.sql

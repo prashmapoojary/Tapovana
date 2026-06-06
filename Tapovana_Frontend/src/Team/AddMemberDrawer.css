@@ -92,10 +92,11 @@
   align-items: center;
   justify-content: center;
   line-height: 1;
+  transition: color 0.2s ease;
 }
 
 .drawer-close-btn:hover {
-  color: #1a1a1a;
+  color: #CDA751;
 }
 
 /* Scrollable Body */
@@ -434,11 +435,13 @@
   padding: 9px;
   font-size: 13px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
 }
 
 .btn-cancel:hover {
-  background: #f5f5f5;
+  background: #CDA751;
+  border-color: #CDA751;
+  color: white;
 }
 
 .btn-save {

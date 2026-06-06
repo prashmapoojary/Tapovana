@@ -808,6 +808,85 @@ const deleteTeamMemberFrontend = async (req, res) => {
     }
 };
 
+const getTeamMemberAllocations = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        
+        // Ensure user exists and get their availability status
+        const userRes = await query(`SELECT availability_status, allocation_details FROM team_members WHERE id = $1`, [userId]);
+        if (!userRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+        
+        const user = userRes.rows[0];
+        const allocDetails = user.allocation_details;
+        const isAllocated = user.availability_status === 'Allocated';
+        
+        // 1. Fetch workshops assigned to this user
+        const workshopsRes = await query(
+            `SELECT id, title, date, status FROM workshops WHERE assigned_staff_ids @> $1::jsonb`,
+            [JSON.stringify([userId])]
+        );
+        const workshops = workshopsRes.rows.map(w => {
+            const endDate = new Date(w.date);
+            const isCompleted = new Date() > endDate;
+            let status = 'Pending';
+            if (isCompleted) status = 'Completed';
+            else if (w.status === 'Cancelled') status = 'Cancelled';
+            else if (isAllocated && allocDetails?.sessionId === w.id) status = 'In Progress';
+            
+            return {
+                id: w.id,
+                sessionTitle: w.title,
+                startDate: w.date,
+                status: status,
+                type: 'workshop'
+            };
+        });
+
+        // 2. Fetch services assigned to this user
+        const servicesRes = await query(
+            `SELECT id, name, category, status FROM services WHERE assigned_staff_ids @> $1::jsonb`,
+            [JSON.stringify([userId])]
+        );
+        const services = servicesRes.rows.map(s => {
+            let status = s.status === 'Inactive' ? 'Completed' : 'Pending';
+            if (isAllocated && allocDetails?.sessionId === s.id) status = 'Active';
+            
+            return {
+                id: s.id,
+                sessionTitle: s.name,
+                type: 'service',
+                status: status
+            };
+        });
+
+        // 3. Vedic Programs (Rely on allocation_details JSON if it contains a vedic program)
+        const vedic_programs = [];
+        if (allocDetails && allocDetails.type === 'vedic_program') {
+            const endDate = new Date(allocDetails.endDate);
+            const isCompleted = new Date() > endDate;
+            vedic_programs.push({
+                id: allocDetails.id || `vp-${allocDetails.sessionId}`,
+                sessionTitle: allocDetails.sessionTitle,
+                startDate: allocDetails.startDate,
+                endDate: allocDetails.endDate,
+                status: isCompleted ? 'Completed' : 'Ongoing',
+                type: 'vedic_program'
+            });
+        }
+        
+        return res.json({ 
+            success: true, 
+            allocations: { workshops, services, vedic_programs } 
+        });
+
+    } catch (err) {
+        console.error('getTeamMemberAllocations error:', err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
 module.exports = {
     getTeam,
     getTeamMember,
@@ -820,6 +899,7 @@ module.exports = {
     addTeamMemberFrontend,
     updateTeamMemberFrontend,
     toggleStatusFrontend,
+    getTeamMemberAllocations,
     deleteTeamMemberFrontend,
     updateSelfProfile,
 };

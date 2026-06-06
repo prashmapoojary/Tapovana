@@ -3,6 +3,7 @@ const { authenticate, requireRole } = require('../middleware/auth');
 const {
     getTeam,
     getTeamMember,
+    getTeamMemberAllocations,
     addTeamMember,
     updateTeamMember,
     deleteTeamMember,
@@ -25,6 +26,8 @@ router.post('/users', ...adminOnly, addTeamMemberFrontend);
 router.patch('/users/:id', ...adminOnly, updateTeamMemberFrontend);
 router.patch('/users/:id/status', ...adminOnly, toggleStatusFrontend);
 router.delete('/users/:id', ...adminOnly, deleteTeamMemberFrontend);
+
+router.get('/users/:id/allocations', ...adminOnly, getTeamMemberAllocations);
 
 // ── Postman testing routes ────────────────────────────────────────────────────
 router.get('/', ...adminOnly, getTeam);
