@@ -45,7 +45,7 @@ const InfoIcon = () => (
 
 function MyAssignments() {
   const loggedInUser = useMemo(() => getUser(), []);
-  const { allocations: contextAllocations, completeAllocation, triggerAlert } = useAllocations();
+  const { allocations: contextAllocations, completeAllocation } = useAllocations();
 
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [staffList, setStaffList] = useState([]);
@@ -197,9 +197,9 @@ function MyAssignments() {
       // Refresh from backend
       await refreshAssignments();
 
-      await triggerAlert("Session marked as Done! You are now Available.", true);
+      alert("✅ Session marked as Done! You are now Available.");
     } catch (err) {
-      await triggerAlert("Error completing assignment: " + err.message);
+      alert("Error completing assignment: " + err.message);
     }
   };
 
@@ -378,7 +378,7 @@ function MyAssignments() {
                   borderRadius: "6px", padding: "10px 14px", margin: "0 0 8px",
                   fontSize: "12px", color: "#c0392b", display: "flex", gap: "8px"
                 }}>
-                  <span></span><span>{validationError.message}</span>
+                  <span>⏳</span><span>{validationError.message}</span>
                 </div>
               )}
 

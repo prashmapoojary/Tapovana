@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import "./AddMemberDrawer.css";
 import DropdownIcon from "../assets/dropdownIcon.svg";
 import OverlayIcon from "../assets/Overlay.png";
-import ProfilePlaceholder from "../assets/profile.png";
+import ProfilePlaceholder from "../assets/profileIconDefault.png";
 import ProfileButtonIcon from "../assets/profileButton.png";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "";

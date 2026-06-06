@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { apiFetch } from "../api/http";
+import "./AllocationContext.css";
 
 const AllocationContext = createContext();
 
@@ -25,39 +26,45 @@ const AllocationContext = createContext();
 export const AllocationProvider = ({ children }) => {
   const [allocations, setAllocations] = useState([]);
   const [emailNotifications, setEmailNotifications] = useState([]);
-  const [customDialog, setCustomDialog] = useState(null); // { type: "alert" | "confirm", message: string, isCritical?: boolean, onConfirm: () => void, onCancel?: () => void }
+  
+  // Custom Alert and Confirm Modal States
+  const [alertState, setAlertState] = useState({ visible: false, message: "", isSuccess: false, resolve: null });
+  const [confirmState, setConfirmState] = useState({ visible: false, message: "", resolve: null });
 
-  const triggerAlert = useCallback((msg, isSuccess = false) => {
+  const triggerAlert = useCallback((message, isSuccess = false) => {
     return new Promise((resolve) => {
-      setCustomDialog({
-        type: "alert",
-        message: msg,
+      setAlertState({
+        visible: true,
+        message,
         isSuccess,
-        onConfirm: () => {
-          setCustomDialog(null);
-          resolve(true);
-        }
+        resolve,
       });
     });
   }, []);
 
-  const triggerConfirm = useCallback((msg, isCritical = false) => {
+  const triggerConfirm = useCallback((message) => {
     return new Promise((resolve) => {
-      setCustomDialog({
-        type: "confirm",
-        message: msg,
-        isCritical,
-        onConfirm: () => {
-          setCustomDialog(null);
-          resolve(true);
-        },
-        onCancel: () => {
-          setCustomDialog(null);
-          resolve(false);
-        }
+      setConfirmState({
+        visible: true,
+        message,
+        resolve,
       });
     });
   }, []);
+
+  const handleAlertClose = useCallback(() => {
+    if (alertState.resolve) {
+      alertState.resolve();
+    }
+    setAlertState({ visible: false, message: "", isSuccess: false, resolve: null });
+  }, [alertState]);
+
+  const handleConfirmAction = useCallback((choice) => {
+    if (confirmState.resolve) {
+      confirmState.resolve(choice);
+    }
+    setConfirmState({ visible: false, message: "", resolve: null });
+  }, [confirmState]);
 
   /**
    * Allocate staff to a session (workshop or vedic program)
@@ -71,7 +78,7 @@ export const AllocationProvider = ({ children }) => {
     if (session.endDate && session.endDate.length <= 10) {
       sessionEndDate.setHours(23, 59, 59, 999);
     }
-    if (sessionEndDate < now) {
+    if (sessionType !== "service" && sessionEndDate < now) {
       triggerAlert(`Cannot allocate staff: This ${sessionType === "workshop" ? "workshop" : "program"} has already ended (${sessionEndDate.toLocaleDateString()}).`);
       return null;
     }
@@ -81,8 +88,8 @@ export const AllocationProvider = ({ children }) => {
     const sessionEnd = sessionEndDate;
 
     // ── Validation 2: Date-conflict check — same staff, overlapping dates ──
-    const hasConflict = allocations.some((a) => {
-      if (a.staffId !== staffId || a.status === "expired") return false;
+    const hasConflict = sessionType !== "service" && allocations.some((a) => {
+      if (a.staffId !== staffId || a.status === "expired" || a.type === "service") return false;
       const existingStart = new Date(a.startDate);
       const existingEnd = new Date(a.endDate);
       if (a.endDate && a.endDate.length <= 10) existingEnd.setHours(23, 59, 59, 999);
@@ -92,7 +99,7 @@ export const AllocationProvider = ({ children }) => {
 
     if (hasConflict) {
       const conflicting = allocations.find((a) => {
-        if (a.staffId !== staffId || a.status === "expired") return false;
+        if (a.staffId !== staffId || a.status === "expired" || a.type === "service") return false;
         const existingStart = new Date(a.startDate);
         const existingEnd = new Date(a.endDate);
         if (a.endDate && a.endDate.length <= 10) existingEnd.setHours(23, 59, 59, 999);
@@ -194,7 +201,7 @@ export const AllocationProvider = ({ children }) => {
         if (a.endDate && a.endDate.length <= 10) {
           endDate.setHours(23, 59, 59, 999);
         }
-        return endDate > now && a.status === "active";
+        return (a.type === "service" || endDate > now) && a.status === "active";
       })
       .map((a) => a.staffId);
   }, [allocations]);
@@ -212,7 +219,7 @@ export const AllocationProvider = ({ children }) => {
       return (
         a.staffId === staffId &&
         a.status === "active" &&
-        endDate > now
+        (a.type === "service" || endDate > now)
       );
     });
   }, [allocations]);
@@ -223,6 +230,7 @@ export const AllocationProvider = ({ children }) => {
   const getStaffAllocations = useCallback((staffId) => {
     const now = new Date();
     return allocations.filter((a) => a.staffId === staffId).map((a) => {
+      if (a.type === "service") return { ...a, status: "active" };
       const endDate = new Date(a.endDate);
       return {
         ...a,
@@ -238,6 +246,7 @@ export const AllocationProvider = ({ children }) => {
     const now = new Date();
     setAllocations((prev) =>
       prev.map((a) => {
+        if (a.type === "service") return a;
         const endDate = new Date(a.endDate);
         if (endDate <= now && a.status === "active") {
           apiFetch(`/api/teams/users/${a.staffId}`, {
@@ -363,94 +372,46 @@ Tapovana Admin Team
   return (
     <AllocationContext.Provider value={value}>
       {children}
-      {customDialog && (
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(15, 23, 42, 0.4)",
-          backdropFilter: "blur(4px)",
-          zIndex: 999999,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          animation: "wsFadeIn 0.2s ease"
-        }}>
-          <div style={{
-            background: "#FFFFFF",
-            border: `2px solid ${customDialog.isCritical ? "#EF4444" : "#CDA751"}`,
-            borderRadius: "16px",
-            width: "440px",
-            maxWidth: "90vw",
-            padding: "24px",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "16px"
-          }}>
-            <h3 style={{
-              margin: 0,
-              fontSize: "18px",
-              color: "#1e293b",
-              fontFamily: "'Poppins', sans-serif",
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center"
-            }}>
-              {customDialog.isSuccess && (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
+
+      {/* Global Alert Modal */}
+      {alertState.visible && (
+        <div className="global-alert-overlay">
+          <div className="global-alert-modal">
+            <div className="global-alert-icon-container">
+              {alertState.isSuccess ? (
+                <div className="global-alert-success-icon">✓</div>
+              ) : (
+                <div className="global-alert-warning-icon">!</div>
               )}
-              {customDialog.isCritical ? "Confirm Action" : "Alert"}
-            </h3>
-            <p style={{
-              margin: 0,
-              fontSize: "14px",
-              color: "#334155",
-              lineHeight: "1.6",
-              fontFamily: "'Manrope', sans-serif",
-              fontWeight: 500
-            }}>
-              {customDialog.message}
-            </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-              {customDialog.type === "confirm" && (
-                <button
-                  style={{
-                    padding: "8px 24px",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    borderRadius: "6px",
-                    cursor: "pointer",
-                    background: "#e2e8f0",
-                    color: "#334155",
-                    border: "none",
-                    transition: "background 0.2s"
-                  }}
-                  onMouseOver={(e) => e.target.style.background = "#cbd5e1"}
-                  onMouseOut={(e) => e.target.style.background = "#e2e8f0"}
-                  onClick={customDialog.onCancel}
-                >
-                  Cancel
-                </button>
-              )}
+            </div>
+            <div className="global-alert-message" style={{ color: alertState.isSuccess ? "#2e7559" : "#e74c3c", fontWeight: 600 }}>{alertState.message}</div>
+            <button className="global-alert-ok-btn" onClick={handleAlertClose}>
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Global Confirm Modal */}
+      {confirmState.visible && (
+        <div className="global-alert-overlay">
+          <div className="global-alert-modal">
+            <div className="global-alert-icon-container">
+              <div className="global-alert-warning-icon">?</div>
+            </div>
+            <div className="global-alert-message">{confirmState.message}</div>
+            <div className="global-confirm-actions">
               <button 
-                style={{ 
-                  padding: "8px 24px", 
-                  fontSize: "13px", 
-                  fontWeight: 600,
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  background: "#CDA751",
-                  color: "white",
-                  border: "none",
-                  transition: "background 0.2s"
-                }}
-                onMouseOver={(e) => e.target.style.background = "#b8903f"}
-                onMouseOut={(e) => e.target.style.background = "#CDA751"}
-                onClick={customDialog.onConfirm}
+                className="global-confirm-cancel-btn" 
+                onClick={() => handleConfirmAction(false)}
               >
-                OK
+                Cancel
+              </button>
+              <button 
+                className="global-confirm-confirm-btn" 
+                onClick={() => handleConfirmAction(true)}
+              >
+                Confirm
               </button>
             </div>
           </div>

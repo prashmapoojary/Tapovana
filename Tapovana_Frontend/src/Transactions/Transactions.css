@@ -72,47 +72,34 @@
 
 .revenue-metric-card {
   background: white;
-  border: 1px solid #CDA751 !important;
+  border: 1px solid #CDA751;
   border-radius: 8px;
-  padding: 16px;
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   box-shadow: none;
+  transition: all 0.25s ease;
 }
 
 .revenue-metric-card:hover {
+  transform: none;
+  box-shadow: none;
   border-color: #CDA751;
 }
 
 .revenue-card-label {
   font-size: 12px;
-  color: #718096;
-  margin: 0;
+  font-weight: 700;
+  color: #7b8a9a;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  font-weight: 600;
 }
 
 .revenue-card-value {
   font-size: 24px;
   font-weight: 700;
-  color: #1a202c !important;
-  margin: 0;
-}
-
-.revenue-metric-card.collected,
-.revenue-metric-card.pending,
-.revenue-metric-card.failed,
-.revenue-metric-card.refunded {
-  border-left: 1px solid #CDA751 !important;
-}
-
-.revenue-metric-card.collected .revenue-card-value,
-.revenue-metric-card.pending .revenue-card-value,
-.revenue-metric-card.failed .revenue-card-value,
-.revenue-metric-card.refunded .revenue-card-value {
-  color: #1a202c !important;
+  color: #2d3748;
 }
 
 /* Table and ledger structures */
@@ -175,16 +162,18 @@
 .method-badge {
   display: inline-flex;
   align-items: center;
-  padding: 4px 0;
+  padding: 4px 10px;
+  border-radius: 6px;
   font-size: 11px;
   font-weight: 700;
-  border: none !important;
-  background: transparent !important;
+  border: 1px solid #e2e8f0;
+  background: #fafbfc;
+  color: #4a5568;
 }
 
-.method-badge.upi { color: #CDA751; }
-.method-badge.card { color: #3498db; }
-.method-badge.netbanking { color: #9b59b6; }
+.method-badge.upi { background: rgba(205, 167, 81, 0.08); color: #CDA751; border-color: rgba(205, 167, 81, 0.15); }
+.method-badge.card { background: transparent; color: #3498db; border-color: rgba(52, 152, 219, 0.15); }
+.method-badge.netbanking { background: rgba(155, 89, 182, 0.08); color: #9b59b6; border-color: rgba(155, 89, 182, 0.15); }
 
 /* External links styling */
 .receipt-link {
@@ -198,7 +187,7 @@
 }
 
 .receipt-link:hover {
-  color: #b59243;
+  color: #b8933f;
   text-decoration: underline;
 }
 
@@ -252,8 +241,7 @@
 }
 
 .page-btn:hover:not(:disabled):not(.active) {
-  background: #CDA751;
-  color: #FFFFFF;
+  background: rgba(205, 167, 81, 0.08);
   border-color: rgba(205, 167, 81, 0.35);
 }
 

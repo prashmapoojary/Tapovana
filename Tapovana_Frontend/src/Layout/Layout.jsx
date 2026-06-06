@@ -87,7 +87,6 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import "./Layout.css";
 
 import logo from "../assets/logo.png";
-import sideImage from "../assets/graphic-side.png";
 import DefaultAvatar from "../assets/profileIconDefault.png"; 
 
 import HomeIcon from "../assets/Home.svg";
@@ -101,443 +100,6 @@ import VerifyIcon from "../assets/verify.svg";
 import DropdownIcon from "../assets/dropdown.svg";
 
 import { getUser, getAccess, roleLabel } from "../utils/session";
-import { useAllocations } from "../utils/AllocationContext";
-
-const EditProfileDrawer = ({ isOpen, onClose, user, onSaved }) => {
-  const navigate = useNavigate();
-  const { triggerAlert } = useAllocations();
-  const [isEditing, setIsEditing] = useState(false);
-  const [firstName, setFirstName] = useState(user?.first_name || "");
-  const [lastName, setLastName] = useState(user?.last_name || "");
-  const [phone, setPhone] = useState(user?.phone || "");
-  const [photoPreview, setPhotoPreview] = useState(null);
-  const [photoSource, setPhotoSource] = useState(user?.profile_photo_source || "default");
-  const [photoUrl, setPhotoUrl] = useState(user?.profile_photo_url || "");
-  const [photoBase64, setPhotoBase64] = useState("");
-  const [showPresets, setShowPresets] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  const fileInputRef = useRef(null);
-
-  const presets = [
-    "avatar1.svg",
-    "avatar2.svg",
-    "avatar3.svg",
-    "avatar4.svg",
-    "avatar5.svg",
-    "avatar6.svg"
-  ];
-
-  useEffect(() => {
-    if (user) {
-      setFirstName(user.first_name || "");
-      setLastName(user.last_name || "");
-      setPhone(user.phone || "");
-      setPhotoSource(user.profile_photo_source || "default");
-      setPhotoUrl(user.profile_photo_url || "");
-      
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-      if (user.profile_photo_source === "upload" && user.profile_photo_url) {
-        setPhotoPreview(`${API_BASE}${user.profile_photo_url}`);
-      } else if (user.profile_photo_source === "local" && user.profile_photo_url) {
-        setPhotoPreview(`/avatars/${user.profile_photo_url}`);
-      } else if (user.avatar_url) {
-        setPhotoPreview(
-          user.avatar_url.startsWith("http") || user.avatar_url.startsWith("/")
-            ? user.avatar_url
-            : `${API_BASE}${user.avatar_url}`
-        );
-      } else {
-        setPhotoPreview(null);
-      }
-    }
-  }, [user, isOpen]);
-
-  useEffect(() => {
-    if (isOpen) {
-      setIsEditing(false);
-    }
-  }, [isOpen]);
-
-  const handleCancelEdit = () => {
-    setFirstName(user?.first_name || "");
-    setLastName(user?.last_name || "");
-    setPhone(user?.phone || "");
-    setPhotoSource(user?.profile_photo_source || "default");
-    setPhotoUrl(user?.profile_photo_url || "");
-    setPhotoBase64("");
-    
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-    if (user?.profile_photo_source === "upload" && user?.profile_photo_url) {
-      setPhotoPreview(`${API_BASE}${user.profile_photo_url}`);
-    } else if (user?.profile_photo_source === "local" && user?.profile_photo_url) {
-      setPhotoPreview(`/avatars/${user.profile_photo_url}`);
-    } else if (user?.avatar_url) {
-      setPhotoPreview(
-        user.avatar_url.startsWith("http") || user.avatar_url.startsWith("/")
-          ? user.avatar_url
-          : `${API_BASE}${user.avatar_url}`
-      );
-    } else {
-      setPhotoPreview(null);
-    }
-    setError("");
-    setIsEditing(false);
-  };
-
-  const handlePhotoClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handlePhotoChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPhotoPreview(reader.result);
-      setPhotoSource("upload");
-      setPhotoBase64(reader.result);
-      setPhotoUrl("");
-      setShowPresets(false);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleSelectPreset = (presetName) => {
-    setPhotoSource("local");
-    setPhotoUrl(presetName);
-    setPhotoBase64("");
-    setPhotoPreview(`/avatars/${presetName}`);
-    setShowPresets(false);
-  };
-
-  const handleResetPhoto = () => {
-    setPhotoSource("default");
-    setPhotoUrl("");
-    setPhotoBase64("");
-    setPhotoPreview(null);
-    setShowPresets(false);
-  };
-
-  const handleSave = async () => {
-    setError("");
-
-    if (!firstName.trim()) {
-      setError("First name is required");
-      return;
-    }
-    if (!lastName.trim()) {
-      setError("Last name is required");
-      return;
-    }
-
-    if (phone && phone.trim()) {
-      const phoneVal = phone.trim();
-      if (!/^\d{10,15}$/.test(phoneVal)) {
-        setError("Phone number must be digits only and between 10 to 15 characters long");
-        return;
-      }
-    }
-
-    const token = sessionStorage.getItem("access_token");
-    if (!token) {
-      setError("Session expired. Please login again.");
-      return;
-    }
-
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-    const payload = {
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      phone: phone?.trim() || null,
-      profile_photo_source: photoSource,
-      profile_photo_url: photoUrl,
-      profile_photo_base64: photoBase64
-    };
-
-    try {
-      setSaving(true);
-      const res = await fetch(`${API_BASE}/api/teams/profile`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok || data.success === false) {
-        setError(data.message || "Failed to update profile");
-        return;
-      }
-
-      if (onSaved) {
-        onSaved(data.user);
-      }
-      setIsEditing(false);
-      await triggerAlert("Profile updated successfully.");
-    } catch (e) {
-      setError("Network error. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <>
-      <div className="profile-modal-overlay" onClick={onClose} style={{ zIndex: 99999 }} />
-      <div className="profile-drawer full-screen-drawer" style={{ zIndex: 100000 }}>
-        
-        {/* Left Side: Form Content */}
-        <div className="profile-drawer-left">
-          <div className="profile-drawer-header">
-            <div className="profile-drawer-title">{isEditing ? "Edit Profile" : "My Profile"}</div>
-            <button className="profile-drawer-close" onClick={onClose} disabled={saving}>
-              ✕
-            </button>
-          </div>
-
-          <div className="profile-drawer-body">
-            {!isEditing ? (
-              /* VIEW MODE */
-              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                <div className="profile-photo-section" style={{ borderBottom: "1px solid #edf2f7", paddingBottom: "20px" }}>
-                  <img
-                    src={photoPreview || DefaultAvatar}
-                    alt="Profile"
-                    className="profile-avatar-preview"
-                    style={{ width: "120px", height: "120px", borderRadius: "50%", objectFit: "cover" }}
-                  />
-                </div>
-
-                <div className="profile-input-group">
-                  <label className="profile-input-label">Name</label>
-                  <div style={{ fontSize: "16px", fontWeight: "600", color: "#1e293b", padding: "8px 0" }}>
-                    {firstName} {lastName}
-                  </div>
-                </div>
-
-                <div className="profile-input-group">
-                  <label className="profile-input-label">Role</label>
-                  <div style={{ fontSize: "16px", fontWeight: "600", color: "#1e293b", padding: "8px 0" }}>
-                    {roleLabel(user?.role)}
-                  </div>
-                </div>
-
-                <div className="profile-input-group">
-                  <label className="profile-input-label">Email</label>
-                  <div style={{ fontSize: "16px", fontWeight: "600", color: "#1e293b", padding: "8px 0" }}>
-                    {user?.email}
-                  </div>
-                </div>
-
-                <div className="profile-input-group">
-                  <label className="profile-input-label">Contact Number</label>
-                  <div style={{ fontSize: "16px", fontWeight: "600", color: "#1e293b", padding: "8px 0" }}>
-                    {phone || "N/A"}
-                  </div>
-                </div>
-
-                {user?.specialization && (
-                  <div className="profile-input-group">
-                    <label className="profile-input-label">Specialization</label>
-                    <div style={{ fontSize: "16px", fontWeight: "600", color: "#1e293b", padding: "8px 0" }}>
-                      {user.specialization}
-                    </div>
-                  </div>
-                )}
-
-                {user?.availability_status && (
-                  <div className="profile-input-group">
-                    <label className="profile-input-label">Availability Status</label>
-                    <div style={{ fontSize: "16px", fontWeight: "600", color: "#1e293b", padding: "8px 0" }}>
-                      {user.availability_status}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* EDIT MODE */
-              <>
-                <div className="profile-photo-section">
-                  <img
-                    src={photoPreview || DefaultAvatar}
-                    alt="Profile"
-                    className="profile-avatar-preview"
-                  />
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button
-                      type="button"
-                      className="profile-btn-secondary"
-                      onClick={handlePhotoClick}
-                      style={{ padding: "6px 12px", fontSize: "12px", cursor: "pointer" }}
-                    >
-                      Upload Photo
-                    </button>
-                    <button
-                      type="button"
-                      className="profile-btn-secondary"
-                      onClick={() => setShowPresets(!showPresets)}
-                      style={{ padding: "6px 12px", fontSize: "12px", cursor: "pointer" }}
-                    >
-                      Choose Preset
-                    </button>
-                    {(photoSource !== "default" || photoPreview) && (
-                      <button
-                        type="button"
-                        className="profile-btn-secondary"
-                        onClick={handleResetPhoto}
-                        style={{ padding: "6px 12px", fontSize: "12px", color: "#e53e3e", cursor: "pointer" }}
-                      >
-                        Reset
-                      </button>
-                    )}
-                  </div>
-
-                  <input
-                    type="file"
-                    accept="image/*"
-                    ref={fileInputRef}
-                    style={{ display: "none" }}
-                    onChange={handlePhotoChange}
-                  />
-
-                  {showPresets && (
-                    <div className="profile-preset-grid">
-                      {presets.map((preset) => (
-                        <div
-                          key={preset}
-                          onClick={() => handleSelectPreset(preset)}
-                          className={`profile-preset-item ${photoUrl === preset ? "selected" : ""}`}
-                        >
-                          <img
-                            src={`/avatars/${preset}`}
-                            alt={preset}
-                            className="profile-preset-img"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="profile-input-group">
-                  <label className="profile-input-label">First Name</label>
-                  <input
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="profile-input-field"
-                    placeholder="First Name"
-                  />
-                </div>
-
-                <div className="profile-input-group">
-                  <label className="profile-input-label">Last Name</label>
-                  <input
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="profile-input-field"
-                    placeholder="Last Name"
-                  />
-                </div>
-
-                <div className="profile-input-group">
-                  <label className="profile-input-label">Phone Number</label>
-                  <input
-                    type="text"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="profile-input-field"
-                    placeholder="Phone Number"
-                  />
-                </div>
-
-                <div className="profile-input-group">
-                  <label className="profile-input-label">Email</label>
-                  <input
-                    type="text"
-                    value={user?.email || ""}
-                    disabled
-                    className="profile-input-field"
-                  />
-                </div>
-
-                <div className="profile-input-group">
-                  <label className="profile-input-label">Password</label>
-                  <div className="profile-password-box">
-                    <span className="profile-password-dots">••••••••</span>
-                    <span
-                      onClick={() => {
-                        navigate(`/set-password?email=${encodeURIComponent(user?.email || "")}&mode=forgot`);
-                      }}
-                      className="profile-password-link"
-                    >
-                      Forgot / Reset Password?
-                    </span>
-                  </div>
-                </div>
-
-                <div className="profile-input-group">
-                  <label className="profile-input-label">Role</label>
-                  <input
-                    type="text"
-                    value={roleLabel(user?.role)}
-                    disabled
-                    className="profile-input-field"
-                  />
-                </div>
-
-                {error && <div style={{ color: "red", fontSize: "13px" }}>{error}</div>}
-              </>
-            )}
-          </div>
-
-          <div className="profile-drawer-footer">
-            {!isEditing ? (
-              <>
-                <button className="profile-btn-secondary" onClick={onClose} style={{ cursor: "pointer" }}>
-                  Cancel
-                </button>
-                <button className="profile-btn-primary" onClick={() => setIsEditing(true)} style={{ cursor: "pointer" }}>
-                  Edit Profile
-                </button>
-              </>
-            ) : (
-              <>
-                <button className="profile-btn-secondary" onClick={handleCancelEdit} disabled={saving} style={{ cursor: "pointer" }}>
-                  Cancel
-                </button>
-                <button className="profile-btn-primary" onClick={handleSave} disabled={saving} style={{ cursor: "pointer" }}>
-                  {saving ? "Saving..." : "Save Changes"}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Right Side: Graphic Background & Logo */}
-        <div 
-          className="profile-drawer-right" 
-          style={{ backgroundImage: `url(${sideImage})` }}
-        >
-          <div className="profile-drawer-logo-container">
-            <img src={logo} alt="Tapovana" className="profile-drawer-logo" />
-          </div>
-        </div>
-
-      </div>
-    </>
-  );
-};
-
 const Layout = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -552,14 +114,24 @@ const Layout = () => {
   const avatarSrc = useMemo(() => {
     if (!user) return DefaultAvatar;
     const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-    if (user.profile_photo_source === "upload" && user.profile_photo_url) {
-      return `${API_BASE}${user.profile_photo_url}`;
-    } else if (user.profile_photo_source === "local" && user.profile_photo_url) {
-      return `/avatars/${user.profile_photo_url}`;
+    
+    let photoUrl = user.profile_photo_url;
+    if (photoUrl && /^[A-Za-z]:[/\\]/i.test(photoUrl)) {
+      photoUrl = "/uploads/" + photoUrl.replace(/\\/g, '/').split('/').pop();
+    }
+
+    if (user.profile_photo_source === "upload" && photoUrl) {
+      return `${API_BASE}${photoUrl}`;
+    } else if (user.profile_photo_source === "local" && photoUrl) {
+      return `/avatars/${photoUrl}`;
     } else if (user.avatar_url) {
-      return user.avatar_url.startsWith("http") || user.avatar_url.startsWith("/")
-        ? user.avatar_url
-        : `${API_BASE}${user.avatar_url}`;
+      let avUrl = user.avatar_url;
+      if (avUrl && /^[A-Za-z]:[/\\]/i.test(avUrl)) {
+        avUrl = "/uploads/" + avUrl.replace(/\\/g, '/').split('/').pop();
+      }
+      return avUrl.startsWith("http") || avUrl.startsWith("/")
+        ? avUrl
+        : `${API_BASE}${avUrl}`;
     }
     return DefaultAvatar;
   }, [user]);
@@ -724,27 +296,24 @@ const Layout = () => {
   });
 
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-  const [showEditProfile, setShowEditProfile] = useState(false);
+
+  useEffect(() => {
+    const handleProfileUpdated = () => {
+      setUser(getUser());
+    };
+    window.addEventListener("profileUpdated", handleProfileUpdated);
+    return () => {
+      window.removeEventListener("profileUpdated", handleProfileUpdated);
+    };
+  }, []);
 
   const handleLogout = () => {
     sessionStorage.clear();
     navigate("/");
   };
 
-  const handleProfileSaved = (updatedUser) => {
-    sessionStorage.setItem("user", JSON.stringify(updatedUser));
-    setUser(updatedUser);
-    window.dispatchEvent(new CustomEvent("profile-updated", { detail: updatedUser }));
-  };
-
   return (
     <div className="layout-container">
-      <EditProfileDrawer
-        isOpen={showEditProfile}
-        onClose={() => setShowEditProfile(false)}
-        user={user}
-        onSaved={handleProfileSaved}
-      />
       <header className="topbar">
         <div className="logo-section">
           <img src={logo} alt="Tapovana" />
@@ -784,7 +353,7 @@ const Layout = () => {
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowProfileDropdown(false);
-                  setShowEditProfile(true);
+                  navigate("/dashboard/profile");
                 }}
                 style={{ padding: '12px 16px', color: '#2d3748', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #edf2f7' }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f7fafc'}

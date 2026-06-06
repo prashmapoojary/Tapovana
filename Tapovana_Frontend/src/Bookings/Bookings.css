@@ -23,10 +23,7 @@
   transition: opacity 0.2s ease;
   white-space: nowrap;
 }
-
-.svc-gold-btn:hover {
-  opacity: 0.88;
-}
+.svc-gold-btn:hover { opacity: 0.88; }
 
 .bookings-header {
   display: flex;
@@ -186,15 +183,12 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: auto;
-  scrollbar-width: none;
-  /* Firefox */
-  -ms-overflow-style: none;
-  /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
 }
 
 .bookings-table-scroll::-webkit-scrollbar {
-  display: none;
-  /* Chrome/Safari */
+  display: none; /* Chrome/Safari */
 }
 
 .bookings-table {
@@ -221,7 +215,7 @@
 .bookings-table td {
   padding: 16px 20px;
   font-size: 14px;
-  color: #b0bfd4;
+  color: #4b5563;
   border-bottom: 1px solid #f1f3f6;
   vertical-align: middle;
 }
@@ -239,33 +233,18 @@
 .status-badge {
   display: inline-flex;
   align-items: center;
-  padding: 6px 12px;
-  border-radius: 20px;
+  padding: 0;
+  border-radius: 0;
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
 
-.status-badge.pending {
-  background: transparent !important;
-  color: #D46B08;
-}
-
-.status-badge.confirmed {
-  background: transparent !important;
-  color: #08979C;
-}
-
-.status-badge.completed {
-  background: transparent !important;
-  color: #cda751;
-}
-
-.status-badge.cancelled {
-  background: transparent !important;
-  color: #CF1322;
-}
+.status-badge.pending { background: transparent; color: #D46B08; }
+.status-badge.confirmed { background: transparent; color: #08979C; }
+.status-badge.completed { background: transparent; color: #cda751; }
+.status-badge.cancelled { background: transparent; color: #CF1322; }
 
 .pay-badge {
   display: inline-flex;
@@ -274,23 +253,11 @@
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
-  background: transparent !important;
 }
 
-.pay-badge.paid {
-  color: #2ecc71;
-  background: transparent !important;
-}
-
-.pay-badge.pending {
-  color: #e67e22;
-  background: transparent !important;
-}
-
-.pay-badge.failed {
-  color: #e74c3c;
-  background: transparent !important;
-}
+.pay-badge.paid { background: rgba(46, 204, 113, 0.15); color: #2ecc71; }
+.pay-badge.pending { background: rgba(243, 156, 18, 0.15); color: #e67e22; }
+.pay-badge.failed { background: rgba(231, 76, 60, 0.15); color: #e74c3c; }
 
 /* Booking Details Slideout Drawer */
 .drawer-overlay {
@@ -308,13 +275,8 @@
 }
 
 @keyframes fadeInOverlay {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .details-drawer {
@@ -330,13 +292,8 @@
 }
 
 @keyframes slideInDrawer {
-  from {
-    transform: translateX(100%);
-  }
-
-  to {
-    transform: translateX(0);
-  }
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
 }
 
 .drawer-header {
@@ -423,7 +380,7 @@
   height: 56px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2.5px solid #cda751;
+  border: 2.5px solid #188A94;
 }
 
 .drawer-user-info h3 {
@@ -525,22 +482,33 @@
   transition: all 0.2s ease;
 }
 
-.drawer-btn.primary,
-.drawer-btn.secondary,
-.drawer-btn.danger,
-.drawer-btn.green {
-  background: white;
-  color: grey;
-  border: 1px solid #cda751;
-}
-
-.drawer-btn.primary:hover:not(:disabled),
-.drawer-btn.secondary:hover:not(:disabled),
-.drawer-btn.danger:hover:not(:disabled),
-.drawer-btn.green:hover:not(:disabled) {
+.drawer-btn.primary {
   background: #cda751;
   color: white;
-  border-color: #cda751;
+}
+
+.drawer-btn.primary:hover {
+  background: #b59243;
+}
+
+.drawer-btn.secondary {
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #4a5568;
+}
+
+.drawer-btn.secondary:hover {
+  background: #f7fafc;
+}
+
+.drawer-btn.danger {
+  background: #FFF1F0;
+  border: 1px solid #FFA39E;
+  color: #CF1322;
+}
+
+.drawer-btn.danger:hover {
+  background: #FFCCC7;
 }
 
 .drawer-btn:disabled {
@@ -594,8 +562,7 @@
 }
 
 .page-btn:hover:not(:disabled):not(.active) {
-  background: #cda751;
-  color: white;
+  background: rgba(205, 167, 81, 0.08);
   border-color: rgba(205, 167, 81, 0.35);
 }
 
@@ -660,10 +627,7 @@
   padding: 0;
   transition: color 0.2s;
 }
-
-.close-btn:hover {
-  color: #1a202c;
-}
+.close-btn:hover { color: #1a202c; }
 
 .drawer-content {
   flex: 1;
@@ -675,23 +639,13 @@
 }
 
 @keyframes drawerFadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes drawerSlideIn {
-  from {
-    transform: translateX(100%);
-  }
-
-  to {
-    transform: translateX(0);
-  }
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
 }
 
 /* ─── Fresh drawer classes for Bookings page ─── */
@@ -711,13 +665,8 @@
 }
 
 @keyframes bkFadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .bk-drawer-panel {
@@ -733,13 +682,8 @@
 }
 
 @keyframes bkSlideIn {
-  from {
-    transform: translateX(100%);
-  }
-
-  to {
-    transform: translateX(0);
-  }
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
 }
 
 .bk-drawer-header {
@@ -781,11 +725,7 @@
   flex-shrink: 0;
   transition: background 0.2s;
 }
-
-.bk-close-btn:hover {
-  background: #e0e0e0;
-  color: #000;
-}
+.bk-close-btn:hover { background: #e0e0e0; color: #000; }
 
 .bk-drawer-body {
   flex: 1;
@@ -828,7 +768,7 @@
   height: 48px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #cda751;
+  border: 2px solid #188A94;
 }
 
 .bk-name {
@@ -890,40 +830,65 @@
   flex-shrink: 0;
 }
 
-.bk-btn-primary,
-.bk-btn-green,
-.bk-btn-danger,
-.bk-btn-secondary {
+.bk-btn-primary {
   flex: 1;
-  min-width: 100px;
+  min-width: 120px;
   height: 42px;
-  background: white;
-  color: grey;
-  border: 1px solid #cda751;
+  background: #cda751;
+  color: white;
+  border: none;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  transition: background 0.2s;
 }
+.bk-btn-primary:hover { background: #b59243; }
+.bk-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.bk-btn-primary:hover:not(:disabled),
-.bk-btn-green:hover:not(:disabled),
-.bk-btn-danger:hover:not(:disabled),
-.bk-btn-secondary:hover:not(:disabled) {
-  background: #cda751;
+.bk-btn-green {
+  flex: 1;
+  min-width: 120px;
+  height: 42px;
+  background: #2ecc71;
   color: white;
-  border-color: #cda751;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
 }
+.bk-btn-green:hover { background: #27ae60; }
+.bk-btn-green:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.bk-btn-primary:disabled,
-.bk-btn-green:disabled,
-.bk-btn-danger:disabled,
-.bk-btn-secondary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.bk-btn-danger {
+  flex: 1;
+  min-width: 100px;
+  height: 42px;
+  background: #fff1f0;
+  color: #cf1322;
+  border: 1px solid #ffa39e;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
 }
+.bk-btn-danger:hover { background: #ffccc7; }
+.bk-btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.bk-btn-secondary {
+  flex: 1;
+  min-width: 80px;
+  height: 42px;
+  background: white;
+  color: #4a5568;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.bk-btn-secondary:hover { background: #f7fafc; }

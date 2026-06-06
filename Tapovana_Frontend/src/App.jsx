@@ -11,6 +11,9 @@ import Customers from "./Customers/Customers";
 import Transactions from "./Transactions/Transactions";
 import Team from "./Team/Team";
 import SetPassword from "./SignIn/SetPassword";
+import ResetPassword from "./SignIn/ResetPassword";
+import ForceChangePassword from "./SignIn/ForceChangePassword";
+import Profile from "./Profile/Profile";
 
 import Membership from "./Membership/Membership";
 import Workshops from "./Workshops/Workshops";
@@ -20,10 +23,21 @@ import MyAssignments from "./MyAssignments/MyAssignments";
 import { AllocationProvider } from "./utils/AllocationContext";
 import { getUser } from "./utils/session";
 
-// Guard 1: Checks for a valid session token
-const ProtectedRoute = ({ children }) => {
+// Guard 1: Checks for a valid session token and handles forced password change
+const ProtectedRoute = ({ children, isForceChangeRoute = false }) => {
   const token = sessionStorage.getItem("access_token");
-  return token ? children : <Navigate to="/" replace />;
+  if (!token) return <Navigate to="/" replace />;
+
+  const mustChange = sessionStorage.getItem("must_change") === "true";
+  
+  if (mustChange && !isForceChangeRoute) {
+    return <Navigate to="/force-change-password" replace />;
+  }
+  if (!mustChange && isForceChangeRoute) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
 };
 
 // Guard 2: Role-based route protection.
@@ -46,6 +60,12 @@ function App() {
 
           <Route path="/" element={<SignIn />} />
           <Route path="/set-password" element={<SetPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/force-change-password" element={
+            <ProtectedRoute isForceChangeRoute={true}>
+              <ForceChangePassword />
+            </ProtectedRoute>
+          } />
 
           <Route
             path="/dashboard"
@@ -57,6 +77,7 @@ function App() {
           >
             {/* Accessible to all logged-in roles */}
             <Route index element={<Home />} />
+            <Route path="profile" element={<Profile />} />
             <Route path="blogs" element={<Blogs />} />
             <Route path="blogs/:id" element={<Blogs />} />
             <Route path="my-assignments" element={<MyAssignments />} />

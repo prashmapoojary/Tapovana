@@ -21,12 +21,12 @@ const BookingDetailsDrawer = ({ booking, onClose, onSaved, userRole, doctors }) 
       setTimeout(() => {
         const custName = booking.customer_name || "Unknown Customer";
         setBookingDetail({
-          customer: {
-            first_name: custName.split(' ')[0],
-            last_name: custName.split(' ').slice(1).join(' '),
-            phone: booking.customer_phone,
-            email: "user@example.com",
-            membership_status: "Gold"
+          customer: { 
+            first_name: custName.split(' ')[0], 
+            last_name: custName.split(' ').slice(1).join(' '), 
+            phone: booking.customer_phone, 
+            email: "user@example.com", 
+            membership_status: "Gold" 
           },
           booking: { ...booking, duration_minutes: 60 },
           payment: { status: booking.payment_status, transaction_id: "TXN12345" }
@@ -77,7 +77,7 @@ const BookingDetailsDrawer = ({ booking, onClose, onSaved, userRole, doctors }) 
 
   // Booking deletion execution
   const handleDeleteBooking = async () => {
-    const confirmed = await triggerConfirm("Are you absolutely sure you want to delete this booking record? This action is irreversible.", true);
+    const confirmed = await triggerConfirm("Are you absolutely sure you want to delete this booking record? This action is irreversible.");
     if (!confirmed) {
       return;
     }
@@ -115,10 +115,10 @@ const BookingDetailsDrawer = ({ booking, onClose, onSaved, userRole, doctors }) 
               <div className="drawer-section">
                 <h4 className="drawer-section-title">Customer Dossier</h4>
                 <div className="drawer-user-card">
-                  <img
-                    src={bookingDetail.customer?.avatar_url || DefaultAvatar}
-                    className="drawer-avatar"
-                    alt="Customer"
+                  <img 
+                    src={bookingDetail.customer?.avatar_url || DefaultAvatar} 
+                    className="drawer-avatar" 
+                    alt="Customer" 
                   />
                   <div className="drawer-user-info">
                     <h3>{bookingDetail.customer?.first_name} {bookingDetail.customer?.last_name}</h3>
@@ -167,8 +167,8 @@ const BookingDetailsDrawer = ({ booking, onClose, onSaved, userRole, doctors }) 
               <div className="drawer-section">
                 <h4 className="drawer-section-title">Doctor/Therapist Allocation</h4>
                 <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                  <select
-                    className="allocation-select"
+                  <select 
+                    className="allocation-select" 
                     value={allocatedDoctorId}
                     onChange={(e) => setAllocatedDoctorId(e.target.value)}
                   >
@@ -179,8 +179,8 @@ const BookingDetailsDrawer = ({ booking, onClose, onSaved, userRole, doctors }) 
                       </option>
                     ))}
                   </select>
-                  <button
-                    className="drawer-btn primary"
+                  <button 
+                    className="drawer-btn primary" 
                     style={{ height: "45px", flex: "0 0 120px" }}
                     onClick={handleAllocateDoctor}
                     disabled={actionLoading}
@@ -193,9 +193,9 @@ const BookingDetailsDrawer = ({ booking, onClose, onSaved, userRole, doctors }) 
               {/* Notes text input editing */}
               <div className="drawer-section">
                 <h4 className="drawer-section-title">Consultation & Special Notes</h4>
-                <textarea
-                  className="notes-textarea"
-                  placeholder="Add specific client symptoms, muscle stiffness directions, doctor recommendations..."
+                <textarea 
+                  className="notes-textarea" 
+                  placeholder="Add specific client symptoms, muscle stiffness directions, doctor recommendations..." 
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                 />
@@ -206,7 +206,7 @@ const BookingDetailsDrawer = ({ booking, onClose, onSaved, userRole, doctors }) 
             <footer className="drawer-footer">
               <div className="drawer-actions-row">
                 {bookingDetail.booking?.status === "PENDING" && (
-                  <button
+                  <button 
                     className="drawer-btn primary"
                     onClick={() => handleUpdateStatus("CONFIRMED")}
                     disabled={actionLoading}
@@ -215,8 +215,9 @@ const BookingDetailsDrawer = ({ booking, onClose, onSaved, userRole, doctors }) 
                   </button>
                 )}
                 {bookingDetail.booking?.status === "CONFIRMED" && (
-                  <button
-                    className="drawer-btn green"
+                  <button 
+                    className="drawer-btn primary"
+                    style={{ backgroundColor: "#2ecc71" }}
                     onClick={() => handleUpdateStatus("COMPLETED")}
                     disabled={actionLoading}
                   >
@@ -224,7 +225,7 @@ const BookingDetailsDrawer = ({ booking, onClose, onSaved, userRole, doctors }) 
                   </button>
                 )}
                 {bookingDetail.booking?.status !== "CANCELLED" && bookingDetail.booking?.status !== "COMPLETED" && (
-                  <button
+                  <button 
                     className="drawer-btn danger"
                     onClick={() => handleUpdateStatus("CANCELLED")}
                     disabled={actionLoading}
@@ -233,20 +234,20 @@ const BookingDetailsDrawer = ({ booking, onClose, onSaved, userRole, doctors }) 
                   </button>
                 )}
               </div>
-
+              
               <div className="drawer-actions-row">
                 {/* Delete booking allowed for Super Admin */}
                 {userRole === "SUPER_ADMIN" && (
-                  <button
+                  <button 
                     className="drawer-btn danger"
-                    style={{ background: "#fff", borderColor: "#b59243", color: "#948d8dff" }}
+                    style={{ background: "#fff", borderColor: "#ff4d4f", color: "#ff4d4f" }}
                     onClick={handleDeleteBooking}
                     disabled={actionLoading}
                   >
                     Delete Record
                   </button>
                 )}
-                <button
+                <button 
                   className="drawer-btn secondary"
                   onClick={() => handleUpdateStatus(bookingDetail.booking?.status)}
                   disabled={actionLoading}

@@ -6,6 +6,7 @@ import SearchIcon from "../assets/searchIcon.svg";
 import DropdownIcon from "../assets/dropdownIcon.svg";
 import { getUser, roleLabel } from "../utils/session";
 import { getImageUrl } from "../utils/image";
+import { useAllocations } from "../utils/AllocationContext";
 
 // Helper to format date
 const formatDate = (dateStr) => {
@@ -44,9 +45,9 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
             borderRadius: "20px",
             fontSize: "11px",
             fontWeight: 700,
-            color: isPublished || isPending ? "#cda751" : isDraft ? "#d4ac0d" : "#c0392b",
-            background: isPublished || isPending ? "rgba(205, 167, 81, 0.15)" : isDraft ? "rgba(241, 196, 15, 0.15)" : "rgba(231, 76, 60, 0.15)",
-            border: isPublished || isPending ? "1px solid rgba(205, 167, 81, 0.3)" : isDraft ? "1px solid rgba(241, 196, 15, 0.3)" : "1px solid rgba(231, 76, 60, 0.3)",
+            color: (isPublished || isPending) ? "#cda751" : isDraft ? "#d4ac0d" : "#c0392b",
+            background: (isPublished || isPending) ? "rgba(205, 167, 81, 0.15)" : isDraft ? "rgba(241, 196, 15, 0.15)" : "rgba(231, 76, 60, 0.15)",
+            border: (isPublished || isPending) ? "1px solid rgba(205, 167, 81, 0.3)" : isDraft ? "1px solid rgba(241, 196, 15, 0.3)" : "1px solid rgba(231, 76, 60, 0.3)",
             boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
             textTransform: "uppercase",
             letterSpacing: "0.5px"
@@ -265,6 +266,7 @@ function RelatedBlogs({ currentBlogId, blogs, onClick }) {
 }
 
 function CreateOrEditBlogModal({ blogToEdit, staffProfile, onClose, onSave }) {
+  const { triggerAlert } = useAllocations();
   const [formData, setFormData] = useState({
     title: blogToEdit?.title || "",
     category: blogToEdit?.category || "AYURVEDA",
@@ -277,7 +279,7 @@ function CreateOrEditBlogModal({ blogToEdit, staffProfile, onClose, onSave }) {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert("Image exceeds 5 MB limit. Please upload a smaller image.");
+        triggerAlert("Image exceeds 5 MB limit. Please upload a smaller image.");
         return;
       }
       const reader = new FileReader();
@@ -299,22 +301,22 @@ function CreateOrEditBlogModal({ blogToEdit, staffProfile, onClose, onSave }) {
     const bodyVal = formData.body.trim();
 
     if (!titleVal || !summaryVal || !bodyVal) {
-      alert("Please fill in all fields (Title, Summary, and Content)");
+      triggerAlert("Please fill in all fields (Title, Summary, and Content)");
       return;
     }
 
     if (titleVal.length < 10 || titleVal.length > 100) {
-      alert(`Title must be between 10 and 100 characters long (currently ${titleVal.length}).`);
+      triggerAlert(`Title must be between 10 and 100 characters long (currently ${titleVal.length}).`);
       return;
     }
 
     if (summaryVal.length < 50 || summaryVal.length > 200) {
-      alert(`Summary must be between 50 and 200 characters long (currently ${summaryVal.length}).`);
+      triggerAlert(`Summary must be between 50 and 200 characters long (currently ${summaryVal.length}).`);
       return;
     }
 
     if (bodyVal.length < 100) {
-      alert(`Full content must be at least 100 characters long (currently ${bodyVal.length}).`);
+      triggerAlert(`Full content must be at least 100 characters long (currently ${bodyVal.length}).`);
       return;
     }
 
@@ -470,6 +472,7 @@ function CreateOrEditBlogModal({ blogToEdit, staffProfile, onClose, onSave }) {
 }
 
 function AdminEditBlogModal({ blogToEdit, onClose, onSave }) {
+  const { triggerAlert } = useAllocations();
   const [formData, setFormData] = useState({
     title: blogToEdit?.title || "",
     category: blogToEdit?.category || "AYURVEDA",
@@ -488,22 +491,22 @@ function AdminEditBlogModal({ blogToEdit, onClose, onSave }) {
     const bodyVal = formData.body.trim();
 
     if (!titleVal || !summaryVal || !bodyVal) {
-      alert("Please fill in all fields");
+      triggerAlert("Please fill in all fields");
       return;
     }
 
     if (titleVal.length < 10 || titleVal.length > 100) {
-      alert(`Title must be between 10 and 100 characters long (currently ${titleVal.length}).`);
+      triggerAlert(`Title must be between 10 and 100 characters long (currently ${titleVal.length}).`);
       return;
     }
 
     if (summaryVal.length < 50 || summaryVal.length > 200) {
-      alert(`Summary must be between 50 and 200 characters long (currently ${summaryVal.length}).`);
+      triggerAlert(`Summary must be between 50 and 200 characters long (currently ${summaryVal.length}).`);
       return;
     }
 
     if (bodyVal.length < 100) {
-      alert(`Full content must be at least 100 characters long (currently ${bodyVal.length}).`);
+      triggerAlert(`Full content must be at least 100 characters long (currently ${bodyVal.length}).`);
       return;
     }
 
@@ -611,6 +614,7 @@ function AdminEditBlogModal({ blogToEdit, onClose, onSave }) {
 export default function Blogs() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { triggerAlert, triggerConfirm } = useAllocations();
 
   // Load and persist blogs from local storage (synced globally)
   const [blogs, setBlogs] = useState(() => {
@@ -671,7 +675,7 @@ export default function Blogs() {
   const handleApprove = (blogId) => {
     const blog = blogs.find(b => b.id === blogId);
     if (!blog || !blog.body || !blog.body.trim()) {
-      alert("Cannot approve blog: The blog body is empty.");
+      triggerAlert("Cannot approve blog: The blog body is empty.");
       return;
     }
     const updated = blogs.map((b) =>
@@ -686,8 +690,17 @@ export default function Blogs() {
   const handleReject = (blogId) => {
     const blog = blogs.find(b => b.id === blogId);
     if (blog && blog.status === "published") {
-      const confirmed = window.confirm("Are you sure you want to reject and remove this already PUBLISHED blog post?");
-      if (!confirmed) return;
+      triggerConfirm(
+        "Are you sure you want to reject and remove this already PUBLISHED blog post?",
+        () => {
+          const updated = blogs.map((b) =>
+            b.id === blogId ? { ...b, status: "removed" } : b
+          );
+          persistBlogs(updated);
+          showToastMsg("Article rejected and set to Removed.");
+        }
+      );
+      return;
     }
     // Flag as removed, author will see "Removed by Admin" in their "My Blogs" panel
     const updated = blogs.map((b) =>
@@ -698,16 +711,20 @@ export default function Blogs() {
   };
 
   const handleDelete = (blogId) => {
-    if (!window.confirm("Are you sure you want to permanently delete this article?")) return;
-    const updated = blogs.filter((b) => b.id !== blogId);
-    persistBlogs(updated);
-    showToastMsg("Article permanently deleted.");
+    triggerConfirm(
+      "Are you sure you want to permanently delete this article?",
+      () => {
+        const updated = blogs.filter((b) => b.id !== blogId);
+        persistBlogs(updated);
+        showToastMsg("Article permanently deleted.");
+      }
+    );
   };
 
   const handleSaveBlog = (savedBlog) => {
     const existing = blogs.find((b) => b.id === savedBlog.id);
     if (existing && existing.status === "pending" && savedBlog.status === "pending") {
-      alert("This blog is already pending review and cannot be re-submitted.");
+      triggerAlert("This blog is already pending review and cannot be re-submitted.");
       return;
     }
     const exists = blogs.some((b) => b.id === savedBlog.id);

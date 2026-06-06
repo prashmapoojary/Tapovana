@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import './Services.css';
 import { apiFetch } from '../api/http';
 import { getImageUrl } from '../utils/image';
+import { useAllocations } from '../utils/AllocationContext';
 import EditService from './EditService';
 import AddService from './AddService';
-import { useAllocations } from '../utils/AllocationContext';
 
 const subCategoriesMap = {
   'Body Care': ['Massages', 'Facials', 'Scrubs', 'Hydrotherapy'],
@@ -53,7 +53,7 @@ const TrashIcon = () => (
 );
 
 function Services() {
-  const { triggerConfirm, triggerAlert } = useAllocations();
+  const { triggerAlert, triggerConfirm } = useAllocations();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -139,7 +139,7 @@ function Services() {
     try {
       const bookingsData = await apiFetch('/api/bookings?limit=100');
       if (bookingsData.success && bookingsData.bookings) {
-        const hasActiveBookings = bookingsData.bookings.some(b => 
+        const hasActiveBookings = bookingsData.bookings.some(b =>
           b.service_name === serviceName && (b.status === 'PENDING' || b.status === 'CONFIRMED')
         );
         if (hasActiveBookings) {
@@ -151,14 +151,17 @@ function Services() {
       console.warn("Could not check bookings:", err);
     }
 
-    const confirmed = await triggerConfirm(`Are you sure you want to delete this service "${serviceName}"?`, true);
-    if (!confirmed) return;
-    try {
-      await apiFetch(`/api/services/${id}`, { method: 'DELETE' });
-      fetchServices();
-    } catch (err) {
-      triggerAlert("Failed to delete service: " + err.message);
-    }
+    triggerConfirm(
+      `Are you sure you want to delete this service "${serviceName}"?`,
+      async () => {
+        try {
+          await apiFetch(`/api/services/${id}`, { method: 'DELETE' });
+          fetchServices();
+        } catch (err) {
+          triggerAlert("Failed to delete service: " + err.message);
+        }
+      }
+    );
   };
 
   const availableSubCategories = selectedCategory !== 'All' ? ['All', ...(subCategoriesMap[selectedCategory] || [])] : ['All'];

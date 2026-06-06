@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import "./Bookings.css";
 import { apiFetch } from "../api/http";
 import { getUser } from "../utils/session";
+import { useAllocations } from "../utils/AllocationContext";
 import SearchIcon from "../assets/searchIcon.svg";
 import ActionIcon from "../assets/Button.svg";
 import DefaultAvatar from "../assets/profileIconDefault.png";
@@ -25,6 +26,8 @@ function Bookings() {
   const { triggerAlert, triggerConfirm } = useAllocations();
   const userRole = useMemo(() => getUser()?.role, []);
   const canEdit = ["SUPER_ADMIN", "CO_ADMIN"].includes((userRole || "").toUpperCase());
+
+  const { triggerAlert } = useAllocations();
 
   const [bookings, setBookings] = useState(DUMMY_BOOKINGS);
   const [loading, setLoading] = useState(false);

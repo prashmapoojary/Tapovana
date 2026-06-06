@@ -73,9 +73,9 @@
 
 .ma-stat-card {
   background: white;
-  border-radius: 12px;
+  border-radius: 8px !important;
   padding: 20px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #CDA751 !important;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -84,9 +84,7 @@
 }
 
 .ma-stat-card:hover {
-  transform: translateY(-2px);
   box-shadow: 0 12px 20px -8px rgba(205, 167, 81, 0.15);
-  border-color: #cda75166;
 }
 
 .ma-stat-icon {

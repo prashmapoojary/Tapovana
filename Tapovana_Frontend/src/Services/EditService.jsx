@@ -4,6 +4,9 @@ import { apiFetch } from '../api/http';
 import { getImageUrl } from '../utils/image';
 import PricingAndDuration from '../assets/PricingAndDuration.png';
 import { useAllocations } from '../utils/AllocationContext';
+import DefaultAvatar from '../assets/profileIconDefault.png';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 
@@ -89,7 +92,7 @@ const CameraPlusIcon = () => (
 // ── Main Component ─────────────────────────────────────────────────────────
 
 function EditService({ service, onBack }) {
-    const { isStaffAllocated, allocateStaff, deallocateStaff, allocations, triggerAlert } = useAllocations();
+    const { isStaffAllocated, allocateStaff, deallocateStaff, allocations } = useAllocations();
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
 
@@ -149,9 +152,11 @@ function EditService({ service, onBack }) {
     useEffect(() => {
         const fetchStaff = async () => {
             try {
-                const res = await apiFetch('/api/teams/users?page=1&limit=100');
+                const res = await apiFetch(`/api/teams/users?page=1&limit=100&_t=${Date.now()}`);
                 if (res.success && res.users) {
-                    const docsAndTherapists = res.users.filter(u => u.role === 'DOCTOR' || u.role === 'THERAPIST');
+                    const docsAndTherapists = res.users.filter(u => 
+                        (u.role === 'DOCTOR' || u.role === 'THERAPIST') && u.status === 'active'
+                    );
                     setAvailableStaff(docsAndTherapists);
                 }
             } catch (err) {
@@ -165,23 +170,8 @@ function EditService({ service, onBack }) {
         const isCurrentlyAssigned = assignedStaff.includes(id);
         if (isCurrentlyAssigned) {
             setAssignedStaff(prev => prev.filter(x => x !== id));
-            const alloc = allocations.find(a => a.staffId === id && a.sessionId === service.id && a.type === 'service');
-            if (alloc) {
-                deallocateStaff(alloc.id);
-            }
         } else {
-            const staffMember = availableStaff.find(s => s.user_id === id);
-            if (staffMember) {
-                const allocatedId = allocateStaff(staffMember, {
-                    id: service.id,
-                    title: serviceName || service.name || 'Wellness Service',
-                    startDate: new Date().toISOString().split('T')[0],
-                    endDate: new Date().toISOString().split('T')[0]
-                }, 'service');
-                if (allocatedId) {
-                    setAssignedStaff(prev => [...prev, id]);
-                }
-            }
+            setAssignedStaff(prev => [...prev, id]);
         }
     };
 
@@ -240,7 +230,7 @@ function EditService({ service, onBack }) {
                 }
             }
         } catch (err) {
-            triggerAlert("Failed to load service details: " + err.message);
+            alert("Failed to load service details: " + err.message);
         } finally {
             setLoading(false);
         }
@@ -249,24 +239,24 @@ function EditService({ service, onBack }) {
     // ★ FIXED: Image is sent in JSON body — no separate /image endpoint call
     const handleUpdateService = async () => {
         if (!serviceName || !category || !subCategory || !basePrice || !duration) {
-            triggerAlert("Please fill all required fields.");
+            alert("Please fill all required fields.");
             return;
         }
 
         if (serviceName.trim().length < 3) {
-            triggerAlert("Service name must be at least 3 characters long.");
+            alert("Service name must be at least 3 characters long.");
             return;
         }
 
         const parsedPrice = parseFloat(basePrice);
         if (isNaN(parsedPrice) || parsedPrice <= 0) {
-            triggerAlert("Service price must be a positive number greater than 0.");
+            alert("Service price must be a positive number greater than 0.");
             return;
         }
 
         const parsedDuration = parseInt(duration);
         if (isNaN(parsedDuration) || parsedDuration <= 0) {
-            triggerAlert("Duration must be a positive number of minutes.");
+            alert("Duration must be a positive number of minutes.");
             return;
         }
 
@@ -301,11 +291,11 @@ function EditService({ service, onBack }) {
             });
 
             if (data.success) {
-                triggerAlert("Service updated successfully!");
+                alert("Service updated successfully!");
                 onBack();
             }
         } catch (err) {
-            triggerAlert("Error updating service: " + err.message);
+            alert("Error updating service: " + err.message);
         } finally {
             setUpdating(false);
         }
@@ -342,11 +332,11 @@ function EditService({ service, onBack }) {
         const valid = [];
         for (const f of files) {
             if (f.type !== 'image/jpeg' && f.type !== 'image/png' && f.type !== 'image/webp') {
-                triggerAlert(`File ${f.name} has unsupported file type. Please upload only JPG, PNG or WEBP images.`);
+                alert(`File ${f.name} has unsupported file type. Please upload only JPG, PNG or WEBP images.`);
                 continue;
             }
             if (f.size > 5 * 1024 * 1024) {
-                triggerAlert(`File ${f.name} exceeds the 5MB size limit.`);
+                alert(`File ${f.name} exceeds the 5MB size limit.`);
                 continue;
             }
             valid.push(f);
@@ -659,7 +649,26 @@ function EditService({ service, onBack }) {
                                                                 </svg>
                                                             )}
                                                         </span>
-                                                        <span>{`${staff.first_name || ''} ${staff.last_name || ''} (${staff.role})`.trim()}</span>
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                          <img 
+                                                            src={(() => {
+                                                              let photoUrl = staff.profile_photo_url;
+                                                              if (photoUrl && /^[A-Za-z]:[/\\]/i.test(photoUrl)) photoUrl = "/uploads/" + photoUrl.replace(/\\/g, '/').split('/').pop();
+                                                              if (staff.profile_photo_source === "upload" && photoUrl) return `${API_BASE}${photoUrl}`;
+                                                              if (staff.profile_photo_source === "local" && photoUrl) return `/avatars/${photoUrl}`;
+                                                              if (staff.avatar_url) {
+                                                                let avUrl = staff.avatar_url;
+                                                                if (avUrl && /^[A-Za-z]:[/\\]/i.test(avUrl)) avUrl = "/uploads/" + avUrl.replace(/\\/g, '/').split('/').pop();
+                                                                return avUrl.startsWith("http") || avUrl.startsWith("/") ? avUrl : `${API_BASE}${avUrl}`;
+                                                              }
+                                                              return DefaultAvatar;
+                                                            })()}
+                                                            alt="" 
+                                                            style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }}
+                                                            onError={(e) => { e.target.onerror = null; e.target.src = DefaultAvatar; }}
+                                                          />
+                                                          {`${staff.first_name || ''} ${staff.last_name || ''} (${staff.role})`.trim()}
+                                                        </span>
                                                     </label>
                                                 ))
                                         )}

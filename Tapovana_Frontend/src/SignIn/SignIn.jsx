@@ -11,7 +11,6 @@ function SignIn() {
   const [otp, setOtp] = useState("");
   const [isChecked, setIsChecked] = useState(false);
   const [showOtpSection, setShowOtpSection] = useState(false);
-  const [mustChange, setMustChange] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [otpError, setOtpError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -52,9 +51,8 @@ function SignIn() {
         return;
       }
 
-      setMustChange(!!data.must_change);
       setShowOtpSection(true);
-    } catch {
+    } catch (err) {
       setErrorMessage("Network error. Please try again.");
     } finally {
       setLoading(false);
@@ -85,17 +83,18 @@ function SignIn() {
         return;
       }
 
+      // Save session — matches our backend response
       sessionStorage.setItem("access_token", data.token);
       sessionStorage.setItem("user", JSON.stringify(data.user));
       sessionStorage.setItem("access", JSON.stringify(data.access));
+      sessionStorage.setItem("must_change", data.must_change ? "true" : "false");
 
       if (data.must_change) {
-        navigate(`/set-password?email=${encodeURIComponent(email)}&mode=first-login`);
-        return;
+        navigate("/force-change-password");
+      } else {
+        navigate("/dashboard");
       }
-
-      navigate("/dashboard");
-    } catch {
+    } catch (err) {
       setOtpError("Network error. Please try again.");
     } finally {
       setLoading(false);
@@ -104,51 +103,62 @@ function SignIn() {
 
   return (
     <div className="container">
-      <div className="left-section" style={{ backgroundImage: `url(${sideImage})` }} />
+      <div
+        className="left-section"
+        style={{ backgroundImage: `url(${sideImage})` }}
+      />
       <div className="right-section">
         <h1>Log In</h1>
-        <p className="note">Note: This page is dedicated only for Governing Members of Tapovana Life Space Pvt Ltd</p>
-
+        <p className="note">
+          Note: This page is dedicated only for Governing Members of Tapovana
+          Life Space Pvt Ltd
+        </p>
         <div className="form-container">
           <label>Email</label>
-          <input type="email" className="input-field" value={email} onChange={(e) => setEmail(e.target.value)} />
-
+          <input
+            type="email"
+            className="input-field"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
           <label>Password</label>
-          <input type="password" className="input-field" value={password} onChange={(e) => setPassword(e.target.value)} style={{ marginBottom: "6px" }} />
-
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
+          <input
+            type="password"
+            className="input-field"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <div className="checkbox-container">
+            <input
+              type="checkbox"
+              checked={isChecked}
+              onChange={() => setIsChecked(!isChecked)}
+            />
+            <label style={{ marginTop: 0 }}>I agree with the terms of use</label>
+          </div>
+          <div style={{ textAlign: "right", marginTop: "4px", marginBottom: "12px" }}>
             <span
-              onClick={() => {
-                navigate(`/set-password?email=${encodeURIComponent(email)}&mode=forgot`);
-              }}
+              onClick={() => navigate("/reset-password")}
               style={{
-                fontSize: "13px",
                 color: "#caa24a",
                 cursor: "pointer",
+                fontSize: "13px",
                 fontWeight: "600",
+                textDecoration: "underline"
               }}
-              onMouseEnter={(e) => e.currentTarget.style.color = "#b8933f"}
-              onMouseLeave={(e) => e.currentTarget.style.color = "#caa24a"}
             >
               Forgot Password?
             </span>
           </div>
-
-          <div className="checkbox-container">
-            <input type="checkbox" checked={isChecked} onChange={() => setIsChecked(!isChecked)} />
-            <label>I agree with the terms of use</label>
-          </div>
-
           {errorMessage && <p className="error-message">{errorMessage}</p>}
-
           <button className="btn" onClick={handleGenerateOtp} disabled={loading}>
             {loading ? "Please wait..." : "Generate OTP"}
           </button>
-
           {showOtpSection && (
             <>
-              <h5 className="otp-heading"><b>Enter OTP received to above email ID</b></h5>
-              {mustChange && <p className="note">After OTP verification, you will be required to reset your password.</p>}
+              <h5 className="otp-heading">
+                <b>Enter OTP received to Above Email ID</b>
+              </h5>
               <input
                 type="text"
                 inputMode="numeric"
@@ -156,7 +166,10 @@ function SignIn() {
                 className="input-field"
                 value={otp}
                 maxLength={6}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, "");
+                  setOtp(value);
+                }}
               />
               {otpError && <p className="error-message">{otpError}</p>}
               <button className="btn" onClick={handleVerifyOtp} disabled={loading}>

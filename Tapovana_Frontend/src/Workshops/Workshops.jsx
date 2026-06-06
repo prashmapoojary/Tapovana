@@ -44,26 +44,12 @@ const getLiveStatus = (ws) => {
   return "completed";
 };
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return "N/A";
-  const date = new Date(dateStr);
-  if (isNaN(date)) return dateStr;
-  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  
-  const w = weekdays[date.getDay()];
-  const d = date.getDate();
-  const m = months[date.getMonth()];
-  const y = date.getFullYear();
-  return `${w}, ${d} ${m} ${y}`;
-};
-
 const CATEGORY_COLORS = {
   "Yoga": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
-  "Meditation": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
-  "Nutrition": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
-  "Ayurveda": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
-  "Holistic": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
+  "Meditation": { color: "#8b5cf6", bg: "rgba(139,92,246,0.1)" },
+  "Nutrition": { color: "#2ecc71", bg: "rgba(46,204,113,0.1)" },
+  "Ayurveda": { color: "#cda751", bg: "rgba(205,167,81,0.1)" },
+  "Holistic": { color: "#e67e22", bg: "rgba(230,126,34,0.1)" },
 };
 
 const STATUS_CONFIG = {
@@ -80,7 +66,7 @@ const DUMMY_WORKSHOPS = [
 const BLANK_FORM = {
   title: "", category: "Yoga", instructor_id: "", instructor_name: "",
   date: "", time: "", duration: 60, capacity: 20,
-  price: "", description: "", image_url: "", image_base64: "", video_url: "", video_file: null
+  price: "", description: "", image_url: "", image_base64: "", video_url: "", video_base64: "", video_file: null
 };
 
 // ─── File to base64 helper ────────────────────────────────────────────────
@@ -110,7 +96,7 @@ function WorkshopCard({ w, onClick }) {
         )}
         <div className="ws-card-category-badge" style={{ background: cat.color, color: "white", zIndex: 2 }}>{w.category}</div>
         <div className="ws-card-status-badge" style={{
-          background: liveStatus === "live" ? "#e74c3c" : "#ffffff", color: st.color,
+          background: liveStatus === "live" ? "#e74c3c" : "#ffffff", color: liveStatus === "live" ? "#ffffff" : st.color,
           border: `1px solid ${liveStatus === "live" ? "#e74c3c" : st.color}`, fontWeight: 700, zIndex: 2,
           animation: liveStatus === "live" ? "wsPulse 1.5s infinite" : "none"
         }}>{liveStatus === "live" ? "LIVE" : st.label}</div>
@@ -133,7 +119,7 @@ function WorkshopCard({ w, onClick }) {
         </div>
         <div className="ws-card-footer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid #f1f3f7" }}>
           <span style={{ fontSize: 17, fontWeight: 800, color: "#2d3748" }}>₹{(w.price || 0).toLocaleString("en-IN")}</span>
-          <button className="ws-card-btn"
+          <button className="ws-card-btn" style={{ background: liveStatus === "live" ? "#e74c3c" : cat.color, padding: "7px 16px", border: "none", borderRadius: 8, color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
             onClick={e => { e.stopPropagation(); onClick({ ...w, _liveStatus: liveStatus }); }}>
             View Workshop
           </button>
@@ -145,7 +131,7 @@ function WorkshopCard({ w, onClick }) {
 
 // ─── Main Component ─────────────────────────────────────────────────────
 export default function Workshops() {
-  const { allocateStaff, allocations, triggerConfirm, triggerAlert } = useAllocations();
+  const { allocateStaff } = useAllocations();
   const [workshops, setWorkshops] = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [instructors, setInstructors] = useState([]);
@@ -170,68 +156,8 @@ export default function Workshops() {
   const [addError, setAddError] = useState("");
 
   // Video player
-  const [detailVideoPlaying, setDetailVideoPlaying] = useState(false);
-  const [editVideoPlaying, setEditVideoPlaying] = useState(false);
+  const [videoPlaying, setVideoPlaying] = useState(false);
   const videoRef = useRef(null);
-
-  const renderPreviewSection = (displayImage, displayVideo, isEdit = false) => {
-    const isPlaying = isEdit ? editVideoPlaying : detailVideoPlaying;
-    const setIsPlaying = isEdit ? setEditVideoPlaying : setDetailVideoPlaying;
-
-    if (!displayVideo) {
-      if (displayImage) {
-        return (
-          <div style={{ borderRadius: 8, overflow: "hidden", width: "100%", maxHeight: 320 }}>
-            <img src={getImageUrl(displayImage)} alt="preview"
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              onError={(e) => { e.target.style.display = "none"; }} />
-          </div>
-        );
-      }
-      return null;
-    }
-
-    return (
-      <div>
-        {!isPlaying ? (
-          <div onClick={() => setIsPlaying(true)}
-            style={{ position: "relative", width: "100%", height: 280, borderRadius: 8, overflow: "hidden", cursor: "pointer", background: "#1a1a1a" }}>
-            {displayImage ? (
-              <img src={getImageUrl(displayImage)} alt="video cover"
-                style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.6 }} />
-            ) : (
-              <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #2d3748, #1a202c)" }} />
-            )}
-            {/* Play button overlay */}
-            <div style={{
-              position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-              width: 64, height: 64, borderRadius: "50%", background: "rgba(205,167,81,0.9)",
-              display: "flex", alignItems: "center", justifyContent: "center"
-            }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><polygon points="6 3 20 12 6 21 6 3" /></svg>
-            </div>
-            <div style={{ position: "absolute", bottom: 12, left: 14, color: "white", fontSize: 12, background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: 4 }}>
-              Click to play video
-            </div>
-          </div>
-        ) : (
-          <div style={{ borderRadius: 8, overflow: "hidden" }}>
-            {displayVideo.includes("youtube") || displayVideo.includes("youtu.be") ? (
-              <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden" }}>
-                <iframe src={displayVideo.replace("watch?v=", "embed/")} title="Workshop Video"
-                  style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
-                  allowFullScreen />
-              </div>
-            ) : (
-              <video ref={videoRef} controls autoPlay style={{ width: "100%", maxHeight: 400, borderRadius: 8 }}>
-                <source src={displayVideo} />
-              </video>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   // ─── Fetch instructors ──────────────────────────────────────────────────
   const fetchInstructors = async () => {
@@ -262,13 +188,13 @@ export default function Workshops() {
 
   useEffect(() => { fetchWorkshops(); }, []);
 
-  // Auto-refresh live status every 30 seconds
+  // Auto-refresh live status every 60 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       if (workshops.length > 0) setWorkshops(prev => [...prev]);
-    }, 30000);
+    }, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [workshops.length]);
 
   // ─── Stats ─────────────────────────────────────────────────────────────
   const STATS = useMemo(() => ({
@@ -297,16 +223,14 @@ export default function Workshops() {
   const handleOpenDetail = (w) => {
     setSelectedWs({ ...w });
     setIsEditing(false);
-    setDetailVideoPlaying(false);
-    setEditVideoPlaying(false);
+    setVideoPlaying(false);
   };
 
   // ─── Close detail view ───────────────────────────────────────────────────
   const handleCloseDetail = () => {
     setSelectedWs(null);
     setIsEditing(false);
-    setDetailVideoPlaying(false);
-    setEditVideoPlaying(false);
+    setVideoPlaying(false);
   };
 
   // ─── Start editing ──────────────────────────────────────────────────────
@@ -325,11 +249,11 @@ export default function Workshops() {
       image_url: selectedWs.image_url || selectedWs.image || "",
       image_base64: selectedWs.image_base64 || "",
       video_url: selectedWs.video_url || "",
+      video_base64: selectedWs.video_base64 || "",
       video_file: null,
     });
     setEditError("");
-    setDetailVideoPlaying(false);
-    setEditVideoPlaying(false);
+    setVideoPlaying(false);
     setIsEditing(true);
   };
 
@@ -337,8 +261,7 @@ export default function Workshops() {
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditError("");
-    setDetailVideoPlaying(false);
-    setEditVideoPlaying(false);
+    setVideoPlaying(false);
   };
 
   // ─── Save edit ─────────────────────────────────────────────────────────
@@ -361,7 +284,7 @@ export default function Workshops() {
         price: Number(editForm.price),
         description: editForm.description.trim(),
         image_url: editForm.image_base64 || editForm.image_url || null,
-        video_url: editForm.video_url || null,
+        video_url: editForm.video_base64 || editForm.video_url || null,
         assigned_staff_ids: editForm.instructor_id ? [editForm.instructor_id] : [],
       };
 
@@ -376,28 +299,12 @@ export default function Workshops() {
       showToast("Workshop updated!");
     } catch {
       setWorkshops(prev => prev.map(w =>
-        w.id === selectedWs.id ? { ...w, ...editForm, image: editForm.image_base64 || editForm.image_url || w.image, video_url: editForm.video_url } : w
+        w.id === selectedWs.id ? { ...w, ...editForm, image: editForm.image_base64 || editForm.image_url || w.image, video_url: editForm.video_base64 || editForm.video_url } : w
       ));
-      setSelectedWs(prev => ({ ...prev, ...editForm }));
+      setSelectedWs(prev => ({ ...prev, ...editForm, video_url: editForm.video_base64 || editForm.video_url }));
       setIsEditing(false);
     } finally {
       setEditSaving(false);
-    }
-  };
-
-  // ─── Delete Workshop ───────────────────────────────────────────────────
-  const handleDeleteWorkshop = async () => {
-    const confirmed = await triggerConfirm("Are you sure you want to delete this workshop?", true);
-    if (!confirmed) return;
-    try {
-      await apiFetch("/api/workshops/" + selectedWs.id, { method: "DELETE" });
-      await fetchWorkshops();
-      handleCloseDetail();
-      showToast("Workshop deleted successfully!");
-    } catch {
-      setWorkshops(prev => prev.filter(w => w.id !== selectedWs.id));
-      handleCloseDetail();
-      showToast("Workshop deleted!");
     }
   };
 
@@ -408,36 +315,6 @@ export default function Workshops() {
     if (!addForm.date) { setAddError("Date is required"); return; }
     if (!addForm.price) { setAddError("Price is required"); return; }
     if (Number(addForm.price) <= 0) { setAddError("Price must be greater than 0"); return; }
-
-    // Date and Conflict Validation dry-run check
-    if (addForm.instructor_id) {
-      const inst = instructors.find(i => i.user_id === addForm.instructor_id || i.id === addForm.instructor_id);
-      if (inst) {
-        // Date Check
-        const sessionEndDate = new Date(addForm.date);
-        sessionEndDate.setHours(23, 59, 59, 999);
-        if (sessionEndDate < new Date()) {
-          allocateStaff(inst, { title: addForm.title, startDate: addForm.date, date: addForm.date, endDate: addForm.date }, "workshop");
-          return; // STOP!
-        }
-
-        // Overlap Check
-        const staffId = inst.user_id || inst.id;
-        const sessionStart = new Date(addForm.date);
-        const hasConflict = (allocations || []).some((a) => {
-          if (a.staffId !== staffId || a.status === "expired") return false;
-          const existingStart = new Date(a.startDate);
-          const existingEnd = new Date(a.endDate);
-          if (a.endDate && a.endDate.length <= 10) existingEnd.setHours(23, 59, 59, 999);
-          return sessionStart <= existingEnd && sessionEndDate >= existingStart;
-        });
-
-        if (hasConflict) {
-          allocateStaff(inst, { title: addForm.title, startDate: addForm.date, date: addForm.date, endDate: addForm.date }, "workshop");
-          return; // STOP!
-        }
-      }
-    }
 
     try {
       setAddSaving(true);
@@ -453,7 +330,7 @@ export default function Workshops() {
         price: Number(addForm.price),
         description: addForm.description.trim(),
         image_url: addForm.image_base64 || addForm.image_url || null,
-        video_url: addForm.video_url || null,
+        video_url: addForm.video_base64 || addForm.video_url || null,
         status: "upcoming",
         enrolled: 0,
         assigned_staff_ids: addForm.instructor_id ? [addForm.instructor_id] : [],
@@ -484,7 +361,7 @@ export default function Workshops() {
   // ─── Image file upload handler ──────────────────────────────────────────
   const handleImageFile = async (target, file) => {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { triggerAlert("Image must be less than 5MB"); return; }
+    if (file.size > 5 * 1024 * 1024) { alert("Image must be less than 5MB"); return; }
     const base64 = await fileToBase64(file);
     if (target === "add") {
       setAddForm(prev => ({ ...prev, image_base64: base64, image_url: "" }));
@@ -497,10 +374,16 @@ export default function Workshops() {
   const handleVideoFile = async (target, file) => {
     if (!file) return;
     const objectUrl = URL.createObjectURL(file);
-    if (target === "add") {
-      setAddForm(prev => ({ ...prev, video_url: objectUrl, video_file: file }));
-    } else {
-      setEditForm(prev => ({ ...prev, video_url: objectUrl, video_file: file }));
+    try {
+      // Create base64 string for the payload
+      const base64 = await fileToBase64(file);
+      if (target === "add") {
+        setAddForm(prev => ({ ...prev, video_url: objectUrl, video_base64: base64, video_file: file }));
+      } else {
+        setEditForm(prev => ({ ...prev, video_url: objectUrl, video_base64: base64, video_file: file }));
+      }
+    } catch (err) {
+      alert("Error reading video file.");
     }
   };
 
@@ -521,7 +404,6 @@ export default function Workshops() {
   // ─── Render edit form ──────────────────────────────────────────────────
   const renderEditForm = () => (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      {renderPreviewSection(editForm.image_base64 || editForm.image_url, editForm.video_url, true)}
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Program Title</label>
         <input value={editForm.title} onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))} style={{ padding: "7px 10px", borderRadius: 4, border: "1px solid rgba(205,167,81,0.2)", fontSize: 13, color: "#333", outline: "none", fontFamily: "Manrope, sans-serif", width: "100%", boxSizing: "border-box", background: "white" }} />
@@ -612,7 +494,7 @@ export default function Workshops() {
             Browse Video
           </button>
           <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
-          <input value={editForm.video_url} onChange={e => setEditForm(p => ({ ...p, video_url: e.target.value }))}
+          <input value={editForm.video_url} onChange={e => setEditForm(p => ({ ...p, video_url: e.target.value, video_base64: "" }))}
             style={{ padding: "7px 10px", borderRadius: 4, border: "1px solid rgba(205,167,81,0.2)", fontSize: 13, color: "#333", outline: "none", fontFamily: "Manrope, sans-serif", width: "100%", boxSizing: "border-box", background: "white", flex: 1 }} placeholder="https://youtube.com/..." />
         </div>
       </div>
@@ -640,12 +522,57 @@ export default function Workshops() {
           Instructor: {ws.instructor_name || ws.instructor || "Not assigned"}
         </p>
 
-        {/* 3. Preview Section */}
-        <div style={{ marginBottom: 16 }}>
-          {renderPreviewSection(displayImage, displayVideo, false)}
-        </div>
+        {/* 3. Preview Section - Video Player with Cover Image */}
+        {displayVideo && (
+          <div style={{ marginBottom: 16 }}>
+            {!videoPlaying ? (
+              <div onClick={() => setVideoPlaying(true)}
+                style={{ position: "relative", width: "100%", height: 280, borderRadius: 8, overflow: "hidden", cursor: "pointer", background: "#1a1a1a" }}>
+                {displayImage ? (
+                  <img src={getImageUrl(displayImage)} alt="video cover"
+                    style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.6 }} />
+                ) : (
+                  <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #2d3748, #1a202c)" }} />
+                )}
+                {/* Play button overlay */}
+                <div style={{
+                  position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+                  width: 64, height: 64, borderRadius: "50%", background: "rgba(205,167,81,0.9)",
+                  display: "flex", alignItems: "center", justifyContent: "center"
+                }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><polygon points="6 3 20 12 6 21 6 3" /></svg>
+                </div>
+                <div style={{ position: "absolute", bottom: 12, left: 14, color: "white", fontSize: 12, background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: 4 }}>
+                  Click to play video
+                </div>
+              </div>
+            ) : (
+              <div style={{ borderRadius: 8, overflow: "hidden" }}>
+                {displayVideo.includes("youtube") || displayVideo.includes("youtu.be") ? (
+                  <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden" }}>
+                    <iframe src={displayVideo.replace("watch?v=", "embed/")} title="Workshop Video"
+                      style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+                      allowFullScreen />
+                  </div>
+                ) : (
+                  <video ref={videoRef} controls autoPlay style={{ width: "100%", maxHeight: 400, borderRadius: 8 }}>
+                    <source src={displayVideo} />
+                  </video>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 4. Description */}
+        {!displayVideo && displayImage && (
+          <div style={{ marginBottom: 16, borderRadius: 8, overflow: "hidden" }}>
+            <img src={getImageUrl(displayImage)} alt={ws.title}
+              style={{ width: "100%", maxHeight: 320, objectFit: "cover" }}
+              onError={(e) => { e.target.style.display = "none"; }} />
+          </div>
+        )}
+
         <p style={{ fontSize: 15, color: "#4a5568", lineHeight: 1.7, margin: "0 0 20px 0" }}>{ws.description}</p>
 
         {/* 5. Workshop Details */}
@@ -656,7 +583,7 @@ export default function Workshops() {
               <span style={{ fontSize: 12, color: "#a0aec0" }}>Date</span>
               <br />
               <span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>
-                {formatDate(ws.date)}
+                {ws.date ? new Date(ws.date).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" }) : "N/A"}
               </span>
             </div>
             <div>
@@ -672,23 +599,15 @@ export default function Workshops() {
             <div>
               <span style={{ fontSize: 12, color: "#a0aec0" }}>Price</span>
               <br />
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>₹{Number(ws.price || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>Rs{(ws.price || 0).toLocaleString("en-IN")}</span>
             </div>
           </div>
         </div>
 
-        {/* Edit, Cancel, Delete buttons */}
-        <div style={{ display: "flex", gap: 12 }}>
-          <button className="ws-modal-btn-secondary ws-edit-trigger-btn" style={{ flex: 1.5 }} onClick={handleStartEdit}>
-            Edit Workshop
-          </button>
-          <button className="ws-modal-btn-secondary ws-edit-trigger-btn" style={{ flex: 1 }} onClick={handleCloseDetail}>
-            Cancel
-          </button>
-          <button className="ws-modal-btn-secondary ws-edit-trigger-btn" style={{ flex: 1.2 }} onClick={handleDeleteWorkshop}>
-            Delete Workshop
-          </button>
-        </div>
+        {/* Edit Workshop button */}
+        <button className="ws-modal-btn-primary" style={{ width: "100%" }} onClick={handleStartEdit}>
+          Edit Workshop
+        </button>
       </div>
     );
   };
@@ -874,8 +793,7 @@ export default function Workshops() {
                       Browse Video
                     </button>
                     <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
-                    <input value={addForm.video_url} onChange={e => setAddForm(p => ({ ...p, video_url: e.target.value }))}
-                      className="ws-modal-input" style={{ flex: 1 }} placeholder="https://youtube.com/..." />
+                    <input value={addForm.video_url} onChange={e => setAddForm(p => ({ ...p, video_url: e.target.value, video_base64: "" }))} className="ws-modal-input" placeholder="https://youtube.com/..." style={{ flex: 1 }} />
                   </div>
                   {addForm.video_url && <span style={{ fontSize: 11, color: "#4a5568", marginTop: 4 }}>Video attached</span>}
                 </div>
@@ -904,7 +822,7 @@ export default function Workshops() {
       {toast && (
         <div style={{
           position: 'fixed', bottom: '24px', right: '24px',
-          background: '#CDA751', color: 'white', padding: '16px 24px',
+          background: '#2ecc71', color: 'white', padding: '16px 24px',
           borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 99999
         }}>
           <div style={{ fontWeight: 700, fontSize: '14px' }}>{toast}</div>

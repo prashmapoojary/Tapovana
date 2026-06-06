@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from "react";
 import "./Customers.css";
 import { apiFetch } from "../api/http";
 import { getUser } from "../utils/session";
+import { useAllocations } from "../utils/AllocationContext";
 import SearchIcon from "../assets/searchIcon.svg";
 import ActionIcon from "../assets/Button.svg";
 import DefaultAvatar from "../assets/profileIcon.png";
-import { useAllocations } from "../utils/AllocationContext";
 
 const DUMMY_CUSTOMERS = [
   { id: "1", customer_id: "CUST-001", first_name: "Rahul", last_name: "Sharma", email: "rahul.s@example.com", phone: "+91 98765 43210", membership_status: "GOLD", total_bookings: 12, total_spent: 24500, join_date: "2024-01-15" },
@@ -16,8 +16,8 @@ const DUMMY_CUSTOMERS = [
 ];
 
 function Customers() {
-  const { triggerAlert, triggerConfirm } = useAllocations();
   const userRole = useMemo(() => getUser()?.role, []);
+  const { triggerAlert, triggerConfirm } = useAllocations();
 
   const [customers, setCustomers] = useState(DUMMY_CUSTOMERS);
   const [loading, setLoading] = useState(false);
@@ -77,11 +77,14 @@ function Customers() {
     }, 300);
   };
 
-  const handleDelete = async () => {
-    const confirmed = await triggerConfirm("Delete this customer? This is irreversible.", true);
-    if (!confirmed) return;
-    setCustomers(prev => prev.filter(c => c.id !== selectedCustomer.id));
-    setSelectedCustomer(null);
+  const handleDelete = () => {
+    triggerConfirm(
+      "Delete this customer? This is irreversible.",
+      () => {
+        setCustomers(prev => prev.filter(c => c.id !== selectedCustomer.id));
+        setSelectedCustomer(null);
+      }
+    );
   };
 
   return (
@@ -132,7 +135,7 @@ function Customers() {
                 <div className="cust-metrics-grid">
                   <div className="cust-metric">
                     <span className="cust-metric-label">Total Spend (LTV)</span>
-                    <span className="cust-metric-value" style={{ color: "#cda751" }}>₹{(selectedCustomer.total_spent || 0).toLocaleString("en-IN")}</span>
+                    <span className="cust-metric-value" style={{ color: "#188A94" }}>₹{(selectedCustomer.total_spent || 0).toLocaleString("en-IN")}</span>
                   </div>
                   <div className="cust-metric">
                     <span className="cust-metric-label">Sessions</span>
@@ -164,10 +167,9 @@ function Customers() {
                     <option value="PLATINUM">Platinum (30% Off)</option>
                   </select>
                   <button
-                    className="cust-btn-secondary"
                     onClick={handleUpdateMembership}
                     disabled={actionLoading}
-                    style={{ padding: "0 20px" }}
+                    style={{ padding: "0 20px", height: 42, background: "#cda751", color: "white", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}
                   >
                     Update
                   </button>
@@ -255,7 +257,7 @@ function Customers() {
                     </span>
                   </td>
                   <td><strong>{c.total_bookings || 0} Sessions</strong></td>
-                  <td><strong style={{ color: "#cda751" }}>₹{(c.total_spent || 0).toLocaleString("en-IN")}</strong></td>
+                  <td><strong style={{ color: "#188A94" }}>₹{(c.total_spent || 0).toLocaleString("en-IN")}</strong></td>
                   <td>{c.join_date || "-"}</td>
                   <td onClick={(e) => { e.stopPropagation(); setSelectedCustomer(c); }}>
                     <img src={ActionIcon} alt="Actions" className="action-icon" />
