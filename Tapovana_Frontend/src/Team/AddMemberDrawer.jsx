@@ -4,8 +4,7 @@ import DropdownIcon from "../assets/dropdownIcon.svg";
 import OverlayIcon from "../assets/Overlay.png";
 import ProfilePlaceholder from "../assets/profileIconDefault.png";
 import ProfileButtonIcon from "../assets/profileButton.png";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+import { apiFetch } from "../api/http";
 const initialForm = {
   firstName: "",
   lastName: "",
@@ -134,12 +133,6 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved }) => {
       return;
     }
 
-    const token = sessionStorage.getItem("access_token");
-    if (!token) {
-      setError("Session expired. Please login again.");
-      return;
-    }
-
     const payload = {
       email: formData.email.trim().toLowerCase(),
       role: formData.role,
@@ -159,27 +152,16 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved }) => {
     try {
       setSaving(true);
 
-      const res = await fetch(`${API_BASE}/api/teams/users`, {
+      await apiFetch("/api/teams/users", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
         body: JSON.stringify(payload)
       });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok || data.success === false) {
-        setError(data.error || "Failed to create user");
-        return;
-      }
 
       onClose();
       resetForm();
       if (onSaved) onSaved();
     } catch (e) {
-      setError("Network error. Please try again.");
+      setError(e.message || "Failed to create user. Please try again.");
     } finally {
       setSaving(false);
     }

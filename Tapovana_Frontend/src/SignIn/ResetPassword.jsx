@@ -34,7 +34,7 @@ function ResetPassword() {
 
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/api/admin/password/forgot`, {
+      const res = await fetch(`${API_BASE}/api/admin/password/forgot/request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email })
@@ -76,7 +76,7 @@ function ResetPassword() {
 
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/api/admin/password/reset`, {
+      const res = await fetch(`${API_BASE}/api/admin/password/forgot/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
