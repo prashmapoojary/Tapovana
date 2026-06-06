@@ -72,6 +72,8 @@ const loginPassword = async (req, res) => {
         // Send OTP email
         await sendOtpEmail({ to: member.email, firstName: member.first_name, otp });
 
+        console.log(`\n🔑 [DEVELOPMENT ONLY] Login OTP for ${member.email} is: ${otp}\n`);
+
         return res.json({
             success: true,
             message: 'OTP sent to your registered email.',
@@ -97,10 +99,10 @@ const verifyOtp = async (req, res) => {
 
         const memberResult = await client.query(
             `SELECT tm.id, tm.first_name, tm.last_name, tm.email, tm.avatar_url, tm.status,
-              tm.profile_photo_url, tm.profile_photo_source, tm.availability_status, tm.allocation_details,
-              r.name AS role, r.access
+              r.name AS role, r.access, lc.must_change
        FROM team_members tm
        JOIN roles r ON r.id = tm.role_id
+       JOIN login_credentials lc ON lc.member_id = tm.id
        WHERE LOWER(tm.email) = LOWER($1)`,
             [email]
         );
@@ -169,6 +171,7 @@ const verifyOtp = async (req, res) => {
             success: true,
             message: 'Login successful.',
             token,
+            must_change: member.must_change,
             user: {
                 user_id: member.id,
                 first_name: member.first_name,
@@ -176,10 +179,6 @@ const verifyOtp = async (req, res) => {
                 email: member.email,
                 role: member.role,
                 avatar_url: member.avatar_url,
-                profile_photo_url: member.profile_photo_url,
-                profile_photo_source: member.profile_photo_source,
-                availability_status: member.availability_status,
-                allocation_details: member.allocation_details,
             },
             access: accessMap,
         });
