@@ -7,6 +7,7 @@ const { sendAllocationEmail } = require('../services/emailService');
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 
 const ensureUploadsDir = () => {
+    if (process.env.NODE_ENV === 'production') return; // Vercel filesystem is read-only
     if (!fs.existsSync(UPLOADS_DIR)) {
         fs.mkdirSync(UPLOADS_DIR, { recursive: true });
     }
@@ -18,6 +19,10 @@ const handleWorkshopImage = (imageData) => {
 
     const matches = imageData.match(/^data:(image\/(jpeg|png|webp|gif|svg\+xml));base64,(.+)$/);
     if (matches && matches.length === 4) {
+        // In production (Vercel), filesystem is read-only — store base64 directly in DB
+        if (process.env.NODE_ENV === 'production') {
+            return imageData; // store as base64 string
+        }
         const mime = matches[1];
         const extMap = {
             'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'image/png': '.png',
