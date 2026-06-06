@@ -32,7 +32,7 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 app.use(rateLimit({
     windowMs: 60 * 1000,
-    max: 120,
+    max: process.env.NODE_ENV === 'production' ? 120 : 1000, // Increased for dev
 }));
 
 app.get("/health", (_req, res) => {

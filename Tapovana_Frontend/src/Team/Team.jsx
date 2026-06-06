@@ -184,6 +184,7 @@ const EditMemberDrawer = ({ user, onClose }) => {
 function Team() {
   const { isStaffAllocated, triggerAlert, triggerConfirm } = useAllocations();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [toast, setToast] = useState({ visible: false, message: "", type: "" });
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -193,8 +194,30 @@ function Team() {
   const [page, setPage] = useState(1);
   const [editingUser, setEditingUser] = useState(null);
   const [openActionMenu, setOpenActionMenu] = useState(null);
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState(null);
 
   const ITEMS_PER_PAGE = 10;
+
+  const getAvatarUrl = (u) => {
+    if (!u) return DefaultAvatar;
+    let photoUrl = u.profile_photo_url;
+    if (photoUrl && /^[A-Za-z]:[/\\]/i.test(photoUrl)) {
+      photoUrl = "/uploads/" + photoUrl.replace(/\\/g, '/').split('/').pop();
+    }
+    let avatarSrc = DefaultAvatar;
+    if (u.profile_photo_source === "upload" && photoUrl) {
+      avatarSrc = `${API_BASE}${photoUrl}`;
+    } else if (u.profile_photo_source === "local" && photoUrl) {
+      avatarSrc = `/avatars/${photoUrl}`;
+    } else if (u.avatar_url) {
+      let avUrl = u.avatar_url;
+      if (avUrl && /^[A-Za-z]:[/\\]/i.test(avUrl)) {
+        avUrl = "/uploads/" + avUrl.replace(/\\/g, '/').split('/').pop();
+      }
+      avatarSrc = avUrl.startsWith("http") || avUrl.startsWith("/") ? avUrl : `${API_BASE}${avUrl}`;
+    }
+    return avatarSrc;
+  };
 
   const fetchUsers = async () => {
     try {
@@ -227,15 +250,26 @@ function Team() {
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
-  const handleDeleteMember = async (userId, firstName, lastName) => {
-    const confirmed = await triggerConfirm(`Are you sure you want to delete ${firstName} ${lastName}?\n\nThis action cannot be undone.`);
-    if (!confirmed) return;
+  const initiateDelete = (user) => {
+    setDeleteConfirmUser(user);
+    setOpenActionMenu(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmUser) return;
+    const u = deleteConfirmUser;
+    setDeleteConfirmUser(null);
     try {
-      await apiFetch(`/api/teams/users/${userId}`, { method: "DELETE" });
+      await apiFetch(`/api/teams/users/${u.user_id}`, { method: "DELETE" });
       await fetchUsers();
+      showToast("Team member deleted permanently.", "success");
     } catch (e) {
       triggerAlert("Failed to delete member: " + e.message);
     }
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmUser(null);
   };
 
   const toggleStatus = async (userId, currentStatusBool) => {
@@ -276,9 +310,62 @@ function Team() {
   const handleRoleFilter = (val) => { setRoleFilter(val); setPage(1); };
   const handleStatusFilter = (val) => { setStatusFilter(val); setPage(1); };
 
+  const showToast = (message, type) => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => setToast({ visible: false, message: "", type: "" }), 3000);
+  };
+
   return (
     <div className="team-container">
-      <AddMemberDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} onSaved={fetchUsers} />
+      {deleteConfirmUser && (
+        <div className="global-alert-overlay" style={{ zIndex: 10002 }}>
+          <div className="global-alert-modal">
+            <div className="global-alert-icon-container" style={{ background: "transparent", border: "none", marginBottom: "16px" }}>
+              <img 
+                src={getAvatarUrl(deleteConfirmUser)} 
+                alt="Profile" 
+                style={{ width: "64px", height: "64px", borderRadius: "50%", objectFit: "cover", border: "2px solid #e2e8f0" }}
+                onError={(e) => { e.target.onerror = null; e.target.src = DefaultAvatar; }}
+              />
+            </div>
+            <div className="global-alert-message">
+              <p style={{ margin: "0 0 16px 0", fontSize: "16px", color: "#2d3748" }}>
+                Are you sure you want to delete {`${deleteConfirmUser.first_name || ""} ${deleteConfirmUser.last_name || ""}`.trim()}?
+              </p>
+              <p style={{ margin: 0, fontSize: "14px", color: "#7b8a9a" }}>
+                This action cannot be undone.
+              </p>
+            </div>
+            <div className="global-confirm-actions">
+              <button className="global-confirm-cancel-btn" onClick={cancelDelete}>Cancel</button>
+              <button className="global-confirm-confirm-btn" onClick={confirmDelete}>Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast.visible && (
+        <div style={{
+          position: "fixed", top: "20px", right: "20px", zIndex: 10001,
+          background: "#fff", border: "2px solid #cda751", borderRadius: "8px",
+          padding: "16px 24px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+          color: toast.type === "success" ? "#2e7559" : toast.type === "error" ? "#e53e3e" : "#4a5568",
+          fontWeight: 600, fontSize: "14px", display: "flex", alignItems: "center", gap: "8px",
+          animation: "slideInRight 0.3s ease-out"
+        }}>
+          {toast.type === "success" && "✓ "}
+          {toast.type === "error" && "⚠ "}
+          {toast.type === "info" && "ℹ "}
+          {toast.message}
+        </div>
+      )}
+
+      <AddMemberDrawer 
+        isOpen={drawerOpen} 
+        onClose={() => setDrawerOpen(false)} 
+        onSaved={fetchUsers} 
+        onShowToast={showToast} 
+      />
 
       {editingUser && (
         <EditMemberDrawer
@@ -352,22 +439,7 @@ function Team() {
             <tbody>
               {paginatedUsers.map((u) => {
                 const isActive = u.status === "active";
-                let photoUrl = u.profile_photo_url;
-                if (photoUrl && /^[A-Za-z]:[/\\]/i.test(photoUrl)) {
-                  photoUrl = "/uploads/" + photoUrl.replace(/\\/g, '/').split('/').pop();
-                }
-                let avatarSrc = DefaultAvatar;
-                if (u.profile_photo_source === "upload" && photoUrl) {
-                  avatarSrc = `${API_BASE}${photoUrl}`;
-                } else if (u.profile_photo_source === "local" && photoUrl) {
-                  avatarSrc = `/avatars/${photoUrl}`;
-                } else if (u.avatar_url) {
-                  let avUrl = u.avatar_url;
-                  if (avUrl && /^[A-Za-z]:[/\\]/i.test(avUrl)) {
-                    avUrl = "/uploads/" + avUrl.replace(/\\/g, '/').split('/').pop();
-                  }
-                  avatarSrc = avUrl.startsWith("http") || avUrl.startsWith("/") ? avUrl : `${API_BASE}${avUrl}`;
-                }
+                let avatarSrc = getAvatarUrl(u);
                 return (
                   <tr key={u.user_id}>
                     <td className="user-cell">
@@ -400,9 +472,9 @@ function Team() {
                               onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                               View
                             </div>
-                            <div onClick={(e) => { e.stopPropagation(); handleDeleteMember(u.user_id, u.first_name, u.last_name); setOpenActionMenu(null); }}
-                              style={{ padding: "10px 16px", cursor: "pointer", fontSize: "14px", color: "#e53e3e", display: "flex", alignItems: "center", gap: "8px", borderTop: "1px solid #f0f0f0" }}
-                              onMouseEnter={e => e.currentTarget.style.background = "#fff5f5"}
+                            <div onClick={(e) => { e.stopPropagation(); initiateDelete(u); }}
+                              style={{ padding: "10px 16px", cursor: "pointer", fontSize: "14px", color: "#cda751", display: "flex", alignItems: "center", gap: "8px", borderTop: "1px solid #f0f0f0" }}
+                              onMouseEnter={e => e.currentTarget.style.background = "#fcf8ed"}
                               onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                               Delete
                             </div>

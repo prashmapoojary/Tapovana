@@ -13,8 +13,8 @@
 
 .team-title {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .team-title h1 {

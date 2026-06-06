@@ -16,7 +16,7 @@ const initialForm = {
   sendEmailInvitation: true
 };
 
-const AddMemberDrawer = ({ isOpen, onClose, onSaved }) => {
+const AddMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoSource, setPhotoSource] = useState("default");
   const [photoUrl, setPhotoUrl] = useState("");
@@ -105,19 +105,15 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved }) => {
   };
 
   const validate = () => {
+    if (photoSource === "default" && !photoUrl && !photoBase64) return "Profile photo is required";
     if (!formData.firstName.trim()) return "First name is required";
     if (!/^[a-zA-Z\s'-]+$/.test(formData.firstName.trim())) return "First name must contain letters only";
     if (!formData.lastName.trim()) return "Last name is required";
     if (!/^[a-zA-Z\s'-]+$/.test(formData.lastName.trim())) return "Last name must contain letters only";
     if (!formData.email.trim()) return "Work email is required";
-    if (!/\S+@\S+\.\S+/.test(formData.email.trim())) return "Please enter a valid email";
+    if (!/\S+@\S+\.com$/.test(formData.email.trim())) return "Work email must end with .com";
+    if (!formData.phone || !/^\d{10}$/.test(formData.phone.trim())) return "Phone number must be exactly 10 digits";
     if (!formData.role) return "Please select a role";
-    if (formData.phone && formData.phone.trim()) {
-      const phoneVal = formData.phone.trim();
-      if (!/^\d{10,15}$/.test(phoneVal)) {
-        return "Phone number must be digits only and between 10 to 15 characters long";
-      }
-    }
     if ((formData.role === "DOCTOR" || formData.role === "THERAPIST") && !formData.specialization?.trim()) {
       return "Specialization is required for Doctors and Therapists";
     }
@@ -152,20 +148,35 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved }) => {
     try {
       setSaving(true);
 
-      await apiFetch("/api/teams/users", {
+      const res = await apiFetch("/api/teams/users", {
         method: "POST",
         body: JSON.stringify(payload)
       });
+      
+      if (!res || res.error) {
+         throw new Error(res?.error || "Failed to save user. Please check inputs.");
+      }
+
+      if (onShowToast) {
+        onShowToast("User saved successfully.", "success");
+        if (payload.send_invite_email) {
+           setTimeout(() => onShowToast("Invitation email sent.", "info"), 1500);
+        }
+      }
 
       onClose();
       resetForm();
       if (onSaved) onSaved();
     } catch (e) {
-      setError(e.message || "Failed to create user. Please try again.");
+      setError(e.message || "Failed to save user. Please check inputs.");
+      if (onShowToast) onShowToast("Failed to save user. Please check inputs.", "error");
     } finally {
       setSaving(false);
     }
   };
+
+  const validationError = validate();
+  const isSaveDisabled = saving || !!validationError;
 
   return (
     <>
@@ -450,7 +461,7 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved }) => {
           <button className="btn-cancel" onClick={handleClose} disabled={saving}>
             Cancel
           </button>
-          <button className="btn-save" onClick={handleSave} disabled={saving}>
+          <button className="btn-save" onClick={handleSave} disabled={isSaveDisabled} style={{ opacity: isSaveDisabled ? 0.6 : 1 }}>
             {saving ? "Saving..." : "Save User"}
             {!saving && (
               <svg
