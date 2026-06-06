@@ -55,13 +55,10 @@ app.use((err, _req, res, _next) => {
     res.status(500).json({ success: false, message: "Internal server error." });
 });
 
-// For local development
-if (process.env.NODE_ENV !== "production") {
-    app.listen(PORT, () => {
-        console.log(`🌿 Tapovana Backend running on port ${PORT}`);
-        console.log(`ENV: ${process.env.NODE_ENV || "development"}`);
-    });
-}
+app.listen(PORT, () => {
+    console.log(`🌿 Tapovana Backend running on port ${PORT}`);
+    console.log(`ENV: ${process.env.NODE_ENV || "development"}`);
+});
 
-// Export for Vercel serverless
+// Export for compatibility
 module.exports = app;
