@@ -6,7 +6,6 @@ import { useAllocations } from "../utils/AllocationContext";
 import SearchIcon from "../assets/searchIcon.svg";
 import ActionIcon from "../assets/Button.svg";
 import DefaultAvatar from "../assets/profileIconDefault.png";
-import { useAllocations } from "../utils/AllocationContext";
 
 const DUMMY_BOOKINGS = [
   { id: "1", booking_id: "BK-1001", customer_name: "Rahul Sharma", customer_phone: "+91 9876543210", service_name: "Ayurvedic Massage", doctor_name: "Dr. Kavitha", booking_date: "2026-06-15", booking_time: "10:00 AM", amount: "2500", payment_status: "PAID", status: "CONFIRMED" },
@@ -26,8 +25,6 @@ function Bookings() {
   const { triggerAlert, triggerConfirm } = useAllocations();
   const userRole = useMemo(() => getUser()?.role, []);
   const canEdit = ["SUPER_ADMIN", "CO_ADMIN"].includes((userRole || "").toUpperCase());
-
-  const { triggerAlert } = useAllocations();
 
   const [bookings, setBookings] = useState(DUMMY_BOOKINGS);
   const [loading, setLoading] = useState(false);
