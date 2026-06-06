@@ -16,11 +16,11 @@ const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN')];
 const staffOrAdmin = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR', 'THERAPIST')];
 
 // ─── My Assignments (must be BEFORE /:id routes) ─────────────────────────
-router.get('/my/assignments', authenticate, getMyAssignments);
+router.get('/my/assignments', getMyAssignments);
 
-// ─── Read routes (accessible to all authenticated users - web + mobile) ──
-router.get('/', staffOrAdmin, getAllServices);
-router.get('/:id', staffOrAdmin, getServiceById);
+// ─── Read routes (public) ────────────────────────────────────────────────
+router.get('/', getAllServices);
+router.get('/:id', getServiceById);
 
 // ─── Admin-only CRUD ─────────────────────────────────────────────────────
 router.post('/', ...adminOnly, createService);

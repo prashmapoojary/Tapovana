@@ -13,9 +13,9 @@ const {
 const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN')];
 const staffOrAdmin = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR', 'THERAPIST')];
 
-// Read routes
-router.get('/', staffOrAdmin, getAllWorkshops);
-router.get('/:id', staffOrAdmin, getWorkshopById);
+// Read routes (public)
+router.get('/', getAllWorkshops);
+router.get('/:id', getWorkshopById);
 
 // Admin CRUD
 router.post('/', ...adminOnly, createWorkshop);
