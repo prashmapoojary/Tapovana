@@ -1,0 +1,24 @@
+name: 🌿 Keep Render Backend Alive
+
+on:
+  schedule:
+    # Runs every 14 minutes — prevents Render free-tier from sleeping (sleeps after 15 min idle)
+    - cron: "*/14 * * * *"
+  workflow_dispatch: # allows manual trigger from GitHub Actions tab
+
+jobs:
+  ping:
+    name: Ping Tapovana Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping /health endpoint
+        run: |
+          echo "⏰ Pinging backend at $(date)"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://tapovana.onrender.com/health)
+          echo "📡 HTTP Status: $STATUS"
+          if [ "$STATUS" -eq 200 ]; then
+            echo "✅ Backend is alive!"
+          else
+            echo "⚠️ Backend returned status $STATUS"
+          fi
