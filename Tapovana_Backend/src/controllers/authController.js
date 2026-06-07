@@ -57,12 +57,12 @@ const loginPassword = async (req, res) => {
 
         const otp = generateOtp();
         const expiresAt = new Date(Date.now() + parseInt(process.env.OTP_EXPIRES_MINUTES || "10", 10) * 60000);
-        const otpHash = await bcrypt.hash(otp, 10);
 
+        // FIX: Insert plaintext OTP to fit in VARCHAR(6) column, avoiding the 500 error
         await query(
             `INSERT INTO otp_verification (member_id, otp_code, otp_type, expires_at)
        VALUES ($1, $2, 'login', $3)`,
-            [member.id, otpHash, expiresAt]
+            [member.id, otp, expiresAt]
         );
 
         console.log("LOGIN OTP DEV:", otp);
@@ -134,7 +134,7 @@ const verifyOtp = async (req, res) => {
             return res.status(429).json({ success: false, message: "Too many attempts. Please login again." });
         }
 
-        const otpValid = (process.env.NODE_ENV === "development" && otp === "000000") || await bcrypt.compare(otp, otpRow.otp_code);
+        const otpValid = (process.env.NODE_ENV === "development" && otp === "000000") || (otp === otpRow.otp_code);
         if (!otpValid) {
             await client.query("UPDATE otp_verification SET attempts = attempts + 1 WHERE id = $1", [otpRow.id]);
             await client.query("COMMIT");

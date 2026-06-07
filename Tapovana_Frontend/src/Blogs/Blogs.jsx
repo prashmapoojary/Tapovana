@@ -8,7 +8,6 @@ import { getUser, roleLabel } from "../utils/session";
 import { getImageUrl } from "../utils/image";
 import { useAllocations } from "../utils/AllocationContext";
 
-// Helper to format date
 const formatDate = (dateStr) => {
   return new Date(dateStr).toLocaleDateString("en-IN", {
     day: "numeric",
@@ -17,15 +16,20 @@ const formatDate = (dateStr) => {
   });
 };
 
+const getReadTime = (text = "") => {
+  return Math.max(3, Math.ceil(text.split(/\s+/).length / 200)) + " min read";
+};
+
 function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove, onReject }) {
   const isDraft = blog.status === "draft";
   const isPending = blog.status === "pending";
   const isPublished = blog.status === "published";
-  const isRemoved = blog.status === "removed";
+  const isRejected = blog.status === "rejected";
+  const isArchived = blog.status === "archived";
 
   return (
     <div className="blog-card" onClick={() => onClick(blog.id)}>
-      <div style={{ position: "relative" }}>
+      <div className="blog-card-image-wrapper">
         <img
           src={getImageUrl(blog.image)}
           alt={blog.title}
@@ -35,24 +39,9 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
           }}
         />
 
-        {/* Status badges for staff or admins */}
         {(isStaff || isAdmin) && (
-          <div style={{
-            position: "absolute",
-            top: "12px",
-            left: "12px",
-            padding: "4px 10px",
-            borderRadius: "20px",
-            fontSize: "11px",
-            fontWeight: 700,
-            color: (isPublished || isPending) ? "#cda751" : isDraft ? "#d4ac0d" : "#c0392b",
-            background: (isPublished || isPending) ? "rgba(205, 167, 81, 0.15)" : isDraft ? "rgba(241, 196, 15, 0.15)" : "rgba(231, 76, 60, 0.15)",
-            border: (isPublished || isPending) ? "1px solid rgba(205, 167, 81, 0.3)" : isDraft ? "1px solid rgba(241, 196, 15, 0.3)" : "1px solid rgba(231, 76, 60, 0.3)",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-            textTransform: "uppercase",
-            letterSpacing: "0.5px"
-          }}>
-            {isPublished ? "Published" : isPending ? "Pending" : isDraft ? "Draft" : "Removed by Admin"}
+          <div className={"blog-status-badge " + blog.status}>
+            {isPublished ? "Published" : isPending ? "Pending" : isDraft ? "Draft" : isRejected ? "Rejected" : "Archived"}
           </div>
         )}
       </div>
@@ -62,164 +51,56 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
         <h3 className="blog-card-title">{blog.title}</h3>
         <p className="blog-card-summary">{blog.summary}</p>
 
+        {isRejected && blog.rejectionReason && (
+          <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#fff5f5', border: '1px solid #feb2b2', borderRadius: '6px', fontSize: '12px', color: '#c53030' }}>
+            <strong style={{ display: 'block', marginBottom: '4px' }}>Rejection Reason:</strong>
+            {blog.rejectionReason}
+          </div>
+        )}
+
         <div className="blog-card-meta">
-          <div className="blog-card-meta-item">
-            <div className="blog-card-author">
-              <div className="blog-card-author-avatar">
-                {blog.author?.initials || "AU"}
-              </div>
-              <span>{blog.author?.name || "Anonymous"}</span>
-            </div>
+          <div className="blog-card-author">
+            <div className="blog-card-author-avatar">{blog.author?.initials || "AU"}</div>
+            <span>{blog.author?.name || "Anonymous"}</span>
           </div>
-          <div className="blog-card-meta-item">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-            {formatDate(blog.date)}
-          </div>
-          <div className="blog-card-meta-item">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-            {blog.readTime || "5 min read"}
-          </div>
+          <div className="blog-card-meta-item">{formatDate(blog.date)}</div>
+          <div className="blog-card-meta-item">{blog.readTime}</div>
         </div>
 
-        {/* Dynamic Action Buttons inside card footer */}
-        <div className="blog-card-footer" onClick={e => e.stopPropagation()} style={{ gap: "8px", flexWrap: "wrap" }}>
+        <div className="blog-card-footer" onClick={(e) => e.stopPropagation()}>
           {isPublished && (
             <button className="blog-card-read-more" onClick={() => onClick(blog.id)}>
               Read Article
             </button>
           )}
 
-          {/* Staff specific actions on their own draft / pending articles */}
-          {isStaff && (
-            <div style={{ display: "flex", gap: "6px", width: "100%", marginTop: "4px" }}>
-              {isDraft && (
-                <button
-                  onClick={() => onEdit(blog)}
-                  style={{
-                    flex: 1, padding: "6px 12px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
-                    color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
-                  }}
-                >
-                  Edit Draft
-                </button>
-              )}
-              {(isDraft || isPending || isRemoved) && (
-                <button
-                  onClick={() => onDelete(blog.id)}
-                  style={{
-                    padding: "6px 10px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
-                    color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
-                  }}
-                >
-                  Delete
-                </button>
-              )}
+          {isStaff && (isDraft || isRejected) && (
+            <div className="blog-card-actions">
+              <button onClick={() => onEdit(blog)}>Edit</button>
+              <button onClick={() => onDelete(blog.id)}>Delete</button>
             </div>
           )}
 
-          {/* Admin specific actions for review & moderation */}
           {isAdmin && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%", marginTop: "4px" }}>
+            <div className="blog-card-actions admin-actions">
               {isPending && (
-                <div style={{ display: "flex", gap: "6px", width: "100%" }}>
-                  <button
-                    onClick={() => onApprove(blog.id)}
-                    style={{
-                      flex: 2, padding: "8px 12px", background: "#cda751", border: "none", borderRadius: "4px",
-                      color: "white", fontSize: "11px", fontWeight: 700, cursor: "pointer"
-                    }}
-                  >
-                    Approve &amp; Publish
-                  </button>
-                  <button
-                    onClick={() => onEdit(blog)}
-                    style={{
-                      flex: 1, padding: "8px 12px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
-                      color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => onReject(blog.id)}
-                    style={{
-                      padding: "8px 10px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
-                      color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
-                    }}
-                  >
-                    Reject
-                  </button>
-                </div>
+                <>
+                  <button onClick={() => onApprove(blog.id)}>Approve</button>
+                  <button onClick={() => onReject(blog.id)}>Reject</button>
+                </>
               )}
               {isPublished && (
-                <div style={{ display: "flex", gap: "6px", width: "100%" }}>
-                  <button
-                    onClick={() => onEdit(blog)}
-                    style={{
-                      flex: 1, padding: "8px 12px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
-                      color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => onReject(blog.id)}
-                    style={{
-                      flex: 2, padding: "8px 12px", background: "white", border: "1px solid #cda751",
-                      borderRadius: "4px", color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
-                    }}
-                  >
-                    Remove / Reject
-                  </button>
-                  <button
-                    onClick={() => onDelete(blog.id)}
-                    style={{
-                      padding: "8px 10px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
-                      color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
+                <>
+                  <button onClick={() => onEdit(blog)}>Edit</button>
+                  <button onClick={() => onReject(blog.id, true)}>Archive</button>
+                  <button onClick={() => onDelete(blog.id)}>Delete</button>
+                </>
               )}
-              {isRemoved && (
-                <div style={{ display: "flex", gap: "6px", width: "100%" }}>
-                  <button
-                    onClick={() => onApprove(blog.id)}
-                    style={{
-                      flex: 2, padding: "8px 12px", background: "#cda751", border: "none", borderRadius: "4px",
-                      color: "white", fontSize: "11px", fontWeight: 700, cursor: "pointer"
-                    }}
-                  >
-                    Publish / Restore
-                  </button>
-                  <button
-                    onClick={() => onEdit(blog)}
-                    style={{
-                      flex: 1, padding: "8px 12px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
-                      color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => onDelete(blog.id)}
-                    style={{
-                      padding: "8px 10px", background: "white", border: "1px solid #cda751", borderRadius: "4px",
-                      color: "#cda751", fontSize: "11px", fontWeight: 700, cursor: "pointer"
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
+              {isArchived && (
+                <>
+                  <button onClick={() => onApprove(blog.id)}>Restore</button>
+                  <button onClick={() => onDelete(blog.id)}>Delete</button>
+                </>
               )}
             </div>
           )}
@@ -230,30 +111,21 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
 }
 
 function RelatedBlogs({ currentBlogId, blogs, onClick }) {
-  const related = useMemo(() => {
-    return blogs.filter((b) => b.id !== currentBlogId && b.status === "published");
-  }, [currentBlogId, blogs]);
+  const relatedBlogs = useMemo(() => {
+    return blogs
+      .filter((blog) => blog.id !== currentBlogId && blog.status === "published")
+      .slice(0, 4);
+  }, [blogs, currentBlogId]);
 
-  if (related.length === 0) return null;
+  if (relatedBlogs.length === 0) return null;
 
   return (
     <div className="blog-related">
       <h3 className="blog-related-title">Recommended Readings</h3>
       <div className="blog-related-grid">
-        {related.map((blog) => (
-          <div
-            key={blog.id}
-            className="blog-related-card"
-            onClick={() => onClick(blog.id)}
-          >
-            <img
-              src={getImageUrl(blog.image)}
-              alt={blog.title}
-              className="blog-related-card-image"
-              onError={(e) => {
-                e.target.src = "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800";
-              }}
-            />
+        {relatedBlogs.map((blog) => (
+          <div key={blog.id} className="blog-related-card" onClick={() => onClick(blog.id)}>
+            <img src={getImageUrl(blog.image)} alt={blog.title} className="blog-related-card-image" />
             <div className="blog-related-card-content">
               <h4 className="blog-related-card-title">{blog.title}</h4>
               <p className="blog-related-card-date">{formatDate(blog.date)} · {blog.readTime}</p>
@@ -265,383 +137,22 @@ function RelatedBlogs({ currentBlogId, blogs, onClick }) {
   );
 }
 
-function CreateOrEditBlogModal({ blogToEdit, staffProfile, onClose, onSave }) {
-  const { triggerAlert } = useAllocations();
-  const [formData, setFormData] = useState({
-    title: blogToEdit?.title || "",
-    category: blogToEdit?.category || "AYURVEDA",
-    summary: blogToEdit?.summary || "",
-    body: blogToEdit?.body || "",
-  });
-  const [coverImage, setCoverImage] = useState(blogToEdit?.image || "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800");
-
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        triggerAlert("Image exceeds 5 MB limit. Please upload a smaller image.");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCoverImage(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleAction = (status) => {
-    const titleVal = formData.title.trim();
-    const summaryVal = formData.summary.trim();
-    const bodyVal = formData.body.trim();
-
-    if (!titleVal || !summaryVal || !bodyVal) {
-      triggerAlert("Please fill in all fields (Title, Summary, and Content)");
-      return;
-    }
-
-    if (titleVal.length < 10 || titleVal.length > 100) {
-      triggerAlert(`Title must be between 10 and 100 characters long (currently ${titleVal.length}).`);
-      return;
-    }
-
-    if (summaryVal.length < 50 || summaryVal.length > 200) {
-      triggerAlert(`Summary must be between 50 and 200 characters long (currently ${summaryVal.length}).`);
-      return;
-    }
-
-    if (bodyVal.length < 100) {
-      triggerAlert(`Full content must be at least 100 characters long (currently ${bodyVal.length}).`);
-      return;
-    }
-
-    const calculatedReadTime = `${Math.max(3, Math.ceil(bodyVal.split(/\s+/).length / 200))} min read`;
-
-    const savedBlog = {
-      id: blogToEdit?.id || `blog-${Date.now()}`,
-      title: titleVal,
-      category: formData.category,
-      summary: summaryVal,
-      body: bodyVal,
-      image: coverImage,
-      author: blogToEdit?.author || {
-        name: `${staffProfile.first_name} ${staffProfile.last_name}`,
-        role: roleLabel(staffProfile.role),
-        initials: `${staffProfile.first_name[0] || ""}${staffProfile.last_name[0] || ""}`.toUpperCase(),
-        userId: staffProfile.user_id || staffProfile.id || "staff-user",
-      },
-      date: blogToEdit?.date || new Date().toISOString().split("T")[0],
-      readTime: calculatedReadTime,
-      status: status, // "draft" or "pending" (or preserved)
-    };
-
-    onSave(savedBlog);
-    onClose();
-  };
-
-  return (
-    <div className="vedic-modal-overlay" onClick={onClose}>
-      <div className="vedic-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "700px" }}>
-        <div className="vedic-modal-header">
-          <h2 className="vedic-modal-title">
-            {blogToEdit ? "Edit Blog Article" : "Create New Blog Article"}
-          </h2>
-          <button className="vedic-modal-close" onClick={onClose}>✕</button>
-        </div>
-
-        <div className="vedic-modal-body" style={{ gap: "16px", maxHeight: "72vh", overflowY: "auto" }}>
-
-          <div className="form-group">
-            <label className="form-label" style={{ fontWeight: 600, color: "#4a5568", fontSize: "13px" }}>Article Title *</label>
-            <input
-              type="text"
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
-              placeholder="e.g., The Sacred Rhythms of Ayurvedic Dinacharya"
-              className="vedic-form-input"
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: (formData.title.length < 10 || formData.title.length > 100) ? "#e74c3c" : "#2ecc71", marginTop: "2px" }}>
-              <span>Required length: 10 - 100 characters</span>
-              <span>{formData.title.length}/100</span>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-            <div className="form-group">
-              <label className="form-label" style={{ fontWeight: 600, color: "#4a5568", fontSize: "13px" }}>Category</label>
-              <select
-                name="category"
-                value={formData.category}
-                onChange={handleChange}
-                className="vedic-form-select"
-              >
-                <option value="AYURVEDA">Ayurveda</option>
-                <option value="YOGA">Yoga</option>
-                <option value="NUTRITION">Nutrition</option>
-                <option value="WELLNESS">Wellness</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" style={{ fontWeight: 600, color: "#4a5568", fontSize: "13px" }}>Article Cover Image</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="vedic-form-file-input"
-                style={{ marginTop: "4px" }}
-              />
-            </div>
-          </div>
-
-          {coverImage && (
-            <div style={{ marginTop: "4px", textAlign: "center" }}>
-              <img src={coverImage} alt="Cover Preview" style={{ width: "100%", maxHeight: "180px", objectFit: "cover", borderRadius: "6px", border: "1px solid rgba(205, 167, 81, 0.2)" }} />
-            </div>
-          )}
-
-          <div className="form-group">
-            <label className="form-label" style={{ fontWeight: 600, color: "#4a5568", fontSize: "13px" }}>Short Summary * (Displays on Blog Card)</label>
-            <input
-              type="text"
-              name="summary"
-              value={formData.summary}
-              onChange={handleChange}
-              placeholder="Provide a brief, catchy 1-2 sentence hook..."
-              maxLength={200}
-              className="vedic-form-input"
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: (formData.summary.length < 50 || formData.summary.length > 200) ? "#e74c3c" : "#2ecc71", marginTop: "2px" }}>
-              <span>Required length: 50 - 200 characters</span>
-              <span>{formData.summary.length}/200</span>
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" style={{ fontWeight: 600, color: "#4a5568", fontSize: "13px" }}>Full Content / Body * (HTML Supported)</label>
-            <textarea
-              name="body"
-              value={formData.body}
-              onChange={handleChange}
-              placeholder="Write your comprehensive wellness insights here. You can use standard HTML like <p>, <h2>, <ul> to format..."
-              rows="8"
-              className="vedic-form-textarea"
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: (formData.body.length < 100) ? "#e74c3c" : "#2ecc71", marginTop: "2px" }}>
-              <span>Required length: minimum 100 characters</span>
-              <span>{formData.body.length} characters</span>
-            </div>
-          </div>
-
-        </div>
-
-        <div className="vedic-modal-footer" style={{ borderTop: "1px solid #E8E2D9", paddingTop: "12px", display: "flex", justifyContent: "space-between", gap: "12px" }}>
-          <button type="button" className="vedic-btn-cancel" onClick={onClose} style={{ marginRight: "auto" }}>
-            Cancel
-          </button>
-
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button
-              type="button"
-              onClick={() => handleAction("draft")}
-              style={{
-                padding: "10px 18px", background: "#edf2f7", color: "#4a5568", border: "none", borderRadius: "6px",
-                fontWeight: 600, cursor: "pointer", fontSize: "13px"
-              }}
-            >
-              Save as Draft
-            </button>
-            <button
-              type="button"
-              className="vedic-btn-allocate"
-              onClick={() => handleAction("pending")}
-            >
-              Submit for Review
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AdminEditBlogModal({ blogToEdit, onClose, onSave }) {
-  const { triggerAlert } = useAllocations();
-  const [formData, setFormData] = useState({
-    title: blogToEdit?.title || "",
-    category: blogToEdit?.category || "AYURVEDA",
-    summary: blogToEdit?.summary || "",
-    body: blogToEdit?.body || "",
-  });
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSave = () => {
-    const titleVal = formData.title.trim();
-    const summaryVal = formData.summary.trim();
-    const bodyVal = formData.body.trim();
-
-    if (!titleVal || !summaryVal || !bodyVal) {
-      triggerAlert("Please fill in all fields");
-      return;
-    }
-
-    if (titleVal.length < 10 || titleVal.length > 100) {
-      triggerAlert(`Title must be between 10 and 100 characters long (currently ${titleVal.length}).`);
-      return;
-    }
-
-    if (summaryVal.length < 50 || summaryVal.length > 200) {
-      triggerAlert(`Summary must be between 50 and 200 characters long (currently ${summaryVal.length}).`);
-      return;
-    }
-
-    if (bodyVal.length < 100) {
-      triggerAlert(`Full content must be at least 100 characters long (currently ${bodyVal.length}).`);
-      return;
-    }
-
-    const updatedBlog = {
-      ...blogToEdit,
-      title: titleVal,
-      category: formData.category,
-      summary: summaryVal,
-      body: bodyVal,
-    };
-
-    onSave(updatedBlog);
-    onClose();
-  };
-
-  return (
-    <div className="vedic-modal-overlay" onClick={onClose}>
-      <div className="vedic-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "700px" }}>
-        <div className="vedic-modal-header">
-          <h2 className="vedic-modal-title">Admin formatting &amp; Corrections</h2>
-          <button className="vedic-modal-close" onClick={onClose}>✕</button>
-        </div>
-
-        <div className="vedic-modal-body" style={{ gap: "16px", maxHeight: "70vh", overflowY: "auto" }}>
-
-          <div className="form-group">
-            <label className="form-label" style={{ fontWeight: 600, color: "#4a5568", fontSize: "13px" }}>Adjust Title</label>
-            <input
-              type="text"
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
-              className="vedic-form-input"
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: (formData.title.length < 10 || formData.title.length > 100) ? "#e74c3c" : "#2ecc71", marginTop: "2px" }}>
-              <span>Required length: 10 - 100 characters</span>
-              <span>{formData.title.length}/100</span>
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" style={{ fontWeight: 600, color: "#4a5568", fontSize: "13px" }}>Category</label>
-            <select
-              name="category"
-              value={formData.category}
-              onChange={handleChange}
-              className="vedic-form-select"
-            >
-              <option value="AYURVEDA">Ayurveda</option>
-              <option value="YOGA">Yoga</option>
-              <option value="NUTRITION">Nutrition</option>
-              <option value="WELLNESS">Wellness</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" style={{ fontWeight: 600, color: "#4a5568", fontSize: "13px" }}>Summary</label>
-            <input
-              type="text"
-              name="summary"
-              value={formData.summary}
-              onChange={handleChange}
-              className="vedic-form-input"
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: (formData.summary.length < 50 || formData.summary.length > 200) ? "#e74c3c" : "#2ecc71", marginTop: "2px" }}>
-              <span>Required length: 50 - 200 characters</span>
-              <span>{formData.summary.length}/200</span>
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" style={{ fontWeight: 600, color: "#4a5568", fontSize: "13px" }}>Content / Body (HTML)</label>
-            <textarea
-              name="body"
-              value={formData.body}
-              onChange={handleChange}
-              rows="8"
-              className="vedic-form-textarea"
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: (formData.body.length < 100) ? "#e74c3c" : "#2ecc71", marginTop: "2px" }}>
-              <span>Required length: minimum 100 characters</span>
-              <span>{formData.body.length} characters</span>
-            </div>
-          </div>
-
-        </div>
-
-        <div className="vedic-modal-footer" style={{ borderTop: "1px solid #E8E2D9" }}>
-          <button type="button" className="vedic-btn-cancel" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="vedic-btn-allocate"
-            onClick={handleSave}
-          >
-            Save Corrections
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function Blogs() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { triggerAlert, triggerConfirm } = useAllocations();
 
-  // Load and persist blogs from local storage (synced globally)
   const [blogs, setBlogs] = useState(() => {
-    const saved = localStorage.getItem("tapovana_blogs");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      let updated = false;
-      const healed = parsed.map(blog => {
-        const matchingDummy = DUMMY_BLOGS.find(d => d.id === blog.id);
-        if (matchingDummy && blog.image !== matchingDummy.image) {
-          updated = true;
-          return { ...blog, image: matchingDummy.image };
-        }
-        return blog;
-      });
-      if (updated) {
-        localStorage.setItem("tapovana_blogs", JSON.stringify(healed));
-        return healed;
-      }
-      return parsed;
+    const savedBlogs = localStorage.getItem("tapovana_blogs");
+    if (savedBlogs) {
+      return JSON.parse(savedBlogs);
     }
-    const initial = DUMMY_BLOGS.map((b) => ({
-      ...b,
-      status: "published", // Default mock blogs are pre-approved and published
+    const initialBlogs = DUMMY_BLOGS.map((blog) => ({
+      ...blog,
+      status: "published",
     }));
-    localStorage.setItem("tapovana_blogs", JSON.stringify(initial));
-    return initial;
+    localStorage.setItem("tapovana_blogs", JSON.stringify(initialBlogs));
+    return initialBlogs;
   });
 
   const currentUser = useMemo(() => getUser(), []);
@@ -651,479 +162,321 @@ export default function Blogs() {
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
-  const [activeTab, setActiveTab] = useState(isStaff ? "my_blogs" : "published"); // Default to "my_blogs" for staff, "published" for admin/public
-
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showAdminEditModal, setShowAdminEditModal] = useState(false);
-
+  const [activeTab, setActiveTab] = useState(isStaff ? "my_blogs" : isAdmin ? "published" : "published");
   const [selectedBlog, setSelectedBlog] = useState(null);
+  const [showEditor, setShowEditor] = useState(false);
+  const [editBlogData, setEditBlogData] = useState({ title: "", category: "AYURVEDA", summary: "", body: "", image: "" });
+  const [rejectionModal, setRejectionModal] = useState({ isOpen: false, blogId: null, reason: "" });
   const [toast, setToast] = useState(null);
 
-  // Sync state helpers
-  const persistBlogs = (newList) => {
-    setBlogs(newList);
-    localStorage.setItem("tapovana_blogs", JSON.stringify(newList));
+  const persistBlogs = (updatedBlogs) => {
+    setBlogs(updatedBlogs);
+    localStorage.setItem("tapovana_blogs", JSON.stringify(updatedBlogs));
   };
 
-  const showToastMsg = (msg) => {
-    setToast(msg);
+  const showToastMsg = (message) => {
+    setToast(message);
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Moderation Logic
   const handleApprove = (blogId) => {
-    const blog = blogs.find(b => b.id === blogId);
-    if (!blog || !blog.body || !blog.body.trim()) {
-      triggerAlert("Cannot approve blog: The blog body is empty.");
-      return;
-    }
-    const updated = blogs.map((b) =>
-      b.id === blogId
-        ? { ...b, status: "published", date: new Date().toISOString().split("T")[0] }
-        : b
-    );
-    persistBlogs(updated);
-    showToastMsg("Blog post approved and published successfully!");
+    triggerConfirm("Are you sure you want to approve and publish this blog?", () => {
+      const updatedBlogs = blogs.map((blog) =>
+        blog.id === blogId ? { ...blog, status: "published", date: blog.status === "published" ? blog.date : new Date().toISOString().split("T")[0] } : blog
+      );
+      persistBlogs(updatedBlogs);
+      showToastMsg("Blog approved and published successfully.");
+    });
   };
 
-  const handleReject = (blogId) => {
-    const blog = blogs.find(b => b.id === blogId);
-    if (blog && blog.status === "published") {
-      triggerConfirm(
-        "Are you sure you want to reject and remove this already PUBLISHED blog post?",
-        () => {
-          const updated = blogs.map((b) =>
-            b.id === blogId ? { ...b, status: "removed" } : b
-          );
-          persistBlogs(updated);
-          showToastMsg("Article rejected and set to Removed.");
-        }
-      );
+  const handleReject = (blogId, isArchiveAction = false) => {
+    if (isArchiveAction) {
+      triggerConfirm("Are you sure you want to archive this published article?", () => {
+        const updatedBlogs = blogs.map((b) => (b.id === blogId ? { ...b, status: "archived" } : b));
+        persistBlogs(updatedBlogs);
+        showToastMsg("Article archived successfully.");
+      });
+    } else {
+      setRejectionModal({ isOpen: true, blogId, reason: "" });
+    }
+  };
+
+  const submitRejection = () => {
+    if (!rejectionModal.reason.trim()) {
+      triggerAlert("Please provide a rejection reason.");
       return;
     }
-    // Flag as removed, author will see "Removed by Admin" in their "My Blogs" panel
-    const updated = blogs.map((b) =>
-      b.id === blogId ? { ...b, status: "removed" } : b
-    );
-    persistBlogs(updated);
-    showToastMsg("Article rejected and set to Removed.");
+    const updatedBlogs = blogs.map((b) => (b.id === rejectionModal.blogId ? { ...b, status: "rejected", rejectionReason: rejectionModal.reason } : b));
+    persistBlogs(updatedBlogs);
+    showToastMsg("Article rejected and notification sent to author.");
+    setRejectionModal({ isOpen: false, blogId: null, reason: "" });
   };
 
   const handleDelete = (blogId) => {
-    triggerConfirm(
-      "Are you sure you want to permanently delete this article?",
-      () => {
-        const updated = blogs.filter((b) => b.id !== blogId);
-        persistBlogs(updated);
-        showToastMsg("Article permanently deleted.");
-      }
-    );
+    triggerConfirm("Are you sure you want to permanently delete this article?", () => {
+      const updatedBlogs = blogs.filter((blog) => blog.id !== blogId);
+      persistBlogs(updatedBlogs);
+      showToastMsg("Article permanently deleted.");
+    });
   };
 
   const handleSaveBlog = (savedBlog) => {
-    const existing = blogs.find((b) => b.id === savedBlog.id);
-    if (existing && existing.status === "pending" && savedBlog.status === "pending") {
-      triggerAlert("This blog is already pending review and cannot be re-submitted.");
+    const existingBlog = blogs.find((blog) => blog.id === savedBlog.id);
+
+    if (existingBlog && existingBlog.status === "pending" && savedBlog.status === "pending") {
+      triggerAlert("This blog is already pending review.");
       return;
     }
-    const exists = blogs.some((b) => b.id === savedBlog.id);
-    let updated;
-    if (exists) {
-      updated = blogs.map((b) => (b.id === savedBlog.id ? savedBlog : b));
-      showToastMsg(`Updated article "${savedBlog.title}" successfully!`);
+
+    const blogExists = blogs.some((blog) => blog.id === savedBlog.id);
+    let updatedBlogs = [];
+
+    if (blogExists) {
+      updatedBlogs = blogs.map((blog) => (blog.id === savedBlog.id ? savedBlog : blog));
+      showToastMsg(savedBlog.status === "draft" ? "Draft updated successfully." : "Blog updated successfully. It is now pending admin approval.");
     } else {
-      updated = [savedBlog, ...blogs];
-      showToastMsg(`Created article "${savedBlog.title}" successfully!`);
+      updatedBlogs = [savedBlog, ...blogs];
+      showToastMsg(savedBlog.status === "draft" ? "Draft saved successfully." : "Blog created successfully. It is now pending admin approval.");
     }
-    persistBlogs(updated);
+
+    persistBlogs(updatedBlogs);
   };
 
-  const handleAdminCorrection = (correctedBlog) => {
-    const updated = blogs.map((b) => (b.id === correctedBlog.id ? correctedBlog : b));
-    persistBlogs(updated);
-    showToastMsg("Formatted corrections saved!");
+  const handleEditorSubmit = (e, targetStatus) => {
+    if (e) e.preventDefault();
+    const newBlog = {
+      id: selectedBlog ? selectedBlog.id : Date.now().toString(),
+      title: editBlogData.title,
+      category: editBlogData.category,
+      summary: editBlogData.summary,
+      body: editBlogData.body,
+      image: editBlogData.image || "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800",
+      status: targetStatus,
+      author: currentUser ? { name: currentUser.name, userId: currentUser.user_id || currentUser.id, initials: currentUser.name ? currentUser.name[0] : "AU", role: currentUser.role } : { name: "Doctor", initials: "D", role: "Doctor", userId: "123" },
+      date: new Date().toISOString().split("T")[0],
+      readTime: getReadTime(editBlogData.body),
+    };
+    handleSaveBlog(newBlog);
+    setShowEditor(false);
   };
 
-  // Filter & Display Logic
   const filteredBlogs = useMemo(() => {
     return blogs.filter((blog) => {
-      // 1. Tab segregation
-      if (activeTab === "my_blogs" && isStaff) {
-        // Staff sees only their own authored blogs (all states: draft, pending, published, removed)
-        const myUserId = currentUser.user_id || currentUser.id || "";
-        const authorUserId = blog.author?.userId || "";
-        if (authorUserId !== myUserId) return false;
-      } else if (activeTab === "pending" && isAdmin) {
-        // Admin sees only pending submitted blogs
-        if (blog.status !== "pending") return false;
-      } else if (activeTab === "all_blogs" && isAdmin) {
-        // Admin sees all blogs except drafts (drafts are private to the author until submitted)
-        if (blog.status === "draft") return false;
-      } else {
-        // Default "published" tab: shows ONLY published articles to everyone
-        // For staff (Doctor/Therapist), this represents the "Other Blogs" tab, which filters out their own published blogs
-        if (blog.status !== "published") return false;
-        if (isStaff) {
-          const myUserId = currentUser.user_id || currentUser.id || "";
-          const authorUserId = blog.author?.userId || "";
-          if (authorUserId === myUserId) return false;
+      // Role-based status filtering
+      if (!isAdmin && !isStaff && blog.status !== "published") return false;
+      
+      if (isAdmin) {
+        if (activeTab === "pending" && blog.status !== "pending") return false;
+        if (activeTab === "published" && blog.status !== "published") return false;
+        if (activeTab === "archived" && blog.status !== "archived") return false;
+      }
+
+      // Staff specific tabs
+      if (isStaff) {
+        const myUserId = currentUser?.user_id || currentUser?.id;
+        if (activeTab === "my_blogs" && blog.author?.userId !== myUserId) return false;
+        if (activeTab === "other_blogs") {
+          if (blog.author?.userId === myUserId) return false;
+          if (blog.status !== "published") return false;
         }
       }
 
-      // 2. Search & Category filter
-      const matchesSearch =
-        blog.title.toLowerCase().includes(search.toLowerCase()) ||
-        blog.summary.toLowerCase().includes(search.toLowerCase()) ||
-        (blog.author?.name || "").toLowerCase().includes(search.toLowerCase());
-
-      const matchesCategory =
-        categoryFilter === "ALL" || blog.category === categoryFilter;
+      const matchesSearch = blog.title.toLowerCase().includes(search.toLowerCase()) || blog.summary.toLowerCase().includes(search.toLowerCase());
+      const matchesCategory = categoryFilter === "ALL" || blog.category === categoryFilter;
 
       return matchesSearch && matchesCategory;
     });
   }, [blogs, search, categoryFilter, activeTab, currentUser, isStaff, isAdmin]);
 
   const handleCardClick = (blogId) => {
-    navigate(`/dashboard/blogs/${blogId}`);
+    navigate("/dashboard/blogs/" + blogId);
   };
 
-  const handleBackClick = () => {
-    navigate("/dashboard/blogs");
-  };
-
-  // ── DETAIL VIEW ──
   if (id) {
-    const currentBlog = blogs.find((b) => b.id === id);
-
-    // Detail view is only accessible if article is published OR if staff is viewing their own preview OR if admin is reviewing
-    const canView = currentBlog && (
-      currentBlog.status === "published" ||
-      (isStaff && currentBlog.author?.userId === (currentUser.user_id || currentUser.id)) ||
-      isAdmin
-    );
-
-    if (!canView) {
-      return (
-        <div className="blog-detail-container">
-          <div className="blog-detail-back" onClick={handleBackClick}>
-            ← Back to Blogs
-          </div>
-          <div className="blog-empty">
-            <div className="blog-empty-icon"></div>
-            <p className="blog-empty-text">Article Not Found</p>
-            <p className="blog-empty-subtext">The article you are looking for does not exist, has been removed, or requires approval.</p>
-          </div>
-        </div>
-      );
+    const currentBlog = blogs.find((blog) => blog.id === id);
+    if (!currentBlog) {
+      return <div className="blog-empty">Blog not found.</div>;
     }
 
     return (
       <div className="blog-detail-container">
-        <div className="blog-detail-back" onClick={handleBackClick}>
+        <div className="blog-detail-back" onClick={() => navigate("/dashboard/blogs")}>
           ← Back to Blogs
         </div>
-
         <article className="blog-detail-header">
-          <img
-            src={getImageUrl(currentBlog.image)}
-            alt={currentBlog.title}
-            className="blog-detail-image"
-            onError={(e) => {
-              e.target.src = "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800";
-            }}
-          />
+          <img src={getImageUrl(currentBlog.image)} alt={currentBlog.title} className="blog-detail-image" />
           <div className="blog-detail-info">
             <span className="blog-detail-category">{currentBlog.category}</span>
             <h1 className="blog-detail-title">{currentBlog.title}</h1>
-
             <div className="blog-detail-meta">
-              <div className="blog-detail-meta-item">
-                <div className="blog-detail-author">
-                  <div className="blog-detail-author-avatar">
-                    {currentBlog.author?.initials || "AU"}
-                  </div>
-                  <div className="blog-detail-author-info">
-                    <h4>{currentBlog.author?.name || "Anonymous"}</h4>
-                    <p>{currentBlog.author?.role || "Staff Specialist"}</p>
-                  </div>
+              <div className="blog-detail-author">
+                <div className="blog-detail-author-avatar">{currentBlog.author?.initials}</div>
+                <div className="blog-detail-author-info">
+                  <h4>{currentBlog.author?.name}</h4>
+                  <p>{currentBlog.author?.role}</p>
                 </div>
               </div>
-
-              <div className="blog-detail-meta-item">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="4" width="18" height="18" rx="2" />
-                  <line x1="16" y1="2" x2="16" y2="6" />
-                  <line x1="8" y1="2" x2="8" y2="6" />
-                  <line x1="3" y1="10" x2="21" y2="10" />
-                </svg>
-                <span>Published on {formatDate(currentBlog.date)}</span>
-              </div>
-
-              <div className="blog-detail-meta-item">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-                <span>{currentBlog.readTime || "5 min read"}</span>
-              </div>
+              <div>Published on {formatDate(currentBlog.date)}</div>
+              <div>{currentBlog.readTime}</div>
             </div>
           </div>
         </article>
-
-        <section
-          className="blog-detail-body"
-          dangerouslySetInnerHTML={{ __html: currentBlog.body }}
-        />
-
-        <RelatedBlogs
-          currentBlogId={currentBlog.id}
-          blogs={blogs}
-          onClick={handleCardClick}
-        />
+        <section className="blog-detail-body" dangerouslySetInnerHTML={{ __html: currentBlog.body }} />
+        <RelatedBlogs currentBlogId={currentBlog.id} blogs={blogs} onClick={handleCardClick} />
       </div>
     );
   }
 
-  // ── LIST VIEW ──
   return (
-    <div className="blog-container" style={{ position: "relative" }}>
+    <div className="blog-container">
+      {toast && <div className="blog-toast">{toast}</div>}
 
-      {/* Toast Notification Widget */}
-      {toast && (
-        <div style={{
-          position: "fixed",
-          bottom: "24px",
-          right: "24px",
-          background: "#cda751",
-          color: "white",
-          padding: "16px 24px",
-          borderRadius: "8px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-          zIndex: 999999,
-          fontWeight: 600,
-          fontSize: "14px",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px"
-        }}>
-          {toast}
+      {rejectionModal.isOpen && (
+        <div className="blog-editor-modal-overlay">
+          <div className="blog-editor-modal" style={{ maxWidth: '400px' }}>
+            <h2>Reject Blog</h2>
+            <p style={{ color: '#718096', marginBottom: '16px', fontSize: '14px' }}>Please provide a reason for rejecting this article. This will be sent to the author.</p>
+            <textarea
+              placeholder="Rejection Reason"
+              value={rejectionModal.reason}
+              onChange={(e) => setRejectionModal({ ...rejectionModal, reason: e.target.value })}
+              className="blog-editor-form-textarea"
+              style={{ width: '100%', padding: '12px', border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '16px', fontFamily: 'inherit', resize: 'vertical' }}
+              rows={4}
+              required
+            />
+            <div className="blog-editor-actions">
+              <button type="button" onClick={() => setRejectionModal({ isOpen: false, blogId: null, reason: "" })} className="blog-editor-cancel">Cancel</button>
+              <button type="button" onClick={submitRejection} className="blog-editor-save" style={{ background: '#e53e3e' }}>Reject Article</button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Header */}
-      <div className="blog-header" style={{ alignItems: "center" }}>
-        <div className="blog-title">
-          <h1>Vedic &amp; Ayurvedic Blogs</h1>
-          <p>Read about authentic Ayurveda, Yoga routines, dietary habits, and healthy lifestyles</p>
+      {showEditor && (
+        <div className="blog-editor-modal-overlay">
+          <div className="blog-editor-modal">
+            <h2>{selectedBlog ? "Edit Blog" : "Create New Blog"}</h2>
+            <form onSubmit={(e) => { e.preventDefault(); handleEditorSubmit(e, e.nativeEvent.submitter.name === 'draft' ? 'draft' : 'pending'); }} className="blog-editor-form">
+              <input type="text" placeholder="Blog Title" value={editBlogData.title} onChange={(e) => setEditBlogData({ ...editBlogData, title: e.target.value })} required />
+              <select value={editBlogData.category} onChange={(e) => setEditBlogData({ ...editBlogData, category: e.target.value })} required>
+                <option value="AYURVEDA">Ayurveda</option>
+                <option value="YOGA">Yoga</option>
+                <option value="NUTRITION">Nutrition</option>
+                <option value="WELLNESS">Wellness</option>
+              </select>
+              <textarea placeholder="Short Summary" value={editBlogData.summary} onChange={(e) => setEditBlogData({ ...editBlogData, summary: e.target.value })} required rows={2} />
+              <textarea placeholder="Full Content (HTML supported)" value={editBlogData.body} onChange={(e) => setEditBlogData({ ...editBlogData, body: e.target.value })} required rows={6} />
+              <input type="text" placeholder="Image URL (e.g. filename from /uploads or absolute URL)" value={editBlogData.image} onChange={(e) => setEditBlogData({ ...editBlogData, image: e.target.value })} />
+              
+              <div className="blog-editor-actions">
+                <button type="button" onClick={() => setShowEditor(false)} className="blog-editor-cancel">Cancel</button>
+                <button type="submit" name="draft" className="blog-editor-save" style={{background: '#718096', border: '1px solid #718096'}}>Save Draft</button>
+                <button type="submit" name="pending" className="blog-editor-save">Submit for Review</button>
+              </div>
+            </form>
+          </div>
         </div>
+      )}
 
-        {/* Create Blog Button shown only to Doctors/Therapists on their My Blogs tab */}
+      <div className="blog-header">
+        <div className="blog-title">
+          <h1>Vedic & Ayurvedic Blogs</h1>
+          <p>Read about Ayurveda, Yoga, Wellness and Healthy Lifestyle</p>
+        </div>
         {isStaff && activeTab === "my_blogs" && (
-          <button className="blog-add-btn" onClick={() => { setSelectedBlog(null); setShowCreateModal(true); }}>
-            <span>Create Blog</span>
+          <button style={{ background: '#cda751', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }} onClick={() => {
+            setEditBlogData({ title: "", category: "AYURVEDA", summary: "", body: "", image: "" });
+            setSelectedBlog(null);
+            setShowEditor(true);
+          }}>
+            + Create Blog
           </button>
         )}
       </div>
 
-      {/* Tab Navigations for Roles */}
-      {(isStaff || isAdmin) && (
-        <div style={{ display: "flex", borderBottom: "2px solid #e2e8f0", gap: "24px", marginBottom: "8px" }}>
-
-          {/* STAFF TABS */}
-          {isStaff && (
-            <>
-              <button
-                onClick={() => setActiveTab("my_blogs")}
-                style={{
-                  padding: "12px 8px", border: "none", background: "none",
-                  fontFamily: "Manrope, sans-serif", fontSize: "14px", fontWeight: 700, cursor: "pointer",
-                  color: activeTab === "my_blogs" ? "#cda751" : "#718096",
-                  borderBottom: activeTab === "my_blogs" ? "3px solid #cda751" : "3px solid transparent",
-                  marginBottom: "-2px", transition: "all 0.2s"
-                }}
-              >
-                My Blogs
-              </button>
-              <button
-                onClick={() => setActiveTab("published")}
-                style={{
-                  padding: "12px 8px", border: "none", background: "none",
-                  fontFamily: "Manrope, sans-serif", fontSize: "14px", fontWeight: 700, cursor: "pointer",
-                  color: activeTab === "published" ? "#cda751" : "#718096",
-                  borderBottom: activeTab === "published" ? "3px solid #cda751" : "3px solid transparent",
-                  marginBottom: "-2px", transition: "all 0.2s"
-                }}
-              >
-                Other Blogs
-              </button>
-            </>
-          )}
-
-          {/* ADMIN TABS */}
-          {isAdmin && (
-            <>
-              <button
-                onClick={() => setActiveTab("published")}
-                style={{
-                  padding: "12px 8px", border: "none", background: "none",
-                  fontFamily: "Manrope, sans-serif", fontSize: "14px", fontWeight: 700, cursor: "pointer",
-                  color: activeTab === "published" ? "#cda751" : "#718096",
-                  borderBottom: activeTab === "published" ? "3px solid #cda751" : "3px solid transparent",
-                  marginBottom: "-2px", transition: "all 0.2s"
-                }}
-              >
-                 Published Articles
-              </button>
-              <button
-                onClick={() => setActiveTab("pending")}
-                style={{
-                  padding: "12px 8px", border: "none", background: "none",
-                  fontFamily: "Manrope, sans-serif", fontSize: "14px", fontWeight: 700, cursor: "pointer",
-                  color: activeTab === "pending" ? "#cda751" : "#718096",
-                  borderBottom: activeTab === "pending" ? "3px solid #cda751" : "3px solid transparent",
-                  marginBottom: "-2px", transition: "all 0.2s",
-                  display: "flex", alignItems: "center", gap: "6px"
-                }}
-              >
-                 Pending Review
-                {blogs.filter(b => b.status === "pending").length > 0 && (
-                  <span style={{
-                    padding: "1px 6px", background: "rgba(205, 167, 81, 0.15)", color: "#cda751", fontSize: "11px",
-                    border: "1px solid rgba(205, 167, 81, 0.3)", borderRadius: "10px", fontWeight: 700
-                  }}>
-                    {blogs.filter(b => b.status === "pending").length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab("all_blogs")}
-                style={{
-                  padding: "12px 8px", border: "none", background: "none",
-                  fontFamily: "Manrope, sans-serif", fontSize: "14px", fontWeight: 700, cursor: "pointer",
-                  color: activeTab === "all_blogs" ? "#cda751" : "#718096",
-                  borderBottom: activeTab === "all_blogs" ? "3px solid #cda751" : "3px solid transparent",
-                  marginBottom: "-2px", transition: "all 0.2s"
-                }}
-              >
-                 All Blogs
-              </button>
-            </>
-          )}
-
+      {isStaff && (
+        <div className="blog-tabs" style={{ display: 'flex', gap: '16px', marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+          <button
+            style={{ background: 'none', border: 'none', padding: '8px 12px', fontSize: '15px', fontWeight: '600', color: activeTab === 'my_blogs' ? '#cda751' : '#718096', borderBottom: activeTab === 'my_blogs' ? '2px solid #cda751' : '2px solid transparent', cursor: 'pointer', transition: '0.2s' }}
+            onClick={() => setActiveTab("my_blogs")}
+          >
+            My Blogs
+          </button>
+          <button
+            style={{ background: 'none', border: 'none', padding: '8px 12px', fontSize: '15px', fontWeight: '600', color: activeTab === 'other_blogs' ? '#cda751' : '#718096', borderBottom: activeTab === 'other_blogs' ? '2px solid #cda751' : '2px solid transparent', cursor: 'pointer', transition: '0.2s' }}
+            onClick={() => setActiveTab("other_blogs")}
+          >
+            Other Blogs
+          </button>
         </div>
       )}
 
-      {/* Filters & Search Control panel */}
+      {isAdmin && (
+        <div className="blog-tabs" style={{ display: 'flex', gap: '16px', marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+          <button
+            style={{ background: 'none', border: 'none', padding: '8px 12px', fontSize: '15px', fontWeight: '600', color: activeTab === 'published' ? '#cda751' : '#718096', borderBottom: activeTab === 'published' ? '2px solid #cda751' : '2px solid transparent', cursor: 'pointer', transition: '0.2s' }}
+            onClick={() => setActiveTab("published")}
+          >
+            Published Blogs
+          </button>
+          <button
+            style={{ background: 'none', border: 'none', padding: '8px 12px', fontSize: '15px', fontWeight: '600', color: activeTab === 'pending' ? '#cda751' : '#718096', borderBottom: activeTab === 'pending' ? '2px solid #cda751' : '2px solid transparent', cursor: 'pointer', transition: '0.2s' }}
+            onClick={() => setActiveTab("pending")}
+          >
+            Pending Blogs
+          </button>
+          <button
+            style={{ background: 'none', border: 'none', padding: '8px 12px', fontSize: '15px', fontWeight: '600', color: activeTab === 'archived' ? '#cda751' : '#718096', borderBottom: activeTab === 'archived' ? '2px solid #cda751' : '2px solid transparent', cursor: 'pointer', transition: '0.2s' }}
+            onClick={() => setActiveTab("archived")}
+          >
+            Archived Blogs
+          </button>
+        </div>
+      )}
+
       <div className="blog-controls">
         <div className="blog-search-box">
           <img src={SearchIcon} alt="search" />
-          <input
-            type="text"
-            placeholder="Search articles, authors..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <input type="text" placeholder="Search blogs..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-
-        <div className="blog-filters">
-          <div className="blog-filter-dropdown" style={{ padding: 0, position: "relative", display: "flex", alignItems: "center" }}>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              style={{
-                border: "none", outline: "none", background: "transparent",
-                fontSize: "14px", color: "#4a5568", padding: "10px 32px 10px 12px",
-                cursor: "pointer", appearance: "none", fontWeight: 600,
-                width: "100%", height: "100%"
-              }}
-            >
-              <option value="ALL">All Categories</option>
-              <option value="AYURVEDA">Ayurveda</option>
-              <option value="YOGA">Yoga</option>
-              <option value="NUTRITION">Nutrition</option>
-              <option value="WELLNESS">Wellness</option>
-            </select>
-            <img
-              src={DropdownIcon}
-              alt="dropdown"
-              style={{ position: "absolute", right: "12px", pointerEvents: "none", width: "12px", height: "12px" }}
-            />
-          </div>
+        <div className="blog-filter-dropdown">
+          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+            <option value="ALL">All Categories</option>
+            <option value="AYURVEDA">Ayurveda</option>
+            <option value="YOGA">Yoga</option>
+            <option value="NUTRITION">Nutrition</option>
+            <option value="WELLNESS">Wellness</option>
+          </select>
+          <img src={DropdownIcon} alt="dropdown" />
         </div>
       </div>
 
-      {/* Articles Grid rendering */}
-      {filteredBlogs.length === 0 ? (
-        <div className="blog-empty">
-          <div className="blog-empty-icon"></div>
-          <p className="blog-empty-text">No articles found</p>
-          <p className="blog-empty-subtext">
-            {activeTab === "pending"
-              ? "All submitted blogs have been processed. Great job!"
-              : activeTab === "my_blogs"
-                ? "You haven't written any drafts or articles yet. Click 'Create Blog' to get started!"
-                : activeTab === "all_blogs"
-                  ? "No submitted or moderated articles exist in the database yet."
-                  : "Try refining your search terms or selecting another category."}
-          </p>
-        </div>
-      ) : (
-        <div className="blog-grid">
-          {filteredBlogs.map((blog) => (
-            <BlogCard
-              key={blog.id}
-              blog={blog}
-              onClick={handleCardClick}
-              isStaff={isStaff && activeTab === "my_blogs"}
-              isAdmin={isAdmin}
-              onEdit={(b) => {
-                setSelectedBlog(b);
-                if (isAdmin) setShowAdminEditModal(true);
-                else setShowEditModal(true);
-              }}
-              onDelete={handleDelete}
-              onApprove={handleApprove}
-              onReject={handleReject}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* CREATE BLOG MODAL */}
-      {showCreateModal && isStaff && (
-        <CreateOrEditBlogModal
-          staffProfile={currentUser}
-          onClose={() => setShowCreateModal(false)}
-          onSave={handleSaveBlog}
-        />
-      )}
-
-      {/* EDIT BLOG MODAL FOR STAFF */}
-      {showEditModal && isStaff && selectedBlog && (
-        <CreateOrEditBlogModal
-          blogToEdit={selectedBlog}
-          staffProfile={currentUser}
-          onClose={() => {
-            setShowEditModal(false);
-            setSelectedBlog(null);
-          }}
-          onSave={handleSaveBlog}
-        />
-      )}
-
-      {/* EDIT BLOG MODAL FOR ADMIN */}
-      {showAdminEditModal && isAdmin && selectedBlog && (
-        <AdminEditBlogModal
-          blogToEdit={selectedBlog}
-          onClose={() => {
-            setShowAdminEditModal(false);
-            setSelectedBlog(null);
-          }}
-          onSave={handleAdminCorrection}
-        />
-      )}
-
+      <div className="blog-grid">
+        {filteredBlogs.map((blog) => (
+          <BlogCard
+            key={blog.id}
+            blog={blog}
+            onClick={handleCardClick}
+            isStaff={isStaff && activeTab === "my_blogs"}
+            isAdmin={isAdmin}
+            onEdit={(blog) => {
+              setSelectedBlog(blog);
+              setEditBlogData({
+                title: blog.title || "",
+                category: blog.category || "AYURVEDA",
+                summary: blog.summary || "",
+                body: blog.body || "",
+                image: blog.image || ""
+              });
+              setShowEditor(true);
+            }}
+            onDelete={handleDelete}
+            onApprove={handleApprove}
+            onReject={handleReject}
+          />
+        ))}
+      </div>
     </div>
   );
 }

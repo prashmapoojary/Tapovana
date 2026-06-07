@@ -15,21 +15,24 @@ const authenticate = async (req, res, next) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         const result = await query(
-            `SELECT tm.id, tm.email, tm.first_name, tm.last_name, tm.status,
-              r.name AS role, r.access
-       FROM team_members tm
-       JOIN roles r ON r.id = tm.role_id
-       WHERE tm.id = $1`,
+            'SELECT tm.id, tm.email, tm.first_name, tm.last_name, tm.status, tm.role_id, r.name AS role, r.access FROM team_members tm JOIN roles r ON r.id = tm.role_id WHERE tm.id = $1',
             [decoded.sub]
         );
 
-        if (!result.rows.length || result.rows[0].status !== 'active') {
-            return res.status(401).json({ success: false, message: 'Account not found or inactive.' });
+        if (!result.rows.length) {
+            return res.status(401).json({ success: false, message: 'Account not found.' });
+        }
+
+        // Allow pending status for force password change flow
+        // Block only inactive accounts
+        if (result.rows[0].status === 'inactive') {
+            return res.status(401).json({ success: false, message: 'Account is inactive.' });
         }
 
         req.user = result.rows[0];
         next();
     } catch (err) {
+        console.error('Auth error:', err.message);
         return res.status(401).json({ success: false, message: 'Invalid or expired token.' });
     }
 };

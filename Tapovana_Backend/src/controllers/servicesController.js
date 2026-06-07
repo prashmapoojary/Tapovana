@@ -109,7 +109,8 @@ const getAllServices = async (req, res) => {
         const total = parseInt(countResult.rows[0].count);
 
         const result = await query(
-            'SELECT s.*, tm.first_name AS created_by_first_name, tm.last_name AS created_by_last_name FROM services s LEFT JOIN team_members tm ON tm.id = s.created_by ' + whereClause + ' ORDER BY s.created_at DESC LIMIT $' + idx + ' OFFSET $' + (idx + 1),
+            'SELECT s.*, tm.first_name AS created_by_first_name, tm.last_name AS created_by_last_name ' +
+            'FROM services s LEFT JOIN team_members tm ON tm.id = s.created_by ' + whereClause + ' ORDER BY s.created_at DESC LIMIT $' + idx + ' OFFSET $' + (idx + 1),
             [...values, parseInt(limit), offset]
         );
 
@@ -128,7 +129,8 @@ const getAllServices = async (req, res) => {
 const getServiceById = async (req, res) => {
     try {
         const result = await query(
-            'SELECT s.*, tm.first_name AS created_by_first_name, tm.last_name AS created_by_last_name FROM services s LEFT JOIN team_members tm ON tm.id = s.created_by WHERE s.id = $1',
+            'SELECT s.*, tm.first_name AS created_by_first_name, tm.last_name AS created_by_last_name ' +
+            'FROM services s LEFT JOIN team_members tm ON tm.id = s.created_by WHERE s.id = $1',
             [req.params.id]
         );
 
@@ -155,14 +157,24 @@ const createService = async (req, res) => {
         const savedImageUrl = handleServiceImage(image_url);
         const staffIds = assigned_staff_ids || [];
 
+        let staffDetails = [];
+        if (staffIds.length > 0) {
+            const staffResult = await query('SELECT id, first_name, last_name, email FROM team_members WHERE id = ANY($1::uuid[])', [staffIds]);
+            staffDetails = staffResult.rows.map(r => ({
+                id: r.id,
+                name: `${r.first_name} ${r.last_name}`.trim(),
+                email: r.email
+            }));
+        }
+
         const result = await query(
-            'INSERT INTO services (name, category, subcategory, description, base_price, duration_minutes, benefits, required_certification, experience_level, tools, image_url, status, assigned_staff_ids, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *',
+            'INSERT INTO services (name, category, subcategory, description, base_price, duration_minutes, benefits, required_certification, experience_level, tools, image_url, status, assigned_staff_ids, assigned_staff_details, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *',
             [
                 name.trim(), category || null, subcategory || null, description || null,
                 base_price || null, duration_minutes || null, benefits || null,
                 required_certification || null, experience_level || null, tools || null,
                 savedImageUrl, (status || 'ACTIVE').toUpperCase(),
-                JSON.stringify(staffIds), req.user?.id || null
+                JSON.stringify(staffIds), JSON.stringify(staffDetails), req.user?.id || null
             ]
         );
 
@@ -222,6 +234,18 @@ const updateService = async (req, res) => {
         if (assigned_staff_ids !== undefined) {
             fields.push('assigned_staff_ids = $' + idx++);
             values.push(JSON.stringify(assigned_staff_ids));
+
+            let staffDetails = [];
+            if (assigned_staff_ids.length > 0) {
+                const staffResult = await query('SELECT id, first_name, last_name, email FROM team_members WHERE id = ANY($1::uuid[])', [assigned_staff_ids]);
+                staffDetails = staffResult.rows.map(r => ({
+                    id: r.id,
+                    name: `${r.first_name} ${r.last_name}`.trim(),
+                    email: r.email
+                }));
+            }
+            fields.push('assigned_staff_details = $' + idx++);
+            values.push(JSON.stringify(staffDetails));
 
             const removedStaff = oldStaffIds.filter(id => !assigned_staff_ids.includes(id));
             const addedStaff = assigned_staff_ids.filter(id => !oldStaffIds.includes(id));
@@ -294,7 +318,17 @@ const updateServiceStaff = async (req, res) => {
         const removedStaff = oldStaffIds.filter(id => !assigned_staff_ids.includes(id));
         const addedStaff = assigned_staff_ids.filter(id => !oldStaffIds.includes(id));
 
-        await query('UPDATE services SET assigned_staff_ids = $1 WHERE id = $2', [JSON.stringify(assigned_staff_ids), req.params.id]);
+        let staffDetails = [];
+        if (assigned_staff_ids.length > 0) {
+            const staffResult = await query('SELECT id, first_name, last_name, email FROM team_members WHERE id = ANY($1::uuid[])', [assigned_staff_ids]);
+            staffDetails = staffResult.rows.map(r => ({
+                id: r.id,
+                name: `${r.first_name} ${r.last_name}`.trim(),
+                email: r.email
+            }));
+        }
+
+        await query('UPDATE services SET assigned_staff_ids = $1, assigned_staff_details = $2 WHERE id = $3', [JSON.stringify(assigned_staff_ids), JSON.stringify(staffDetails), req.params.id]);
 
         for (const staffId of removedStaff) {
             await deallocateStaffMember(staffId);
@@ -329,7 +363,10 @@ const completeServiceAllocation = async (req, res) => {
         let staffIds = service.assigned_staff_ids || [];
         staffIds = staffIds.filter(id => id !== staff_id);
 
-        await query('UPDATE services SET assigned_staff_ids = $1 WHERE id = $2', [JSON.stringify(staffIds), req.params.id]);
+        let staffDetails = service.assigned_staff_details || [];
+        staffDetails = staffDetails.filter(s => s.id !== staff_id);
+
+        await query('UPDATE services SET assigned_staff_ids = $1, assigned_staff_details = $2 WHERE id = $3', [JSON.stringify(staffIds), JSON.stringify(staffDetails), req.params.id]);
         await deallocateStaffMember(staff_id);
 
         return res.json({ success: true, message: 'Staff allocation completed. Staff is now Available.' });

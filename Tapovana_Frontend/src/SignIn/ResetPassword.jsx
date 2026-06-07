@@ -80,7 +80,7 @@ function ResetPassword() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          token: resetToken,
+          email,
           otp,
           password,
           confirm_password: confirmPassword
