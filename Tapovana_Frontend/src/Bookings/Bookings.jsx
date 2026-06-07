@@ -5,6 +5,7 @@ import { getUser } from "../utils/session";
 import { useAllocations } from "../utils/AllocationContext";
 import SearchIcon from "../assets/searchIcon.svg";
 import ActionIcon from "../assets/Button.svg";
+import DropdownIcon from "../assets/dropdownIcon.svg";
 import DefaultAvatar from "../assets/profileIconDefault.png";
 
 const DUMMY_BOOKINGS = [
@@ -12,7 +13,8 @@ const DUMMY_BOOKINGS = [
   { id: "2", booking_id: "BK-1002", customer_name: "Priya Desai", customer_phone: "+91 8765432109", service_name: "Yoga Therapy", doctor_name: "Dr. Rekha", booking_date: "2026-06-16", booking_time: "07:00 AM", amount: "1200", payment_status: "PENDING", status: "PENDING" },
   { id: "3", booking_id: "BK-1003", customer_name: "Vikram Singh", customer_phone: "+91 7654321098", service_name: "Panchakarma", doctor_name: "", booking_date: "2026-06-18", booking_time: "09:00 AM", amount: "5000", payment_status: "PAID", status: "CONFIRMED" },
   { id: "4", booking_id: "BK-1004", customer_name: "Anita Nair", customer_phone: "+91 6543210987", service_name: "Meditation Session", doctor_name: "Dr. Arjun", booking_date: "2026-06-15", booking_time: "05:00 PM", amount: "800", payment_status: "PAID", status: "COMPLETED" },
-  { id: "5", booking_id: "BK-1005", customer_name: "Sanjay Kumar", customer_phone: "+91 5432109876", service_name: "Acupuncture", doctor_name: "Dr. Ramesh", booking_date: "2026-06-20", booking_time: "11:00 AM", amount: "1500", payment_status: "FAILED", status: "CANCELLED" }
+  { id: "5", booking_id: "BK-1005", customer_name: "Sanjay Kumar", customer_phone: "+91 5432109876", service_name: "Acupuncture", doctor_name: "Dr. Ramesh", booking_date: "2026-06-20", booking_time: "11:00 AM", amount: "1500", payment_status: "FAILED", status: "CANCELLED" },
+  { id: "6", booking_id: "BK-1006", customer_name: "Sneha Reddy", customer_phone: "+91 9988776655", service_name: "Facial", doctor_name: "Dr. Kavitha", booking_date: "2026-06-25", booking_time: "02:00 PM", amount: "2000", payment_status: "PAID", status: "PENDING" }
 ];
 
 const DUMMY_DOCTORS = [
@@ -315,8 +317,8 @@ function Bookings() {
       {/* Filters */}
       <section className="filters-card">
         <div className="bookings-filters">
-          <div className="search-box">
-            <img src={SearchIcon} className="search-icon" alt="" />
+          <div className="bk-search-box">
+            <img src={SearchIcon} className="bk-search-icon" alt="" />
             <input
               type="text"
               placeholder="Search by name, phone, service or booking ID..."
@@ -324,23 +326,23 @@ function Bookings() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="filter-select-wrapper">
-            <label>Status</label>
-            <select className="filter-select" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
-              <option value="">All</option>
+          <div className="bk-filter-dropdown">
+            <select className="bk-filter-select" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
+              <option value="">Status: All</option>
               <option value="PENDING">Pending</option>
               <option value="CONFIRMED">Confirmed</option>
               <option value="COMPLETED">Completed</option>
               <option value="CANCELLED">Cancelled</option>
             </select>
+            <img src={DropdownIcon} className="bk-dropdown-icon" alt="" />
           </div>
-          <div className="date-input-wrapper">
+          <div className="bk-date-wrapper">
             <label>From</label>
-            <input type="date" className="date-input" value={dateFrom} onChange={(e) => handleDateFromChange(e.target.value)} />
+            <input type="date" className="bk-date-input" value={dateFrom} onChange={(e) => handleDateFromChange(e.target.value)} />
           </div>
-          <div className="date-input-wrapper">
+          <div className="bk-date-wrapper">
             <label>To</label>
-            <input type="date" className="date-input" value={dateTo} onChange={(e) => handleDateToChange(e.target.value)} />
+            <input type="date" className="bk-date-input" value={dateTo} onChange={(e) => handleDateToChange(e.target.value)} />
           </div>
         </div>
       </section>

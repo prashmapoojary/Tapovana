@@ -92,7 +92,7 @@ const CameraPlusIcon = () => (
 // ── Main Component ─────────────────────────────────────────────────────────
 
 function EditService({ service, onBack }) {
-    const { isStaffAllocated, allocateStaff, deallocateStaff, allocations } = useAllocations();
+    const { isStaffAllocated, allocateStaff, deallocateStaff, allocations, triggerAlert } = useAllocations();
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
 
@@ -230,7 +230,7 @@ function EditService({ service, onBack }) {
                 }
             }
         } catch (err) {
-            alert("Failed to load service details: " + err.message);
+            triggerAlert("Failed to load service details: " + err.message);
         } finally {
             setLoading(false);
         }
@@ -239,24 +239,24 @@ function EditService({ service, onBack }) {
     // ★ FIXED: Image is sent in JSON body — no separate /image endpoint call
     const handleUpdateService = async () => {
         if (!serviceName || !category || !subCategory || !basePrice || !duration) {
-            alert("Please fill all required fields.");
+            triggerAlert("Please fill all required fields.");
             return;
         }
 
         if (serviceName.trim().length < 3) {
-            alert("Service name must be at least 3 characters long.");
+            triggerAlert("Service name must be at least 3 characters long.");
             return;
         }
 
         const parsedPrice = parseFloat(basePrice);
         if (isNaN(parsedPrice) || parsedPrice <= 0) {
-            alert("Service price must be a positive number greater than 0.");
+            triggerAlert("Service price must be a positive number greater than 0.");
             return;
         }
 
         const parsedDuration = parseInt(duration);
         if (isNaN(parsedDuration) || parsedDuration <= 0) {
-            alert("Duration must be a positive number of minutes.");
+            triggerAlert("Duration must be a positive number of minutes.");
             return;
         }
 
@@ -291,11 +291,11 @@ function EditService({ service, onBack }) {
             });
 
             if (data.success) {
-                alert("Service updated successfully!");
+                triggerAlert("Service updated successfully!", true);
                 onBack();
             }
         } catch (err) {
-            alert("Error updating service: " + err.message);
+            triggerAlert("Error updating service: " + err.message);
         } finally {
             setUpdating(false);
         }
@@ -332,11 +332,11 @@ function EditService({ service, onBack }) {
         const valid = [];
         for (const f of files) {
             if (f.type !== 'image/jpeg' && f.type !== 'image/png' && f.type !== 'image/webp') {
-                alert(`File ${f.name} has unsupported file type. Please upload only JPG, PNG or WEBP images.`);
+                triggerAlert(`File ${f.name} has unsupported file type. Please upload only JPG, PNG or WEBP images.`);
                 continue;
             }
             if (f.size > 5 * 1024 * 1024) {
-                alert(`File ${f.name} exceeds the 5MB size limit.`);
+                triggerAlert(`File ${f.name} exceeds the 5MB size limit.`);
                 continue;
             }
             valid.push(f);

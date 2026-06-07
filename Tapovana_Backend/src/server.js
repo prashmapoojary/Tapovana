@@ -62,6 +62,11 @@ app.get("/api/bookings", (req, res) => {
     res.json({ success: true, bookings: [], total: 0 });
 });
 
+// ── Customers stub (prevents 404, triggers frontend dummy fallback) ───────────
+app.get("/api/customers", (req, res) => {
+    res.json({ success: false, message: "Use dummy fallback" });
+});
+
 app.use((_req, res) => {
     res.status(404).json({ success: false, message: "Endpoint not found." });
 });

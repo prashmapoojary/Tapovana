@@ -135,7 +135,10 @@ function Services() {
     }
   };
 
-  const handleDelete = async (id, serviceName) => {
+  const handleDelete = async (service) => {
+    const { id, name: serviceName, image_url } = service;
+    const imageUrl = getImageUrl(image_url, 'https://placehold.co/150?text=No+Image');
+
     try {
       const bookingsData = await apiFetch('/api/bookings?limit=100');
       if (bookingsData.success && bookingsData.bookings) {
@@ -151,17 +154,19 @@ function Services() {
       console.warn("Could not check bookings:", err);
     }
 
-    triggerConfirm(
-      `Are you sure you want to delete this service "${serviceName}"?`,
-      async () => {
-        try {
-          await apiFetch(`/api/services/${id}`, { method: 'DELETE' });
-          fetchServices();
-        } catch (err) {
-          triggerAlert("Failed to delete service: " + err.message);
-        }
-      }
+    const confirmed = await triggerConfirm(
+      `Are you sure you want to delete this service\n"${serviceName}"?`,
+      imageUrl
     );
+    
+    if (confirmed) {
+      try {
+        await apiFetch(`/api/services/${id}`, { method: 'DELETE' });
+        fetchServices();
+      } catch (err) {
+        triggerAlert("Failed to delete service: " + err.message);
+      }
+    }
   };
 
   const availableSubCategories = selectedCategory !== 'All' ? ['All', ...(subCategoriesMap[selectedCategory] || [])] : ['All'];
@@ -359,7 +364,7 @@ function Services() {
                         >
                           <EditIcon />
                         </button>
-                        <button className="action-btn" title="Delete" onClick={() => handleDelete(service.id, service.name)}><TrashIcon /></button>
+                        <button className="action-btn" title="Delete" onClick={() => handleDelete(service)}><TrashIcon /></button>
                       </div>
                     </td>
                   </tr>

@@ -29,7 +29,7 @@ export const AllocationProvider = ({ children }) => {
   
   // Custom Alert and Confirm Modal States
   const [alertState, setAlertState] = useState({ visible: false, message: "", isSuccess: false, resolve: null });
-  const [confirmState, setConfirmState] = useState({ visible: false, message: "", resolve: null });
+  const [confirmState, setConfirmState] = useState({ visible: false, message: "", imageUrl: null, resolve: null });
 
   const triggerAlert = useCallback((message, isSuccess = false) => {
     return new Promise((resolve) => {
@@ -42,11 +42,12 @@ export const AllocationProvider = ({ children }) => {
     });
   }, []);
 
-  const triggerConfirm = useCallback((message) => {
+  const triggerConfirm = useCallback((message, imageUrl = null) => {
     return new Promise((resolve) => {
       setConfirmState({
         visible: true,
         message,
+        imageUrl,
         resolve,
       });
     });
@@ -63,7 +64,7 @@ export const AllocationProvider = ({ children }) => {
     if (confirmState.resolve) {
       confirmState.resolve(choice);
     }
-    setConfirmState({ visible: false, message: "", resolve: null });
+    setConfirmState({ visible: false, message: "", imageUrl: null, resolve: null });
   }, [confirmState]);
 
   /**
@@ -397,7 +398,11 @@ Tapovana Admin Team
         <div className="global-alert-overlay">
           <div className="global-alert-modal">
             <div className="global-alert-icon-container">
-              <div className="global-alert-warning-icon">?</div>
+              {confirmState.imageUrl ? (
+                <img src={confirmState.imageUrl} alt="" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
+              ) : (
+                <div className="global-alert-warning-icon">?</div>
+              )}
             </div>
             <div className="global-alert-message">{confirmState.message}</div>
             <div className="global-confirm-actions">

@@ -88,18 +88,19 @@
   gap: 14px;
 }
 
-.search-box {
+.bk-search-box {
   flex: 1.5;
   display: flex;
   align-items: center;
   background: white;
   border: 1px solid #e3e7ed;
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 0 16px;
+  height: 52px;
   min-width: 240px;
 }
 
-.search-box input {
+.bk-search-box input {
   border: none;
   outline: none;
   width: 100%;
@@ -108,65 +109,86 @@
   color: #2d3748;
 }
 
-.search-icon {
+.bk-search-icon {
   width: 16px;
   opacity: 0.6;
 }
 
-.filter-select-wrapper {
+.bk-filter-dropdown {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
   background: white;
   border: 1px solid #e3e7ed;
   border-radius: 8px;
-  height: 45px;
-  padding: 0 12px;
+  height: 52px;
+  padding: 0;
+  overflow: hidden;
+  font-size: 14px;
+  color: #2f2f2f;
   min-width: 150px;
 }
 
-.filter-select-wrapper label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #7b8a9a;
-  text-transform: uppercase;
+.bk-dropdown-icon {
+  width: 14px;
+  margin-right: 16px;
+  pointer-events: none;
 }
 
-.filter-select {
+.bk-date-wrapper {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 2px;
+  background: white;
+  border: 1px solid #e3e7ed;
+  border-radius: 8px;
+  height: 52px;
+  padding: 0 14px;
+  min-width: 160px;
+}
+
+.bk-date-wrapper label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #8fa1c3;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.bk-filter-select {
   border: none;
   outline: none;
   background: transparent;
   font-size: 14px;
+  font-weight: 500;
   color: #2d3748;
   width: 100%;
   cursor: pointer;
+  padding: 0 0 0 16px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
 }
 
-.date-input-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: white;
-  border: 1px solid #e3e7ed;
-  border-radius: 8px;
-  height: 45px;
-  padding: 0 12px;
-}
-
-.date-input-wrapper label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #7b8a9a;
-  text-transform: uppercase;
-}
-
-.date-input {
+.bk-date-input {
   border: none;
   outline: none;
-  font-size: 13px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
   color: #2d3748;
+  width: 100%;
   cursor: pointer;
+  padding: 0;
+  margin: 0;
 }
+
+
 
 /* Bookings Table Card */
 .bookings-table-card {

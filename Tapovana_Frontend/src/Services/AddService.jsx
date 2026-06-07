@@ -90,7 +90,7 @@ const CameraPlusIcon = () => (
 );
 
 function AddService({ onBack }) {
-  const { isStaffAllocated, allocateStaff, deallocateStaff, allocations } = useAllocations();
+  const { isStaffAllocated, allocateStaff, deallocateStaff, allocations, triggerAlert } = useAllocations();
   const [tempServiceId] = useState(() => `srv-${Date.now()}`);
   // General Info
   const [serviceName, setServiceName] = useState('');
@@ -186,24 +186,24 @@ function AddService({ onBack }) {
 
   const handleSaveService = async (statusOverride = 'ACTIVE') => {
     if (!serviceName || !category || !subCategory || !basePrice || !duration) {
-      alert("Please fill all required fields.");
+      triggerAlert("Please fill all required fields.");
       return;
     }
 
     if (serviceName.trim().length < 3) {
-      alert("Service name must be at least 3 characters long.");
+      triggerAlert("Service name must be at least 3 characters long.");
       return;
     }
 
     const parsedPrice = parseFloat(basePrice);
     if (isNaN(parsedPrice) || parsedPrice <= 0) {
-      alert("Service price must be a positive number greater than 0.");
+      triggerAlert("Service price must be a positive number greater than 0.");
       return;
     }
 
     const parsedDuration = parseInt(duration);
     if (isNaN(parsedDuration) || parsedDuration <= 0) {
-      alert("Duration must be a positive number of minutes.");
+      triggerAlert("Duration must be a positive number of minutes.");
       return;
     }
 
@@ -243,11 +243,11 @@ function AddService({ onBack }) {
       console.log('Create service response:', data);
 
       if (data.success) {
-        alert("Service created successfully!");
+        triggerAlert("Service created successfully!", true);
         onBack();
       }
     } catch (err) {
-      alert("Error creating service: " + err.message);
+      triggerAlert("Error creating service: " + err.message);
     } finally {
       setIsSaving(false);
       setIsDrafting(false);
@@ -297,11 +297,11 @@ function AddService({ onBack }) {
     const valid = [];
     for (const f of files) {
       if (f.type !== 'image/jpeg' && f.type !== 'image/png' && f.type !== 'image/webp') {
-        alert(`File ${f.name} has unsupported file type. Please upload only JPG, PNG or WEBP images.`);
+        triggerAlert(`File ${f.name} has unsupported file type. Please upload only JPG, PNG or WEBP images.`);
         continue;
       }
       if (f.size > 5 * 1024 * 1024) {
-        alert(`File ${f.name} exceeds the 5MB size limit.`);
+        triggerAlert(`File ${f.name} exceeds the 5MB size limit.`);
         continue;
       }
       valid.push(f);
