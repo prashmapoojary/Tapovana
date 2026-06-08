@@ -112,8 +112,8 @@ function ResetPassword() {
         style={{ backgroundImage: `url(${sideImage})` }}
       />
       <div className="right-section">
-        <h1>Reset Password</h1>
-        <p className="note">
+        <h1 style={{ fontSize: "20px" }}>Reset Password</h1>
+        <p className="note" style={{ fontSize: "11px" }}>
           Recover access to your Tapovana Governing Member account.
         </p>
         <div className="form-container">
@@ -129,8 +129,8 @@ function ResetPassword() {
 
           {!otpSent && (
             <>
-              {error && <p className="error-message">{error}</p>}
-              {successMsg && <p className="success-message" style={{ color: "green", textAlign: "center" }}>{successMsg}</p>}
+              {error && <p className="error-message" style={{ fontSize: "11px" }}>{error}</p>}
+              {successMsg && <p className="success-message" style={{ color: "green", textAlign: "center", fontSize: "11px" }}>{successMsg}</p>}
               <button className="btn" onClick={handleSendOtp} disabled={loading}>
                 {loading ? "Sending..." : "Send OTP"}
               </button>
@@ -153,6 +153,25 @@ function ResetPassword() {
                 }}
                 placeholder="6-digit code"
               />
+              <div style={{ textAlign: "right", marginTop: "-8px", marginBottom: "10px" }}>
+                <button
+                  type="button"
+                  onClick={handleSendOtp}
+                  disabled={loading}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#caa24a",
+                    cursor: loading ? "not-allowed" : "pointer",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    textDecoration: "underline",
+                    padding: 0
+                  }}
+                >
+                  {loading ? "Sending..." : "Resend OTP"}
+                </button>
+              </div>
 
               <label>New Password</label>
               <input
@@ -172,8 +191,8 @@ function ResetPassword() {
                 placeholder="Re-enter password"
               />
 
-              {error && <p className="error-message">{error}</p>}
-              {successMsg && <p className="success-message" style={{ color: "green", textAlign: "center" }}>{successMsg}</p>}
+              {error && <p className="error-message" style={{ fontSize: "11px" }}>{error}</p>}
+              {successMsg && <p className="success-message" style={{ color: "green", textAlign: "center", fontSize: "11px" }}>{successMsg}</p>}
               
               <button className="btn" onClick={handleResetPassword} disabled={loading}>
                 {loading ? "Resetting..." : "Reset Password"}

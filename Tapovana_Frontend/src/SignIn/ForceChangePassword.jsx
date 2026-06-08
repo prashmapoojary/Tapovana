@@ -123,14 +123,14 @@ export default function ForceChangePassword() {
         style={{ backgroundImage: `url(${sideImage})` }}
       />
       <div className="right-section">
-        <h1>Reset Password</h1>
+        <h1 style={{ fontSize: "20px" }}>Reset Password</h1>
         
         <div style={{ textAlign: "center", marginBottom: "15px" }}>
-          <img src={logoImg} alt="Tapovana" width="160" />
+          <img src={logoImg} alt="Tapovana" width="90" />
         </div>
 
-        <h3 style={{ color: "#d97706", textAlign: "center", marginBottom: "10px" }}>Change Password Required</h3>
-        <p className="note" style={{ color: "#d97706", marginBottom: "30px", fontWeight: "500" }}>
+        <h3 style={{ color: "#d97706", textAlign: "center", marginBottom: "10px", fontSize: "14px" }}>Change Password Required</h3>
+        <p className="note" style={{ color: "#d97706", marginBottom: "30px", fontWeight: "500", fontSize: "11px" }}>
           For security reasons, you must change your temporary password before continuing.
         </p>
         
@@ -157,8 +157,8 @@ export default function ForceChangePassword() {
 
           {!otpSent && (
             <>
-              {error && <p className="error-message">{error}</p>}
-              {successMsg && <p className="success-message" style={{ color: "green", textAlign: "center" }}>{successMsg}</p>}
+              {error && <p className="error-message" style={{ fontSize: "11px" }}>{error}</p>}
+              {successMsg && <p className="success-message" style={{ color: "green", textAlign: "center", fontSize: "11px" }}>{successMsg}</p>}
               
               <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                 <button
@@ -198,9 +198,28 @@ export default function ForceChangePassword() {
                 }}
                 placeholder="6-digit code"
               />
+              <div style={{ textAlign: "right", marginTop: "-8px", marginBottom: "10px" }}>
+                <button
+                  type="button"
+                  onClick={handleGenerateOtp}
+                  disabled={loading}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#caa24a",
+                    cursor: loading ? "not-allowed" : "pointer",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    textDecoration: "underline",
+                    padding: 0
+                  }}
+                >
+                  {loading ? "Sending..." : "Resend OTP"}
+                </button>
+              </div>
 
-              {error && <p className="error-message">{error}</p>}
-              {successMsg && <p className="success-message" style={{ color: "green", textAlign: "center" }}>{successMsg}</p>}
+              {error && <p className="error-message" style={{ fontSize: "11px" }}>{error}</p>}
+              {successMsg && <p className="success-message" style={{ color: "green", textAlign: "center", fontSize: "11px" }}>{successMsg}</p>}
               
               <button className="btn" onClick={handleVerifyOtpAndSave} disabled={loading} style={{ marginTop: "10px" }}>
                 {loading ? "Verifying..." : "Verify and Save"}

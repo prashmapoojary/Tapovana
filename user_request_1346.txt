@@ -1,0 +1,139 @@
+<USER_REQUEST>
+import React, { useState, useEffect, useMemo } from "react";
+
+import "./Customers.css";
+
+import { apiFetch } from "../api/http";
+
+import { getUser } from "../utils/session";
+
+import { useAllocations } from "../utils/AllocationContext";
+
+import SearchIcon from "../assets/searchIcon.svg";
+
+import ActionIcon from "../assets/Button.svg";
+
+import DefaultAvatar from "../assets/profileIcon.png";
+
+const DUMMY_CUSTOMERS = [
+
+  { id: "1", customer_id: "CUST-001", first_name: "Rahul", last_name: "Sharma", email: "rahul.s@example.com", phone: "+91 98765 43210", membership_status: "GOLD", total_bookings: 12, total_spent: 24500, join_date: "2024-01-15" },
+
+  { id: "2", customer_id: "CUST-002", first_name: "Priya", last_name: "Desai", email: "priya.d@example.com", phone: "+91 87654 32109", membership_status: "NONE", total_bookings: 2, total_spent: 3500, join_date: "2025-11-20" },
+
+  { id: "3", customer_id: "CUST-003", first_name: "Vikram", last_name: "Singh", email: "vikram.s@example.com", phone: "+91 76543 21098", membership_status: "PLATINUM", total_bookings: 45, total_spent: 89000, join_date: "2023-05-10" },
+
+  { id: "4", customer_id: "CUST-004", first_name: "Anita", last_name: "Nair", email: "anita.n@example.com", phone: "+91 65432 10987", membership_status: "SILVER", total_bookings: 8, total_spent: 12000, join_date: "2024-08-22" },
+
+  { id: "5", customer_id: "CUST-005", first_name: "Sanjay", last_name: "Kumar", email: "sanjay.k@example.com", phone: "+91 54321 09876", membership_status: "NONE", total_bookings: 1, total_spent: 1500, join_date: "2026-05-01" },
+
+];
+
+function Customers() {
+
+  const userRole = useMemo(() => getUser()?.role, []);
+
+  const { triggerAlert, triggerConfirm } = useAllocations();
+
+  const [customers, setCustomers] = useState(DUMMY_CUSTOMERS);
+
+  const [loading, setLoading] = useState(false);
+
+  const [search, setSearch] = useState("");
+
+  const [membershipFilter, setMembershipFilter] = useState("");
+
+  const [page, setPage] = useState(1);
+
+  
+<truncated 28908 bytes>
+,
+
+.cust-btn-secondary {
+
+  flex: 1;
+
+  height: 42px;
+
+  background: white;
+
+  color: grey;
+
+  border: 1px solid #cda751;
+
+  border-radius: 8px;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: all 0.2s ease;
+
+  box-sizing: border-box;
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+}
+
+.cust-btn-danger:hover:not(:disabled),
+
+.cust-btn-secondary:hover:not(:disabled) {
+
+  background: #cda751;
+
+  color: white;
+
+  border-color: #cda751;
+
+}
+
+.cust-btn-danger:disabled,
+
+.cust-btn-secondary:disabled {
+
+  opacity: 0.5;
+
+  cursor: not-allowed;
+
+}
+
+.action-icon {
+
+  width: 20px;
+
+  height: 20px;
+
+  cursor: pointer;
+
+  transition: filter 0.2s ease;
+
+}
+
+.action-icon:hover {
+
+  filter: brightness(0) saturate(100%);
+
+} correct both files and rewrite entire file both file entirely 
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-06-07T19:16:18+05:30.
+
+The user's current state is as follows:
+Active Document: c:\Users\prash\Desktop\College Project2\Tapovana\Tapovana_Frontend\src\Membership\Membership.css (LANGUAGE_CSS)
+Cursor is on line: 648
+Other open documents:
+- c:\Users\prash\Desktop\College Project2\Tapovana\Tapovana_Frontend\src\Membership\Membership.css (LANGUAGE_CSS)
+- c:\Users\prash\Desktop\College Project2\Tapovana\Tapovana_Frontend\src\SignIn\SignIn.jsx (LANGUAGE_JAVASCRIPT)
+- c:\Users\prash\Desktop\College Project2\Tapovana\Tapovana_Frontend\src\SignIn\ForceChangePassword.jsx (LANGUAGE_JAVASCRIPT)
+- c:\Users\prash\Desktop\College Project2\Tapovana\Tapovana_Backend\fix_db.js (LANGUAGE_JAVASCRIPT)
+- c:\Users\prash\Desktop\College Project2\Tapovana\Tapovana_Frontend\src\Membership\Membership.jsx (LANGUAGE_JAVASCRIPT)
+Running terminal commands:
+- npm run dev (in c:\Users\prash\Desktop\College Project2\Tapovana\Tapovana_Frontend, running for 59m16s)
+- npm run dev (in c:\Users\prash\Desktop\College Project2\Tapovana\Tapovana_Backend, running for 59m13s)
+</ADDITIONAL_METADATA>
