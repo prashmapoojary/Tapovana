@@ -466,7 +466,8 @@ function Bookings() {
                 <th>SERVICE</th>
                 <th>ASSIGNED STAFF</th>
                 <th>ROLE</th>
-                <th>DATE & TIME</th>
+                <th>DATE</th>
+                <th>TIME</th>
                 <th>AMOUNT</th>
                 <th>STATUS</th>
                 <th>ACTIONS</th>
@@ -474,9 +475,9 @@ function Bookings() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="9" className="bk-loading-cell">Loading bookings...</td></tr>
+                <tr><td colSpan="10" className="bk-loading-cell">Loading bookings...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan="9" className="bk-empty-cell">No bookings found.</td></tr>
+                <tr><td colSpan="10" className="bk-empty-cell">No bookings found.</td></tr>
               ) : (
                 filtered.map((b) => {
                   const staffInfo = getStaffDisplay(b.therapist_name);
@@ -504,7 +505,9 @@ function Bookings() {
                         )}
                       </td>
                       <td>
-                        <div>{formatDate(b.booking_date)}</div>
+                        {formatDate(b.booking_date)}
+                      </td>
+                      <td>
                         <div className="bk-cell-time">{b.booking_time}</div>
                       </td>
                       <td>
