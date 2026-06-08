@@ -1,4 +1,5 @@
 const { query } = require('../config/db');
+const { sendBookingStatusEmail, sendBookingAllocationEmail } = require('../services/emailService');
 
 // GET ALL BOOKINGS
 const getAllBookings = async (req, res) => {
@@ -51,20 +52,177 @@ const getBookingById = async (req, res) => {
 
 // UPDATE BOOKING STATUS
 const updateBookingStatus = async (req, res) => {
-    const { status } = req.body;
-    if (!status || !['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(status.toUpperCase())) {
-        return res.status(400).json({ success: false, message: 'Valid status is required (PENDING, CONFIRMED, COMPLETED, CANCELLED).' });
+    const { status, staff_id, note } = req.body;
+    const newStatus = status ? status.toUpperCase() : null;
+
+    if (!newStatus || !['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(newStatus)) {
+        return res.status(400).json({ success: false, message: 'Valid status is required.' });
     }
 
     try {
-        const result = await query(
-            'UPDATE bookings SET status = $1 WHERE id = $2 RETURNING *',
-            [status.toUpperCase(), req.params.id]
-        );
-        if (!result.rows.length) {
+        const existingRes = await query('SELECT * FROM bookings WHERE id = $1', [req.params.id]);
+        if (!existingRes.rows.length) {
             return res.status(404).json({ success: false, message: 'Booking not found.' });
         }
-        return res.json({ success: true, message: 'Booking status updated.', booking: result.rows[0] });
+        const booking = existingRes.rows[0];
+
+        let finalStaffId = booking.therapist_id;
+        let finalStaffName = booking.therapist_name;
+        let staffEmail = null;
+
+        // Completion constraints
+        if (newStatus === 'COMPLETED') {
+            const serviceRes = await query('SELECT duration_minutes FROM services WHERE name = $1', [booking.service_name]);
+            let duration = 60; // default
+            if (serviceRes.rows.length && serviceRes.rows[0].duration_minutes) {
+                duration = serviceRes.rows[0].duration_minutes;
+            }
+
+            const baseDate = new Date(booking.booking_date);
+            const timeStr = booking.booking_time || '00:00';
+            let match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+            if (match) {
+                let hours = parseInt(match[1], 10);
+                const mins = parseInt(match[2], 10);
+                const ampm = match[3] ? match[3].toUpperCase() : null;
+                if (ampm === 'PM' && hours < 12) hours += 12;
+                if (ampm === 'AM' && hours === 12) hours = 0;
+                baseDate.setHours(hours, mins, 0, 0);
+            }
+
+            const endTime = new Date(baseDate.getTime() + (duration + 10) * 60000);
+            if (new Date() < endTime) {
+                return res.status(400).json({ success: false, message: 'Error: Booking cannot be marked as completed before scheduled end time + buffer.' });
+            }
+        }
+
+        // Cancellation constraints
+        if (newStatus === 'CANCELLED') {
+            if (booking.status === 'COMPLETED') {
+                return res.status(400).json({ success: false, message: 'Error: Completed bookings cannot be cancelled.' });
+            }
+            finalStaffId = null;
+            finalStaffName = null;
+        }
+
+        // Staff assignment rules
+        if (staff_id !== undefined) {
+            if (staff_id !== null && newStatus !== 'CONFIRMED') {
+                return res.status(400).json({ success: false, message: 'Error: Staff allocation is only allowed after booking is confirmed.' });
+            }
+
+            if (staff_id === null) {
+                finalStaffId = null;
+                finalStaffName = null;
+            } else if (staff_id !== booking.therapist_id) {
+                // Check scheduling conflict
+                const currServiceRes = await query('SELECT duration_minutes FROM services WHERE name = $1', [booking.service_name]);
+                let currDuration = 60;
+                if (currServiceRes.rows.length && currServiceRes.rows[0].duration_minutes) currDuration = currServiceRes.rows[0].duration_minutes;
+
+                const getMinsFromTime = (timeStr) => {
+                    let match = (timeStr || '00:00').match(/(\d+):(\d+)\s*(AM|PM)?/i);
+                    if (!match) return 0;
+                    let hours = parseInt(match[1], 10);
+                    const mins = parseInt(match[2], 10);
+                    const ampm = match[3] ? match[3].toUpperCase() : null;
+                    if (ampm === 'PM' && hours < 12) hours += 12;
+                    if (ampm === 'AM' && hours === 12) hours = 0;
+                    return hours * 60 + mins;
+                };
+
+                const currStart = getMinsFromTime(booking.booking_time);
+                const currEnd = currStart + currDuration;
+
+                const staffBookings = await query('SELECT service_name, booking_time FROM bookings WHERE therapist_id = $1 AND booking_date = $2 AND id != $3 AND status IN ($4, $5)', [staff_id, booking.booking_date, booking.id, 'CONFIRMED', 'PENDING']);
+                
+                let conflict = false;
+                for (let b of staffBookings.rows) {
+                    const bServiceRes = await query('SELECT duration_minutes FROM services WHERE name = $1', [b.service_name]);
+                    let bDuration = 60;
+                    if (bServiceRes.rows.length && bServiceRes.rows[0].duration_minutes) bDuration = bServiceRes.rows[0].duration_minutes;
+                    
+                    const bStart = getMinsFromTime(b.booking_time);
+                    const bEnd = bStart + bDuration;
+
+                    if (currStart < bEnd && currEnd > bStart) {
+                        conflict = true;
+                        break;
+                    }
+                }
+
+                if (conflict) {
+                    return res.status(400).json({ success: false, message: 'Error: Staff allocation failed due to scheduling conflict.' });
+                }
+
+                // If no conflict, assign
+                const staffRes = await query('SELECT id, first_name, last_name, email FROM team_members WHERE id = $1', [staff_id]);
+                if (staffRes.rows.length) {
+                    finalStaffId = staffRes.rows[0].id;
+                    finalStaffName = (staffRes.rows[0].first_name + ' ' + staffRes.rows[0].last_name).trim();
+                    staffEmail = staffRes.rows[0].email;
+                }
+            }
+        }
+
+        const result = await query(
+            'UPDATE bookings SET status = $1, therapist_id = $2, therapist_name = $3, note = $4 WHERE id = $5 RETURNING *',
+            [newStatus, finalStaffId, finalStaffName, note !== undefined ? note : booking.note, req.params.id]
+        );
+        const updatedBooking = result.rows[0];
+
+        // Attempt to find user email
+        let userEmail = null;
+        if (updatedBooking.user_email) {
+            userEmail = updatedBooking.user_email;
+        }
+
+        const details = {
+            service: updatedBooking.service_name,
+            date: updatedBooking.booking_date,
+            time: updatedBooking.booking_time,
+            staff: updatedBooking.therapist_name,
+            customer: updatedBooking.user_name
+        };
+
+        if (userEmail && booking.status !== newStatus) {
+            await sendBookingStatusEmail({
+                to: userEmail,
+                firstName: updatedBooking.user_name || 'Customer',
+                status: newStatus,
+                details
+            }).catch(e => console.error("Error sending user email:", e));
+        }
+
+        if (newStatus === 'CONFIRMED' && staffEmail && finalStaffId !== booking.therapist_id) {
+            await sendBookingAllocationEmail({
+                to: staffEmail,
+                staffName: finalStaffName,
+                bookingId: updatedBooking.id,
+                details
+            }).catch(e => console.error("Error sending staff email:", e));
+        }
+
+        if (newStatus === 'COMPLETED' && booking.status !== 'COMPLETED' && finalStaffId) {
+            // Need to fetch staff email to send completion note if staffEmail not populated in this request
+            if (!staffEmail) {
+                const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [finalStaffId]);
+                if (staffRes.rows.length) {
+                    staffEmail = staffRes.rows[0].email;
+                    finalStaffName = (staffRes.rows[0].first_name + ' ' + staffRes.rows[0].last_name).trim();
+                }
+            }
+            if (staffEmail) {
+                await sendBookingStatusEmail({
+                    to: staffEmail,
+                    firstName: finalStaffName,
+                    status: 'COMPLETED',
+                    details
+                }).catch(e => console.error("Error sending staff completion email:", e));
+            }
+        }
+
+        return res.json({ success: true, message: 'Booking status updated.', booking: updatedBooking });
     } catch (err) {
         console.error('updateBookingStatus error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
@@ -98,7 +256,7 @@ const assignTherapist = async (req, res) => {
     }
 };
 
-// SYNC BOOKINGS FROM RENDER API
+// SYNC BOOKINGS FROM RENDER API (mobile app data)
 const syncFromRender = async (req, res) => {
     try {
         const response = await fetch('https://tapoclg.onrender.com/api/bookings?limit=100');
@@ -110,26 +268,42 @@ const syncFromRender = async (req, res) => {
 
         let synced = 0;
         for (const booking of data.bookings) {
-            // Check if already exists
             const existing = await query('SELECT id FROM bookings WHERE id = $1', [booking.id]);
             if (existing.rows.length) continue;
 
-            // Parse total_amount to extract numeric value and payment status
-            const amountStr = booking.total_amount || '₹0';
-            const amountMatch = amountStr.match(/₹([\d,]+)/);
-            const numericAmount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0;
-            const paymentStatus = amountStr.includes('FREE') ? 'PAID' : (amountStr.includes('Pass') ? 'PAID' : 'PENDING');
+            const paymentStatus = 'PAID';
 
-            await query(
-                'INSERT INTO bookings (id, user_name, profile_pic, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)',
+            const insertResult = await query(
+                'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
                 [
-                    booking.id, booking.user_name, booking.profile_pic, booking.service_name,
+                    booking.id, booking.user_name, booking.service_name,
                     booking.booking_date, booking.booking_time, booking.therapist_name,
                     booking.note, booking.total_amount, booking.pass_details,
                     paymentStatus, 'PENDING', booking.created_at
                 ]
             );
+
             synced++;
+            
+            // Try to find user email and send Pending notification
+            const newBooking = insertResult.rows[0];
+            let userEmail = null;
+            if (newBooking.user_email) {
+                userEmail = newBooking.user_email;
+            }
+
+            if (userEmail) {
+                await sendBookingStatusEmail({
+                    to: userEmail,
+                    firstName: newBooking.user_name || 'Customer',
+                    status: 'PENDING',
+                    details: {
+                        service: newBooking.service_name,
+                        date: newBooking.booking_date,
+                        time: newBooking.booking_time
+                    }
+                }).catch(e => console.error("Error sending pending email:", e));
+            }
         }
 
         return res.json({ success: true, message: 'Sync complete.', synced: synced, total: data.bookings.length });

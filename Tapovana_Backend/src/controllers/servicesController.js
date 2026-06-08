@@ -432,27 +432,27 @@ const getMyAssignments = async (req, res) => {
 
         const assignments = [];
 
-        // ─── Fetch SERVICE assignments ───
-        const servicesResult = await query(
-            'SELECT id, name, category, description, base_price, duration_minutes, image_url, status, created_at, assigned_staff_ids FROM services WHERE assigned_staff_ids @> $1::jsonb AND status = $2',
-            [JSON.stringify([userId]), 'ACTIVE']
+        // ─── Fetch BOOKING assignments ───
+        const bookingsResult = await query(
+            `SELECT id, service_name, user_name, booking_date, status, created_at FROM bookings WHERE therapist_id = $1 AND status IN ('CONFIRMED', 'COMPLETED') ORDER BY booking_date DESC`,
+            [userId]
         );
 
-        console.log('Found ' + servicesResult.rows.length + ' services for user ' + userId);
+        console.log('Found ' + bookingsResult.rows.length + ' bookings for user ' + userId);
 
-        for (const svc of servicesResult.rows) {
+        for (const bk of bookingsResult.rows) {
             assignments.push({
-                id: 'srv-alloc-' + svc.id,
+                id: 'bk-alloc-' + bk.id,
                 type: 'service',
                 staffId: userId,
                 staffName: (user.first_name + ' ' + user.last_name).trim(),
                 staffRole: user.role,
-                sessionTitle: svc.name,
-                sessionId: svc.id,
-                startDate: svc.created_at,
+                sessionTitle: `${bk.service_name} - ${bk.user_name || 'Guest'} (#${bk.id})`,
+                sessionId: bk.id,
+                startDate: bk.booking_date,
                 endDate: null,
-                status: 'active',
-                createdAt: svc.created_at
+                status: bk.status === 'CONFIRMED' ? 'active' : 'expired',
+                createdAt: bk.created_at
             });
         }
 

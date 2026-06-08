@@ -138,4 +138,88 @@ const sendAllocationEmail = async ({ to, firstName, programName, programType, st
   });
 };
 
-module.exports = { sendWelcomeEmail, sendOtpEmail, sendPasswordChangedEmail, sendAllocationEmail };
+// ─── NEW: Booking Email Notifications ──────────────────────────────────────
+const sendBookingStatusEmail = async ({ to, firstName, status, details = {} }) => {
+  let subject = "";
+  let message = "";
+  let detailsHtml = "";
+
+  const formattedDate = details.date ? new Date(details.date).toLocaleDateString() : "";
+
+  if (status === "PENDING") {
+    subject = "Tapovana — Booking Pending Confirmation";
+    message = "Your booking has been submitted and is pending confirmation.";
+  } else if (status === "CONFIRMED") {
+    subject = "Tapovana — Booking Confirmed";
+    message = "Your booking has been confirmed.";
+    detailsHtml = `
+      <div style="background:#1e1a0e;border-left:4px solid #cda751;border-radius:6px;padding:20px 24px;margin:20px 0;">
+        <p style="margin:0 0 8px;font-size:14px;color:#cda751;font-weight:600;">Booking Details</p>
+        <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Service:</strong> ${details.service || "N/A"}</p>
+        <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Date:</strong> ${formattedDate}</p>
+        <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Time:</strong> ${details.time || "N/A"}</p>
+        <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Staff:</strong> ${details.staff || "Not Assigned"}</p>
+      </div>
+    `;
+  } else if (status === "CANCELLED") {
+    subject = "Tapovana — Booking Cancelled";
+    message = "Your booking has been cancelled.";
+  } else if (status === "COMPLETED") {
+    subject = "Tapovana — Booking Completed";
+    message = "Your booking has been completed. Thank you.";
+  }
+
+  const html = emailWrapper(`
+    <h1 style="color:#cda751;text-align:center;">Booking Update</h1>
+    <p style="color:#cccccc;text-align:center;">
+      Hello ${firstName},
+    </p>
+    <p style="color:#cccccc;text-align:center;">
+      ${message}
+    </p>
+    ${detailsHtml}
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject,
+    html,
+  });
+};
+
+const sendBookingAllocationEmail = async ({ to, staffName, bookingId, details = {} }) => {
+  const formattedDate = details.date ? new Date(details.date).toLocaleDateString() : "";
+  const html = emailWrapper(`
+    <h1 style="color:#cda751;text-align:center;">New Booking Allocation</h1>
+    <p style="color:#cccccc;text-align:center;">
+      Hello ${staffName},
+    </p>
+    <p style="color:#cccccc;text-align:center;">
+      You have been allocated to booking <strong>#${bookingId}</strong>.
+    </p>
+    <div style="background:#1e1a0e;border-left:4px solid #cda751;border-radius:6px;padding:20px 24px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-size:14px;color:#cda751;font-weight:600;">Booking Details</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Service:</strong> ${details.service || "N/A"}</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Date:</strong> ${formattedDate}</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Time:</strong> ${details.time || "N/A"}</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Customer:</strong> ${details.customer || "Guest"}</p>
+    </div>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Tapovana — New Booking Allocation #${bookingId}`,
+    html,
+  });
+};
+
+module.exports = { 
+  sendWelcomeEmail, 
+  sendOtpEmail, 
+  sendPasswordChangedEmail, 
+  sendAllocationEmail,
+  sendBookingStatusEmail,
+  sendBookingAllocationEmail
+};

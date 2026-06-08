@@ -614,57 +614,7 @@ function AddService({ onBack }) {
               </div>
             </div>
 
-            <div className="es-spec-divider" />
 
-            {/* Manual Staff Assignment */}
-            <div className="es-spec-col">
-              <label className="es-spec-col-label">Assign Doctors &amp; Therapists</label>
-              <div className="es-cert-list" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                {availableStaff.length === 0 ? (
-                  <span style={{ fontSize: 13, color: '#7b8a9a' }}>No doctors or therapists found.</span>
-                ) : (
-                  availableStaff
-                    .filter(staff => !isStaffAllocated(staff.user_id) || assignedStaff.includes(staff.user_id))
-                    .map(staff => (
-                      <label key={staff.user_id} className="es-cert-row">
-                        <input
-                          type="checkbox"
-                          checked={assignedStaff.includes(staff.user_id)}
-                          onChange={() => toggleStaff(staff.user_id)}
-                          className="es-checkbox-hidden"
-                        />
-                        <span className={`es-custom-checkbox ${assignedStaff.includes(staff.user_id) ? 'checked' : ''}`}>
-                          {assignedStaff.includes(staff.user_id) && (
-                            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="4 8 7 11 12 5" />
-                            </svg>
-                          )}
-                        </span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <img 
-                            src={(() => {
-                              let photoUrl = staff.profile_photo_url;
-                              if (photoUrl && /^[A-Za-z]:[/\\]/i.test(photoUrl)) photoUrl = "/uploads/" + photoUrl.replace(/\\/g, '/').split('/').pop();
-                              if (staff.profile_photo_source === "upload" && photoUrl) return `${API_BASE}${photoUrl}`;
-                              if (staff.profile_photo_source === "local" && photoUrl) return `/avatars/${photoUrl}`;
-                              if (staff.avatar_url) {
-                                let avUrl = staff.avatar_url;
-                                if (avUrl && /^[A-Za-z]:[/\\]/i.test(avUrl)) avUrl = "/uploads/" + avUrl.replace(/\\/g, '/').split('/').pop();
-                                return avUrl.startsWith("http") || avUrl.startsWith("/") ? avUrl : `${API_BASE}${avUrl}`;
-                              }
-                              return DefaultAvatar;
-                            })()}
-                            alt="" 
-                            style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }}
-                            onError={(e) => { e.target.onerror = null; e.target.src = DefaultAvatar; }}
-                          />
-                          {`${staff.first_name || ''} ${staff.last_name || ''} (${staff.role})`.trim()}
-                        </span>
-                      </label>
-                    ))
-                )}
-              </div>
-            </div>
 
             <div className="es-spec-divider" />
 

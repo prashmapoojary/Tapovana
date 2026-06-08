@@ -172,10 +172,12 @@
   backdrop-filter: blur(4px);
 }
 
-.blog-status-badge.published {
-  background: rgba(46, 204, 113, 0.14);
-  color: #2ecc71;
-  border: 1px solid rgba(46, 204, 113, 0.3);
+.blog-status-badge.published,
+.blog-status-badge.pending,
+.blog-status-badge.archived {
+  background: rgba(205, 167, 81, 0.14);
+  color: #cda751;
+  border: 1px solid rgba(205, 167, 81, 0.3);
 }
 
 .blog-status-badge.draft {
@@ -184,12 +186,7 @@
   border: 1px solid rgba(241, 196, 15, 0.3);
 }
 
-.blog-status-badge.pending {
-  background: rgba(205, 167, 81, 0.14);
-  color: #cda751;
-  border: 1px solid rgba(205, 167, 81, 0.3);
-}
-
+.blog-status-badge.rejected,
 .blog-status-badge.removed {
   background: rgba(231, 76, 60, 0.14);
   color: #c0392b;

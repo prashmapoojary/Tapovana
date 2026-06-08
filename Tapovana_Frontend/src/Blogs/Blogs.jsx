@@ -81,29 +81,6 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
             </div>
           )}
 
-          {isAdmin && (
-            <div className="blog-card-actions admin-actions">
-              {isPending && (
-                <>
-                  <button onClick={() => onApprove(blog.id)}>Approve</button>
-                  <button onClick={() => onReject(blog.id)}>Reject</button>
-                </>
-              )}
-              {isPublished && (
-                <>
-                  <button onClick={() => onEdit(blog)}>Edit</button>
-                  <button onClick={() => onReject(blog.id, true)}>Archive</button>
-                  <button onClick={() => onDelete(blog.id)}>Delete</button>
-                </>
-              )}
-              {isArchived && (
-                <>
-                  <button onClick={() => onApprove(blog.id)}>Restore</button>
-                  <button onClick={() => onDelete(blog.id)}>Delete</button>
-                </>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -412,28 +389,6 @@ export default function Blogs() {
         </div>
       )}
 
-      {isAdmin && (
-        <div className="blog-tabs" style={{ display: 'flex', gap: '16px', marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-          <button
-            style={{ background: 'none', border: 'none', padding: '8px 12px', fontSize: '15px', fontWeight: '600', color: activeTab === 'published' ? '#cda751' : '#718096', borderBottom: activeTab === 'published' ? '2px solid #cda751' : '2px solid transparent', cursor: 'pointer', transition: '0.2s' }}
-            onClick={() => setActiveTab("published")}
-          >
-            Published Blogs
-          </button>
-          <button
-            style={{ background: 'none', border: 'none', padding: '8px 12px', fontSize: '15px', fontWeight: '600', color: activeTab === 'pending' ? '#cda751' : '#718096', borderBottom: activeTab === 'pending' ? '2px solid #cda751' : '2px solid transparent', cursor: 'pointer', transition: '0.2s' }}
-            onClick={() => setActiveTab("pending")}
-          >
-            Pending Blogs
-          </button>
-          <button
-            style={{ background: 'none', border: 'none', padding: '8px 12px', fontSize: '15px', fontWeight: '600', color: activeTab === 'archived' ? '#cda751' : '#718096', borderBottom: activeTab === 'archived' ? '2px solid #cda751' : '2px solid transparent', cursor: 'pointer', transition: '0.2s' }}
-            onClick={() => setActiveTab("archived")}
-          >
-            Archived Blogs
-          </button>
-        </div>
-      )}
 
       <div className="blog-controls">
         <div className="blog-search-box">

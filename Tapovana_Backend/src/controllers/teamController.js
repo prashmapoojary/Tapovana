@@ -844,20 +844,17 @@ const getTeamMemberAllocations = async (req, res) => {
             };
         });
 
-        // 2. Fetch services assigned to this user
+        // 2. Fetch services assigned to this user from bookings
         const servicesRes = await query(
-            `SELECT id, name, category, status FROM services WHERE assigned_staff_ids @> $1::jsonb`,
-            [JSON.stringify([userId])]
+            `SELECT id, service_name, user_name, status, booking_date FROM bookings WHERE therapist_id = $1 AND status IN ('CONFIRMED', 'COMPLETED') ORDER BY booking_date DESC`,
+            [userId]
         );
         const services = servicesRes.rows.map(s => {
-            let status = s.status === 'Inactive' ? 'Completed' : 'Pending';
-            if (isAllocated && allocDetails?.sessionId === s.id) status = 'Active';
-            
             return {
                 id: s.id,
-                sessionTitle: s.name,
+                sessionTitle: `${s.service_name} - ${s.user_name || 'Guest'} (#${s.id})`,
                 type: 'service',
-                status: status
+                status: s.status === 'CONFIRMED' ? 'Active' : 'Completed'
             };
         });
 
