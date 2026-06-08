@@ -235,6 +235,15 @@ function AddService({ onBack }) {
         status: statusOverride
       };
 
+      if (statusOverride === 'DRAFT') {
+        const drafts = JSON.parse(localStorage.getItem('tapovana_service_drafts') || '[]');
+        drafts.push({ ...body, id: 'draft_' + Date.now(), status: 'DRAFT' });
+        localStorage.setItem('tapovana_service_drafts', JSON.stringify(drafts));
+        triggerAlert("Service saved as Draft", true);
+        onBack();
+        return;
+      }
+
       const data = await apiFetch('/api/services', {
         method: 'POST',
         body: JSON.stringify(body)
@@ -243,7 +252,7 @@ function AddService({ onBack }) {
       console.log('Create service response:', data);
 
       if (data.success) {
-        triggerAlert("Service created successfully!", true);
+        triggerAlert("Service created successfully", true);
         onBack();
       }
     } catch (err) {

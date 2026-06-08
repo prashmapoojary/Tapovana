@@ -148,8 +148,9 @@
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 9px 14px;
-  min-width: 220px;
-  max-width: 300px;
+  min-width: 320px;
+  width: 520px;
+  max-width: 100%;
 }
 
 .ws-search {

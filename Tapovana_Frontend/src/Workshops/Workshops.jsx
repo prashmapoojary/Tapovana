@@ -46,10 +46,10 @@ const getLiveStatus = (ws) => {
 
 const CATEGORY_COLORS = {
   "Yoga": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
-  "Meditation": { color: "#8b5cf6", bg: "rgba(139,92,246,0.1)" },
-  "Nutrition": { color: "#2ecc71", bg: "rgba(46,204,113,0.1)" },
-  "Ayurveda": { color: "#cda751", bg: "rgba(205,167,81,0.1)" },
-  "Holistic": { color: "#e67e22", bg: "rgba(230,126,34,0.1)" },
+  "Meditation": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
+  "Nutrition": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
+  "Ayurveda": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
+  "Holistic": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
 };
 
 const STATUS_CONFIG = {
@@ -154,6 +154,9 @@ export default function Workshops() {
   const [addForm, setAddForm] = useState(BLANK_FORM);
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState("");
+
+  // Delete confirm
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Video player
   const [videoPlaying, setVideoPlaying] = useState(false);
@@ -308,6 +311,33 @@ export default function Workshops() {
     }
   };
 
+  // ─── Delete Workshop ───────────────────────────────────────────────────
+  const handleDeleteWorkshop = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteWorkshop = async () => {
+    try {
+      setShowDeleteConfirm(false);
+      setEditSaving(true);
+      if (String(selectedWs.id).startsWith("WS-")) {
+        // It's a dummy local workshop, just remove it locally
+        setWorkshops(prev => prev.filter(w => w.id !== selectedWs.id));
+        setSelectedWs(null);
+        showToast("Workshop deleted successfully!");
+        return;
+      }
+      await apiFetch("/api/workshops/" + selectedWs.id, { method: "DELETE" });
+      await fetchWorkshops();
+      setSelectedWs(null);
+      showToast("Workshop deleted successfully!");
+    } catch (e) {
+      showToast("Failed to delete workshop: " + e.message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   // ─── Create Workshop ───────────────────────────────────────────────────
   const handleCreateWorkshop = async () => {
     setAddError("");
@@ -361,7 +391,7 @@ export default function Workshops() {
   // ─── Image file upload handler ──────────────────────────────────────────
   const handleImageFile = async (target, file) => {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert("Image must be less than 5MB"); return; }
+    if (file.size > 5 * 1024 * 1024) { showToast("Image must be less than 5MB"); return; }
     const base64 = await fileToBase64(file);
     if (target === "add") {
       setAddForm(prev => ({ ...prev, image_base64: base64, image_url: "" }));
@@ -383,7 +413,7 @@ export default function Workshops() {
         setEditForm(prev => ({ ...prev, video_url: objectUrl, video_base64: base64, video_file: file }));
       }
     } catch (err) {
-      alert("Error reading video file.");
+      showToast("Error reading video file.");
     }
   };
 
@@ -604,10 +634,15 @@ export default function Workshops() {
           </div>
         </div>
 
-        {/* Edit Workshop button */}
-        <button className="ws-modal-btn-primary" style={{ width: "100%" }} onClick={handleStartEdit}>
-          Edit Workshop
-        </button>
+        {/* Actions */}
+        <div style={{ display: "flex", gap: 12 }}>
+          <button className="ws-modal-btn-primary" style={{ flex: 1 }} onClick={handleStartEdit}>
+            Edit Workshop
+          </button>
+          <button className="ws-modal-btn-secondary" style={{ flex: 1, color: "#e74c3c", borderColor: "rgba(231,76,60,0.3)", background: "transparent" }} onClick={handleDeleteWorkshop}>
+            Delete Workshop
+          </button>
+        </div>
       </div>
     );
   };
@@ -695,6 +730,27 @@ export default function Workshops() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── DELETE CONFIRM MODAL ── */}
+      {showDeleteConfirm && (
+        <div className="ws-modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="ws-modal" style={{ width: 400, textAlign: 'center', padding: '32px 24px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(205,167,81,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', overflow: 'hidden', border: '2px solid #CDA751' }}>
+              <img src={getImageUrl(selectedWs?.image_url || selectedWs?.image)} alt="Workshop Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/100x100?text=No+Image'; }} />
+            </div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: "#2d3748", margin: "0 0 8px 0" }}>Delete Workshop?</h2>
+            <p style={{ fontSize: 14, color: "#7b8a9a", margin: "0 0 24px 0", lineHeight: 1.5 }}>
+              Are you sure you want to delete this workshop? This action cannot be undone.
+            </p>
+            <div style={{ display: "flex", gap: 12 }}>
+              <button className="ws-modal-btn-secondary" style={{ flex: 1 }} onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
+              <button className="ws-modal-btn-primary" style={{ flex: 1, background: '#CDA751', borderColor: '#CDA751' }} onClick={confirmDeleteWorkshop}>
+                Yes, Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -821,11 +877,13 @@ export default function Workshops() {
       {/* Toast */}
       {toast && (
         <div style={{
-          position: 'fixed', bottom: '24px', right: '24px',
-          background: '#2ecc71', color: 'white', padding: '16px 24px',
-          borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 99999
+          position: 'fixed', top: '32px', left: '50%', transform: 'translateX(-50%)',
+          background: '#CDA751', color: 'white', padding: '16px 32px',
+          borderRadius: '10px', boxShadow: '0 8px 30px rgba(0,0,0,0.15)', zIndex: 2147483647,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'wsFadeIn 0.3s ease-out'
         }}>
-          <div style={{ fontWeight: 700, fontSize: '14px' }}>{toast}</div>
+          <div style={{ fontWeight: 700, fontSize: '15px' }}>{toast}</div>
         </div>
       )}
     </div>

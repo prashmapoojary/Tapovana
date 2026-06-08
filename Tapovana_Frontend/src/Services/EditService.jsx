@@ -202,6 +202,36 @@ function EditService({ service, onBack }) {
     const fetchServiceDetails = async () => {
         try {
             setLoading(true);
+            const isDraft = typeof service.id === 'string' && service.id.startsWith('draft_');
+            if (isDraft) {
+                const s = service;
+                setServiceName(s.name || '');
+                setCategory(s.category || '');
+                setSubCategory(s.subcategory || '');
+                setDescription(s.description || '');
+                setBasePrice(s.base_price || '');
+                setDuration(s.duration_minutes || '');
+
+                if (s.benefits) setBenefits(typeof s.benefits === 'string' ? s.benefits.split('\n') : s.benefits);
+                if (s.tools) setTools(typeof s.tools === 'string' ? s.tools.split('\n') : s.tools);
+                if (s.image_url) setGalleryImages([s.image_url]);
+
+                if (s.required_certification) {
+                    const certs = typeof s.required_certification === 'string' ? s.required_certification.split('\n') : [];
+                    setCertifications(prev => {
+                        const next = { ...prev };
+                        certs.forEach(c => { if (next[c] !== undefined) next[c] = true; });
+                        return next;
+                    });
+                }
+                setExperienceLevel(s.experience_level || '');
+                if (s.assigned_staff_ids) {
+                    setAssignedStaff(s.assigned_staff_ids);
+                }
+                setLoading(false);
+                return;
+            }
+
             const data = await apiFetch(`/api/services/${service.id}`);
             if (data.success && data.service) {
                 const s = data.service;
@@ -284,6 +314,23 @@ function EditService({ service, onBack }) {
                 assigned_staff_ids: assignedStaff,
                 image_url: firstImage
             };
+
+            const isDraft = typeof service.id === 'string' && service.id.startsWith('draft_');
+
+            if (isDraft) {
+                body.status = 'ACTIVE';
+                const data = await apiFetch('/api/services', {
+                    method: 'POST',
+                    body: JSON.stringify(body)
+                });
+                if (data.success) {
+                    const drafts = JSON.parse(localStorage.getItem('tapovana_service_drafts') || '[]');
+                    localStorage.setItem('tapovana_service_drafts', JSON.stringify(drafts.filter(d => d.id !== service.id)));
+                    triggerAlert("Service updated successfully and activated", true);
+                    onBack();
+                }
+                return;
+            }
 
             const data = await apiFetch(`/api/services/${service.id}`, {
                 method: 'PATCH',

@@ -42,23 +42,8 @@ const handleServiceImage = (imageData) => {
     return imageData;
 };
 
-// Helper: Allocate a single staff member
-const allocateStaffMember = async (staffId, service) => {
-    const allocationDetails = {
-        id: service.id,
-        type: 'service',
-        sessionTitle: service.name,
-        sessionId: service.id,
-        startDate: new Date().toISOString(),
-        endDate: null
-    };
-
-    await query(
-        'UPDATE team_members SET availability_status = $1, allocation_details = $2::jsonb WHERE id = $3 AND status = $4',
-        ['Allocated', JSON.stringify(allocationDetails), staffId, 'active']
-    );
-
-    // Send email notification (fire and forget - don't block)
+// Helper: Send email notification
+const sendEmailForAllocation = async (staffId, service) => {
     try {
         const staffRes = await query('SELECT first_name, email FROM team_members WHERE id = $1', [staffId]);
         if (staffRes.rows.length) {
@@ -80,6 +65,28 @@ const allocateStaffMember = async (staffId, service) => {
         }
     } catch (emailErr) {
         console.error('Email error: ' + emailErr.message);
+    }
+};
+
+// Helper: Allocate a single staff member
+const allocateStaffMember = async (staffId, service) => {
+    const allocationDetails = {
+        id: service.id,
+        type: 'service',
+        sessionTitle: service.name,
+        sessionId: service.id,
+        startDate: new Date().toISOString(),
+        endDate: null
+    };
+
+    await query(
+        'UPDATE team_members SET availability_status = $1, allocation_details = $2::jsonb WHERE id = $3 AND status = $4',
+        ['Allocated', JSON.stringify(allocationDetails), staffId, 'active']
+    );
+
+    // Send email notification (fire and forget - don't block)
+    if (service.status !== 'DRAFT') {
+        await sendEmailForAllocation(staffId, service);
     }
 };
 
@@ -226,9 +233,11 @@ const updateService = async (req, res) => {
         if (status !== undefined) { fields.push('status = $' + idx++); values.push(status?.toUpperCase() || null); }
 
         // Auto-activate DRAFT on update
-        if (existingService.status === 'DRAFT' && status === undefined) {
+        let isPublishingDraft = false;
+        if (existingService.status === 'DRAFT' && (status === 'ACTIVE' || status === undefined)) {
             fields.push('status = $' + idx++);
             values.push('ACTIVE');
+            isPublishingDraft = true;
         }
 
         if (assigned_staff_ids !== undefined) {
@@ -254,7 +263,7 @@ const updateService = async (req, res) => {
                 await deallocateStaffMember(staffId);
             }
 
-            const serviceForAlloc = { ...existingService, name: name || existingService.name };
+            const serviceForAlloc = { ...existingService, name: name || existingService.name, status: status || 'ACTIVE' };
             for (const staffId of addedStaff) {
                 await allocateStaffMember(staffId, serviceForAlloc);
             }
@@ -269,8 +278,18 @@ const updateService = async (req, res) => {
             'UPDATE services SET ' + fields.join(', ') + ' WHERE id = $' + idx + ' RETURNING *',
             values
         );
+        const updatedService = result.rows[0];
 
-        return res.json({ success: true, message: 'Service updated.', service: result.rows[0] });
+        if (isPublishingDraft) {
+            const finalStaffIds = updatedService.assigned_staff_ids || [];
+            const addedStaff = assigned_staff_ids !== undefined ? assigned_staff_ids.filter(id => !oldStaffIds.includes(id)) : [];
+            const staffToEmail = finalStaffIds.filter(id => !addedStaff.includes(id));
+            for (const staffId of staffToEmail) {
+                await sendEmailForAllocation(staffId, updatedService);
+            }
+        }
+
+        return res.json({ success: true, message: 'Service updated.', service: updatedService });
     } catch (err) {
         console.error('updateService error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });

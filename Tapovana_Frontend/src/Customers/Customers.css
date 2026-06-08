@@ -270,8 +270,17 @@
 .cust-btn-danger:hover:not(:disabled) { background: #e74c3c; color: white; border-color: #e74c3c; }
 .cust-btn-secondary:hover:not(:disabled) { background: #cda751; color: white; border-color: #cda751; }
 .cust-btn-danger:disabled, .cust-btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
-.action-icon { width: 24px; height: 24px; cursor: pointer; transition: filter 0.2s ease; }
-.action-icon:hover { filter: brightness(0) saturate(100%); }
+.action-icon {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.2s, filter 0.2s;
+}
+.action-icon:hover {
+  opacity: 1;
+  filter: brightness(0);
+}
 
 @media (max-width: 1024px) {
   .customers-container { padding: 0 16px; }

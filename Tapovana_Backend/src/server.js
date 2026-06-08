@@ -9,6 +9,7 @@ const authRoutes = require("./routes/auth");
 const passwordRoutes = require("./routes/password");
 const teamRoutes = require("./routes/team");
 const serviceRoutes = require("./routes/services");
+const bookingRoutes = require("./routes/bookings");
 const workshopRoutes = require("./routes/workshops");
 
 const app = express();
@@ -44,6 +45,7 @@ app.use("/api/admin/password", passwordRoutes);
 app.use("/api/admin/team", teamRoutes);
 app.use("/api/teams", teamRoutes);
 app.use("/api/services", serviceRoutes);
+app.use("/api/bookings", bookingRoutes);
 app.use("/api/workshops", workshopRoutes);
 
 // ── Analytics stub (returns dummy data until real analytics are built) ────────
@@ -51,7 +53,7 @@ app.get("/api/analytics/dashboard", (req, res) => {
     res.json({
         success: true,
         stats: { today_bookings: 0, today_revenue: 0, active_customers: 0, pending_bookings: 0 },
-        trends: { bookings_last_7_days: [0,0,0,0,0,0,0], revenue_last_7_days: [0,0,0,0,0,0,0] },
+        trends: { bookings_last_7_days: [0, 0, 0, 0, 0, 0, 0], revenue_last_7_days: [0, 0, 0, 0, 0, 0, 0] },
         membership_breakdown: { NONE: 0, SILVER: 0, GOLD: 0, PLATINUM: 0 },
         service_demand: {}
     });

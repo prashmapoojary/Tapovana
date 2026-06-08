@@ -472,9 +472,12 @@ function Customers() {
             <thead>
               <tr>
                 <th className="sortable-th" onClick={() => handleSort("customer_id")}>CUSTOMER ID {renderSortIcon("customer_id")}</th>
-                <th className="sortable-th" onClick={() => handleSort("first_name")}>CUSTOMER {renderSortIcon("first_name")}</th>
-                <th>CONTACT INFO</th>
-                <th className="sortable-th" onClick={() => handleSort("membership_status")}>STATUS & TIER {renderSortIcon("membership_status")}</th>
+                <th className="sortable-th" onClick={() => handleSort("first_name")}>NAME {renderSortIcon("first_name")}</th>
+                <th className="sortable-th" onClick={() => handleSort("email")}>EMAIL {renderSortIcon("email")}</th>
+                <th className="sortable-th" onClick={() => handleSort("phone")}>PHONE {renderSortIcon("phone")}</th>
+                <th className="sortable-th" onClick={() => handleSort("join_date")}>JOINED {renderSortIcon("join_date")}</th>
+                <th className="sortable-th" onClick={() => handleSort("status")}>STATUS {renderSortIcon("status")}</th>
+                <th className="sortable-th" onClick={() => handleSort("membership_status")}>TIER {renderSortIcon("membership_status")}</th>
                 <th className="sortable-th" onClick={() => handleSort("total_bookings")}>SESSIONS {renderSortIcon("total_bookings")}</th>
                 <th className="sortable-th" onClick={() => handleSort("total_spent")}>TOTAL SPEND {renderSortIcon("total_spent")}</th>
                 <th className="sortable-th" onClick={() => handleSort("last_activity")}>LAST ACTIVITY {renderSortIcon("last_activity")}</th>
@@ -486,7 +489,7 @@ function Customers() {
                 Array.from({ length: 5 }).map((_, i) => renderSkeletonRow(i))
               ) : paginatedList.length === 0 ? (
                 <tr>
-                  <td colSpan="8">
+                  <td colSpan="11">
                     <div className="cust-empty-state">
                       <h3 className="cust-empty-title">No customers match your filters</h3>
                       <p className="cust-empty-sub">Try adjusting your search terms or filter selections.</p>
@@ -498,27 +501,17 @@ function Customers() {
                 paginatedList.map((c) => (
                   <tr key={c.id} onClick={() => setSelectedCustomer(c)}>
                     <td className="cust-cell-name">{c.customer_id}</td>
-                    <td>
-                      <div className="cust-cell-name">{c.first_name} {c.last_name}</div>
-                      <div className="cust-cell-email">Joined: {c.join_date}</div>
-                    </td>
-                    <td>
-                      <div style={{ color: "#2d3748" }}>{c.phone}</div>
-                      <div className="cust-cell-email">{c.email || "No Email"}</div>
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px" }}>
-                        <span className={`status-badge ${(c.status || "ACTIVE").toLowerCase()}`}>{c.status || "ACTIVE"}</span>
-                        <span className={`tier-badge ${(c.membership_status || "NONE").toLowerCase()}`}>
-                          {c.membership_status === "NONE" ? "Regular" : c.membership_status}
-                        </span>
-                      </div>
-                    </td>
+                    <td className="cust-cell-name">{c.first_name} {c.last_name}</td>
+                    <td className="cust-cell-email">{c.email || "No Email"}</td>
+                    <td style={{ color: "#2d3748" }}>{c.phone}</td>
+                    <td className="cust-cell-email">{c.join_date}</td>
+                    <td><span className={`status-badge ${(c.status || "ACTIVE").toLowerCase()}`}>{c.status || "ACTIVE"}</span></td>
+                    <td><span className={`tier-badge ${(c.membership_status || "NONE").toLowerCase()}`}>{c.membership_status === "NONE" ? "Regular" : c.membership_status}</span></td>
                     <td><strong className="metric-gold">{c.total_bookings || 0}</strong></td>
                     <td className="metric-teal">₹{(c.total_spent || 0).toLocaleString("en-IN")}</td>
                     <td className="cust-cell-email">{c.last_activity || "-"}</td>
-                    <td onClick={(e) => { e.stopPropagation(); setSelectedCustomer(c); }}>
-                      <img src={ActionIcon} alt="Actions" className="action-icon" style={{ width: 24, height: 24 }} />
+                    <td onClick={(e) => { e.stopPropagation(); setSelectedCustomer(c); }} style={{ textAlign: "center" }}>
+                      <img src={ActionIcon} alt="Actions" className="action-icon" />
                     </td>
                   </tr>
                 ))

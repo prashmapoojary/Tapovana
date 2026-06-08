@@ -97,9 +97,12 @@ function Services() {
     try {
       setLoading(true);
       const data = await apiFetch('/api/services');
+      let backendServices = [];
       if (data.success) {
-        setServices(data.services || []);
+        backendServices = data.services || [];
       }
+      const drafts = JSON.parse(localStorage.getItem('tapovana_service_drafts') || '[]');
+      setServices([...drafts, ...backendServices]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -154,6 +157,8 @@ function Services() {
       console.warn("Could not check bookings:", err);
     }
 
+    const isDraft = typeof id === 'string' && id.startsWith('draft_');
+
     const confirmed = await triggerConfirm(
       `Are you sure you want to delete this service\n"${serviceName}"?`,
       imageUrl
@@ -161,8 +166,20 @@ function Services() {
     
     if (confirmed) {
       try {
-        await apiFetch(`/api/services/${id}`, { method: 'DELETE' });
-        fetchServices();
+        if (isDraft) {
+          const drafts = JSON.parse(localStorage.getItem('tapovana_service_drafts') || '[]');
+          localStorage.setItem('tapovana_service_drafts', JSON.stringify(drafts.filter(d => d.id !== id)));
+          fetchServices();
+          triggerAlert(`${serviceName} deleted successfully`, true);
+        } else {
+          const res = await apiFetch(`/api/services/${id}`, { method: 'DELETE' });
+          if (res.success || res.message) {
+            fetchServices();
+            triggerAlert(`${serviceName} deleted successfully`, true);
+          } else {
+            fetchServices();
+          }
+        }
       } catch (err) {
         triggerAlert("Failed to delete service: " + err.message);
       }
