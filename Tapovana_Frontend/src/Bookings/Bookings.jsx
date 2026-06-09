@@ -63,6 +63,10 @@ function Bookings() {
   const [newNote, setNewNote] = useState("");
   const [openActionMenu, setOpenActionMenu] = useState(null);
 
+  // Ref to track which booking we've already pre-filled staff for
+  // Prevents staffList async updates from overwriting the user's checkbox selections
+  const staffPrefilledForRef = React.useRef(null);
+
   // ─── Fetch staff from backend ───
   useEffect(() => {
     const fetchStaff = async () => {
@@ -110,7 +114,7 @@ function Bookings() {
         if (statusFilter) q += `&status=${statusFilter}`;
         if (dateFrom) q += `&date_from=${dateFrom}`;
         if (dateTo) q += `&date_to=${dateTo}`;
-        
+
         const data = await apiFetch(q);
         if (data.success) {
           setBookings(data.bookings || []);
@@ -128,39 +132,49 @@ function Bookings() {
 
   // ─── Pre-fill status and staff when booking selected ───
   useEffect(() => {
-    if (selectedBooking) {
-      setNewStatus((selectedBooking.status || "PENDING").toUpperCase());
-      setNewNote(selectedBooking.note || "");
+    if (!selectedBooking) {
+      // Drawer closed — reset the ref so next open pre-fills fresh
+      staffPrefilledForRef.current = null;
+      return;
+    }
 
-      // Pre-fill multi-staff: fetch existing allocations for this booking
-      const loadAllocatedStaff = async () => {
-        if ((selectedBooking.status || 'PENDING').toUpperCase() === 'CONFIRMED') {
-          try {
-            // therapist_name can be comma-joined; match against staffList
-            const nameList = (selectedBooking.therapist_name || '')
-              .split(',')
-              .map(n => n.trim().toLowerCase())
-              .filter(Boolean);
-            if (nameList.length > 0) {
-              const matched = staffList
-                .filter(s => {
-                  const full = `${s.first_name || ''} ${s.last_name || ''}`.trim().toLowerCase();
-                  return nameList.some(n => full.includes(n) || n.includes(full.split(' ')[0]));
-                })
-                .map(s => s.id || s.user_id);
-              setAssignedStaffIds(matched);
-            } else {
-              setAssignedStaffIds([]);
-            }
-          } catch {
+    setNewStatus((selectedBooking.status || "PENDING").toUpperCase());
+    setNewNote(selectedBooking.note || "");
+
+    // Only pre-fill staff ONCE per booking open (skip if staffList updates later)
+    if (staffPrefilledForRef.current === selectedBooking.id) return;
+    // Wait until staffList has loaded before attempting to match names
+    if (staffList.length === 0) return;
+
+    staffPrefilledForRef.current = selectedBooking.id;
+
+    // Pre-fill multi-staff: match names from therapist_name against staffList
+    const loadAllocatedStaff = async () => {
+      if ((selectedBooking.status || 'PENDING').toUpperCase() === 'CONFIRMED') {
+        try {
+          const nameList = (selectedBooking.therapist_name || '')
+            .split(',')
+            .map(n => n.trim().toLowerCase())
+            .filter(Boolean);
+          if (nameList.length > 0) {
+            const matched = staffList
+              .filter(s => {
+                const full = `${s.first_name || ''} ${s.last_name || ''}`.trim().toLowerCase();
+                return nameList.some(n => full.includes(n) || n.includes(full.split(' ')[0]));
+              })
+              .map(s => s.id || s.user_id);
+            setAssignedStaffIds(matched);
+          } else {
             setAssignedStaffIds([]);
           }
-        } else {
+        } catch {
           setAssignedStaffIds([]);
         }
-      };
-      loadAllocatedStaff();
-    }
+      } else {
+        setAssignedStaffIds([]);
+      }
+    };
+    loadAllocatedStaff();
   }, [selectedBooking, staffList]);
 
   // ─── Get staff display with role suffix ───
@@ -182,7 +196,7 @@ function Bookings() {
   // ─── Search filter ───
   const filtered = useMemo(() => {
     let result = bookings;
-    
+
 
 
     if (!search) return result;
@@ -387,8 +401,8 @@ function Bookings() {
                     <span className="bk-value" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       {selectedBooking.therapist_name
                         ? selectedBooking.therapist_name.split(',').map((name, i) => (
-                            <span key={i}>{name.trim()}</span>
-                          ))
+                          <span key={i}>{name.trim()}</span>
+                        ))
                         : <span>Not assigned</span>}
                       {isBookingConflicted(selectedBooking.id) && (
                         <span style={{ color: "#e53e3e", fontSize: "12px", fontWeight: "600", marginTop: "2px" }}>
@@ -413,65 +427,87 @@ function Bookings() {
                 <>
                   <div className="bk-drawer-section">
                     <h4 className="bk-section-title">Update Booking Status</h4>
-                  <div className="bk-status-row">
-                    {(() => {
-                      const cur = (selectedBooking.status || "PENDING").toUpperCase();
+                    <div className="bk-status-row">
+                      {(() => {
+                        const cur = (selectedBooking.status || "PENDING").toUpperCase();
 
-                      // ── Compute whether the 30-min buffer has passed (CONFIRMED only) ──
-                      let completionAllowed = false;
-                      let bufferLabel = '';
-                      if (cur === 'CONFIRMED') {
-                        const matchedSvc = servicesList.find(
-                          s => (s.name || '').toLowerCase() === (selectedBooking.service_name || '').toLowerCase()
-                        );
-                        const durationMins = matchedSvc?.duration_minutes || 60;
-                        const dateStr = selectedBooking.booking_date;
-                        const timeStr = selectedBooking.booking_time || '00:00';
-                        if (dateStr) {
-                          const base = new Date(dateStr);
-                          const m = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
-                          if (m) {
-                            let h = parseInt(m[1], 10);
-                            const min = parseInt(m[2], 10);
-                            const ampm = m[3] ? m[3].toUpperCase() : null;
-                            if (ampm === 'PM' && h < 12) h += 12;
-                            if (ampm === 'AM' && h === 12) h = 0;
-                            base.setHours(h, min, 0, 0);
-                          }
-                          const unlockAt = new Date(base.getTime() + (durationMins + 10) * 60000);
-                          const now = new Date();
-                          if (now >= unlockAt) {
-                            completionAllowed = true;
-                          } else {
-                            const diffMins = Math.ceil((unlockAt - now) / 60000);
-                            const hrs = Math.floor(diffMins / 60);
-                            const mins = diffMins % 60;
-                            bufferLabel = hrs > 0
-                              ? `Available in ${hrs}h ${mins}m (end time + 10 min buffer)`
-                              : `Available in ${mins} min (end time + 10 min buffer)`;
+                        // ── Compute whether the 30-min buffer has passed (CONFIRMED only) ──
+                        let completionAllowed = false;
+                        let bufferLabel = '';
+                        if (cur === 'CONFIRMED') {
+                          const matchedSvc = servicesList.find(
+                            s => (s.name || '').toLowerCase() === (selectedBooking.service_name || '').toLowerCase()
+                          );
+                          const durationMins = matchedSvc?.duration_minutes || 60;
+                          const dateStr = selectedBooking.booking_date;
+                          const timeStr = selectedBooking.booking_time || '00:00';
+                          if (dateStr) {
+                            const base = new Date(dateStr);
+                            const m = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+                            if (m) {
+                              let h = parseInt(m[1], 10);
+                              const min = parseInt(m[2], 10);
+                              const ampm = m[3] ? m[3].toUpperCase() : null;
+                              if (ampm === 'PM' && h < 12) h += 12;
+                              if (ampm === 'AM' && h === 12) h = 0;
+                              base.setHours(h, min, 0, 0);
+                            }
+                            const unlockAt = new Date(base.getTime() + (durationMins + 10) * 60000);
+                            const now = new Date();
+                            if (now >= unlockAt) {
+                              completionAllowed = true;
+                            } else {
+                              const diffMins = Math.ceil((unlockAt - now) / 60000);
+                              const hrs = Math.floor(diffMins / 60);
+                              const mins = diffMins % 60;
+                              bufferLabel = hrs > 0
+                                ? `Available in ${hrs}h ${mins}m (end time + 10 min buffer)`
+                                : `Available in ${mins} min (end time + 10 min buffer)`;
+                            }
                           }
                         }
-                      }
 
-                      // ── Terminal states — no changes allowed ──
-                      if (cur === 'COMPLETED' || cur === 'CANCELLED') {
-                        return (
-                          <div style={{
-                            padding: '10px 14px',
-                            background: cur === 'COMPLETED' ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
-                            border: `1px solid ${cur === 'COMPLETED' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                            color: cur === 'COMPLETED' ? '#16a34a' : '#dc2626',
-                            fontWeight: 600
-                          }}>
-                            {cur === 'COMPLETED' ? '✅ Completed — no further changes allowed' : 'This service has been cancelled.'}
-                          </div>
-                        );
-                      }
+                        // ── Terminal states — no changes allowed ──
+                        if (cur === 'COMPLETED' || cur === 'CANCELLED') {
+                          return (
+                            <div style={{
+                              padding: '10px 14px',
+                              background: cur === 'COMPLETED' ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+                              border: `1px solid ${cur === 'COMPLETED' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                              borderRadius: '8px',
+                              fontSize: '13px',
+                              color: cur === 'COMPLETED' ? '#16a34a' : '#dc2626',
+                              fontWeight: 600
+                            }}>
+                              {cur === 'COMPLETED' ? '✅ Completed — no further changes allowed' : 'This service has been cancelled.'}
+                            </div>
+                          );
+                        }
 
-                      // ── PENDING state ──
-                      if (cur === 'PENDING') {
+                        // ── PENDING state ──
+                        if (cur === 'PENDING') {
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                              <select
+                                value={newStatus}
+                                onChange={(e) => setNewStatus(e.target.value)}
+                                className="bk-status-select"
+                              >
+                                <option value="PENDING">Pending</option>
+                                <option value="CONFIRMED">Confirmed</option>
+                                <option value="CANCELLED">Cancelled</option>
+                                <option value="COMPLETED" disabled={true}>Completed</option>
+                              </select>
+                              {newStatus === 'CANCELLED' && (
+                                <div style={{ color: '#dc2626', fontSize: '13px', fontWeight: 600, marginTop: '4px' }}>
+                                  This service has been cancelled.
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        // ── CONFIRMED state ──
                         return (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                             <select
@@ -479,10 +515,11 @@ function Bookings() {
                               onChange={(e) => setNewStatus(e.target.value)}
                               className="bk-status-select"
                             >
-                              <option value="PENDING">Pending</option>
                               <option value="CONFIRMED">Confirmed</option>
+                              <option value="COMPLETED" disabled={!completionAllowed}>
+                                Completed
+                              </option>
                               <option value="CANCELLED">Cancelled</option>
-                              <option value="COMPLETED" disabled={true}>Completed</option>
                             </select>
                             {newStatus === 'CANCELLED' && (
                               <div style={{ color: '#dc2626', fontSize: '13px', fontWeight: 600, marginTop: '4px' }}>
@@ -491,31 +528,8 @@ function Bookings() {
                             )}
                           </div>
                         );
-                      }
-
-                      // ── CONFIRMED state ──
-                      return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-                          <select
-                            value={newStatus}
-                            onChange={(e) => setNewStatus(e.target.value)}
-                            className="bk-status-select"
-                          >
-                            <option value="CONFIRMED">Confirmed</option>
-                            <option value="COMPLETED" disabled={!completionAllowed}>
-                              Completed
-                            </option>
-                            <option value="CANCELLED">Cancelled</option>
-                          </select>
-                          {newStatus === 'CANCELLED' && (
-                            <div style={{ color: '#dc2626', fontSize: '13px', fontWeight: 600, marginTop: '4px' }}>
-                              This service has been cancelled.
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
+                      })()}
+                    </div>
                   </div>
 
                   {newStatus === 'CONFIRMED' && (
@@ -525,58 +539,56 @@ function Bookings() {
                         {staffList.length === 0 ? (
                           <span style={{ fontSize: 13, color: '#7b8a9a' }}>No doctors or therapists found.</span>
                         ) : (
-                        staffList
-                          .filter(staff => (staff.role === "DOCTOR" || staff.role === "THERAPIST") && staff.availability_status !== "On Leave")
-                          .map(staff => {
-                            const staffId = staff.id || staff.user_id;
-                            const API_BASE = "http://localhost:5000";
-                            let photoUrl = staff.profile_photo_url;
-                            if (photoUrl && /^[A-Za-z]:[/\\]/i.test(photoUrl)) photoUrl = "/uploads/" + photoUrl.replace(/\\/g, '/').split('/').pop();
-                            
-                            let finalAvatar = DefaultAvatar;
-                            if (staff.profile_photo_source === "upload" && photoUrl) finalAvatar = `${API_BASE}${photoUrl}`;
-                            else if (staff.profile_photo_source === "local" && photoUrl) finalAvatar = `/avatars/${photoUrl}`;
-                            else if (staff.avatar_url) {
-                              let avUrl = staff.avatar_url;
-                              if (avUrl && /^[A-Za-z]:[/\\]/i.test(avUrl)) avUrl = "/uploads/" + avUrl.replace(/\\/g, '/').split('/').pop();
-                              finalAvatar = avUrl.startsWith("http") || avUrl.startsWith("/") ? avUrl : `${API_BASE}${avUrl}`;
-                            }
+                          staffList
+                            .filter(staff => (staff.role === "DOCTOR" || staff.role === "THERAPIST") && staff.availability_status !== "On Leave")
+                            .map(staff => {
+                              const staffId = staff.id || staff.user_id;
+                              const API_BASE = "http://localhost:5000";
+                              let photoUrl = staff.profile_photo_url;
+                              if (photoUrl && /^[A-Za-z]:[/\\]/i.test(photoUrl)) photoUrl = "/uploads/" + photoUrl.replace(/\\/g, '/').split('/').pop();
 
-                            const isChecked = assignedStaffIds.includes(staffId);
+                              let finalAvatar = DefaultAvatar;
+                              if (staff.profile_photo_source === "upload" && photoUrl) finalAvatar = `${API_BASE}${photoUrl}`;
+                              else if (staff.profile_photo_source === "local" && photoUrl) finalAvatar = `/avatars/${photoUrl}`;
+                              else if (staff.avatar_url) {
+                                let avUrl = staff.avatar_url;
+                                if (avUrl && /^[A-Za-z]:[/\\]/i.test(avUrl)) avUrl = "/uploads/" + avUrl.replace(/\\/g, '/').split('/').pop();
+                                finalAvatar = avUrl.startsWith("http") || avUrl.startsWith("/") ? avUrl : `${API_BASE}${avUrl}`;
+                              }
 
-                            return (
-                              <label key={staffId} className="bk-cert-row">
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    setAssignedStaffIds(prev =>
-                                      isChecked
-                                        ? prev.filter(id => id !== staffId)
-                                        : [...prev, staffId]
-                                    );
-                                  }}
-                                  className="bk-checkbox-hidden"
-                                />
-                                <span className={`bk-custom-checkbox ${isChecked ? 'checked' : ''}`}>
-                                  {isChecked && (
-                                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                      <polyline points="4 8 7 11 12 5" />
-                                    </svg>
-                                  )}
-                                </span>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <img 
-                                    src={finalAvatar}
-                                    alt="" 
-                                    style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }}
-                                    onError={(e) => { e.target.onerror = null; e.target.src = DefaultAvatar; }}
+                              const isChecked = assignedStaffIds.includes(staffId);
+
+                              return (
+                                <label key={staffId} className="bk-cert-row">
+                                  <input
+                                    type="radio"
+                                    name="staff-allocation"
+                                    checked={isChecked}
+                                    onChange={() => {
+                                      // Single-select: replace the entire array with just this one staff
+                                      setAssignedStaffIds([staffId]);
+                                    }}
+                                    className="bk-checkbox-hidden"
                                   />
-                                  {`${staff.first_name || ''} ${staff.last_name || ''} (${staff.role === 'DOCTOR' ? 'Doctor' : 'Therapist'})`.trim()}
-                                </span>
-                              </label>
-                            );
-                          })
+                                  <span className={`bk-custom-checkbox ${isChecked ? 'checked' : ''}`}>
+                                    {isChecked && (
+                                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="4 8 7 11 12 5" />
+                                      </svg>
+                                    )}
+                                  </span>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <img
+                                      src={finalAvatar}
+                                      alt=""
+                                      style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }}
+                                      onError={(e) => { e.target.onerror = null; e.target.src = DefaultAvatar; }}
+                                    />
+                                    {`${staff.first_name || ''} ${staff.last_name || ''} (${staff.role === 'DOCTOR' ? 'Doctor' : 'Therapist'})`.trim()}
+                                  </span>
+                                </label>
+                              );
+                            })
                         )}
                       </div>
                     </div>
@@ -597,7 +609,7 @@ function Bookings() {
               <div className="bk-drawer-section">
                 <h4 className="bk-section-title">Notes</h4>
                 {canEdit ? (
-                  <textarea 
+                  <textarea
                     value={newNote}
                     onChange={(e) => setNewNote(e.target.value)}
                     className="bk-notes-textarea"
@@ -700,9 +712,9 @@ function Bookings() {
                 filtered.map((b) => {
                   const staffInfo = getStaffDisplay(b.therapist_name);
                   return (
-                    <tr 
-                      key={b.id} 
-                      className={`bk-table-row ${isBookingConflicted(b.id) ? 'conflicted-row' : ''}`} 
+                    <tr
+                      key={b.id}
+                      className={`bk-table-row ${isBookingConflicted(b.id) ? 'conflicted-row' : ''}`}
                       onClick={() => setSelectedBooking(b)}
                       style={isBookingConflicted(b.id) ? { backgroundColor: "rgba(100, 116, 139, 0.08)" } : undefined}
                     >
@@ -747,7 +759,7 @@ function Bookings() {
                             })}
                           </div>
                         ) : (
-                          <span style={{color: '#cbd5e1', fontSize: '13px'}}>-</span>
+                          <span style={{ color: '#cbd5e1', fontSize: '13px' }}>-</span>
                         )}
                       </td>
                       <td>
@@ -775,7 +787,7 @@ function Bookings() {
                           if (lower.includes("gold")) { displayPass = "Gold Pass"; }
                           else if (lower.includes("diamond")) { displayPass = "Diamond Pass"; }
                           else if (lower.includes("silver")) { displayPass = "Silver Pass"; }
-                          
+
                           return (
                             <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 'bold' }}>
                               {displayPass}
@@ -790,43 +802,43 @@ function Bookings() {
                       </td>
                       <td style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
                         <div style={{ position: "relative", display: "inline-block" }}>
-                          <img 
-                            src={ActionIcon} 
-                            className="action-icon" 
-                            alt="Actions" 
+                          <img
+                            src={ActionIcon}
+                            className="action-icon"
+                            alt="Actions"
                             style={{ cursor: "pointer" }}
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              setOpenActionMenu(openActionMenu === b.id ? null : b.id); 
-                            }} 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenActionMenu(openActionMenu === b.id ? null : b.id);
+                            }}
                           />
                           {openActionMenu === b.id && (
-                            <div style={{ 
-                              position: "absolute", 
-                              right: 0, 
-                              top: "100%", 
-                              zIndex: 1000, 
-                              background: "#fff", 
-                              border: "1px solid #e2e8f0", 
-                              borderRadius: "8px", 
-                              boxShadow: "0 4px 12px rgba(0,0,0,0.15)", 
-                              minWidth: "140px", 
-                              overflow: "hidden" 
+                            <div style={{
+                              position: "absolute",
+                              right: 0,
+                              top: "100%",
+                              zIndex: 1000,
+                              background: "#fff",
+                              border: "1px solid #e2e8f0",
+                              borderRadius: "8px",
+                              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                              minWidth: "140px",
+                              overflow: "hidden"
                             }}>
-                              <div 
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  setSelectedBooking(b); 
-                                  setOpenActionMenu(null); 
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedBooking(b);
+                                  setOpenActionMenu(null);
                                 }}
-                                style={{ 
-                                  padding: "10px 16px", 
-                                  cursor: "pointer", 
-                                  fontSize: "14px", 
-                                  color: "#2d3748", 
-                                  display: "flex", 
-                                  alignItems: "center", 
-                                  gap: "8px" 
+                                style={{
+                                  padding: "10px 16px",
+                                  cursor: "pointer",
+                                  fontSize: "14px",
+                                  color: "#2d3748",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px"
                                 }}
                                 onMouseEnter={e => e.currentTarget.style.background = "#f7fafc"}
                                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
