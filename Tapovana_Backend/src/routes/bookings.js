@@ -11,9 +11,9 @@ const {
 const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR')];
 const staffOrAdmin = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR', 'THERAPIST')];
 
-// Read routes
-router.get('/', staffOrAdmin, getAllBookings);
-router.get('/:id', staffOrAdmin, getBookingById);
+// Read routes — public, no auth required
+router.get('/', getAllBookings);
+router.get('/:id', getBookingById);
 
 // Admin-only actions
 router.patch('/:id/status', ...adminOnly, updateBookingStatus);

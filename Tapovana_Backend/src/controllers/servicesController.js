@@ -13,29 +13,17 @@ const ensureUploadsDir = () => {
     }
 };
 
-// Helper: handle image save (base64 or URL)
+// Helper: handle image save (always stored as base64 in DB)
 const handleServiceImage = (imageData) => {
     if (!imageData || typeof imageData !== 'string') return null;
 
+    // If it's already a base64 data URI, store it directly in DB
     const matches = imageData.match(/^data:(image\/(jpeg|png|webp|gif|svg\+xml));base64,(.+)$/);
-    if (matches && matches.length === 4) {
-        // In production (Vercel), filesystem is read-only — store base64 directly in DB
-        if (process.env.NODE_ENV === 'production') {
-            return imageData; // store as base64 string
-        }
-        const mime = matches[1];
-        const extMap = {
-            'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'image/png': '.png',
-            'image/gif': '.gif', 'image/webp': '.webp', 'image/svg+xml': '.svg'
-        };
-        const ext = extMap[mime] || '.png';
-        const buffer = Buffer.from(matches[3], 'base64');
-        const filename = uuidv4() + ext;
-        ensureUploadsDir();
-        fs.writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
-        return '/uploads/' + filename;
+    if (matches) {
+        return imageData; // store as base64 string in Neon DB
     }
 
+    // If it's already an http URL or relative path, keep as-is
     if (/^https?:\/\//.test(imageData) || imageData.startsWith('/uploads/')) {
         return imageData;
     }
