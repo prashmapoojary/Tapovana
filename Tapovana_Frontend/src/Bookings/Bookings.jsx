@@ -520,7 +520,7 @@ function Bookings() {
 
                   {newStatus === 'CONFIRMED' && (
                     <div className="bk-drawer-section">
-                      <h4 className="bk-section-title">Staff Allocation <span style={{ fontSize: '12px', fontWeight: 400, color: '#e53e3e' }}>(required — select one or more)</span></h4>
+                      <h4 className="bk-section-title">Staff Allocation</h4>
                       <div className="bk-cert-list" style={{ maxHeight: '220px', overflowY: 'auto', marginTop: '8px' }}>
                         {staffList.length === 0 ? (
                           <span style={{ fontSize: 13, color: '#7b8a9a' }}>No doctors or therapists found.</span>
