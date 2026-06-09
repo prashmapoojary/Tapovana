@@ -715,11 +715,14 @@ function Bookings() {
                         {staffInfo ? (
                           <>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              {(b.therapist_name || '').split(',').map((name, i) => (
-                                <span key={i} className={staffInfo.role === "DOCTOR" ? "bk-staff-dr" : "bk-staff-tr"}>
-                                  {name.trim()}
-                                </span>
-                              ))}
+                              {(b.therapist_name || '').split(',').map((name, i) => {
+                                const info = getStaffDisplay(name.trim());
+                                return (
+                                  <span key={i} className={info?.role === "DOCTOR" ? "bk-staff-dr" : "bk-staff-tr"}>
+                                    {name.trim()}
+                                  </span>
+                                );
+                              })}
                             </div>
                             {isBookingConflicted(b.id) && (
                               <div style={{ color: "#64748b", fontSize: "11px", fontWeight: "600", marginTop: "4px" }}>
@@ -733,7 +736,16 @@ function Bookings() {
                       </td>
                       <td>
                         {staffInfo ? (
-                          <span style={{color: '#64748b', fontWeight: 500, fontSize: '13px'}}>{staffInfo.role === "DOCTOR" ? "Doctor" : "Therapist"}</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            {(b.therapist_name || '').split(',').map((name, i) => {
+                              const info = getStaffDisplay(name.trim());
+                              return (
+                                <span key={i} style={{ color: '#64748b', fontWeight: 500, fontSize: '13px' }}>
+                                  {info?.role === "DOCTOR" ? "Doctor" : "Therapist"}
+                                </span>
+                              );
+                            })}
+                          </div>
                         ) : (
                           <span style={{color: '#cbd5e1', fontSize: '13px'}}>-</span>
                         )}
