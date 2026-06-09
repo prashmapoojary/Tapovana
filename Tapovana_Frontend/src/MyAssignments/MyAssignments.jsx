@@ -321,9 +321,9 @@ function MyAssignments() {
           </select>
           <select className="ma-filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
             <option value="all">All Statuses</option>
-            <option value="active">Active & Upcoming</option>
-            <option value="expired">Completed</option>
+            <option value="active">Active</option>
             <option value="cancelled">Cancelled</option>
+            <option value="expired">Completed</option>
             <option value="removed">Removed</option>
           </select>
         </div>

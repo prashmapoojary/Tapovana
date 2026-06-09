@@ -343,7 +343,26 @@ const updateBookingStatus = async (req, res) => {
 
         if (newStatus === 'CONFIRMED' && incomingStaffIds !== null) {
             if (incomingStaffIds.length === 0) {
-                return res.status(400).json({ success: false, message: 'Please select at least one staff member to confirm the booking.' });
+                return res.status(400).json({ success: false, message: 'Please select a staff member to confirm the booking.' });
+            }
+
+            // ── Enforce max 2 allocations per booking ──
+            const oldTherapistId = booking.therapist_id;
+            const newTherapistId = incomingStaffIds[0];
+            const isReallocating = (booking.status !== 'CONFIRMED') || (newTherapistId !== oldTherapistId);
+
+            if (isReallocating) {
+                const allocCountRes = await query(
+                    `SELECT COUNT(*) as cnt FROM booking_status_updates WHERE booking_id = $1 AND status = 'CONFIRMED'`,
+                    [parseInt(booking.id)]
+                );
+                const allocCount = parseInt(allocCountRes.rows[0]?.cnt || 0);
+                if (allocCount >= 2) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Staff allocation limit reached. You cannot allocate more than twice for this booking.'
+                    });
+                }
             }
 
             // Fetch all names for display
@@ -507,6 +526,21 @@ const assignTherapist = async (req, res) => {
         }
         const booking = bookingRes.rows[0];
         const oldTherapistId = booking.therapist_id;
+        const isReallocating = therapist_id && (therapist_id !== oldTherapistId);
+
+        if (isReallocating) {
+            const allocCountRes = await query(
+                `SELECT COUNT(*) as cnt FROM booking_status_updates WHERE booking_id = $1 AND status = 'CONFIRMED'`,
+                [parseInt(booking.id)]
+            );
+            const allocCount = parseInt(allocCountRes.rows[0]?.cnt || 0);
+            if (allocCount >= 2) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Staff allocation limit reached. You cannot allocate more than twice for this booking.'
+                });
+            }
+        }
 
         let name = therapist_name;
         if (therapist_id) {
@@ -553,31 +587,16 @@ const assignTherapist = async (req, res) => {
             [parseInt(updatedBooking.id), updatedBooking.status, updatedBooking.therapist_id, updatedBooking.therapist_name, updatedBooking.note]
         );
 
-        // Sync to allocations table
-        const allocationId = `bk-alloc-${updatedBooking.id}`;
-        await query('DELETE FROM allocations WHERE id = $1', [allocationId]);
-
-        if (updatedBooking.status === 'CONFIRMED' && updatedBooking.therapist_id) {
-            const serviceRes = await query('SELECT duration_minutes FROM services WHERE name = $1', [updatedBooking.service_name]);
-            const duration = serviceRes.rows.length && serviceRes.rows[0].duration_minutes ? serviceRes.rows[0].duration_minutes : 60;
-
-            await query(
-                `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes, status)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-                [
-                    allocationId,
-                    updatedBooking.therapist_id,
-                    'service',
-                    `${updatedBooking.service_name} - ${updatedBooking.user_name || 'Guest'}`,
-                    updatedBooking.id,
-                    updatedBooking.booking_date,
-                    updatedBooking.booking_date,
-                    updatedBooking.booking_time,
-                    duration,
-                    'active'
-                ]
-            );
-        }
+        // Sync to allocations table using the multi-staff helper to keep formats consistent
+        const serviceRes = await query('SELECT duration_minutes FROM services WHERE name = $1', [updatedBooking.service_name]);
+        const duration = serviceRes.rows.length && serviceRes.rows[0].duration_minutes ? serviceRes.rows[0].duration_minutes : 60;
+        await syncBookingAllocations(
+            updatedBooking.id,
+            updatedBooking.therapist_id ? [updatedBooking.therapist_id] : [],
+            updatedBooking.status,
+            updatedBooking,
+            duration
+        );
 
         // Sync team_members table status for both old and new therapist
         if (oldTherapistId) {

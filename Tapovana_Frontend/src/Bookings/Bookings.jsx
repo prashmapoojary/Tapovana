@@ -258,7 +258,7 @@ function Bookings() {
 
     const isConfirmed = newStatus === 'CONFIRMED';
     const msg = isConfirmed && assignedStaffIds.length > 0
-      ? `Are you sure you want to confirm this booking and allocate ${assignedStaffIds.length} staff member(s)?`
+      ? `Are you sure you want to confirm this booking and allocate 1 staff member?`
       : `Are you sure you want to change status of ${contextName} to ${newStatus}?`;
 
     const confirmed = await triggerConfirm(msg, dummyImage);
@@ -289,7 +289,7 @@ function Bookings() {
           setSelectedBooking(updatedBooking);
 
           if (isConfirmed && assignedStaffIds.length > 0) {
-            triggerAlert(`Booking confirmed and ${assignedStaffIds.length} staff member(s) allocated successfully`, true);
+            triggerAlert(`Booking confirmed and 1 staff member allocated successfully`, true);
           } else {
             triggerAlert(`Booking ${newStatus.toLowerCase()} successfully`, true);
           }
@@ -535,60 +535,31 @@ function Bookings() {
                   {newStatus === 'CONFIRMED' && (
                     <div className="bk-drawer-section">
                       <h4 className="bk-section-title">Staff Allocation</h4>
-                      <div className="bk-cert-list" style={{ maxHeight: '220px', overflowY: 'auto', marginTop: '8px' }}>
+                      <div style={{ marginTop: '8px' }}>
                         {staffList.length === 0 ? (
                           <span style={{ fontSize: 13, color: '#7b8a9a' }}>No doctors or therapists found.</span>
                         ) : (
-                          staffList
-                            .filter(staff => (staff.role === "DOCTOR" || staff.role === "THERAPIST") && staff.availability_status !== "On Leave")
-                            .map(staff => {
-                              const staffId = staff.id || staff.user_id;
-                              const API_BASE = "http://localhost:5000";
-                              let photoUrl = staff.profile_photo_url;
-                              if (photoUrl && /^[A-Za-z]:[/\\]/i.test(photoUrl)) photoUrl = "/uploads/" + photoUrl.replace(/\\/g, '/').split('/').pop();
-
-                              let finalAvatar = DefaultAvatar;
-                              if (staff.profile_photo_source === "upload" && photoUrl) finalAvatar = `${API_BASE}${photoUrl}`;
-                              else if (staff.profile_photo_source === "local" && photoUrl) finalAvatar = `/avatars/${photoUrl}`;
-                              else if (staff.avatar_url) {
-                                let avUrl = staff.avatar_url;
-                                if (avUrl && /^[A-Za-z]:[/\\]/i.test(avUrl)) avUrl = "/uploads/" + avUrl.replace(/\\/g, '/').split('/').pop();
-                                finalAvatar = avUrl.startsWith("http") || avUrl.startsWith("/") ? avUrl : `${API_BASE}${avUrl}`;
-                              }
-
-                              const isChecked = assignedStaffIds.includes(staffId);
-
-                              return (
-                                <label key={staffId} className="bk-cert-row">
-                                  <input
-                                    type="radio"
-                                    name="staff-allocation"
-                                    checked={isChecked}
-                                    onChange={() => {
-                                      // Single-select: replace the entire array with just this one staff
-                                      setAssignedStaffIds([staffId]);
-                                    }}
-                                    className="bk-checkbox-hidden"
-                                  />
-                                  <span className={`bk-custom-checkbox ${isChecked ? 'checked' : ''}`}>
-                                    {isChecked && (
-                                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="4 8 7 11 12 5" />
-                                      </svg>
-                                    )}
-                                  </span>
-                                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <img
-                                      src={finalAvatar}
-                                      alt=""
-                                      style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }}
-                                      onError={(e) => { e.target.onerror = null; e.target.src = DefaultAvatar; }}
-                                    />
+                          <select
+                            value={assignedStaffIds[0] || ''}
+                            onChange={(e) => {
+                              const staffId = e.target.value;
+                              setAssignedStaffIds(staffId ? [staffId] : []);
+                            }}
+                            className="bk-status-select"
+                            style={{ width: '100%' }}
+                          >
+                            <option value="">-- Select Staff Member --</option>
+                            {staffList
+                              .filter(staff => (staff.role === "DOCTOR" || staff.role === "THERAPIST") && staff.availability_status !== "On Leave")
+                              .map(staff => {
+                                const staffId = staff.id || staff.user_id;
+                                return (
+                                  <option key={staffId} value={staffId}>
                                     {`${staff.first_name || ''} ${staff.last_name || ''} (${staff.role === 'DOCTOR' ? 'Doctor' : 'Therapist'})`.trim()}
-                                  </span>
-                                </label>
-                              );
-                            })
+                                  </option>
+                                );
+                              })}
+                          </select>
                         )}
                       </div>
                     </div>
