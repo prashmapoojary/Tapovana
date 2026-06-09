@@ -215,9 +215,12 @@ const syncBookingAllocations = async (bookingId, newStaffIds, newStatus, booking
     if (newStatus === 'COMPLETED') allocStatus = 'expired';
     if (newStatus === 'CANCELLED') allocStatus = 'cancelled';
 
-    // Delete removed staff rows
+    // Mark removed staff rows as 'removed' (so MyAssignments can show "You have been removed from this service.")
     for (const staffId of removedIds) {
-        await query(`DELETE FROM allocations WHERE id = $1`, [`bk-alloc-${bookingId}-${staffId}`]);
+        await query(
+            `UPDATE allocations SET status = 'removed' WHERE id = $1`,
+            [`bk-alloc-${bookingId}-${staffId}`]
+        );
     }
 
     // Insert or update rows for all new staff

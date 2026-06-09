@@ -384,8 +384,12 @@ function Bookings() {
                   </div>
                   <div className="bk-info-item">
                     <span className="bk-label">Staff</span>
-                    <span className="bk-value" style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span>{selectedBooking.therapist_name || "Not assigned"}</span>
+                    <span className="bk-value" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      {selectedBooking.therapist_name
+                        ? selectedBooking.therapist_name.split(',').map((name, i) => (
+                            <span key={i}>{name.trim()}</span>
+                          ))
+                        : <span>Not assigned</span>}
                       {isBookingConflicted(selectedBooking.id) && (
                         <span style={{ color: "#e53e3e", fontSize: "12px", fontWeight: "600", marginTop: "2px" }}>
                           ⚠️ Staff on Leave
@@ -517,11 +521,6 @@ function Bookings() {
                   {newStatus === 'CONFIRMED' && (
                     <div className="bk-drawer-section">
                       <h4 className="bk-section-title">Staff Allocation <span style={{ fontSize: '12px', fontWeight: 400, color: '#e53e3e' }}>(required — select one or more)</span></h4>
-                      {assignedStaffIds.length > 0 && (
-                        <div style={{ marginBottom: '10px', fontSize: '13px', color: '#2d6a4f', fontWeight: 600 }}>
-                          ✔ {assignedStaffIds.length} staff member{assignedStaffIds.length > 1 ? 's' : ''} selected
-                        </div>
-                      )}
                       <div className="bk-cert-list" style={{ maxHeight: '220px', overflowY: 'auto', marginTop: '8px' }}>
                         {staffList.length === 0 ? (
                           <span style={{ fontSize: 13, color: '#7b8a9a' }}>No doctors or therapists found.</span>
@@ -715,9 +714,13 @@ function Bookings() {
                       <td>
                         {staffInfo ? (
                           <>
-                            <span className={staffInfo.role === "DOCTOR" ? "bk-staff-dr" : "bk-staff-tr"}>
-                              {b.therapist_name}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              {(b.therapist_name || '').split(',').map((name, i) => (
+                                <span key={i} className={staffInfo.role === "DOCTOR" ? "bk-staff-dr" : "bk-staff-tr"}>
+                                  {name.trim()}
+                                </span>
+                              ))}
+                            </div>
                             {isBookingConflicted(b.id) && (
                               <div style={{ color: "#64748b", fontSize: "11px", fontWeight: "600", marginTop: "4px" }}>
                                 ⚠️ Staff on Leave

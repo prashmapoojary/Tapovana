@@ -123,14 +123,14 @@ function MyAssignments() {
       .filter(a => a.staffId === activeStaffId)
       .map(a => ({
         ...a,
-        status: a.status === "expired" ? "expired" : a.status === "cancelled" ? "cancelled" : "active"
+        status: a.status === "expired" ? "expired" : a.status === "cancelled" ? "cancelled" : a.status === "removed" ? "removed" : "active"
       }));
 
     const fromBackend = backendAssignments
       .filter(a => a.staffId === activeStaffId)
       .map(a => ({
         ...a,
-        status: a.status === "expired" ? "expired" : a.status === "cancelled" ? "cancelled" : "active"
+        status: a.status === "expired" ? "expired" : a.status === "cancelled" ? "cancelled" : a.status === "removed" ? "removed" : "active"
       }));
 
     // Merge: deduplicate by sessionId
@@ -324,6 +324,7 @@ function MyAssignments() {
             <option value="active">Active & Upcoming</option>
             <option value="expired">Completed</option>
             <option value="cancelled">Cancelled</option>
+            <option value="removed">Removed</option>
           </select>
         </div>
       </div>
@@ -346,7 +347,10 @@ function MyAssignments() {
                   {a.type === 'vedic_program' ? 'Vedic Program' : a.type}
                 </span>
                 <span className={`ma-status-badge ${a.status}`}>
-                  {a.status === 'active' ? 'Active / Scheduled' : a.status === 'cancelled' ? 'This service has been cancelled.' : 'Completed'}
+                  {a.status === 'active' ? 'Active / Scheduled'
+                    : a.status === 'cancelled' ? 'This service has been cancelled.'
+                    : a.status === 'removed' ? 'You have been removed from this service.'
+                    : 'Completed'}
                 </span>
               </div>
 
@@ -376,6 +380,11 @@ function MyAssignments() {
                 {a.status === 'cancelled' && (
                   <div className="ma-cancelled-message">
                     This service has been cancelled.
+                  </div>
+                )}
+                {a.status === 'removed' && (
+                  <div className="ma-cancelled-message" style={{ color: '#c0392b', background: 'rgba(192,57,43,0.07)', border: '1px solid rgba(192,57,43,0.2)', borderRadius: '6px', padding: '8px 12px', marginTop: '8px', fontSize: '13px', fontWeight: 600 }}>
+                    You have been removed from this service.
                   </div>
                 )}
               </div>
