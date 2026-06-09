@@ -167,7 +167,7 @@ export default function Workshops() {
     try {
       const res = await apiFetch("/api/teams/users?page=1&limit=100");
       if (res.success && res.users) {
-        const docsAndTherapists = res.users.filter(u => u.role === 'DOCTOR' || u.role === 'THERAPIST');
+        const docsAndTherapists = res.users.filter(u => (u.role === 'DOCTOR' || u.role === 'THERAPIST') && u.availability_status !== "On Leave");
         setInstructors(docsAndTherapists);
       }
     } catch (e) { console.error(e); }
@@ -300,12 +300,8 @@ export default function Workshops() {
       }));
       setIsEditing(false);
       showToast("Workshop updated!");
-    } catch {
-      setWorkshops(prev => prev.map(w =>
-        w.id === selectedWs.id ? { ...w, ...editForm, image: editForm.image_base64 || editForm.image_url || w.image, video_url: editForm.video_base64 || editForm.video_url } : w
-      ));
-      setSelectedWs(prev => ({ ...prev, ...editForm, video_url: editForm.video_base64 || editForm.video_url }));
-      setIsEditing(false);
+    } catch (err) {
+      setEditError(err.message || "Failed to update workshop");
     } finally {
       setEditSaving(false);
     }
@@ -379,10 +375,8 @@ export default function Workshops() {
         setAddForm(BLANK_FORM);
         showToast("Workshop created successfully!");
       }
-    } catch {
-      setWorkshops(prev => [{ ...addForm, id: "WS-" + Date.now(), enrolled: 0, duration: Number(addForm.duration), capacity: Number(addForm.capacity), price: Number(addForm.price), image: addForm.image_base64 || addForm.image_url }, ...prev]);
-      setShowAddModal(false);
-      setAddForm(BLANK_FORM);
+    } catch (err) {
+      setAddError(err.message || "Failed to create workshop");
     } finally {
       setAddSaving(false);
     }

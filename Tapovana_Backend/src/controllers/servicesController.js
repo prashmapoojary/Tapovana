@@ -410,7 +410,7 @@ const getServiceAllocations = async (req, res) => {
     }
 };
 
-// GET MY ASSIGNMENTS — returns services AND workshops where user is assigned
+// GET MY ASSIGNMENTS — returns services, workshops, and Vedic programs from central allocations table
 const getMyAssignments = async (req, res) => {
     try {
         const userId = req.user?.id || req.user?.user_id || req.user?._id;
@@ -432,51 +432,32 @@ const getMyAssignments = async (req, res) => {
 
         const assignments = [];
 
-        // ─── Fetch BOOKING assignments ───
-        const bookingsResult = await query(
-            `SELECT id, service_name, user_name, booking_date, status, created_at FROM bookings WHERE therapist_id = $1 AND status IN ('CONFIRMED', 'COMPLETED') ORDER BY booking_date DESC`,
+        // Fetch all assignments from unified allocations table
+        const allocationsResult = await query(
+            `SELECT a.id, a.type, a.session_title, a.session_id, a.start_date, a.end_date, a.booking_time, a.duration_minutes, a.status, a.created_at,
+                    tm.first_name, tm.last_name, r.name AS role
+             FROM allocations a
+             JOIN team_members tm ON tm.id = a.staff_id
+             JOIN roles r ON r.id = tm.role_id
+             WHERE a.staff_id = $1
+             ORDER BY a.start_date DESC, a.created_at DESC`,
             [userId]
         );
 
-        console.log('Found ' + bookingsResult.rows.length + ' bookings for user ' + userId);
-
-        for (const bk of bookingsResult.rows) {
+        for (const alloc of allocationsResult.rows) {
             assignments.push({
-                id: 'bk-alloc-' + bk.id,
-                type: 'service',
+                id: alloc.id,
+                type: alloc.type,
                 staffId: userId,
-                staffName: (user.first_name + ' ' + user.last_name).trim(),
-                staffRole: user.role,
-                sessionTitle: `${bk.service_name} - ${bk.user_name || 'Guest'} (#${bk.id})`,
-                sessionId: bk.id,
-                startDate: bk.booking_date,
-                endDate: null,
-                status: bk.status === 'CONFIRMED' ? 'active' : 'expired',
-                createdAt: bk.created_at
-            });
-        }
-
-        // ─── Fetch WORKSHOP assignments ───
-        const workshopsResult = await query(
-            'SELECT id, title, category, date, time, duration, status, created_at, assigned_staff_ids FROM workshops WHERE assigned_staff_ids @> $1::jsonb AND status IN ($2, $3)',
-            [JSON.stringify([userId]), 'upcoming', 'ongoing']
-        );
-
-        console.log('Found ' + workshopsResult.rows.length + ' workshops for user ' + userId);
-
-        for (const ws of workshopsResult.rows) {
-            assignments.push({
-                id: 'ws-alloc-' + ws.id,
-                type: 'workshop',
-                staffId: userId,
-                staffName: (user.first_name + ' ' + user.last_name).trim(),
-                staffRole: user.role,
-                sessionTitle: ws.title,
-                sessionId: ws.id,
-                startDate: ws.date || ws.created_at,
-                endDate: ws.date || null,
-                status: 'active',
-                createdAt: ws.created_at
+                staffName: `${alloc.first_name || ''} ${alloc.last_name || ''}`.trim(),
+                staffRole: alloc.role,
+                sessionTitle: alloc.session_title,
+                sessionId: alloc.session_id,
+                startDate: alloc.start_date,
+                bookingTime: alloc.booking_time,
+                endDate: alloc.end_date,
+                status: alloc.status === 'active' ? 'active' : (alloc.status === 'cancelled' ? 'cancelled' : 'expired'),
+                createdAt: alloc.created_at
             });
         }
 

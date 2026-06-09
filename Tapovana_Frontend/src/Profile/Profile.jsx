@@ -19,8 +19,9 @@ const presets = [
 
 function Profile() {
   const navigate = useNavigate();
-  const { triggerAlert } = useAllocations();
+  const { triggerAlert, triggerConfirm } = useAllocations();
   const [user, setUser] = useState(() => getUser());
+  const isPractitioner = user?.role === 'DOCTOR' || user?.role === 'THERAPIST';
 
   // Editing state
   const [isEditing, setIsEditing] = useState(false);
@@ -400,6 +401,8 @@ function Profile() {
           </form>
         </div>
       </div>
+
+
 
       {showPasswordModal && (
         <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />

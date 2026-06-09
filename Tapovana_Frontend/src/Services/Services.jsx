@@ -95,7 +95,7 @@ function Services() {
 
   const fetchServices = async () => {
     try {
-      setLoading(true);
+      if (services.length === 0) setLoading(true);
       const data = await apiFetch('/api/services');
       let backendServices = [];
       if (data.success) {
@@ -327,7 +327,7 @@ function Services() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {loading && services.length === 0 ? (
                 <tr>
                   <td colSpan="7" style={{ textAlign: 'center', padding: '40px' }}>Loading services...</td>
                 </tr>

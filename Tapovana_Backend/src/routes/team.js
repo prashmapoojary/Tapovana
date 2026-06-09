@@ -4,6 +4,7 @@ const {
     getTeam,
     getTeamMember,
     getTeamMemberAllocations,
+    getAllAllocations,
     addTeamMember,
     updateTeamMember,
     deleteTeamMember,
@@ -15,12 +16,15 @@ const {
     toggleStatusFrontend,
     deleteTeamMemberFrontend,
     updateSelfProfile,
+    updateAllocationStatus,
 } = require('../controllers/teamController');
 
 const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN')];
 
 // ── Frontend routes MUST come before /:id routes ──────────────────────────────
 router.patch('/profile', authenticate, updateSelfProfile);
+// Allocation-status sync — any authenticated user (DOCTOR/THERAPIST need this)
+router.patch('/users/:id/allocation', authenticate, updateAllocationStatus);
 router.get('/users', ...adminOnly, getTeamFrontend);
 router.post('/users', ...adminOnly, addTeamMemberFrontend);
 router.patch('/users/:id', ...adminOnly, updateTeamMemberFrontend);
@@ -28,6 +32,7 @@ router.patch('/users/:id/status', ...adminOnly, toggleStatusFrontend);
 router.delete('/users/:id', ...adminOnly, deleteTeamMemberFrontend);
 
 router.get('/users/:id/allocations', ...adminOnly, getTeamMemberAllocations);
+router.get('/allocations/all', authenticate, getAllAllocations);
 
 // ── Postman testing routes ────────────────────────────────────────────────────
 router.get('/', ...adminOnly, getTeam);

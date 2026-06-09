@@ -1,8 +1,5 @@
 /* EditService.css */
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
-
-/* ── Page wrapper ─────────────────────────────────────────────────────────── */
-.edit-service-page {
+.edit-service-drawer {
     background: #FFFFFF;
     height: 100%;
     display: flex;

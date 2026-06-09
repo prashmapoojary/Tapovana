@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { apiFetch } from "../api/http";
+import { getUser } from "./session";
 import "./AllocationContext.css";
 
 const AllocationContext = createContext();
@@ -24,9 +26,13 @@ const AllocationContext = createContext();
  */
 
 export const AllocationProvider = ({ children }) => {
+  const location = useLocation();
+  const hasFetchedRef = useRef(false);
   const [allocations, setAllocations] = useState([]);
   const [emailNotifications, setEmailNotifications] = useState([]);
-  
+  const [leaves, setLeaves] = useState([]);
+  const [conflicts, setConflicts] = useState([]);
+
   // Custom Alert and Confirm Modal States
   const [alertState, setAlertState] = useState({ visible: false, message: "", isSuccess: false, resolve: null });
   const [confirmState, setConfirmState] = useState({ visible: false, message: "", imageUrl: null, resolve: null });
@@ -66,6 +72,33 @@ export const AllocationProvider = ({ children }) => {
     }
     setConfirmState({ visible: false, message: "", imageUrl: null, resolve: null });
   }, [confirmState]);
+
+  // Fetch leaves from API
+  const fetchLeaves = useCallback(async (staffId) => {
+    return [];
+  }, []);
+
+  // Fetch conflicts from API (admin only)
+  const fetchConflicts = useCallback(async () => {
+    return [];
+  }, []);
+
+  // Mark leave via API
+  const markLeave = useCallback(async (body) => {
+    return { success: false };
+  }, []);
+
+  // Cancel/Delete leave via API
+  const cancelLeave = useCallback(async (id, staffId) => {
+    return false;
+  }, []);
+
+  // Fetch suggestions from API
+  const getSuggestions = useCallback(async (params) => {
+    return [];
+  }, []);
+  
+
 
   /**
    * Allocate staff to a session (workshop or vedic program)
@@ -126,8 +159,8 @@ export const AllocationProvider = ({ children }) => {
 
     setAllocations((prev) => [...prev, newAllocation]);
 
-    // Sync to database
-    apiFetch(`/api/teams/users/${staffId}`, {
+    // Sync to database (use /allocation route — accessible to all authenticated users)
+    apiFetch(`/api/teams/users/${staffId}/allocation`, {
       method: "PATCH",
       body: JSON.stringify({
         availability_status: "Allocated",
@@ -154,7 +187,7 @@ export const AllocationProvider = ({ children }) => {
   const deallocateStaff = useCallback((allocationId) => {
     const alloc = allocations.find((a) => a.id === allocationId);
     if (alloc) {
-      apiFetch(`/api/teams/users/${alloc.staffId}`, {
+      apiFetch(`/api/teams/users/${alloc.staffId}/allocation`, {
         method: "PATCH",
         body: JSON.stringify({
           availability_status: "Available",
@@ -171,7 +204,7 @@ export const AllocationProvider = ({ children }) => {
   const deallocateFromSession = useCallback((sessionId) => {
     const sessionAllocations = allocations.filter((a) => a.sessionId === sessionId);
     sessionAllocations.forEach((a) => {
-      apiFetch(`/api/teams/users/${a.staffId}`, {
+      apiFetch(`/api/teams/users/${a.staffId}/allocation`, {
         method: "PATCH",
         body: JSON.stringify({
           availability_status: "Available",
@@ -250,7 +283,7 @@ export const AllocationProvider = ({ children }) => {
         if (a.type === "service") return a;
         const endDate = new Date(a.endDate);
         if (endDate <= now && a.status === "active") {
-          apiFetch(`/api/teams/users/${a.staffId}`, {
+          apiFetch(`/api/teams/users/${a.staffId}/allocation`, {
             method: "PATCH",
             body: JSON.stringify({
               availability_status: "Available",
@@ -326,7 +359,7 @@ Tapovana Admin Team
   const completeAllocation = useCallback((allocationId) => {
     const alloc = allocations.find((a) => a.id === allocationId);
     if (alloc) {
-      apiFetch(`/api/teams/users/${alloc.staffId}`, {
+      apiFetch(`/api/teams/users/${alloc.staffId}/allocation`, {
         method: "PATCH",
         body: JSON.stringify({
           availability_status: "Available",
@@ -343,6 +376,34 @@ Tapovana Admin Team
       })
     );
   }, [allocations]);
+
+  // Fetch initial allocations from database on login/mount
+  useEffect(() => {
+    const token = sessionStorage.getItem("access_token");
+    if (!token) {
+      hasFetchedRef.current = false;
+      return;
+    }
+
+    if (hasFetchedRef.current) return;
+
+    const fetchAllAllocations = async () => {
+      try {
+        const data = await apiFetch("/api/teams/allocations/all");
+        if (data.success && data.allocations) {
+          setAllocations(data.allocations);
+          hasFetchedRef.current = true;
+        }
+      } catch (err) {
+        console.error("Error fetching all allocations:", err);
+      }
+    };
+    const loadConflicts = async () => {
+      setConflicts([]);
+    };
+    fetchAllAllocations();
+    loadConflicts();
+  }, [location.pathname]);
 
   // ── Auto-cleanup: mark expired allocations on mount ──
   useEffect(() => {
@@ -368,6 +429,13 @@ Tapovana Admin Team
     completeAllocation,
     triggerAlert,
     triggerConfirm,
+    leaves,
+    conflicts,
+    fetchLeaves,
+    fetchConflicts,
+    markLeave,
+    cancelLeave,
+    getSuggestions
   };
 
   return (

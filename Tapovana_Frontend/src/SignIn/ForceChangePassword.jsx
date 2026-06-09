@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import "./ResetPassword.css";
-import sideImage from "../assets/graphic-side.png";
 import logoImg from "../assets/logo.png";
 import { useNavigate } from "react-router-dom";
 
@@ -118,10 +117,7 @@ export default function ForceChangePassword() {
 
   return (
     <div className="container">
-      <div
-        className="left-section"
-        style={{ backgroundImage: `url(${sideImage})` }}
-      />
+      <div className="left-section" />
       <div className="right-section">
         <h1 style={{ fontSize: "20px" }}>Reset Password</h1>
         

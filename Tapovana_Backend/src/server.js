@@ -11,6 +11,7 @@ const teamRoutes = require("./routes/team");
 const serviceRoutes = require("./routes/services");
 const bookingRoutes = require("./routes/bookings");
 const workshopRoutes = require("./routes/workshops");
+const vedicProgramRoutes = require("./routes/vedic-programs");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -33,7 +34,7 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 app.use(rateLimit({
     windowMs: 60 * 1000,
-    max: process.env.NODE_ENV === 'production' ? 120 : 1000, // Increased for dev
+    max: process.env.NODE_ENV === 'production' ? 120 : 999999, // Disabled for dev to avoid 429
 }));
 
 app.get("/health", (_req, res) => {
@@ -47,6 +48,7 @@ app.use("/api/teams", teamRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/workshops", workshopRoutes);
+app.use("/api/vedic-programs", vedicProgramRoutes);
 
 // ── Analytics stub (returns dummy data until real analytics are built) ────────
 app.get("/api/analytics/dashboard", (req, res) => {
@@ -66,6 +68,11 @@ app.get("/api/bookings", (req, res) => {
 
 // ── Customers stub (prevents 404, triggers frontend dummy fallback) ───────────
 app.get("/api/customers", (req, res) => {
+    res.json({ success: false, message: "Use dummy fallback" });
+});
+
+// ── Transactions stub (prevents 404, triggers frontend dummy fallback) ─────────
+app.get("/api/transactions", (req, res) => {
     res.json({ success: false, message: "Use dummy fallback" });
 });
 
@@ -115,4 +122,4 @@ app.listen(PORT, () => {
 });
 
 // Export for compatibility
-module.exports = app;
+module.exports = app;

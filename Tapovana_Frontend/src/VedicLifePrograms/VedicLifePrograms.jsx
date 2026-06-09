@@ -283,7 +283,7 @@ function ProgramForm({ form, onChange, instructors, mode }) {
 
 // ─── Main Component ─────────────────────────────────────────────────────
 export default function VedicLifePrograms() {
-  const { allocateStaff } = useAllocations();
+  const { allocateStaff, triggerAlert } = useAllocations();
   const [programs, setPrograms] = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [instructors, setInstructors] = useState([]);
@@ -315,11 +315,11 @@ export default function VedicLifePrograms() {
     try {
       const res = await apiFetch("/api/teams/users?page=1&limit=100");
       if (res.success && res.users) {
-        setInstructors(res.users.filter(u => u.role === 'DOCTOR' || u.role === 'THERAPIST'));
+        setInstructors(res.users.filter(u => (u.role === 'DOCTOR' || u.role === 'THERAPIST') && u.availability_status !== "On Leave"));
       } else {
-        setInstructors(DUMMY_STAFF);
+        setInstructors(DUMMY_STAFF.filter(u => u.availability_status !== "On Leave"));
       }
-    } catch { setInstructors(DUMMY_STAFF); }
+    } catch { setInstructors(DUMMY_STAFF.filter(u => u.availability_status !== "On Leave")); }
   };
 
   useEffect(() => { fetchInstructors(); }, []);
@@ -425,10 +425,8 @@ export default function VedicLifePrograms() {
       setSelectedProgram(prev => ({ ...prev, ...editForm, _status: getProgramStatus({ ...prev, ...editForm }) }));
       setIsEditing(false);
       showToast("Program updated successfully!");
-    } catch {
-      setPrograms(prev => prev.map(p => p.id === selectedProgram.id ? { ...p, ...editForm } : p));
-      setSelectedProgram(prev => ({ ...prev, ...editForm }));
-      setIsEditing(false);
+    } catch (err) {
+      setEditError(err.message || "Failed to update program");
     } finally { setEditSaving(false); }
   };
 
@@ -471,10 +469,8 @@ export default function VedicLifePrograms() {
         setAddForm(BLANK_FORM);
         showToast("Program created successfully!");
       }
-    } catch {
-      setPrograms(prev => [{ ...addForm, id: "VP-" + Date.now(), enrolled: 0, price: Number(addForm.price), capacity: Number(addForm.capacity), image: addForm.image_base64 || addForm.image_url, consultant_name: addForm.consultant_name }, ...prev]);
-      setShowCreateModal(false);
-      setAddForm(BLANK_FORM);
+    } catch (err) {
+      setAddError(err.message || "Failed to create program");
     } finally { setAddSaving(false); }
   };
 
@@ -493,7 +489,9 @@ export default function VedicLifePrograms() {
         allocateStaff(inst, { id: selectedProgram.id, title: selectedProgram.title, startDate: selectedProgram.startDate, date: selectedProgram.startDate, endDate: selectedProgram.endDate }, "vedic_program");
       }
       showToast("Instructor allocated and notified via email!");
-    } catch { showToast("Instructor allocation saved!"); }
+    } catch (err) {
+      triggerAlert(err.message || "Failed to allocate instructor");
+    }
   };
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 4000); };

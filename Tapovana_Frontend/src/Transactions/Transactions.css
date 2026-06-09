@@ -249,3 +249,120 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ── Filters card ── */
+.filters-card {
+  background: #ffffff;
+  border: 1px solid #eceff3;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+}
+
+/* ── Single-row filter bar ── */
+.txn-filters-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+
+/* Search box takes remaining space */
+.txn-search-box {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #e3e7ed;
+  border-radius: 8px;
+  padding: 0 14px;
+  height: 42px;
+  transition: border-color 0.2s;
+}
+
+.txn-search-box:hover,
+.txn-search-box:focus-within {
+  border-color: #CDA751;
+}
+
+.txn-search-box .search-icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+
+.txn-search-box input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  font-size: 13px;
+  color: #2d3748;
+  font-family: 'Manrope', sans-serif;
+}
+
+.txn-search-box input::placeholder {
+  color: #a0aec0;
+}
+
+/* Each dropdown / date group */
+.txn-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.txn-filter-group label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #8c9aa8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.txn-filter-select,
+.txn-date-input {
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #e3e7ed;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-family: 'Manrope', sans-serif;
+  font-size: 13px;
+  color: #2d3748;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  white-space: nowrap;
+}
+
+.txn-filter-select {
+  min-width: 120px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a0aec0' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 32px;
+}
+
+.txn-date-input {
+  min-width: 130px;
+}
+
+.txn-filter-select:focus,
+.txn-date-input:focus {
+  border-color: #CDA751;
+}
+
+.txn-filter-select:hover,
+.txn-date-input:hover {
+  border-color: #CDA751;
+}

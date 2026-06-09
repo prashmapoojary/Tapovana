@@ -1,19 +1,49 @@
 import React, { useState, useEffect, useMemo } from "react";
 import "./Bookings.css";
 import { apiFetch } from "../api/http";
-import { getUser } from "../utils/session";
+import { getUser, getToken } from "../utils/session";
 import { useAllocations } from "../utils/AllocationContext";
 import { getImageUrl } from "../utils/image";
 import SearchIcon from "../assets/searchIcon.svg";
 import ActionIcon from "../assets/Button.svg";
 import DefaultAvatar from "../assets/profileIconDefault.png";
 
-const API_URL = "/api/bookings";
+// Local backend base URL — service images are served from here
+const LOCAL_API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
+/**
+ * Resolve a service image_url fetched from the local backend.
+ * - Absolute http(s) URLs → used as-is.
+ * - Windows absolute paths (C:\...) → extract filename, prefix with LOCAL_API_BASE/uploads/
+ * - Relative paths (/uploads/...) → prefix with LOCAL_API_BASE
+ * - Null/empty → return null (caller shows placeholder)
+ */
+function getServiceImageUrl(imageUrl) {
+  if (!imageUrl) return null;
+  if (imageUrl.startsWith("http") || imageUrl.startsWith("data:")) return imageUrl;
+  // Windows absolute path stored in DB
+  if (/^[A-Za-z]:[/\\]/i.test(imageUrl)) {
+    const filename = imageUrl.replace(/\\/g, "/").split("/").pop();
+    return `${LOCAL_API_BASE}/uploads/${filename}`;
+  }
+  // Relative path like /uploads/image.jpg
+  const sep = imageUrl.startsWith("/") ? "" : "/";
+  return `${LOCAL_API_BASE}${sep}${imageUrl}`;
+}
+
 
 function Bookings() {
-  const { triggerAlert, triggerConfirm } = useAllocations();
+  const { triggerAlert, triggerConfirm, conflicts, fetchConflicts } = useAllocations();
   const userRole = useMemo(() => getUser()?.role, []);
-  const canEdit = ["SUPER_ADMIN", "CO_ADMIN"].includes((userRole || "").toUpperCase());
+
+  useEffect(() => {
+    fetchConflicts();
+  }, [fetchConflicts]);
+
+  const isBookingConflicted = (bookingId) => {
+    return (conflicts || []).some(c => String(c.session_id) === String(bookingId));
+  };
+  const canEdit = ["SUPER_ADMIN", "CO_ADMIN", "DOCTOR"].includes((userRole || "").toUpperCase());
 
   const [bookings, setBookings] = useState([]);
   const [staffList, setStaffList] = useState([]);
@@ -29,8 +59,9 @@ function Bookings() {
   // Drawer state
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [newStatus, setNewStatus] = useState("");
-  const [assignedStaffId, setAssignedStaffId] = useState(null);
+  const [assignedStaffIds, setAssignedStaffIds] = useState([]);
   const [newNote, setNewNote] = useState("");
+  const [openActionMenu, setOpenActionMenu] = useState(null);
 
   // ─── Fetch staff from backend ───
   useEffect(() => {
@@ -47,37 +78,44 @@ function Bookings() {
     fetchStaff();
   }, []);
 
-  // ─── Fetch services from backend ───
+  // ─── Fetch services from local backend (for image lookup by name) ───
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        const res = await apiFetch("/api/services");
-        if (res.success && res.services) {
-          setServicesList(res.services);
+        const data = await apiFetch("/api/services");
+        if (data.success && data.services) {
+          setServicesList(data.services);
         }
       } catch {
-        // ignore
+        // ignore — image simply won't show if services can't be fetched
       }
     };
     fetchServices();
+  }, []);
+
+  // ─── Close action menu on click outside ───
+  useEffect(() => {
+    const handleClickOutside = () => setOpenActionMenu(null);
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
   // ─── Fetch bookings from local backend ───
   useEffect(() => {
     const load = async () => {
       try {
-        setLoading(true);
+        if (bookings.length === 0) setLoading(true);
         setError(null);
-        let q = `${API_URL}?limit=50&page=${page}`;
+        let q = `/api/bookings?limit=50&page=${page}`;
         if (statusFilter) q += `&status=${statusFilter}`;
         if (dateFrom) q += `&date_from=${dateFrom}`;
         if (dateTo) q += `&date_to=${dateTo}`;
         
-        const res = await apiFetch(q);
-        if (res.success) {
-          setBookings(res.bookings || []);
+        const data = await apiFetch(q);
+        if (data.success) {
+          setBookings(data.bookings || []);
         } else {
-          throw new Error(res.message || "Failed to load bookings");
+          throw new Error(data.message || "Failed to load bookings");
         }
       } catch (err) {
         setError(err.message || "Error connecting to server");
@@ -91,11 +129,39 @@ function Bookings() {
   // ─── Pre-fill status and staff when booking selected ───
   useEffect(() => {
     if (selectedBooking) {
-      setNewStatus(selectedBooking.status || "PENDING");
-      setAssignedStaffId(selectedBooking.therapist_id || null);
+      setNewStatus((selectedBooking.status || "PENDING").toUpperCase());
       setNewNote(selectedBooking.note || "");
+
+      // Pre-fill multi-staff: fetch existing allocations for this booking
+      const loadAllocatedStaff = async () => {
+        if ((selectedBooking.status || 'PENDING').toUpperCase() === 'CONFIRMED') {
+          try {
+            // therapist_name can be comma-joined; match against staffList
+            const nameList = (selectedBooking.therapist_name || '')
+              .split(',')
+              .map(n => n.trim().toLowerCase())
+              .filter(Boolean);
+            if (nameList.length > 0) {
+              const matched = staffList
+                .filter(s => {
+                  const full = `${s.first_name || ''} ${s.last_name || ''}`.trim().toLowerCase();
+                  return nameList.some(n => full.includes(n) || n.includes(full.split(' ')[0]));
+                })
+                .map(s => s.id || s.user_id);
+              setAssignedStaffIds(matched);
+            } else {
+              setAssignedStaffIds([]);
+            }
+          } catch {
+            setAssignedStaffIds([]);
+          }
+        } else {
+          setAssignedStaffIds([]);
+        }
+      };
+      loadAllocatedStaff();
     }
-  }, [selectedBooking]);
+  }, [selectedBooking, staffList]);
 
   // ─── Get staff display with role suffix ───
   const getStaffDisplay = (therapistName) => {
@@ -117,10 +183,7 @@ function Bookings() {
   const filtered = useMemo(() => {
     let result = bookings;
     
-    // Non-admins can only see CONFIRMED bookings
-    if (!canEdit) {
-      result = result.filter(b => b.status === 'CONFIRMED');
-    }
+
 
     if (!search) return result;
     const q = search.toLowerCase();
@@ -145,8 +208,34 @@ function Bookings() {
   // ─── Handle status update ───
   const handleUpdateStatus = async () => {
     if (!selectedBooking) return;
-    if (newStatus === selectedBooking.status && assignedStaffId === (selectedBooking.therapist_id || null) && newNote === (selectedBooking.note || "")) {
+    const currentStatus = (selectedBooking.status || "PENDING").toUpperCase();
+    const staffIdsChanged = JSON.stringify(assignedStaffIds.slice().sort()) !==
+      JSON.stringify((selectedBooking._allocatedStaffIds || []).slice().sort());
+    if (newStatus === currentStatus && !staffIdsChanged && newNote === (selectedBooking.note || "")) {
       triggerAlert("No changes to update.");
+      return;
+    }
+
+    if (currentStatus === 'COMPLETED' && newStatus === 'CANCELLED') {
+      triggerAlert("Completed bookings cannot be cancelled.");
+      return;
+    }
+    if (currentStatus === 'CANCELLED' && newStatus === 'COMPLETED') {
+      triggerAlert("Cancelled bookings cannot be marked as completed.");
+      return;
+    }
+    if (currentStatus === 'COMPLETED' || currentStatus === 'CANCELLED') {
+      triggerAlert("Once a booking is Completed or Cancelled, the status is locked and cannot be changed further.");
+      return;
+    }
+    if (newStatus === 'COMPLETED' && currentStatus === 'PENDING') {
+      triggerAlert("You cannot mark a pending booking as completed.");
+      return;
+    }
+
+    // Require at least one staff when confirming
+    if (newStatus === 'CONFIRMED' && assignedStaffIds.length === 0) {
+      triggerAlert("Please select at least one staff member to confirm the booking.");
       return;
     }
 
@@ -154,33 +243,39 @@ function Bookings() {
     const dummyImage = "https://ui-avatars.com/api/?name=" + encodeURIComponent(contextName) + "&background=cda751&color=fff";
 
     const isConfirmed = newStatus === 'CONFIRMED';
-    const msg = isConfirmed && assignedStaffId
-      ? `Are you sure you want to change status to ${newStatus} and allocate staff?`
+    const msg = isConfirmed && assignedStaffIds.length > 0
+      ? `Are you sure you want to confirm this booking and allocate ${assignedStaffIds.length} staff member(s)?`
       : `Are you sure you want to change status of ${contextName} to ${newStatus}?`;
 
     const confirmed = await triggerConfirm(msg, dummyImage);
 
     if (confirmed) {
       try {
+        const body = {
+          status: newStatus,
+          note: newNote
+        };
+        // Always send staff_ids when status is CONFIRMED
+        if (isConfirmed) {
+          body.staff_ids = assignedStaffIds;
+        }
+
         const res = await apiFetch(`/api/bookings/${selectedBooking.id}/status`, {
-          method: "PUT",
-          body: JSON.stringify({
-            status: newStatus,
-            staff_id: isConfirmed ? assignedStaffId : undefined,
-            note: newNote
-          })
+          method: "PATCH",
+          body: JSON.stringify(body)
         });
 
         if (res.success) {
-          // Update locally to reflect changes immediately
           const updatedBooking = res.booking || { ...selectedBooking, status: newStatus };
+          // Store allocated staff ids for change detection on next open
+          updatedBooking._allocatedStaffIds = isConfirmed ? assignedStaffIds : [];
           setBookings(prev => prev.map(b =>
             b.id === selectedBooking.id ? updatedBooking : b
           ));
           setSelectedBooking(updatedBooking);
-          
-          if (isConfirmed && assignedStaffId) {
-            triggerAlert(`Status changed to ${newStatus} and staff allocated successfully`, true);
+
+          if (isConfirmed && assignedStaffIds.length > 0) {
+            triggerAlert(`Booking confirmed and ${assignedStaffIds.length} staff member(s) allocated successfully`, true);
           } else {
             triggerAlert(`Booking ${newStatus.toLowerCase()} successfully`, true);
           }
@@ -188,7 +283,7 @@ function Bookings() {
           triggerAlert(res.message || "Failed to update booking status");
         }
       } catch (error) {
-        triggerAlert("An error occurred while updating the booking");
+        triggerAlert(error.message || "An error occurred while updating the booking");
       }
     }
   };
@@ -220,16 +315,24 @@ function Bookings() {
                   <div style={{ marginBottom: "12px", fontWeight: "700", color: "#1a202c", fontSize: "15px" }}>
                     Service Name: <span style={{ fontWeight: "500", color: "#4b5563" }}>{selectedBooking.service_name || "N/A"}</span>
                   </div>
-                  <img 
-                    src={(() => {
-                      const matchedService = servicesList.find(s => s.name?.toLowerCase() === selectedBooking.service_name?.toLowerCase());
-                      return matchedService?.image_url 
-                        ? getImageUrl(matchedService.image_url, "https://via.placeholder.com/300x150?text=Service+Image") 
-                        : "https://via.placeholder.com/300x150?text=Service+Image";
-                    })()}
-                    alt="Service" 
-                    style={{ width: "100%", height: "140px", objectFit: "cover", borderRadius: "8px", border: "1px solid #e3e7ed" }} 
-                  />
+                  {(() => {
+                    const matchedService = servicesList.find(
+                      s => (s.name || "").toLowerCase() === (selectedBooking.service_name || "").toLowerCase()
+                    );
+                    const resolvedUrl = matchedService ? getServiceImageUrl(matchedService.image_url) : null;
+                    return resolvedUrl ? (
+                      <img
+                        src={resolvedUrl}
+                        alt="Service"
+                        style={{ width: "100%", height: "140px", objectFit: "cover", borderRadius: "8px", border: "1px solid #e3e7ed" }}
+                        onError={(e) => { e.target.onerror = null; e.target.style.display = "none"; }}
+                      />
+                    ) : (
+                      <div style={{ width: "100%", height: "140px", borderRadius: "8px", border: "1px solid #e3e7ed", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", color: "#a0aec0", fontSize: "13px" }}>
+                        No image available
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -259,20 +362,35 @@ function Bookings() {
                         const amountStr = selectedBooking.total_amount || "₹0";
                         const match = amountStr.match(/^(.*?)\s*\((.*?)\)$/);
                         const amount = match ? match[1] : amountStr;
+                        return amount;
+                      })()}
+                    </span>
+                  </div>
+                  <div className="bk-info-item">
+                    <span className="bk-label">Membership</span>
+                    <span className="bk-value">
+                      {(() => {
+                        const amountStr = selectedBooking.total_amount || "₹0";
+                        const match = amountStr.match(/^(.*?)\s*\((.*?)\)$/);
                         const pass = match ? match[2] : selectedBooking.pass_details;
-                        return (
-                          <>
-                            {amount}
-                            {pass && <span style={{ marginLeft: "4px", color: "#64748b" }}>({pass})</span>}
-                          </>
-                        );
+                        if (!pass) return "Regular";
+                        const lower = pass.toLowerCase();
+                        if (lower.includes("gold")) return "Gold Pass";
+                        if (lower.includes("diamond")) return "Diamond Pass";
+                        if (lower.includes("silver")) return "Silver Pass";
+                        return "Regular";
                       })()}
                     </span>
                   </div>
                   <div className="bk-info-item">
                     <span className="bk-label">Staff</span>
-                    <span className="bk-value">
-                      {selectedBooking.therapist_name || "Not assigned"}
+                    <span className="bk-value" style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span>{selectedBooking.therapist_name || "Not assigned"}</span>
+                      {isBookingConflicted(selectedBooking.id) && (
+                        <span style={{ color: "#e53e3e", fontSize: "12px", fontWeight: "600", marginTop: "2px" }}>
+                          ⚠️ Staff on Leave
+                        </span>
+                      )}
                     </span>
                   </div>
                   <div className="bk-info-item">
@@ -289,15 +407,127 @@ function Bookings() {
               {/* Admin specific controls */}
               {canEdit ? (
                 <>
+                  <div className="bk-drawer-section">
+                    <h4 className="bk-section-title">Update Booking Status</h4>
+                  <div className="bk-status-row">
+                    {(() => {
+                      const cur = (selectedBooking.status || "PENDING").toUpperCase();
+
+                      // ── Compute whether the 30-min buffer has passed (CONFIRMED only) ──
+                      let completionAllowed = false;
+                      let bufferLabel = '';
+                      if (cur === 'CONFIRMED') {
+                        const matchedSvc = servicesList.find(
+                          s => (s.name || '').toLowerCase() === (selectedBooking.service_name || '').toLowerCase()
+                        );
+                        const durationMins = matchedSvc?.duration_minutes || 60;
+                        const dateStr = selectedBooking.booking_date;
+                        const timeStr = selectedBooking.booking_time || '00:00';
+                        if (dateStr) {
+                          const base = new Date(dateStr);
+                          const m = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+                          if (m) {
+                            let h = parseInt(m[1], 10);
+                            const min = parseInt(m[2], 10);
+                            const ampm = m[3] ? m[3].toUpperCase() : null;
+                            if (ampm === 'PM' && h < 12) h += 12;
+                            if (ampm === 'AM' && h === 12) h = 0;
+                            base.setHours(h, min, 0, 0);
+                          }
+                          const unlockAt = new Date(base.getTime() + (durationMins + 10) * 60000);
+                          const now = new Date();
+                          if (now >= unlockAt) {
+                            completionAllowed = true;
+                          } else {
+                            const diffMins = Math.ceil((unlockAt - now) / 60000);
+                            const hrs = Math.floor(diffMins / 60);
+                            const mins = diffMins % 60;
+                            bufferLabel = hrs > 0
+                              ? `Available in ${hrs}h ${mins}m (end time + 10 min buffer)`
+                              : `Available in ${mins} min (end time + 10 min buffer)`;
+                          }
+                        }
+                      }
+
+                      // ── Terminal states — no changes allowed ──
+                      if (cur === 'COMPLETED' || cur === 'CANCELLED') {
+                        return (
+                          <div style={{
+                            padding: '10px 14px',
+                            background: cur === 'COMPLETED' ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+                            border: `1px solid ${cur === 'COMPLETED' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            color: cur === 'COMPLETED' ? '#16a34a' : '#dc2626',
+                            fontWeight: 600
+                          }}>
+                            {cur === 'COMPLETED' ? '✅ Completed — no further changes allowed' : 'This service has been cancelled.'}
+                          </div>
+                        );
+                      }
+
+                      // ── PENDING state ──
+                      if (cur === 'PENDING') {
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                            <select
+                              value={newStatus}
+                              onChange={(e) => setNewStatus(e.target.value)}
+                              className="bk-status-select"
+                            >
+                              <option value="PENDING">Pending</option>
+                              <option value="CONFIRMED">Confirmed</option>
+                              <option value="CANCELLED">Cancelled</option>
+                              <option value="COMPLETED" disabled={true}>Completed</option>
+                            </select>
+                            {newStatus === 'CANCELLED' && (
+                              <div style={{ color: '#dc2626', fontSize: '13px', fontWeight: 600, marginTop: '4px' }}>
+                                This service has been cancelled.
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      // ── CONFIRMED state ──
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                          <select
+                            value={newStatus}
+                            onChange={(e) => setNewStatus(e.target.value)}
+                            className="bk-status-select"
+                          >
+                            <option value="CONFIRMED">Confirmed</option>
+                            <option value="COMPLETED" disabled={!completionAllowed}>
+                              Completed
+                            </option>
+                            <option value="CANCELLED">Cancelled</option>
+                          </select>
+                          {newStatus === 'CANCELLED' && (
+                            <div style={{ color: '#dc2626', fontSize: '13px', fontWeight: 600, marginTop: '4px' }}>
+                              This service has been cancelled.
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  </div>
+
                   {newStatus === 'CONFIRMED' && (
                     <div className="bk-drawer-section">
-                      <h4 className="bk-section-title">Staff Allocation</h4>
-                      <div className="bk-cert-list" style={{ maxHeight: '180px', overflowY: 'auto', marginTop: '12px' }}>
+                      <h4 className="bk-section-title">Staff Allocation <span style={{ fontSize: '12px', fontWeight: 400, color: '#e53e3e' }}>(required — select one or more)</span></h4>
+                      {assignedStaffIds.length > 0 && (
+                        <div style={{ marginBottom: '10px', fontSize: '13px', color: '#2d6a4f', fontWeight: 600 }}>
+                          ✔ {assignedStaffIds.length} staff member{assignedStaffIds.length > 1 ? 's' : ''} selected
+                        </div>
+                      )}
+                      <div className="bk-cert-list" style={{ maxHeight: '220px', overflowY: 'auto', marginTop: '8px' }}>
                         {staffList.length === 0 ? (
                           <span style={{ fontSize: 13, color: '#7b8a9a' }}>No doctors or therapists found.</span>
                         ) : (
                         staffList
-                          .filter(staff => staff.role === "DOCTOR" || staff.role === "THERAPIST")
+                          .filter(staff => (staff.role === "DOCTOR" || staff.role === "THERAPIST") && staff.availability_status !== "On Leave")
                           .map(staff => {
                             const staffId = staff.id || staff.user_id;
                             const API_BASE = "http://localhost:5000";
@@ -313,16 +543,24 @@ function Bookings() {
                               finalAvatar = avUrl.startsWith("http") || avUrl.startsWith("/") ? avUrl : `${API_BASE}${avUrl}`;
                             }
 
+                            const isChecked = assignedStaffIds.includes(staffId);
+
                             return (
                               <label key={staffId} className="bk-cert-row">
                                 <input
                                   type="checkbox"
-                                  checked={assignedStaffId === staffId}
-                                  onChange={() => setAssignedStaffId(assignedStaffId === staffId ? null : staffId)}
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    setAssignedStaffIds(prev =>
+                                      isChecked
+                                        ? prev.filter(id => id !== staffId)
+                                        : [...prev, staffId]
+                                    );
+                                  }}
                                   className="bk-checkbox-hidden"
                                 />
-                                <span className={`bk-custom-checkbox ${assignedStaffId === staffId ? 'checked' : ''}`}>
-                                  {assignedStaffId === staffId && (
+                                <span className={`bk-custom-checkbox ${isChecked ? 'checked' : ''}`}>
+                                  {isChecked && (
                                     <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                       <polyline points="4 8 7 11 12 5" />
                                     </svg>
@@ -344,29 +582,6 @@ function Bookings() {
                       </div>
                     </div>
                   )}
-
-                  <div className="bk-drawer-section">
-                    <h4 className="bk-section-title">Update Booking Status</h4>
-                  <div className="bk-status-row">
-                    <select
-                      value={newStatus}
-                      onChange={(e) => setNewStatus(e.target.value)}
-                      className="bk-status-select"
-                    >
-                      <option value="PENDING">Pending</option>
-                      <option value="CONFIRMED">Confirmed</option>
-                      <option value="COMPLETED" disabled={selectedBooking.status === 'PENDING'}>Completed</option>
-                      <option value="CANCELLED">Cancelled</option>
-                    </select>
-                    <button
-                      className="bk-status-update-btn"
-                      onClick={handleUpdateStatus}
-                      disabled={newStatus === selectedBooking.status}
-                    >
-                      Update
-                    </button>
-                  </div>
-                  </div>
                 </>
               ) : (
                 <div className="bk-drawer-section">
@@ -400,6 +615,9 @@ function Bookings() {
 
             <div className="bk-drawer-footer">
               <button className="bk-btn-gold" onClick={() => setSelectedBooking(null)}>Close</button>
+              {canEdit && (
+                <button className="bk-btn-gold" style={{ marginLeft: '12px' }} onClick={handleUpdateStatus}>Save Changes</button>
+              )}
             </div>
           </div>
         </div>
@@ -469,20 +687,26 @@ function Bookings() {
                 <th>DATE</th>
                 <th>TIME</th>
                 <th>AMOUNT</th>
+                <th>MEMBERSHIP</th>
                 <th>STATUS</th>
                 <th>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr><td colSpan="10" className="bk-loading-cell">Loading bookings...</td></tr>
+              {loading && bookings.length === 0 ? (
+                <tr><td colSpan="11" className="bk-loading-cell">Loading bookings...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan="10" className="bk-empty-cell">No bookings found.</td></tr>
+                <tr><td colSpan="11" className="bk-empty-cell">No bookings found.</td></tr>
               ) : (
                 filtered.map((b) => {
                   const staffInfo = getStaffDisplay(b.therapist_name);
                   return (
-                    <tr key={b.id} className="bk-table-row" onClick={() => setSelectedBooking(b)}>
+                    <tr 
+                      key={b.id} 
+                      className={`bk-table-row ${isBookingConflicted(b.id) ? 'conflicted-row' : ''}`} 
+                      onClick={() => setSelectedBooking(b)}
+                      style={isBookingConflicted(b.id) ? { backgroundColor: "rgba(100, 116, 139, 0.08)" } : undefined}
+                    >
                       <td><strong>#{b.id}</strong></td>
                       <td>
                         <div className="bk-cell-name">{b.user_name || "Guest User"}</div>
@@ -490,9 +714,16 @@ function Bookings() {
                       <td>{b.service_name || "N/A"}</td>
                       <td>
                         {staffInfo ? (
-                          <span className={staffInfo.role === "DOCTOR" ? "bk-staff-dr" : "bk-staff-tr"}>
-                            {b.therapist_name}
-                          </span>
+                          <>
+                            <span className={staffInfo.role === "DOCTOR" ? "bk-staff-dr" : "bk-staff-tr"}>
+                              {b.therapist_name}
+                            </span>
+                            {isBookingConflicted(b.id) && (
+                              <div style={{ color: "#64748b", fontSize: "11px", fontWeight: "600", marginTop: "4px" }}>
+                                ⚠️ Staff on Leave
+                              </div>
+                            )}
+                          </>
                         ) : (
                           <span className="bk-staff-pending">Pending</span>
                         )}
@@ -515,16 +746,25 @@ function Bookings() {
                           const amountStr = b.total_amount || "₹0";
                           const match = amountStr.match(/^(.*?)\s*\((.*?)\)$/);
                           const amount = match ? match[1] : amountStr;
+                          return <strong>{amount}</strong>;
+                        })()}
+                      </td>
+                      <td>
+                        {(() => {
+                          const amountStr = b.total_amount || "₹0";
+                          const match = amountStr.match(/^(.*?)\s*\((.*?)\)$/);
                           const pass = match ? match[2] : b.pass_details;
+                          if (!pass) return <span style={{ color: '#64748b', fontSize: '13px', fontWeight: 'bold' }}>Regular</span>;
+                          const lower = pass.toLowerCase();
+                          let displayPass = "Regular";
+                          if (lower.includes("gold")) { displayPass = "Gold Pass"; }
+                          else if (lower.includes("diamond")) { displayPass = "Diamond Pass"; }
+                          else if (lower.includes("silver")) { displayPass = "Silver Pass"; }
+                          
                           return (
-                            <>
-                              <strong>{amount}</strong>
-                              {pass && (
-                                <span style={{ fontSize: '13px', color: '#64748b', display: 'block', marginTop: '2px' }}>
-                                  ({pass})
-                                </span>
-                              )}
-                            </>
+                            <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 'bold' }}>
+                              {displayPass}
+                            </span>
                           );
                         })()}
                       </td>
@@ -533,8 +773,54 @@ function Bookings() {
                           {b.status || "PENDING"}
                         </span>
                       </td>
-                      <td onClick={(e) => { e.stopPropagation(); setSelectedBooking(b); }}>
-                        <img src={ActionIcon} alt="Actions" className="action-icon" />
+                      <td style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ position: "relative", display: "inline-block" }}>
+                          <img 
+                            src={ActionIcon} 
+                            className="action-icon" 
+                            alt="Actions" 
+                            style={{ cursor: "pointer" }}
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              setOpenActionMenu(openActionMenu === b.id ? null : b.id); 
+                            }} 
+                          />
+                          {openActionMenu === b.id && (
+                            <div style={{ 
+                              position: "absolute", 
+                              right: 0, 
+                              top: "100%", 
+                              zIndex: 1000, 
+                              background: "#fff", 
+                              border: "1px solid #e2e8f0", 
+                              borderRadius: "8px", 
+                              boxShadow: "0 4px 12px rgba(0,0,0,0.15)", 
+                              minWidth: "140px", 
+                              overflow: "hidden" 
+                            }}>
+                              <div 
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  setSelectedBooking(b); 
+                                  setOpenActionMenu(null); 
+                                }}
+                                style={{ 
+                                  padding: "10px 16px", 
+                                  cursor: "pointer", 
+                                  fontSize: "14px", 
+                                  color: "#2d3748", 
+                                  display: "flex", 
+                                  alignItems: "center", 
+                                  gap: "8px" 
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = "#f7fafc"}
+                                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                              >
+                                View
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

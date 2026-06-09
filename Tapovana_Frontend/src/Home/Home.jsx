@@ -6,7 +6,7 @@ import HomeIcon from "../assets/Home.svg";
 import BookingsIcon from "../assets/Bookings.svg";
 import CustomersIcon from "../assets/Customers.svg";
 import TransactionsIcon from "../assets/Transactions.svg";
-import { getUser, roleLabel } from "../utils/session";
+import { getUser, roleLabel, getToken } from "../utils/session";
 import { useAllocations } from "../utils/AllocationContext";
 
 // Helper map to translate raw backend service catalog IDs into gorgeous premium display names
@@ -46,9 +46,215 @@ const DUMMY_DASHBOARD_DATA = {
   }
 };
 
+function ConflictRow({ conflict, getSuggestions, onReassignSuccess, triggerAlert }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(true);
+  const [selectedStaffId, setSelectedStaffId] = useState("");
+  const [reassigning, setReassigning] = useState(false);
+  const [clientEmail, setClientEmail] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setLoadingSuggestions(true);
+      try {
+        const params = {
+          type: conflict.type,
+          date: conflict.start_date ? new Date(conflict.start_date).toISOString().split('T')[0] : "",
+          timeStr: conflict.booking_time || "",
+          durationMins: conflict.duration_minutes || "",
+          sessionId: conflict.session_id || ""
+        };
+        const result = await getSuggestions(params);
+        if (active) {
+          setSuggestions(result || []);
+          setLoadingSuggestions(false);
+        }
+      } catch (err) {
+        console.error("Error loading suggestions:", err);
+        if (active) setLoadingSuggestions(false);
+      }
+    };
+
+    load();
+
+    return () => { active = false; };
+  }, [conflict, getSuggestions]);
+
+  // Fetch client email for bookings from Render API
+  useEffect(() => {
+    let active = true;
+    if (conflict.type === 'service' && conflict.session_id) {
+      const fetchClientEmail = async () => {
+        try {
+          const response = await fetch(`https://tapoclg.onrender.com/api/bookings/${conflict.session_id}`, {
+            headers: {
+              "Content-Type": "application/json"
+            }
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (active && data.success && data.booking) {
+              setClientEmail(data.booking.user_email || data.booking.email || "");
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching client email:", err);
+        }
+      };
+      fetchClientEmail();
+    }
+    return () => { active = false; };
+  }, [conflict]);
+
+  const handleReassign = async () => {
+    if (!selectedStaffId) {
+      triggerAlert("Please select a replacement staff member.");
+      return;
+    }
+    setReassigning(true);
+    try {
+      let url = "";
+      let body = {};
+
+      if (conflict.type === 'service') {
+        url = `/api/bookings/${conflict.session_id}/therapist`;
+        body = { therapist_id: selectedStaffId, user_email: clientEmail || undefined };
+      } else if (conflict.type === 'workshop') {
+        url = `/api/workshops/${conflict.session_id}/staff`;
+        body = { assigned_staff_ids: [selectedStaffId] };
+      } else if (conflict.type === 'vedic_program') {
+        url = `/api/vedic-programs/${conflict.session_id}/staff`;
+        body = { assigned_staff_ids: [selectedStaffId] };
+      }
+
+      const res = await apiFetch(url, {
+        method: "PATCH",
+        body: JSON.stringify(body)
+      });
+
+      if (res.success) {
+        triggerAlert("Staff successfully reassigned!", true);
+        if (onReassignSuccess) {
+          onReassignSuccess();
+        }
+      } else {
+        triggerAlert(res.message || "Failed to reassign staff.");
+      }
+    } catch (err) {
+      console.error("Reassign error:", err);
+      triggerAlert(err.message || "Error reassigning staff.");
+    } finally {
+      setReassigning(false);
+    }
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "-";
+    try {
+      return new Date(dateStr).toLocaleDateString("en-IN", {
+        day: "numeric", month: "short", year: "numeric"
+      });
+    } catch { return dateStr; }
+  };
+
+  return (
+    <div style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "16px",
+      background: "white",
+      borderRadius: "12px",
+      border: "1px solid #fee2e2",
+      marginBottom: "12px",
+      gap: "16px",
+      flexWrap: "wrap"
+    }}>
+      <div style={{ flex: "1 1 300px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+          <span style={{
+            padding: "2px 8px",
+            background: conflict.type === 'service' ? '#edf2f7' : conflict.type === 'workshop' ? '#fef3c7' : '#e0f2fe',
+            color: conflict.type === 'service' ? '#4a5568' : conflict.type === 'workshop' ? '#d97706' : '#0369a1',
+            borderRadius: "4px",
+            fontSize: "11px",
+            fontWeight: "700",
+            textTransform: "uppercase"
+          }}>
+            {conflict.type === 'vedic_program' ? 'Vedic Program' : conflict.type}
+          </span>
+          <strong style={{ fontSize: "14px", color: "#1a202c" }}>{conflict.session_title}</strong>
+        </div>
+        <div style={{ fontSize: "13px", color: "#4a5568", display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px", marginTop: "4px" }}>
+          <span style={{ color: "#718096" }}>Schedule:</span>
+          <span>{formatDate(conflict.start_date)} {conflict.booking_time ? `@ ${conflict.booking_time}` : ''}</span>
+
+          <span style={{ color: "#718096" }}>Conflicted Staff:</span>
+          <span style={{ color: "#e53e3e", fontWeight: "600" }}>
+            {conflict.staff_name} ({conflict.staff_role?.toUpperCase()})
+          </span>
+
+          <span style={{ color: "#718096" }}>Leave Details:</span>
+          <span style={{ fontStyle: "italic" }}>
+            {formatDate(conflict.leave_start_date)} to {formatDate(conflict.leave_end_date)} ({conflict.leave_reason || 'No reason'})
+          </span>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+        {loadingSuggestions ? (
+          <span style={{ fontSize: "13px", color: "#718096" }}>Loading suggestions...</span>
+        ) : suggestions.length === 0 ? (
+          <span style={{ fontSize: "13px", color: "#e53e3e", fontWeight: "500" }}>No available replacement staff</span>
+        ) : (
+          <select
+            value={selectedStaffId}
+            onChange={(e) => setSelectedStaffId(e.target.value)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: "8px",
+              border: "1px solid #cbd5e0",
+              fontSize: "13px",
+              backgroundColor: "white",
+              outline: "none",
+              cursor: "pointer",
+              fontFamily: "inherit"
+            }}
+          >
+            <option value="">Select replacement staff...</option>
+            {suggestions.map(s => (
+              <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
+            ))}
+          </select>
+        )}
+
+        <button
+          onClick={handleReassign}
+          disabled={!selectedStaffId || reassigning}
+          style={{
+            padding: "8px 16px",
+            background: !selectedStaffId || reassigning ? "#cbd5e0" : "#cda751",
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            fontSize: "13px",
+            fontWeight: "700",
+            cursor: !selectedStaffId || reassigning ? "not-allowed" : "pointer",
+            boxShadow: !selectedStaffId || reassigning ? "none" : "0 2px 8px rgba(205,167,81,0.3)",
+            transition: "all 0.2s"
+          }}
+        >
+          {reassigning ? "Reassigning..." : "Reassign"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Home() {
   const navigate = useNavigate();
-  const { allocations } = useAllocations();
+  const { allocations, conflicts, fetchConflicts, getSuggestions, triggerAlert } = useAllocations();
 
   const currentUser = useMemo(() => getUser(), []);
   const role = currentUser?.role?.toUpperCase() || "";
@@ -129,7 +335,7 @@ function Home() {
   const fetchDashboardData = async (isManual = false) => {
     try {
       if (isManual) setRefreshing(true);
-      else setLoading(true);
+      else if (!data) setLoading(true);
       setError("");
       
       const res = await apiFetch("/api/analytics/dashboard");
@@ -149,7 +355,10 @@ function Home() {
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+    if (role === "SUPER_ADMIN" || role === "CO_ADMIN") {
+      fetchConflicts();
+    }
+  }, [role, fetchConflicts]);
 
   // Formatted date string for the subtitle
   const formattedDate = useMemo(() => {
@@ -486,7 +695,7 @@ function Home() {
     );
   }
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="home-container" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" }}>
         <div style={{ textAlign: "center" }}>
@@ -626,6 +835,40 @@ function Home() {
           </div>
         </div>
       </section>
+
+      {/* Emergency Reallocations required panel */}
+      {(role === "SUPER_ADMIN" || role === "CO_ADMIN") && conflicts && conflicts.length > 0 && (
+        <div style={{
+          background: "linear-gradient(135deg, rgba(254, 226, 226, 0.6) 0%, rgba(254, 243, 199, 0.4) 100%)",
+          border: "1px solid #fca5a5",
+          borderRadius: "16px",
+          padding: "20px 24px",
+          marginBottom: "28px",
+          boxShadow: "0 4px 20px rgba(229, 62, 62, 0.05)"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
+            <span style={{ fontSize: "24px" }}>⚠️</span>
+            <div>
+              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#991b1b" }}>Emergency Reallocations Required</h3>
+              <p style={{ margin: "2px 0 0 0", fontSize: "13px", color: "#7f1d1d" }}>
+                Approved staff leaves have created scheduling overlaps. Please reassign the affected sessions.
+              </p>
+            </div>
+          </div>
+          
+          <div>
+            {conflicts.map(conflict => (
+              <ConflictRow
+                key={conflict.id}
+                conflict={conflict}
+                getSuggestions={getSuggestions}
+                triggerAlert={triggerAlert}
+                onReassignSuccess={fetchConflicts}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Admin Action Alerts banner */}
       {(() => {

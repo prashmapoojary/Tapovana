@@ -8,7 +8,7 @@ const {
     syncFromRender
 } = require('../controllers/bookingsController');
 
-const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN')];
+const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR')];
 const staffOrAdmin = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR', 'THERAPIST')];
 
 // Read routes

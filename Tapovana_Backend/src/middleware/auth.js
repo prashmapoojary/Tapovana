@@ -11,9 +11,15 @@ const authenticate = async (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
 
+    let decoded;
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+        console.error('JWT verification error:', err.message);
+        return res.status(401).json({ success: false, message: 'Invalid or expired token.' });
+    }
 
+    try {
         const result = await query(
             'SELECT tm.id, tm.email, tm.first_name, tm.last_name, tm.status, tm.role_id, r.name AS role, r.access FROM team_members tm JOIN roles r ON r.id = tm.role_id WHERE tm.id = $1',
             [decoded.sub]
@@ -32,8 +38,8 @@ const authenticate = async (req, res, next) => {
         req.user = result.rows[0];
         next();
     } catch (err) {
-        console.error('Auth error:', err.message);
-        return res.status(401).json({ success: false, message: 'Invalid or expired token.' });
+        console.error('Database query error in auth middleware:', err.message);
+        return res.status(500).json({ success: false, message: 'Internal server error.' });
     }
 };
 

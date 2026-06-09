@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import AddMemberDrawer from "./AddMemberDrawer";
 import AddUserIcon from "../assets/Add_userIcon.svg";
 import "./Team.css";
@@ -19,6 +19,10 @@ const EditMemberDrawer = ({ user, onClose }) => {
   const [photoPreview, setPhotoPreview] = useState(null);
   const [allocations, setAllocations] = useState({ workshops: [], services: [], vedic_programs: [] });
   const [loadingAllocations, setLoadingAllocations] = useState(false);
+
+  const { triggerConfirm, triggerAlert } = useAllocations();
+
+  const isPractitioner = user?.role?.toUpperCase() === 'DOCTOR' || user?.role?.toUpperCase() === 'THERAPIST';
 
   const getStatusStyle = (status) => {
     switch (status?.toLowerCase()) {
@@ -137,89 +141,95 @@ const EditMemberDrawer = ({ user, onClose }) => {
             </div>
           </div>
 
-          <div className="drawer-divider" />
-          
-          <div className="section-label-container">
-            <div className="section-badge">📋</div>
-            <div className="section-title">Allocations & Activities</div>
-          </div>
+          {isPractitioner && (
+            <>
+              <div className="drawer-divider" />
+              
+              <div className="section-label-container">
+                <div className="section-badge">📋</div>
+                <div className="section-title">Allocations & Activities</div>
+              </div>
 
-          <div className="allocations-container" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {loadingAllocations ? (
-              <div style={{ fontSize: 13, color: "#a0aec0", fontStyle: "italic", marginTop: 8 }}>Loading allocations...</div>
-            ) : (
-              <>
-                <div className="allocation-group">
-                  <label className="input-label" style={{ display: "block", marginBottom: 8 }}>Workshops</label>
-                  {allocations.workshops.length > 0 ? (
-                    allocations.workshops.map(a => {
-                      const style = getStatusStyle(a.status);
-                      return (
-                        <div key={a.id} className="settings-card" style={{ marginBottom: 8 }}>
-                          <div className="settings-row">
-                            <div className="settings-info">
-                              <span className="settings-label">{a.sessionTitle}</span>
+              <div className="allocations-container" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {loadingAllocations ? (
+                  <div style={{ fontSize: 13, color: "#a0aec0", fontStyle: "italic", marginTop: 8 }}>Loading allocations...</div>
+                ) : (
+                  <>
+                    <div className="allocation-group">
+                      <label className="input-label" style={{ display: "block", marginBottom: 8 }}>Workshops</label>
+                      {allocations.workshops.length > 0 ? (
+                        allocations.workshops.map(a => {
+                          const style = getStatusStyle(a.status);
+                          return (
+                            <div key={a.id} className="settings-card" style={{ marginBottom: 8 }}>
+                              <div className="settings-row">
+                                <div className="settings-info">
+                                  <span className="settings-label">{a.sessionTitle}</span>
+                                </div>
+                                <div style={{ fontSize: 12, color: style.color, fontWeight: 600 }}>
+                                  {a.status}
+                                </div>
+                              </div>
                             </div>
-                            <div style={{ fontSize: 12, color: style.color, fontWeight: 600 }}>
-                              {a.status}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })
-                  ) : (
-                    <div style={{ fontSize: 13, color: "#a0aec0", fontStyle: "italic" }}>No workshops assigned</div>
-                  )}
-                </div>
+                          )
+                        })
+                      ) : (
+                        <div style={{ fontSize: 13, color: "#a0aec0", fontStyle: "italic" }}>No workshops assigned</div>
+                      )}
+                    </div>
 
-                <div className="allocation-group">
-                  <label className="input-label" style={{ display: "block", marginBottom: 8 }}>Services</label>
-                  {allocations.services.length > 0 ? (
-                    allocations.services.map(a => {
-                      const style = getStatusStyle(a.status);
-                      return (
-                        <div key={a.id} className="settings-card" style={{ marginBottom: 8 }}>
-                          <div className="settings-row">
-                            <div className="settings-info">
-                              <span className="settings-label">{a.sessionTitle}</span>
+                    <div className="allocation-group">
+                      <label className="input-label" style={{ display: "block", marginBottom: 8 }}>Services</label>
+                      {allocations.services.length > 0 ? (
+                        allocations.services.map(a => {
+                          const style = getStatusStyle(a.status);
+                          return (
+                            <div key={a.id} className="settings-card" style={{ marginBottom: 8 }}>
+                              <div className="settings-row">
+                                <div className="settings-info">
+                                  <span className="settings-label">{a.sessionTitle}</span>
+                                </div>
+                                <div style={{ fontSize: 12, color: style.color, fontWeight: 600 }}>
+                                  {a.status}
+                                </div>
+                              </div>
                             </div>
-                            <div style={{ fontSize: 12, color: style.color, fontWeight: 600 }}>
-                              {a.status}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })
-                  ) : (
-                    <div style={{ fontSize: 13, color: "#a0aec0", fontStyle: "italic" }}>No services allocated</div>
-                  )}
-                </div>
+                          )
+                        })
+                      ) : (
+                        <div style={{ fontSize: 13, color: "#a0aec0", fontStyle: "italic" }}>No services allocated</div>
+                      )}
+                    </div>
 
-                <div className="allocation-group">
-                  <label className="input-label" style={{ display: "block", marginBottom: 8 }}>Vedic Programs</label>
-                  {allocations.vedic_programs.length > 0 ? (
-                    allocations.vedic_programs.map(a => {
-                      const style = getStatusStyle(a.status);
-                      return (
-                        <div key={a.id} className="settings-card" style={{ marginBottom: 8 }}>
-                          <div className="settings-row">
-                            <div className="settings-info">
-                              <span className="settings-label">{a.sessionTitle}</span>
+                    <div className="allocation-group">
+                      <label className="input-label" style={{ display: "block", marginBottom: 8 }}>Vedic Programs</label>
+                      {allocations.vedic_programs.length > 0 ? (
+                        allocations.vedic_programs.map(a => {
+                          const style = getStatusStyle(a.status);
+                          return (
+                            <div key={a.id} className="settings-card" style={{ marginBottom: 8 }}>
+                              <div className="settings-row">
+                                <div className="settings-info">
+                                  <span className="settings-label">{a.sessionTitle}</span>
+                                </div>
+                                <div style={{ fontSize: 12, color: style.color, fontWeight: 600 }}>
+                                  {a.status}
+                                </div>
+                              </div>
                             </div>
-                            <div style={{ fontSize: 12, color: style.color, fontWeight: 600 }}>
-                              {a.status}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })
-                  ) : (
-                    <div style={{ fontSize: 13, color: "#a0aec0", fontStyle: "italic" }}>No programs assigned</div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
+                          )
+                        })
+                      ) : (
+                        <div style={{ fontSize: 13, color: "#a0aec0", fontStyle: "italic" }}>No programs assigned</div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+
+
         </div>
 
         <div className="drawer-footer">

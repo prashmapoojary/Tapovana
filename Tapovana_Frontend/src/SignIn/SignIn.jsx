@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import "./SignIn.css";
-import sideImage from "../assets/graphic-side.png";
 import { useNavigate } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -105,10 +104,7 @@ function SignIn() {
 
   return (
     <div className="container">
-      <div
-        className="left-section"
-        style={{ backgroundImage: `url(${sideImage})` }}
-      />
+      <div className="left-section" />
       <div className="right-section">
         <h1>Log In</h1>
         <p className="note">

@@ -43,7 +43,7 @@ function Customers() {
   // Load Customers
   const loadCustomers = async () => {
     try {
-      setLoading(true);
+      if (customers.length === 0) setLoading(true);
       setError(null);
       
       let q = `/api/customers?limit=100`;
@@ -485,7 +485,7 @@ function Customers() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {loading && customers.length === 0 ? (
                 Array.from({ length: 5 }).map((_, i) => renderSkeletonRow(i))
               ) : paginatedList.length === 0 ? (
                 <tr>

@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import "./ResetPassword.css";
-import sideImage from "../assets/graphic-side.png";
 import { useNavigate } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -107,19 +106,18 @@ function ResetPassword() {
 
   return (
     <div className="container">
-      <div
-        className="left-section"
-        style={{ backgroundImage: `url(${sideImage})` }}
-      />
+      <div className="left-section" />
       <div className="right-section">
         <h1 style={{ fontSize: "20px" }}>Reset Password</h1>
         <p className="note" style={{ fontSize: "11px" }}>
           Recover access to your Tapovana Governing Member account.
         </p>
         <div className="form-container">
-          <label>Email Address</label>
+          <label htmlFor="reset_email">Email Address</label>
           <input
             type="email"
+            id="reset_email"
+            name="reset_email"
             className="input-field"
             value={email}
             disabled={otpSent}
@@ -139,9 +137,11 @@ function ResetPassword() {
 
           {otpSent && (
             <>
-              <label>Enter OTP Code</label>
+              <label htmlFor="reset_otp">Enter OTP Code</label>
               <input
                 type="text"
+                id="reset_otp"
+                name="reset_otp"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 className="input-field"
@@ -173,18 +173,22 @@ function ResetPassword() {
                 </button>
               </div>
 
-              <label>New Password</label>
+              <label htmlFor="reset_new_password">New Password</label>
               <input
                 type="password"
+                id="reset_new_password"
+                name="reset_new_password"
                 className="input-field"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Min. 8 characters"
               />
 
-              <label>Confirm New Password</label>
+              <label htmlFor="reset_confirm_password">Confirm New Password</label>
               <input
                 type="password"
+                id="reset_confirm_password"
+                name="reset_confirm_password"
                 className="input-field"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}

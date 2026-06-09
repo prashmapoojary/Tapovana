@@ -139,7 +139,7 @@ const sendAllocationEmail = async ({ to, firstName, programName, programType, st
 };
 
 // ─── NEW: Booking Email Notifications ──────────────────────────────────────
-const sendBookingStatusEmail = async ({ to, firstName, status, details = {} }) => {
+const sendBookingStatusEmail = async ({ to, firstName, status, details = {}, previousStatus = null }) => {
   let subject = "";
   let message = "";
   let detailsHtml = "";
@@ -147,8 +147,8 @@ const sendBookingStatusEmail = async ({ to, firstName, status, details = {} }) =
   const formattedDate = details.date ? new Date(details.date).toLocaleDateString() : "";
 
   if (status === "PENDING") {
-    subject = "Tapovana — Booking Pending Confirmation";
-    message = "Your booking has been submitted and is pending confirmation.";
+    subject = "Tapovana — Booking Pending Approval";
+    message = "Your booking request is pending approval.";
   } else if (status === "CONFIRMED") {
     subject = "Tapovana — Booking Confirmed";
     message = "Your booking has been confirmed.";
@@ -162,11 +162,16 @@ const sendBookingStatusEmail = async ({ to, firstName, status, details = {} }) =
       </div>
     `;
   } else if (status === "CANCELLED") {
-    subject = "Tapovana — Booking Cancelled";
-    message = "Your booking has been cancelled.";
+    if (previousStatus === "CONFIRMED") {
+      subject = "Tapovana — Confirmed Booking Cancelled";
+      message = "Your confirmed booking has been cancelled.";
+    } else {
+      subject = "Tapovana — Booking Cancelled";
+      message = "Your booking has been cancelled.";
+    }
   } else if (status === "COMPLETED") {
     subject = "Tapovana — Booking Completed";
-    message = "Your booking has been completed. Thank you.";
+    message = "Your booking has been marked as completed.";
   }
 
   const html = emailWrapper(`
@@ -215,11 +220,117 @@ const sendBookingAllocationEmail = async ({ to, staffName, bookingId, details = 
   });
 };
 
+const sendStaffLeaveCancellationEmail = async ({ to, staffName, details = [] }) => {
+  const html = emailWrapper(`
+    <h1 style="color:#e74c3c;text-align:center;">Allocations Cancelled Due to Leave</h1>
+    <p style="color:#cccccc;">
+      Hello ${staffName},
+    </p>
+    <p style="color:#cccccc;">
+      Your allocations have been cancelled due to your marked leave.
+    </p>
+    <div style="background:#2c1a1a;border-left:4px solid #e74c3c;border-radius:6px;padding:20px 24px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-size:14px;color:#e74c3c;font-weight:600;">Affected Sessions:</p>
+      ${details.map(d => `<p style="margin:0 0 4px;font-size:13px;color:#ccc;">• <strong>${d.type}</strong>: ${d.title} on ${new Date(d.date).toLocaleDateString()} at ${d.time || 'N/A'}</p>`).join('')}
+    </div>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: "Tapovana — Allocations Cancelled due to Leave",
+    html,
+  });
+};
+
+const sendAdminLeaveAlertEmail = async ({ to, staffName, details = [] }) => {
+  const html = emailWrapper(`
+    <h1 style="color:#e67e22;text-align:center;">Staff Leave Alert</h1>
+    <p style="color:#cccccc;">
+      Hello Admin,
+    </p>
+    <p style="color:#cccccc;">
+      Staff member <strong style="color:#cda751;">${staffName}</strong> has marked leave and is unavailable. Reallocation is required for the following sessions:
+    </p>
+    <div style="background:#2c221a;border-left:4px solid #e67e22;border-radius:6px;padding:20px 24px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-size:14px;color:#e67e22;font-weight:600;">Sessions Needing Reassignment:</p>
+      ${details.map(d => `<p style="margin:0 0 4px;font-size:13px;color:#ccc;">• <strong>${d.type}</strong>: ${d.title} on ${new Date(d.date).toLocaleDateString()} at ${d.time || 'N/A'}</p>`).join('')}
+    </div>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Tapovana — Staff ${staffName} Unavailable: Reallocation Required`,
+    html,
+  });
+};
+
+const sendBookingRemovalEmail = async ({ to, staffName, bookingId, details = {} }) => {
+  const formattedDate = details.date ? new Date(details.date).toLocaleDateString() : "";
+  const html = emailWrapper(`
+    <h1 style="color:#e74c3c;text-align:center;">Booking Allocation Removed</h1>
+    <p style="color:#cccccc;text-align:center;">
+      Hello ${staffName},
+    </p>
+    <p style="color:#cccccc;text-align:center;">
+      You have been <strong style="color:#e74c3c;">removed</strong> from booking <strong>#${bookingId}</strong>.
+    </p>
+    <div style="background:#2c1a1a;border-left:4px solid #e74c3c;border-radius:6px;padding:20px 24px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-size:14px;color:#e74c3c;font-weight:600;">Booking Details</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Service:</strong> ${details.service || "N/A"}</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Date:</strong> ${formattedDate}</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Time:</strong> ${details.time || "N/A"}</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Customer:</strong> ${details.customer || "Guest"}</p>
+    </div>
+    <p style="color:#888;text-align:center;font-size:13px;">
+      This service has been reassigned. You are no longer required for this booking.
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Tapovana — Removed from Booking #${bookingId}`,
+    html,
+  });
+};
+
+const sendUserReassignmentEmail = async ({ to, userName, details = {} }) => {
+  const html = emailWrapper(`
+    <h1 style="color:#cda751;text-align:center;">Booking Reassigned</h1>
+    <p style="color:#cccccc;">
+      Hello ${userName},
+    </p>
+    <p style="color:#cccccc;">
+      Your upcoming session has been reassigned to a new specialist.
+    </p>
+    <div style="background:#1e1a0e;border-left:4px solid #cda751;border-radius:6px;padding:20px 24px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-size:14px;color:#cda751;font-weight:600;">Updated Session Details</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Service:</strong> ${details.service || 'N/A'}</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Date:</strong> ${new Date(details.date).toLocaleDateString()}</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Time:</strong> ${details.time || 'N/A'}</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>New Specialist:</strong> ${details.staff || 'N/A'}</p>
+    </div>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: "Tapovana — Session Reassigned",
+    html,
+  });
+};
+
 module.exports = { 
   sendWelcomeEmail, 
   sendOtpEmail, 
   sendPasswordChangedEmail, 
   sendAllocationEmail,
   sendBookingStatusEmail,
-  sendBookingAllocationEmail
+  sendBookingAllocationEmail,
+  sendBookingRemovalEmail,
+  sendStaffLeaveCancellationEmail,
+  sendAdminLeaveAlertEmail,
+  sendUserReassignmentEmail
 };

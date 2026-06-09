@@ -9,13 +9,11 @@
 
 @keyframes fadeIn {
   from {
-    opacity: 0;
-    transform: translateY(8px);
+    opacity: 0.9;
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -190,13 +188,14 @@
 
 /* ── Table Card ── */
 .bookings-table-card {
-  background: white;
-  border: 1px solid #eceff3;
-  border-radius: 14px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  background: #FFFFFF;
+  border: 1px solid rgba(205, 167, 81, 0.1);
+  box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
   min-height: 400px;
+  overflow: hidden;
 }
 
 .bookings-table-scroll {
@@ -217,7 +216,7 @@
 }
 
 .bookings-table thead {
-  background: #fafbfc;
+  background: #F8F7F6;
   position: sticky;
   top: 0;
   z-index: 1;
@@ -225,21 +224,37 @@
 
 .bookings-table th {
   text-align: left;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
   font-size: 12px;
-  font-weight: 600;
-  color: #1a202c;
-  padding: 16px 20px;
-  border-bottom: 1px solid #eceff3;
+  line-height: 16px;
+  letter-spacing: 0.6px;
+  color: #64748B;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  padding: 12px 16px;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
 .bookings-table td {
-  padding: 16px 20px;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(205, 167, 81, 0.1);
+  font-family: 'Manrope', sans-serif;
   font-size: 14px;
-  color: #718096;
-  border-bottom: 1px solid #f1f3f6;
+  color: #475569; /* Dark grey */
   vertical-align: middle;
+  white-space: nowrap;
+}
+
+.bookings-table th:nth-child(1),
+.bookings-table td:nth-child(1) {
+  width: 60px;
+}
+
+.bookings-table th:nth-child(11),
+.bookings-table td:nth-child(11) {
+  width: 90px;
+  text-align: center;
 }
 
 .bk-table-row {
@@ -260,7 +275,7 @@
 
 .bk-cell-name {
   font-weight: 600;
-  color: #718096;
+  color: #475569; /* Dark grey */
 }
 
 .bk-cell-time {
@@ -283,7 +298,7 @@
   font-style: italic;
 }
 
-/* ── Status Badges (Gold Theme) ── */
+/* ── Status Badges ── */
 .bk-status-badge {
   display: inline-flex;
   align-items: center;
@@ -294,31 +309,37 @@
 }
 
 .bk-status-badge.pending {
-  color: #e67e22;
+  color: #f1c40f; /* Amber/Yellow */
 }
 
 .bk-status-badge.confirmed {
-  color: #08979c;
+  color: #2ecc71; /* Light green */
 }
 
 .bk-status-badge.completed {
-  color: #2ecc71;
+  color: #e67e22; /* Light orange */
 }
 
 .bk-status-badge.cancelled {
-  color: #e74c3c;
+  color: #000000; /* Dark black */
 }
 
 /* ── Action Icon ── */
 .action-icon {
-  width: 20px;
-  height: 20px;
+  width: 12px;
+  height: 12px;
   cursor: pointer;
-  transition: filter 0.2s ease;
+  transition: filter 0.2s ease, opacity 0.2s ease;
+  filter: none; /* Native SVG color is grey (#94A3B8) */
 }
 
 .action-icon:hover {
-  filter: brightness(0) saturate(100%) invert(68%) sepia(80%) saturate(400%) hue-rotate(0deg);
+  filter: brightness(0); /* Converts to black */
+}
+
+/* Ensure strong tags inside table cells are grey */
+.bookings-table td strong {
+  color: #475569;
 }
 
 /* ── Pagination ── */
@@ -326,12 +347,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 20px;
-  border-top: 1px solid #f1f3f6;
-  background: white;
-  font-size: 13px;
-  color: #8c9aa8;
-  border-radius: 0 0 14px 14px;
+  padding: 9.5px 20px;
+  border-top: none;
+  background: #F8F7F6;
+  font-size: 14px;
+  color: #64748B;
+  border-radius: 0 0 8px 8px;
 }
 
 .pagination-controls {

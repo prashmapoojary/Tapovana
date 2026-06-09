@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
 const { sendAllocationEmail } = require('../services/emailService');
+const { checkStaffAllocationConflict, syncStaffMemberStatus } = require('../utils/conflictChecker');
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 
@@ -90,6 +91,66 @@ const deallocateStaffMember = async (staffId) => {
     );
 };
 
+// Helper: Synchronize workshop allocations with allocations table and update staff status
+const syncWorkshopAllocations = async (workshopId) => {
+    try {
+        const wsRes = await query('SELECT * FROM workshops WHERE id = $1', [workshopId]);
+        if (!wsRes.rows.length) return;
+        const workshop = wsRes.rows[0];
+
+        const existingAllocRes = await query(`SELECT staff_id FROM allocations WHERE type = 'workshop' AND session_id = $1`, [String(workshopId)]);
+        const oldStaffIds = existingAllocRes.rows.map(r => r.staff_id);
+
+        await query(`DELETE FROM allocations WHERE type = 'workshop' AND session_id = $1`, [String(workshopId)]);
+
+        const isCancelled = workshop.status === 'cancelled';
+        if (!isCancelled) {
+            const isCompleted = workshop.status === 'completed';
+            const allocationStatus = isCompleted ? 'expired' : 'active';
+            const staffIds = workshop.assigned_staff_ids || [];
+
+            for (const staffId of staffIds) {
+                const allocationId = `ws-alloc-${workshop.id}-${staffId}`;
+                await query(
+                    `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes, status)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                     ON CONFLICT (id) DO UPDATE SET
+                        staff_id = EXCLUDED.staff_id,
+                        type = EXCLUDED.type,
+                        session_title = EXCLUDED.session_title,
+                        session_id = EXCLUDED.session_id,
+                        start_date = EXCLUDED.start_date,
+                        end_date = EXCLUDED.end_date,
+                        booking_time = EXCLUDED.booking_time,
+                        duration_minutes = EXCLUDED.duration_minutes,
+                        status = EXCLUDED.status`,
+                    [
+                        allocationId,
+                        staffId,
+                        'workshop',
+                        workshop.title,
+                        String(workshop.id),
+                        workshop.date,
+                        workshop.date,
+                        workshop.time,
+                        workshop.duration || 60,
+                        allocationStatus
+                    ]
+                );
+            }
+        }
+
+        const newStaffIds = isCancelled ? [] : (workshop.assigned_staff_ids || []);
+        const allStaffIds = Array.from(new Set([...oldStaffIds, ...newStaffIds]));
+
+        for (const staffId of allStaffIds) {
+            await syncStaffMemberStatus(staffId);
+        }
+    } catch (err) {
+        console.error('Error in syncWorkshopAllocations:', err);
+    }
+};
+
 // GET ALL WORKSHOPS
 const getAllWorkshops = async (req, res) => {
     try {
@@ -154,6 +215,24 @@ const createWorkshop = async (req, res) => {
         const savedImageUrl = handleWorkshopImage(image_url);
         const staffIds = assigned_staff_ids || [];
 
+        // Check scheduling conflict and daily limits for each staff
+        for (const staffId of staffIds) {
+            const conflictCheck = await checkStaffAllocationConflict({
+                staffId,
+                date: date,
+                timeStr: time,
+                durationMins: duration || 60,
+                type: 'workshop'
+            });
+
+            if (conflictCheck.conflict) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Conflict: Staff already allocated at this time or daily limit exceeded."
+                });
+            }
+        }
+
         const result = await query(
             'INSERT INTO workshops (title, category, instructor, date, time, duration, capacity, enrolled, price, status, description, image_url, video_url, assigned_staff_ids, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *',
             [
@@ -169,6 +248,9 @@ const createWorkshop = async (req, res) => {
         for (const staffId of staffIds) {
             await allocateStaffToWorkshop(staffId, workshop);
         }
+
+        // Sync to unified allocations table
+        await syncWorkshopAllocations(workshop.id);
 
         return res.status(201).json({ success: true, message: 'Workshop created.', workshop });
     } catch (err) {
@@ -188,6 +270,36 @@ const updateWorkshop = async (req, res) => {
         }
         const existing = existingResult.rows[0];
         const oldStaffIds = existing.assigned_staff_ids || [];
+
+        const targetDate = date !== undefined ? date : existing.date;
+        const targetTime = time !== undefined ? time : existing.time;
+        const targetDuration = duration !== undefined ? duration : existing.duration;
+
+        let newStaffIds = oldStaffIds;
+        if (assigned_staff_ids !== undefined) {
+            newStaffIds = assigned_staff_ids;
+        }
+
+        // Check conflicts before updating
+        if (assigned_staff_ids !== undefined || date !== undefined || time !== undefined || duration !== undefined) {
+            for (const staffId of newStaffIds) {
+                const conflictCheck = await checkStaffAllocationConflict({
+                    staffId,
+                    date: targetDate,
+                    timeStr: targetTime,
+                    durationMins: targetDuration || 60,
+                    type: 'workshop',
+                    sessionId: existing.id
+                });
+
+                if (conflictCheck.conflict) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Conflict: Staff already allocated at this time or daily limit exceeded."
+                    });
+                }
+            }
+        }
 
         let savedImageUrl = undefined;
         if (image_url !== undefined) {
@@ -238,6 +350,9 @@ const updateWorkshop = async (req, res) => {
             values
         );
 
+        // Sync workshop allocations
+        await syncWorkshopAllocations(req.params.id);
+
         return res.json({ success: true, message: 'Workshop updated.', workshop: result.rows[0] });
     } catch (err) {
         console.error('updateWorkshop error:', err);
@@ -249,16 +364,25 @@ const updateWorkshop = async (req, res) => {
 const deleteWorkshop = async (req, res) => {
     try {
         const existing = await query('SELECT assigned_staff_ids FROM workshops WHERE id = $1', [req.params.id]);
-        if (existing.rows.length && existing.rows[0].assigned_staff_ids) {
-            for (const staffId of existing.rows[0].assigned_staff_ids) {
-                await deallocateStaffMember(staffId);
-            }
+        const oldStaffIds = existing.rows.length && existing.rows[0].assigned_staff_ids ? existing.rows[0].assigned_staff_ids : [];
+
+        for (const staffId of oldStaffIds) {
+            await deallocateStaffMember(staffId);
         }
 
         const result = await query('DELETE FROM workshops WHERE id = $1 RETURNING id', [req.params.id]);
         if (!result.rows.length) {
             return res.status(404).json({ success: false, message: 'Workshop not found.' });
         }
+
+        // Clean up allocations table
+        await query(`DELETE FROM allocations WHERE type = 'workshop' AND session_id = $1`, [String(req.params.id)]);
+
+        // Sync old staff members
+        for (const staffId of oldStaffIds) {
+            await syncStaffMemberStatus(staffId);
+        }
+
         return res.json({ success: true, message: 'Workshop deleted.' });
     } catch (err) {
         console.error('deleteWorkshop error:', err);
@@ -282,6 +406,25 @@ const updateWorkshopStaff = async (req, res) => {
         const workshop = wsResult.rows[0];
         const oldStaffIds = workshop.assigned_staff_ids || [];
 
+        // Check conflict for all new assigned_staff_ids
+        for (const staffId of assigned_staff_ids) {
+            const conflictCheck = await checkStaffAllocationConflict({
+                staffId,
+                date: workshop.date,
+                timeStr: workshop.time,
+                durationMins: workshop.duration || 60,
+                type: 'workshop',
+                sessionId: workshop.id
+            });
+
+            if (conflictCheck.conflict) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Conflict: Staff already allocated at this time or daily limit exceeded."
+                });
+            }
+        }
+
         const removedStaff = oldStaffIds.filter(id => !assigned_staff_ids.includes(id));
         const addedStaff = assigned_staff_ids.filter(id => !oldStaffIds.includes(id));
 
@@ -293,6 +436,9 @@ const updateWorkshopStaff = async (req, res) => {
         for (const staffId of addedStaff) {
             await allocateStaffToWorkshop(staffId, workshop);
         }
+
+        // Sync workshop allocations
+        await syncWorkshopAllocations(workshop.id);
 
         const updated = await query('SELECT * FROM workshops WHERE id = $1', [req.params.id]);
         return res.json({ success: true, message: 'Staff allocations updated.', workshop: updated.rows[0] });
@@ -321,6 +467,9 @@ const completeWorkshopAllocation = async (req, res) => {
 
         await query('UPDATE workshops SET assigned_staff_ids = $1 WHERE id = $2', [JSON.stringify(staffIds), req.params.id]);
         await deallocateStaffMember(staff_id);
+
+        // Sync workshop allocations
+        await syncWorkshopAllocations(workshop.id);
 
         return res.json({ success: true, message: 'Staff allocation completed. Staff is now Available.' });
     } catch (err) {

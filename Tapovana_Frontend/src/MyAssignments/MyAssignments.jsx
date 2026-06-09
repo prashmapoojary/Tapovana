@@ -123,14 +123,14 @@ function MyAssignments() {
       .filter(a => a.staffId === activeStaffId)
       .map(a => ({
         ...a,
-        status: a.status === "expired" ? "expired" : "active"
+        status: a.status === "expired" ? "expired" : a.status === "cancelled" ? "cancelled" : "active"
       }));
 
     const fromBackend = backendAssignments
       .filter(a => a.staffId === activeStaffId)
       .map(a => ({
         ...a,
-        status: a.status === "expired" ? "expired" : "active"
+        status: a.status === "expired" ? "expired" : a.status === "cancelled" ? "cancelled" : "active"
       }));
 
     // Merge: deduplicate by sessionId
@@ -323,6 +323,7 @@ function MyAssignments() {
             <option value="all">All Statuses</option>
             <option value="active">Active & Upcoming</option>
             <option value="expired">Completed</option>
+            <option value="cancelled">Cancelled</option>
           </select>
         </div>
       </div>
@@ -345,7 +346,7 @@ function MyAssignments() {
                   {a.type === 'vedic_program' ? 'Vedic Program' : a.type}
                 </span>
                 <span className={`ma-status-badge ${a.status}`}>
-                  {a.status === 'active' ? 'Active / Scheduled' : 'Completed'}
+                  {a.status === 'active' ? 'Active / Scheduled' : a.status === 'cancelled' ? 'This service has been cancelled.' : 'Completed'}
                 </span>
               </div>
 
@@ -356,7 +357,9 @@ function MyAssignments() {
                     <CalendarIcon />
                     <span className="ma-detail-label">Timeline:</span>
                     <span className="ma-detail-value">
-                      {getFormatDate(a.startDate)}{a.endDate && a.endDate !== a.startDate ? ` - ${getFormatDate(a.endDate)}` : ''}
+                      {getFormatDate(a.startDate)}
+                      {a.type === 'service' && a.bookingTime ? ` at ${a.bookingTime}` : ''}
+                      {a.endDate && a.endDate !== a.startDate ? ` - ${getFormatDate(a.endDate)}` : ''}
                     </span>
                   </div>
                   <div className="ma-detail-item">
@@ -370,6 +373,11 @@ function MyAssignments() {
                     <span className="ma-detail-value">{a.sessionId || a.id}</span>
                   </div>
                 </div>
+                {a.status === 'cancelled' && (
+                  <div className="ma-cancelled-message">
+                    This service has been cancelled.
+                  </div>
+                )}
               </div>
 
               {validationError?.id === a.id && (
@@ -384,7 +392,7 @@ function MyAssignments() {
 
               <div className="ma-card-footer">
                 <span className="ma-assigned-date">Assigned: {getFormatDate(a.createdAt)}</span>
-                {a.status === 'active' && (
+                {a.status === 'active' && a.type !== 'service' && (
                   <button
                     className="ma-action-btn"
                     onClick={() => handleMarkAsComplete(a.id, a.sessionId, a.endDate, a.type)}

@@ -812,65 +812,41 @@ const getTeamMemberAllocations = async (req, res) => {
     try {
         const userId = req.params.id;
         
-        // Ensure user exists and get their availability status
-        const userRes = await query(`SELECT availability_status, allocation_details FROM team_members WHERE id = $1`, [userId]);
+        // Ensure user exists
+        const userRes = await query(`SELECT id FROM team_members WHERE id = $1`, [userId]);
         if (!userRes.rows.length) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
         
-        const user = userRes.rows[0];
-        const allocDetails = user.allocation_details;
-        const isAllocated = user.availability_status === 'Allocated';
-        
-        // 1. Fetch workshops assigned to this user
-        const workshopsRes = await query(
-            `SELECT id, title, date, status FROM workshops WHERE assigned_staff_ids @> $1::jsonb`,
-            [JSON.stringify([userId])]
-        );
-        const workshops = workshopsRes.rows.map(w => {
-            const endDate = new Date(w.date);
-            const isCompleted = new Date() > endDate;
-            let status = 'Pending';
-            if (isCompleted) status = 'Completed';
-            else if (w.status === 'Cancelled') status = 'Cancelled';
-            else if (isAllocated && allocDetails?.sessionId === w.id) status = 'In Progress';
-            
-            return {
-                id: w.id,
-                sessionTitle: w.title,
-                startDate: w.date,
-                status: status,
-                type: 'workshop'
-            };
-        });
-
-        // 2. Fetch services assigned to this user from bookings
-        const servicesRes = await query(
-            `SELECT id, service_name, user_name, status, booking_date FROM bookings WHERE therapist_id = $1 AND status IN ('CONFIRMED', 'COMPLETED') ORDER BY booking_date DESC`,
+        // Fetch all allocations from unified table
+        const allocationsRes = await query(
+            `SELECT * FROM allocations WHERE staff_id = $1 ORDER BY start_date DESC`,
             [userId]
         );
-        const services = servicesRes.rows.map(s => {
-            return {
-                id: s.id,
-                sessionTitle: `${s.service_name} - ${s.user_name || 'Guest'} (#${s.id})`,
-                type: 'service',
-                status: s.status === 'CONFIRMED' ? 'Active' : 'Completed'
-            };
-        });
 
-        // 3. Vedic Programs (Rely on allocation_details JSON if it contains a vedic program)
+        const workshops = [];
+        const services = [];
         const vedic_programs = [];
-        if (allocDetails && allocDetails.type === 'vedic_program') {
-            const endDate = new Date(allocDetails.endDate);
-            const isCompleted = new Date() > endDate;
-            vedic_programs.push({
-                id: allocDetails.id || `vp-${allocDetails.sessionId}`,
-                sessionTitle: allocDetails.sessionTitle,
-                startDate: allocDetails.startDate,
-                endDate: allocDetails.endDate,
-                status: isCompleted ? 'Completed' : 'Ongoing',
-                type: 'vedic_program'
-            });
+
+        for (const a of allocationsRes.rows) {
+            const item = {
+                id: a.session_id,
+                sessionTitle: a.session_title,
+                startDate: a.start_date,
+                endDate: a.end_date,
+                type: a.type,
+                status: a.status === 'active' ? 'Ongoing' : 'Completed'
+            };
+
+            if (a.type === 'workshop') {
+                item.status = a.status === 'active' ? 'In Progress' : 'Completed';
+                workshops.push(item);
+            } else if (a.type === 'service') {
+                item.status = a.status === 'active' ? 'Active' : 'Completed';
+                services.push(item);
+            } else if (a.type === 'vedic_program') {
+                vedic_programs.push(item);
+            }
         }
         
         return res.json({ 
@@ -884,9 +860,82 @@ const getTeamMemberAllocations = async (req, res) => {
     }
 };
 
+const getAllAllocations = async (req, res) => {
+    try {
+        const result = await query(
+            `SELECT a.*, tm.first_name, tm.last_name, r.name AS role
+             FROM allocations a
+             JOIN team_members tm ON tm.id = a.staff_id
+             JOIN roles r ON r.id = tm.role_id
+             ORDER BY a.start_date DESC`
+        );
+
+        const allocations = result.rows.map(a => ({
+            id: a.id,
+            type: a.type,
+            staffId: a.staff_id,
+            staffName: `${a.first_name || ''} ${a.last_name || ''}`.trim(),
+            staffRole: a.role,
+            sessionTitle: a.session_title,
+            sessionId: a.session_id,
+            startDate: a.start_date,
+            bookingTime: a.booking_time,
+            endDate: a.end_date,
+            status: a.status === 'active' ? 'active' : 'expired',
+            createdAt: a.created_at
+        }));
+
+        return res.json({ success: true, allocations });
+    } catch (err) {
+        console.error('getAllAllocations error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// ─── Update allocation status only (accessible to any authenticated user) ────
+const updateAllocationStatus = async (req, res) => {
+    const { availability_status, allocation_details } = req.body;
+    const targetId = req.params.id;
+
+    try {
+        const fields = [];
+        const values = [];
+        let idx = 1;
+
+        if (availability_status !== undefined) {
+            fields.push(`availability_status = $${idx++}`);
+            values.push(availability_status);
+        }
+        if (allocation_details !== undefined) {
+            fields.push(`allocation_details = $${idx++}`);
+            values.push(allocation_details ? JSON.stringify(allocation_details) : null);
+        }
+
+        if (!fields.length) {
+            return res.status(400).json({ success: false, message: 'No allocation fields to update.' });
+        }
+
+        values.push(targetId);
+        const result = await query(
+            `UPDATE team_members SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${idx} RETURNING id`,
+            values
+        );
+
+        if (!result.rows.length) {
+            return res.status(404).json({ success: false, message: 'Member not found.' });
+        }
+
+        return res.json({ success: true, message: 'Allocation status updated.' });
+    } catch (err) {
+        console.error('updateAllocationStatus error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
 module.exports = {
     getTeam,
     getTeamMember,
+    getAllAllocations,
     addTeamMember,
     updateTeamMember,
     deleteTeamMember,
@@ -899,4 +948,5 @@ module.exports = {
     getTeamMemberAllocations,
     deleteTeamMemberFrontend,
     updateSelfProfile,
+    updateAllocationStatus,
 };

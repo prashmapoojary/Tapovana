@@ -161,8 +161,8 @@ function Transactions() {
 
       {/* Advanced filtering panel card */}
       <section className="filters-card">
-        <div className="bookings-filters">
-          <div className="search-box" style={{ flex: 1.2 }}>
+        <div className="txn-filters-row">
+          <div className="txn-search-box">
             <img src={SearchIcon} className="search-icon" alt="" />
             <input 
               type="text" 
@@ -172,10 +172,10 @@ function Transactions() {
             />
           </div>
 
-          <div className="filter-select-wrapper" style={{ minWidth: "120px" }}>
+          <div className="txn-filter-group">
             <label>Gateway</label>
             <select 
-              className="filter-select"
+              className="txn-filter-select"
               value={gateway}
               onChange={(e) => { setGateway(e.target.value); setPage(1); }}
             >
@@ -185,10 +185,10 @@ function Transactions() {
             </select>
           </div>
 
-          <div className="filter-select-wrapper" style={{ minWidth: "110px" }}>
+          <div className="txn-filter-group">
             <label>Method</label>
             <select 
-              className="filter-select"
+              className="txn-filter-select"
               value={method}
               onChange={(e) => { setMethod(e.target.value); setPage(1); }}
             >
@@ -200,10 +200,10 @@ function Transactions() {
             </select>
           </div>
 
-          <div className="filter-select-wrapper" style={{ minWidth: "110px" }}>
+          <div className="txn-filter-group">
             <label>Status</label>
             <select 
-              className="filter-select"
+              className="txn-filter-select"
               value={status}
               onChange={(e) => { setStatus(e.target.value); setPage(1); }}
             >
@@ -215,21 +215,21 @@ function Transactions() {
             </select>
           </div>
 
-          <div className="date-input-wrapper">
+          <div className="txn-filter-group">
             <label>From</label>
             <input 
               type="date" 
-              className="date-input" 
+              className="txn-date-input" 
               value={dateFrom}
               onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
             />
           </div>
 
-          <div className="date-input-wrapper">
+          <div className="txn-filter-group">
             <label>To</label>
             <input 
               type="date" 
-              className="date-input" 
+              className="txn-date-input" 
               value={dateTo}
               onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
             />
