@@ -71,7 +71,8 @@
   position: relative;
   z-index: 10;
   margin-bottom: 16px;
-  overflow: visible !important; /* Allow dropdowns to overflow downwards */
+  overflow: visible !important;
+  /* Allow dropdowns to overflow downwards */
 }
 
 .filters-inner {
@@ -81,17 +82,19 @@
   min-height: 48px;
   padding: 0 16px;
   position: relative;
-  
+
   /* Horizontal scroll logic */
   overflow-x: auto;
-  overflow-y: hidden; /* We hide Y to prevent vertical scrolling of the tall padding */
+  overflow-y: hidden;
+  /* We hide Y to prevent vertical scrolling of the tall padding */
   padding-bottom: 300px;
   margin-bottom: -300px;
-  
+
   -ms-overflow-style: none;
   scrollbar-width: none;
   min-width: 100%;
-  pointer-events: none; /* Allow clicks to pass through the invisible tall area */
+  pointer-events: none;
+  /* Allow clicks to pass through the invisible tall area */
 }
 
 .filters-inner::-webkit-scrollbar {
@@ -114,8 +117,9 @@
   pointer-events: auto;
 }
 
-.filters-inner > div {
-  pointer-events: auto; /* Re-enable clicks for the content */
+.filters-inner>div {
+  pointer-events: auto;
+  /* Re-enable clicks for the content */
   height: 48px;
   display: flex;
   align-items: center;
@@ -212,7 +216,8 @@
 
 .dropdown-menu {
   position: absolute;
-  top: calc(100% + 4px); /* Open downwards for consistency with other pages */
+  top: calc(100% + 4px);
+  /* Open downwards for consistency with other pages */
   right: 0;
   background: #FFFFFF;
   border: 1px solid rgba(205, 167, 81, 0.2);
@@ -298,6 +303,9 @@
   text-transform: uppercase;
   padding: 12px 16px;
   vertical-align: middle;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .services-table td {

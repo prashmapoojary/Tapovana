@@ -120,6 +120,25 @@
   min-width: 120px;
 }
 
+.filter-dropdown:hover {
+  border-color: #cda751;
+  box-shadow: 0 0 0 3px rgba(205, 167, 81, 0.1);
+}
+
+.filter-dropdown:focus-within {
+  border-color: #cda751;
+  box-shadow: 0 0 0 3px rgba(205, 167, 81, 0.1);
+}
+
+/* Gold highlight on option hover (Firefox + fallback) */
+.filter-dropdown option:hover,
+.filter-dropdown option:focus {
+  background-color: #cda751;
+  color: white;
+  /* Chrome/Edge workaround for OS-native select rendering */
+  background: linear-gradient(#cda751, #cda751);
+}
+
 .dropdown-icon {
   width: 14px;
 }
@@ -137,9 +156,9 @@
 
 .table-card {
   background: white;
-  border-radius: 14px;
-  border: 1px solid #eceff3;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(205, 167, 81, 0.1);
+  box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
   margin-top: 20px;
 
   display: flex;
@@ -165,29 +184,30 @@ thead {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #fafbfc;
-  position: sticky;
-  top: 0;
-  z-index: 1;
+  background: #F8F7F6;
 }
 
 th {
   text-align: left;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
   font-size: 12px;
-  font-weight: 600;
-  color: #8c9aa8;
-  padding: 16px 20px;
-  background: #fafbfc;
+  line-height: 16px;
+  letter-spacing: 0.6px;
+  color: #64748B;
+  text-transform: uppercase;
+  padding: 12px 16px;
 }
 
 td {
-  padding: 16px 20px;
+  padding: 12px 16px;
+  font-family: 'Manrope', sans-serif;
   font-size: 14px;
-  color: #4b5563;
+  color: #0F172A;
 }
 
 tbody tr {
-  border-top: 1px solid #f1f3f6;
+  border-top: 1px solid rgba(205, 167, 81, 0.1);
 }
 
 .user-cell {
@@ -285,11 +305,13 @@ td:last-child {
   justify-content: space-between;
   align-items: center;
 
-  padding: 14px 20px;
-  border-top: 1px solid #f1f3f6;
+  padding: 9.5px 20px;
+  border-top: none;
   flex-shrink: 0;
-  font-size: 13px;
-  color: #8c9aa8;
+  font-size: 14px;
+  color: #64748B;
+  background: #F8F7F6;
+  border-radius: 0 0 8px 8px;
 }
 
 .pagination-controls {

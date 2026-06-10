@@ -419,7 +419,7 @@ export default function Membership() {
 
       {/* ── Tier Overview Cards ── */}
       <section className="mem-tier-cards">
-        <div className="mem-tier-card" style={{ borderColor: "#cbd5e0", background: "#f7fafc" }}>
+        <div className="mem-tier-card">
           <div className="mem-tier-card-top">
             <div className="mem-tier-badge" style={{ background: "#718096", color: "white" }}>Overview</div>
           </div>
@@ -435,7 +435,7 @@ export default function Membership() {
           <div
             key={key}
             className="mem-tier-card"
-            style={{ borderColor: cfg.border, background: cfg.bg, cursor: "pointer" }}
+            style={{ cursor: "pointer" }}
             onClick={() => handleOpenTierEdit(key)}
           >
             <div className="mem-tier-card-top">
@@ -560,7 +560,6 @@ export default function Membership() {
               <button
                 key={t}
                 className={`mem-filter-btn ${tierFilter === t ? "active" : ""}`}
-                style={tierFilter === t && t !== "ALL" ? { background: tierConfig[t]?.color, borderColor: tierConfig[t]?.color, color: "white" } : {}}
                 onClick={() => setTierFilter(t)}
               >
                 {t === "ALL" ? "All Tiers" : tierConfig[t].label}
@@ -666,11 +665,6 @@ export default function Membership() {
         <div className="mem-table-panel">
           {/* ── Members Table ── */}
           <div className="mem-table-wrap">
-            <div className="mem-table-header">
-              {dataLoading
-                ? "Loading members..."
-                : <span>{filteredMembers.length} members found</span>}
-            </div>
             <div className="table-scroll">
               <table className="mem-table">
                 <thead>

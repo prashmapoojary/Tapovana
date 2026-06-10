@@ -678,7 +678,6 @@ export default function Workshops() {
             <div className="ws-status-tabs">
               {tabs.map(t => (
                 <button key={t} className={"ws-status-tab" + (activeTab === t ? " active" : "")}
-                  style={activeTab === t && t !== "ALL" ? { background: STATUS_CONFIG[t]?.bg, color: STATUS_CONFIG[t]?.color, borderColor: (STATUS_CONFIG[t]?.color || "#CDA751") + "66" } : {}}
                   onClick={() => setActiveTab(t)}>
                   {t === "ALL" ? "All" : STATUS_CONFIG[t]?.label || t}
                 </button>
