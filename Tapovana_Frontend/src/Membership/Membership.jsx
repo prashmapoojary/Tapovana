@@ -153,11 +153,16 @@ export default function Membership() {
             join = new Date(m.start_date);
           } else if (m.purchase_date) {
             join = new Date(m.purchase_date);
+          } else {
+            join = new Date(); // If no join date, use today
           }
 
           let expiry = null;
           if (m.end_date) {
             expiry = new Date(m.end_date);
+          } else {
+            expiry = new Date(join);
+            expiry.setMonth(expiry.getMonth() + 1); // 1 month validity
           }
 
           return {

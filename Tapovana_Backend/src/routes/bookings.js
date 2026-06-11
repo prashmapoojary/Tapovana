@@ -5,7 +5,8 @@ const {
     getBookingById,
     updateBookingStatus,
     assignTherapist,
-    syncFromRender
+    syncFromRender,
+    deleteBooking
 } = require('../controllers/bookingsController');
 
 const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR')];
@@ -18,6 +19,7 @@ router.get('/:id', getBookingById);
 // Admin-only actions
 router.patch('/:id/status', ...adminOnly, updateBookingStatus);
 router.patch('/:id/therapist', ...adminOnly, assignTherapist);
+router.delete('/:id', ...adminOnly, deleteBooking);
 
 // Sync from Render API
 router.post('/sync', ...adminOnly, syncFromRender);

@@ -689,4 +689,40 @@ const syncFromRender = async (req, res) => {
     }
 };
 
-module.exports = { getAllBookings, getBookingById, updateBookingStatus, assignTherapist, syncFromRender };
+// DELETE BOOKING
+const deleteBooking = async (req, res) => {
+    try {
+        const bookingId = req.params.id;
+        const bookingRes = await query('SELECT * FROM bookings WHERE id = $1', [bookingId]);
+        if (!bookingRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Booking not found.' });
+        }
+
+        // First, mark all allocations as removed (so MyAssignments removes them)
+        const allocRes = await query(
+            `UPDATE allocations SET status = 'removed' WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
+            [String(bookingId), `bk-alloc-${bookingId}-%`]
+        );
+
+        // Sync staff status for any allocated staff
+        const staffToSyncRes = await query(
+            `SELECT DISTINCT staff_id FROM allocations WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
+            [String(bookingId), `bk-alloc-${bookingId}-%`]
+        );
+        for (const row of staffToSyncRes.rows) {
+            if (row.staff_id) {
+                await syncStaffMemberStatus(row.staff_id).catch(() => {});
+            }
+        }
+
+        // Now delete the booking from the local DB
+        await query('DELETE FROM bookings WHERE id = $1', [bookingId]);
+
+        return res.json({ success: true, message: 'Booking deleted successfully.' });
+    } catch (err) {
+        console.error('deleteBooking error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+module.exports = { getAllBookings, getBookingById, updateBookingStatus, assignTherapist, syncFromRender, deleteBooking };

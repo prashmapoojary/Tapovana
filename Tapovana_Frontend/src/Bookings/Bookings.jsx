@@ -337,6 +337,38 @@ function Bookings() {
     }
   };
 
+  const handleDeleteBooking = async (booking) => {
+    const contextName = booking.user_name || booking.service_name || "Guest";
+    const dummyImage = "https://ui-avatars.com/api/?name=" + encodeURIComponent(contextName) + "&background=dc2626&color=fff";
+
+    const confirmed = await triggerConfirm(
+      `Are you sure you want to delete this booking? This action cannot be undone.`,
+      dummyImage
+    );
+
+    if (confirmed) {
+      try {
+        const res = await apiFetch(`/api/bookings/${booking.id}`, {
+          method: "DELETE"
+        });
+
+        if (res.success) {
+          // Remove booking from local state
+          setBookings(prev => prev.filter(b => String(b.id) !== String(booking.id)));
+          // If the deleted booking was in the drawer, close it
+          if (selectedBooking && String(selectedBooking.id) === String(booking.id)) {
+            setSelectedBooking(null);
+          }
+          triggerAlert("Booking deleted successfully.", true);
+        } else {
+          triggerAlert(res.message || "Failed to delete booking");
+        }
+      } catch (error) {
+        triggerAlert(error.message || "An error occurred while deleting the booking");
+      }
+    }
+  };
+
   return (
     <div className="bookings-container">
       {/* ── Drawer ── */}
@@ -884,6 +916,26 @@ function Bookings() {
                                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                               >
                                 View
+                              </div>
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenActionMenu(null);
+                                  handleDeleteBooking(b);
+                                }}
+                                style={{
+                                  padding: "10px 16px",
+                                  cursor: "pointer",
+                                  fontSize: "14px",
+                                  color: "#dc2626",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px"
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = "#fef2f2"}
+                                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                              >
+                                Delete
                               </div>
                             </div>
                           )}
