@@ -97,17 +97,18 @@
 
 .mem-tier-card {
   background: white;
-  border: 2px solid #CDA751;
+  border: 2px solid #e2e8f0;
   border-radius: 14px;
-  padding: 20px;
+  padding: 12px 30px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.02);
   transition: all 0.25s ease;
 }
 
 .mem-tier-card:hover {
+  border-color: #CDA751;
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
 }
@@ -176,6 +177,12 @@
   font-size: 11px;
   color: #a0aec0;
   font-style: italic;
+  margin-top: 2px;
+}
+
+.mem-tier-benefits-link {
+  font-size: 11px;
+  font-weight: 500;
   margin-top: 2px;
 }
 
@@ -310,13 +317,14 @@
 }
 
 .mem-table td {
-  padding: 12px 16px;
+  padding: 10px 16px;
   border-top: 1px solid rgba(205, 167, 81, 0.1);
   border-bottom: none;
   font-family: 'Manrope', sans-serif;
   font-size: 14px;
   color: #0F172A;
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .mem-row {
@@ -343,33 +351,33 @@
 }
 
 .mem-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
 }
 
 .mem-name {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: #2d3748;
 }
 
 .mem-email {
-  font-size: 13px;
+  font-size: 12px;
   color: #a0aec0;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .mem-tier-pill {
   padding: 6px 14px;
   border-radius: 20px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -393,7 +401,7 @@
 }
 
 .mem-expiry-warn {
-  font-size: 11px;
+  font-size: 13px;
   color: #e67e22;
   font-weight: 600;
 }
@@ -408,12 +416,14 @@
 }
 
 .mem-status-pill.active {
-  background: rgba(46, 204, 113, 0.12);
+  background: none;
+  padding: 0;
   color: #27ae60;
 }
 
 .mem-status-pill.expired {
-  background: rgba(231, 76, 60, 0.1);
+  background: none;
+  padding: 0;
   color: #e74c3c;
 }
 
@@ -427,7 +437,7 @@
   background: rgba(15, 23, 42, 0.10);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  z-index: 6;
+  z-index: 999;
   display: flex;
   justify-content: flex-end;
   animation: memFadeIn 0.2s ease;
@@ -673,7 +683,8 @@
 }
 
 .mem-status-pill.inactive {
-  background: rgba(231, 76, 60, 0.1);
+  background: none;
+  padding: 0;
   color: #e74c3c;
 }
 
@@ -802,4 +813,43 @@
 
 .table-scroll::-webkit-scrollbar {
   display: none;
+}
+
+.action-btn {
+  font-family: 'Manrope', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+  color: #718096; /* grey text */
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.action-btn:hover {
+  color: #000000; /* black text */
+  background-color: #e2e8f0; /* grey background */
+  border-color: #cbd5e1;
+}
+
+.action-btn:active {
+  color: #ffffff; /* white text */
+  background-color: #cda751; /* gold background */
+  border-color: #cda751;
+}
+
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.action-icon {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  opacity: 0.8;
 }

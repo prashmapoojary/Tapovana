@@ -257,9 +257,17 @@ function Bookings() {
     const dummyImage = "https://ui-avatars.com/api/?name=" + encodeURIComponent(contextName) + "&background=cda751&color=fff";
 
     const isConfirmed = newStatus === 'CONFIRMED';
-    const msg = isConfirmed && assignedStaffIds.length > 0
-      ? `Are you sure you want to confirm this booking and allocate 1 staff member?`
-      : `Are you sure you want to change status of ${contextName} to ${newStatus}?`;
+    const isFirstAllocation = isConfirmed && currentStatus !== 'CONFIRMED';
+    const isReAllocation = isConfirmed && currentStatus === 'CONFIRMED' && staffIdsChanged;
+
+    let msg;
+    if (isFirstAllocation && assignedStaffIds.length > 0) {
+      msg = "Are you sure you want to confirm this booking and allocate 1 staff member(s)?";
+    } else if (isReAllocation) {
+      msg = "Are you sure you want to re-allocate this booking and assign a new staff member? The previously allocated staff will be removed.";
+    } else {
+      msg = `Are you sure you want to change status of ${contextName} to ${newStatus}?`;
+    }
 
     const confirmed = await triggerConfirm(msg, dummyImage);
 
@@ -289,7 +297,11 @@ function Bookings() {
           setSelectedBooking(updatedBooking);
 
           if (isConfirmed && assignedStaffIds.length > 0) {
-            triggerAlert(`Booking confirmed and 1 staff member allocated successfully`, true);
+            if (isReAllocation) {
+              triggerAlert("Booking re-allocated. Previous staff removed, new staff assigned.", true);
+            } else {
+              triggerAlert("Booking confirmed and 1 staff member allocated successfully.", true);
+            }
           } else {
             triggerAlert(`Booking ${newStatus.toLowerCase()} successfully`, true);
           }

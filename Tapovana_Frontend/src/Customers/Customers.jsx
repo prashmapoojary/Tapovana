@@ -285,23 +285,8 @@ function Customers() {
                 </div>
               </div>
 
-              <div className="cust-drawer-section">
-                <h4 className="cust-section-title">Update Membership Tier</h4>
-                <div className="cust-membership-row">
-                  <select className="tier-select" value={newMembership}
-                    onChange={(e) => setNewMembership(e.target.value)}
-                    disabled={!canEdit || selectedCustomer.status === "ARCHIVED"}>
-                    <option value="NONE">Regular (No Discount)</option>
-                    <option value="SILVER">Silver (10% Off)</option>
-                    <option value="GOLD">Gold (20% Off)</option>
-                    <option value="PLATINUM">Platinum (30% Off)</option>
-                  </select>
-                  <button className="cust-btn-primary" onClick={handleUpdateMembership}
-                    disabled={!canEdit || actionLoading || selectedCustomer.status === "ARCHIVED"}>
-                    {actionLoading ? "..." : "Update"}
-                  </button>
-                </div>
-              </div>
+
+
 
               <div className="cust-drawer-section">
                 <h4 className="cust-section-title">Admin Notes</h4>

@@ -11,7 +11,8 @@ export async function apiFetch(path, options = {}) {
 
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const url = path.startsWith("http://") || path.startsWith("https://") ? path : `${API_BASE}${path}`;
+  const res = await fetch(url, { ...options, headers });
 
   if (res.status === 401) {
     sessionStorage.clear();
