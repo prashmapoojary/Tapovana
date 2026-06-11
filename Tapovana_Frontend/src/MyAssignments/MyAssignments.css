@@ -64,69 +64,48 @@
   padding-right: 8px;
 }
 
-/* Stats Cards Grid */
+/* Stats Cards Grid — matches Membership .mem-tier-cards */
 .ma-stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
+  margin-bottom: 24px;
 }
 
 .ma-stat-card {
   background: white;
-  border-radius: 8px !important;
-  padding: 20px;
-  border: 1px solid #CDA751 !important;
+  border: 2px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px 30px;
   display: flex;
-  align-items: center;
-  gap: 16px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.02);
+  transition: all 0.25s ease;
 }
 
 .ma-stat-card:hover {
-  box-shadow: 0 12px 20px -8px rgba(205, 167, 81, 0.15);
+  border-color: #CDA751;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
 }
 
 .ma-stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ma-stat-icon.total {
-  background: rgba(205, 167, 81, 0.1);
-  color: #cda751;
-}
-
-.ma-stat-icon.active {
-  background: rgba(205, 167, 81, 0.1);
-  color: #cda751;
-}
-
-.ma-stat-icon.expired {
-  background: rgba(100, 116, 139, 0.1);
-  color: #64748b;
-}
-
-.ma-stat-details {
-  display: flex;
-  flex-direction: column;
+  font-size: 22px;
+  margin-bottom: 4px;
 }
 
 .ma-stat-value {
   font-size: 24px;
-  font-weight: 700;
-  color: #0f172a;
+  font-weight: 800;
   line-height: 1;
-  margin-bottom: 4px;
+  margin: 2px 0;
+  color: #0f172a;
 }
 
 .ma-stat-label {
-  font-size: 13px;
-  color: #64748b;
+  font-size: 12px;
+  color: #7b8a9a;
   font-weight: 500;
 }
 
@@ -292,6 +271,11 @@
   color: #ef4444;
 }
 
+.ma-status-badge.removed {
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748b;
+}
+
 .ma-cancelled-message {
   margin-top: 8px;
   color: #ef4444;
@@ -437,6 +421,18 @@
   color: #64748b;
   margin: 0;
   line-height: 1.6;
+}
+
+@media (max-width: 1200px) {
+  .ma-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .ma-stats-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {

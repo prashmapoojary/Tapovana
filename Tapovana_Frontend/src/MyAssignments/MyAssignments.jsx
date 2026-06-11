@@ -3,6 +3,7 @@ import './MyAssignments.css';
 import { useAllocations } from '../utils/AllocationContext';
 import { getUser } from '../utils/session';
 import { apiFetch } from '../api/http';
+import { getImageUrl } from '../utils/image';
 import DefaultAvatar from '../assets/profileIconDefault.png';
 
 // Icons
@@ -82,18 +83,57 @@ function MyAssignments() {
   useEffect(() => {
     const fetchMemberships = async () => {
       try {
-        const response = await fetch('https://tapoclg.onrender.com/api/membership');
-        const data = await response.json();
-        if (data.success && data.data) {
-          setMemberships(data.data);
-        } else if (Array.isArray(data)) {
-          setMemberships(data);
+        const res = await apiFetch("https://tapoclg.onrender.com/api/membership");
+        console.log("Membership API response:", res);
+        if (res && (res.success || Array.isArray(res))) {
+          const rawList = res.memberships || res.data || (Array.isArray(res) ? res : []);
+          console.log("Raw memberships list:", rawList);
+          const mappedMembers = rawList.map((m) => ({
+            id: m.id || m.user_id,
+            name: m.name || m.customer_name,
+            email: m.email || m.customer_email,
+            profile_photo_url: m.profile_photo_url || m.profile_pic || null
+          }));
+          console.log("Mapped memberships:", mappedMembers);
+          setMemberships(mappedMembers);
         }
       } catch (err) {
         console.error("Failed to fetch memberships:", err);
       }
     };
     fetchMemberships();
+  }, []);
+
+  // ─── Fetch bookings data for customer info ───
+  const [bookings, setBookings] = useState([]);
+  useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        const res = await apiFetch('/api/bookings');
+        if (res.success) {
+          setBookings(res.bookings || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch bookings:', err);
+      }
+    };
+    fetchBookings();
+  }, []);
+
+  // ─── Fetch services data for service images ───
+  const [services, setServices] = useState([]);
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const res = await apiFetch('/api/services');
+        if (res.success) {
+          setServices(res.services || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch services:', err);
+      }
+    };
+    fetchServices();
   }, []);
 
   // ─── Refresh assignments after marking complete ───
@@ -138,19 +178,19 @@ function MyAssignments() {
   }, [isStaffUser]);
 
   // Merge backend + context allocations
-  const activeAssignments = useMemo(() => {
+  const allAssignments = useMemo(() => {
     const fromContext = contextAllocations
-      .filter(a => a.staffId === activeStaffId && a.status !== 'removed')
+      .filter(a => a.staffId === activeStaffId)
       .map(a => ({
         ...a,
-        status: a.status === 'expired' ? 'expired' : a.status === 'cancelled' ? 'cancelled' : 'active'
+        status: a.status === 'expired' ? 'expired' : a.status === 'cancelled' ? 'cancelled' : a.status === 'removed' ? 'removed' : 'active'
       }));
 
     const fromBackend = backendAssignments
-      .filter(a => a.staffId === activeStaffId && a.status !== 'removed')
+      .filter(a => a.staffId === activeStaffId)
       .map(a => ({
         ...a,
-        status: a.status === 'expired' ? 'expired' : a.status === 'cancelled' ? 'cancelled' : 'active'
+        status: a.status === 'expired' ? 'expired' : a.status === 'cancelled' ? 'cancelled' : a.status === 'removed' ? 'removed' : 'active'
       }));
 
     // Merge: deduplicate by sessionId
@@ -167,15 +207,16 @@ function MyAssignments() {
 
   // Stats
   const stats = useMemo(() => {
-    const active = activeAssignments.filter(a => a.status === 'active').length;
-    const expired = activeAssignments.filter(a => a.status === 'expired').length;
+    const active = allAssignments.filter(a => a.status === 'active').length;
+    const expired = allAssignments.filter(a => a.status === 'expired').length;
+    const removed = allAssignments.filter(a => a.status === 'removed').length;
     const total = active + expired;
-    return { total, active, expired };
-  }, [activeAssignments]);
+    return { total, active, expired, removed };
+  }, [allAssignments]);
 
   // Filtered assignments
   const filteredAssignments = useMemo(() => {
-    return activeAssignments.filter(a => {
+    return allAssignments.filter(a => {
       const matchesType = filterType === 'all' || a.type === filterType;
       const matchesStatus = filterStatus === 'all' || a.status === filterStatus;
       const matchesQuery = !searchQuery ||
@@ -183,7 +224,7 @@ function MyAssignments() {
         (a.sessionId || '').toLowerCase().includes(searchQuery.toLowerCase());
       return matchesType && matchesStatus && matchesQuery;
     });
-  }, [activeAssignments, filterType, filterStatus, searchQuery]);
+  }, [allAssignments, filterType, filterStatus, searchQuery]);
 
   // ─── Handle Mark as Done ───
   const handleMarkAsComplete = async (id, sessionId, endDate, type) => {
@@ -300,24 +341,23 @@ function MyAssignments() {
       <div className="ma-stats-grid">
         <div className="ma-stat-card">
           <div className="ma-stat-icon total"><TagIcon /></div>
-          <div className="ma-stat-details">
-            <span className="ma-stat-value">{stats.total}</span>
-            <span className="ma-stat-label">Total Assigned Sessions</span>
-          </div>
+          <span className="ma-stat-value">{stats.total}</span>
+          <span className="ma-stat-label">Total Assigned Sessions</span>
         </div>
         <div className="ma-stat-card">
           <div className="ma-stat-icon active"><CalendarIcon /></div>
-          <div className="ma-stat-details">
-            <span className="ma-stat-value">{stats.active}</span>
-            <span className="ma-stat-label">Active / Upcoming</span>
-          </div>
+          <span className="ma-stat-value">{stats.active}</span>
+          <span className="ma-stat-label">Active / Upcoming</span>
         </div>
         <div className="ma-stat-card">
           <div className="ma-stat-icon expired"><UserIcon /></div>
-          <div className="ma-stat-details">
-            <span className="ma-stat-value">{stats.expired}</span>
-            <span className="ma-stat-label">Completed</span>
-          </div>
+          <span className="ma-stat-value">{stats.expired}</span>
+          <span className="ma-stat-label">Completed</span>
+        </div>
+        <div className="ma-stat-card">
+          <div className="ma-stat-icon cancelled"><InfoIcon /></div>
+          <span className="ma-stat-value">{stats.removed}</span>
+          <span className="ma-stat-label">Removed</span>
         </div>
       </div>
 
@@ -352,105 +392,182 @@ function MyAssignments() {
       {/* Loading */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px', color: '#64748B' }}>Loading assignments...</div>
-      ) : filteredAssignments.length === 0 ? (
-        <div className="ma-empty-state">
-          <div className="ma-empty-icon"><InfoIcon /></div>
-          <h3>No Assignments Found</h3>
-          <p>There are currently no active or completed assignments for this staff member.</p>
-        </div>
       ) : (
-        <div className="ma-grid">
-          {filteredAssignments.map((a) => {
-            // Find profile photo from memberships
-            const member = memberships.find(m => {
-              const fullName = `${m.name || m.first_name || ''} ${m.last_name || ''}`.trim().toLowerCase();
-              return fullName.includes(a.staffName.toLowerCase()) || a.staffName.toLowerCase().includes(fullName);
-            });
-            const profilePhotoUrl = member?.profile_photo_url || null;
-            const handleImageError = (e) => {
-              e.target.onerror = null;
-              e.target.src = DefaultAvatar;
-            };
-
-            return (
-              <div key={a.id} className={`ma-card ${a.type}`}>
-                <div className="ma-card-header">
-                  <span className={`ma-card-type-tag ${a.type}`}>
-                    {a.type === 'vedic_program' ? 'Vedic Program' : a.type}
-                  </span>
-                  <span className={`ma-status-badge ${a.status}`}>
-                    {a.status === 'active' ? 'Active / Scheduled'
-                      : a.status === 'cancelled' ? 'This service has been cancelled.'
-                      : 'Completed'}
-                  </span>
-                </div>
-
-                <div className="ma-card-body">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                    <img
-                      src={profilePhotoUrl || DefaultAvatar}
-                      alt="Profile"
-                      onError={handleImageError}
-                      style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0' }}
-                    />
-                    <h3 className="ma-session-title" style={{ margin: 0 }}>{a.sessionTitle}</h3>
+        <>
+          {/* Services Section */}
+          {(() => {
+            const servicesAssignments = filteredAssignments.filter(a => a.type === 'service');
+            if (servicesAssignments.length > 0) {
+              return (
+                <div style={{ marginBottom: '32px' }}>
+                  <h2 style={{ marginBottom: '16px', fontSize: '20px', fontWeight: '700', color: '#0F172A' }}>Services</h2>
+                  <div className="ma-grid">
+                    {servicesAssignments.map((a) => renderAssignmentCard(a))}
                   </div>
-                  <div className="ma-details-list">
-                    <div className="ma-detail-item">
-                      <CalendarIcon />
-                      <span className="ma-detail-label">Timeline:</span>
-                      <span className="ma-detail-value">
-                        {getFormatDate(a.startDate)}
-                        {a.type === 'service' && a.bookingTime ? ` at ${a.bookingTime}` : ''}
-                        {a.endDate && a.endDate !== a.startDate ? ` - ${getFormatDate(a.endDate)}` : ''}
-                      </span>
-                    </div>
-                    <div className="ma-detail-item">
-                      <UserIcon />
-                      <span className="ma-detail-label">Staff:</span>
-                      <span className="ma-detail-value">{a.staffName} ({a.staffRole})</span>
-                    </div>
-                    <div className="ma-detail-item">
-                      <TagIcon />
-                      <span className="ma-detail-label">Code:</span>
-                      <span className="ma-detail-value">{a.sessionId || a.id}</span>
-                    </div>
-                  </div>
-                  {a.status === 'cancelled' && (
-                    <div className="ma-cancelled-message">
-                      This service has been cancelled.
-                    </div>
-                  )}
                 </div>
+              );
+            }
+            return null;
+          })()}
 
-                {validationError?.id === a.id && (
-                  <div style={{
-                    background: "rgba(231,76,60,0.08)", border: "1px solid rgba(231,76,60,0.3)",
-                    borderRadius: "6px", padding: "10px 14px", margin: "0 0 8px",
-                    fontSize: "12px", color: "#c0392b", display: "flex", gap: "8px"
-                  }}>
-                    <span>⏳</span><span>{validationError.message}</span>
+          {/* Workshops Section */}
+          {(() => {
+            const workshopsAssignments = filteredAssignments.filter(a => a.type === 'workshop');
+            if (workshopsAssignments.length > 0) {
+              return (
+                <div style={{ marginBottom: '32px' }}>
+                  <h2 style={{ marginBottom: '16px', fontSize: '20px', fontWeight: '700', color: '#0F172A' }}>Workshops</h2>
+                  <div className="ma-grid">
+                    {workshopsAssignments.map((a) => renderAssignmentCard(a))}
                   </div>
-                )}
-
-                <div className="ma-card-footer">
-                  <span className="ma-assigned-date">Assigned: {getFormatDate(a.createdAt)}</span>
-                  {a.status === 'active' && a.type !== 'service' && (
-                    <button
-                      className="ma-action-btn"
-                      onClick={() => handleMarkAsComplete(a.id, a.sessionId, a.endDate, a.type)}
-                    >
-                      Mark as Done
-                    </button>
-                  )}
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            }
+            return null;
+          })()}
+
+          {/* Vedic Programs Section */}
+          {(() => {
+            const vedicProgramsAssignments = filteredAssignments.filter(a => a.type === 'vedic_program');
+            if (vedicProgramsAssignments.length > 0) {
+              return (
+                <div style={{ marginBottom: '32px' }}>
+                  <h2 style={{ marginBottom: '16px', fontSize: '20px', fontWeight: '700', color: '#0F172A' }}>Vedic Life Package</h2>
+                  <div className="ma-grid">
+                    {vedicProgramsAssignments.map((a) => renderAssignmentCard(a))}
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
+
+          {/* Empty State */}
+          {filteredAssignments.length === 0 && (
+            <div className="ma-empty-state">
+              <div className="ma-empty-icon"><InfoIcon /></div>
+              <h3>No Assignments Found</h3>
+              <p>There are currently no active or completed assignments for this staff member.</p>
+            </div>
+          )}
+        </>
       )}
+
     </div>
   );
+
+  function renderAssignmentCard(a) {
+    // Find service image from services (for service assignments)
+    let serviceImageUrl = DefaultAvatar;
+    if (a.type === 'service') {
+      // Extract service name from session title (format: "Service Name - Customer Name")
+      const serviceName = a.sessionTitle.split(' - ')[0];
+      const service = services.find(s => (s.name || '').toLowerCase() === serviceName.toLowerCase());
+      if (service) {
+        serviceImageUrl = getImageUrl(service.image_url, 'https://placehold.co/150?text=No+Image');
+      }
+    }
+    
+    // Find staff profile photo
+    const staffMember = staffList.find(s => 
+      (s.user_id === a.staffId || s.id === a.staffId) || 
+      `${s.first_name || ''} ${s.last_name || ''}`.trim().toLowerCase() === a.staffName.toLowerCase()
+    ) || (isStaffUser ? loggedInUser : null);
+    const staffProfileUrl = staffMember?.profile_photo_url || staffMember?.profile_pic || null;
+    
+    const handleImageError = (e) => {
+      e.target.onerror = null;
+      e.target.src = DefaultAvatar;
+    };
+
+    return (
+      <div key={a.id} className={`ma-card ${a.type}`}>
+        <div className="ma-card-header">
+          <span className={`ma-card-type-tag ${a.type}`}>
+            {a.type === 'vedic_program' ? 'Vedic Program' : a.type}
+          </span>
+          <span className={`ma-status-badge ${a.status}`}>
+            {a.status === 'active' ? 'Active / Scheduled' 
+              : a.status === 'cancelled' ? 'This service has been cancelled.' 
+              : a.status === 'removed' ? 'Removed' 
+              : 'Completed'}
+          </span>
+        </div>
+
+        <div className="ma-card-body">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+            {/* Service image (for service assignments) - fetched from Services API */}
+            {a.type === 'service' && (
+              <img
+                src={serviceImageUrl}
+                alt="Service"
+                onError={handleImageError}
+                style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover', border: '2px solid #e2e8f0' }}
+              />
+            )}
+            {/* Staff profile image (for all assignments) */}
+            {a.type !== 'service' && (
+              <img
+                src={staffProfileUrl || DefaultAvatar}
+                alt="Staff Profile"
+                onError={handleImageError}
+                style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0' }}
+              />
+            )}
+            <h3 className="ma-session-title" style={{ margin: 0 }}>{a.sessionTitle}</h3>
+          </div>
+          <div className="ma-details-list">
+            <div className="ma-detail-item">
+              <CalendarIcon />
+              <span className="ma-detail-label">Timeline:</span>
+              <span className="ma-detail-value">
+                {getFormatDate(a.startDate)}
+                {a.type === 'service' && a.bookingTime ? ` at ${a.bookingTime}` : ''}
+                {a.endDate && a.endDate !== a.startDate ? ` - ${getFormatDate(a.endDate)}` : ''}
+              </span>
+            </div>
+            <div className="ma-detail-item">
+              <UserIcon />
+              <span className="ma-detail-label">Staff:</span>
+              <span className="ma-detail-value">{a.staffName} ({a.staffRole})</span>
+            </div>
+            <div className="ma-detail-item">
+              <TagIcon />
+              <span className="ma-detail-label">Code:</span>
+              <span className="ma-detail-value">{a.sessionId || a.id}</span>
+            </div>
+          </div>
+          {a.status === 'cancelled' && (
+            <div className="ma-cancelled-message">
+              This service has been cancelled.
+            </div>
+          )}
+        </div>
+
+        {validationError?.id === a.id && (
+          <div style={{
+            background: "rgba(231,76,60,0.08)", border: "1px solid rgba(231,76,60,0.3)",
+            borderRadius: "6px", padding: "10px 14px", margin: "0 0 8px",
+            fontSize: "12px", color: "#c0392b", display: "flex", gap: "8px"
+          }}>
+            <span>⏳</span><span>{validationError.message}</span>
+          </div>
+        )}
+
+        <div className="ma-card-footer">
+          <span className="ma-assigned-date">Assigned: {getFormatDate(a.createdAt)}</span>
+          {a.status === 'active' && a.type !== 'service' && (
+            <button
+              className="ma-action-btn"
+              onClick={() => handleMarkAsComplete(a.id, a.sessionId, a.endDate, a.type)}
+            >
+              Mark as Done
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 }
 
 export default MyAssignments;
