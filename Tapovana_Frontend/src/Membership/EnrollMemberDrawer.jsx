@@ -12,7 +12,7 @@ const initialForm = {
   email: "",
   phone: "",
   tier: "SILVER",
-  status: "pending"
+  status: "active"
 };
 
 const EnrollMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
@@ -323,22 +323,7 @@ const EnrollMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
               <img src={DropdownIcon} alt="dropdown" className="select-icon" />
             </div>
           </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label className="input-label">Status</label>
-              <div className="select-wrapper">
-                <select
-                  name="status"
-                  value={formData.status}
-                  className="drawer-select"
-                  disabled
-                >
-                  <option value="pending">Pending (Will Require Approval)</option>
-                </select>
-                <img src={DropdownIcon} alt="dropdown" className="select-icon" />
-              </div>
-            </div>
-          </div>
+
 
           {error && (
             <div style={{ marginTop: 12, color: "red", fontSize: 13 }}>

@@ -38,7 +38,7 @@ const SearchIcon = () => (
 );
 
 const InfoIcon = () => (
-  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />
     <line x1="12" y1="16" x2="12" y2="12" />
     <line x1="12" y1="8" x2="12.01" y2="8" />
@@ -58,6 +58,9 @@ function MyAssignments() {
   const [backendAssignments, setBackendAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [memberships, setMemberships] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [services, setServices] = useState([]);
+  const [workshops, setWorkshops] = useState([]);
 
   const isStaffUser = loggedInUser?.role === 'DOCTOR' || loggedInUser?.role === 'THERAPIST';
 
@@ -84,17 +87,14 @@ function MyAssignments() {
     const fetchMemberships = async () => {
       try {
         const res = await apiFetch("https://tapoclg.onrender.com/api/membership");
-        console.log("Membership API response:", res);
         if (res && (res.success || Array.isArray(res))) {
           const rawList = res.memberships || res.data || (Array.isArray(res) ? res : []);
-          console.log("Raw memberships list:", rawList);
           const mappedMembers = rawList.map((m) => ({
             id: m.id || m.user_id,
             name: m.name || m.customer_name,
             email: m.email || m.customer_email,
             profile_photo_url: m.profile_photo_url || m.profile_pic || null
           }));
-          console.log("Mapped memberships:", mappedMembers);
           setMemberships(mappedMembers);
         }
       } catch (err) {
@@ -105,7 +105,6 @@ function MyAssignments() {
   }, []);
 
   // ─── Fetch bookings data for customer info ───
-  const [bookings, setBookings] = useState([]);
   useEffect(() => {
     const fetchBookings = async () => {
       try {
@@ -121,19 +120,33 @@ function MyAssignments() {
   }, []);
 
   // ─── Fetch services data for service images ───
-  const [services, setServices] = useState([]);
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        const res = await apiFetch('/api/services');
+        const res = await apiFetch("/api/services");
         if (res.success) {
           setServices(res.services || []);
         }
       } catch (err) {
-        console.error('Failed to fetch services:', err);
+        console.error("Failed to fetch services:", err);
       }
     };
     fetchServices();
+  }, []);
+
+  // ─── Fetch workshops data for workshop images ───
+  useEffect(() => {
+    const fetchWorkshops = async () => {
+      try {
+        const res = await apiFetch("/api/workshops");
+        if (res.success) {
+          setWorkshops(res.workshops || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch workshops:", err);
+      }
+    };
+    fetchWorkshops();
   }, []);
 
   // ─── Refresh assignments after marking complete ───
@@ -245,19 +258,14 @@ function MyAssignments() {
 
     try {
       if (type === 'service' && sessionId) {
-        // Call backend API to remove staff from service
         await apiFetch(`/api/services/${sessionId}/complete`, {
           method: 'PATCH',
           body: JSON.stringify({ staff_id: activeStaffId })
         });
       }
 
-      // Also update context
       completeAllocation(id);
-
-      // Refresh from backend
       await refreshAssignments();
-
       alert("✅ Session marked as Done! You are now Available.");
     } catch (err) {
       alert("Error completing assignment: " + err.message);
@@ -281,6 +289,119 @@ function MyAssignments() {
     const currentStaffObj = staffList.find(s => s.user_id === activeStaffId || s.id === activeStaffId);
     return currentStaffObj ? `${currentStaffObj.first_name || ''} ${currentStaffObj.last_name || ''}`.trim() : 'Specialist';
   }, [isStaffUser, loggedInUser, activeStaffId, staffList]);
+
+  // ─── Render Assignment Card (inside component scope) ───
+  const renderAssignmentCard = (a) => {
+    // Find image based on type
+    let imageUrl = DefaultAvatar;
+    if (a.type === 'service') {
+      const serviceName = a.sessionTitle.split(' - ')[0];
+      const service = services.find(s => (s.name || '').toLowerCase() === serviceName.toLowerCase());
+      if (service) {
+        imageUrl = getImageUrl(service.image_url, 'https://placehold.co/150?text=No+Image');
+      }
+    } else if (a.type === 'workshop' || a.type === 'vedic_program') {
+      const workshop = workshops.find(w => (w.title || '').toLowerCase() === a.sessionTitle.toLowerCase());
+      if (workshop) {
+        imageUrl = getImageUrl(workshop.image_url || workshop.image, 'https://placehold.co/150?text=No+Image');
+      }
+    }
+    
+    // Find staff profile photo (for non-service)
+    const staffMember = staffList.find(s => 
+      (s.user_id === a.staffId || s.id === a.staffId) || 
+      `${s.first_name || ''} ${s.last_name || ''}`.trim().toLowerCase() === a.staffName.toLowerCase()
+    ) || (isStaffUser ? loggedInUser : null);
+    const staffProfileUrl = staffMember?.profile_photo_url || staffMember?.profile_pic || null;
+    
+    const handleImageError = (e) => {
+      e.target.onerror = null;
+      e.target.src = DefaultAvatar;
+    };
+
+    return (
+      <div key={a.id} className={`ma-card ${a.type}`}>
+        <div className="ma-card-header">
+          <span className={`ma-card-type-tag ${a.type}`}>
+            {a.type === 'vedic_program' ? 'Vedic Program' : a.type}
+          </span>
+          <span className={`ma-status-badge ${a.status}`}>
+            {a.status === 'active' ? 'Active / Scheduled' 
+              : a.status === 'cancelled' ? 'This service has been cancelled.' 
+              : a.status === 'removed' ? 'Removed' 
+              : 'Completed'}
+          </span>
+        </div>
+
+        <div className="ma-card-body">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+            {/* Cover image (for service/workshop/vedic program) */}
+            <img
+              src={imageUrl}
+              alt={a.type === 'service' ? 'Service' : 'Workshop'}
+              onError={handleImageError}
+              style={{ 
+                width: '48px', 
+                height: '48px', 
+                borderRadius: a.type === 'service' || a.type === 'workshop' || a.type === 'vedic_program' ? '8px' : '50%', 
+                objectFit: 'cover', 
+                border: '2px solid #e2e8f0' 
+              }}
+            />
+            <h3 className="ma-session-title" style={{ margin: 0 }}>{a.sessionTitle}</h3>
+          </div>
+          <div className="ma-details-list">
+            <div className="ma-detail-item">
+              <CalendarIcon />
+              <span className="ma-detail-label">Timeline:</span>
+              <span className="ma-detail-value">
+                {getFormatDate(a.startDate)}
+                {a.type === 'service' && a.bookingTime ? ` at ${a.bookingTime}` : ''}
+                {a.endDate && a.endDate !== a.startDate ? ` - ${getFormatDate(a.endDate)}` : ''}
+              </span>
+            </div>
+            <div className="ma-detail-item">
+              <UserIcon />
+              <span className="ma-detail-label">Staff:</span>
+              <span className="ma-detail-value">{a.staffName} ({a.staffRole})</span>
+            </div>
+            <div className="ma-detail-item">
+              <TagIcon />
+              <span className="ma-detail-label">Code:</span>
+              <span className="ma-detail-value">{a.sessionId || a.id}</span>
+            </div>
+          </div>
+          {a.status === 'cancelled' && (
+            <div className="ma-cancelled-message">
+              This service has been cancelled.
+            </div>
+          )}
+        </div>
+
+        {validationError?.id === a.id && (
+          <div style={{
+            background: "rgba(231,76,60,0.08)", border: "1px solid rgba(231,76,60,0.3)",
+            borderRadius: "6px", padding: "10px 14px", margin: "0 0 8px",
+            fontSize: "12px", color: "#c0392b", display: "flex", gap: "8px"
+          }}>
+            <span>⏳</span><span>{validationError.message}</span>
+          </div>
+        )}
+
+        <div className="ma-card-footer">
+          <span className="ma-assigned-date">Assigned: {getFormatDate(a.createdAt)}</span>
+          {a.status === 'active' && a.type !== 'service' && (
+            <button
+              className="ma-action-btn"
+              onClick={() => handleMarkAsComplete(a.id, a.sessionId, a.endDate, a.type)}
+            >
+              Mark as Done
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="my-assignments-container">
@@ -455,119 +576,6 @@ function MyAssignments() {
 
     </div>
   );
-
-  function renderAssignmentCard(a) {
-    // Find service image from services (for service assignments)
-    let serviceImageUrl = DefaultAvatar;
-    if (a.type === 'service') {
-      // Extract service name from session title (format: "Service Name - Customer Name")
-      const serviceName = a.sessionTitle.split(' - ')[0];
-      const service = services.find(s => (s.name || '').toLowerCase() === serviceName.toLowerCase());
-      if (service) {
-        serviceImageUrl = getImageUrl(service.image_url, 'https://placehold.co/150?text=No+Image');
-      }
-    }
-    
-    // Find staff profile photo
-    const staffMember = staffList.find(s => 
-      (s.user_id === a.staffId || s.id === a.staffId) || 
-      `${s.first_name || ''} ${s.last_name || ''}`.trim().toLowerCase() === a.staffName.toLowerCase()
-    ) || (isStaffUser ? loggedInUser : null);
-    const staffProfileUrl = staffMember?.profile_photo_url || staffMember?.profile_pic || null;
-    
-    const handleImageError = (e) => {
-      e.target.onerror = null;
-      e.target.src = DefaultAvatar;
-    };
-
-    return (
-      <div key={a.id} className={`ma-card ${a.type}`}>
-        <div className="ma-card-header">
-          <span className={`ma-card-type-tag ${a.type}`}>
-            {a.type === 'vedic_program' ? 'Vedic Program' : a.type}
-          </span>
-          <span className={`ma-status-badge ${a.status}`}>
-            {a.status === 'active' ? 'Active / Scheduled' 
-              : a.status === 'cancelled' ? 'This service has been cancelled.' 
-              : a.status === 'removed' ? 'Removed' 
-              : 'Completed'}
-          </span>
-        </div>
-
-        <div className="ma-card-body">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-            {/* Service image (for service assignments) - fetched from Services API */}
-            {a.type === 'service' && (
-              <img
-                src={serviceImageUrl}
-                alt="Service"
-                onError={handleImageError}
-                style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover', border: '2px solid #e2e8f0' }}
-              />
-            )}
-            {/* Staff profile image (for all assignments) */}
-            {a.type !== 'service' && (
-              <img
-                src={staffProfileUrl || DefaultAvatar}
-                alt="Staff Profile"
-                onError={handleImageError}
-                style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0' }}
-              />
-            )}
-            <h3 className="ma-session-title" style={{ margin: 0 }}>{a.sessionTitle}</h3>
-          </div>
-          <div className="ma-details-list">
-            <div className="ma-detail-item">
-              <CalendarIcon />
-              <span className="ma-detail-label">Timeline:</span>
-              <span className="ma-detail-value">
-                {getFormatDate(a.startDate)}
-                {a.type === 'service' && a.bookingTime ? ` at ${a.bookingTime}` : ''}
-                {a.endDate && a.endDate !== a.startDate ? ` - ${getFormatDate(a.endDate)}` : ''}
-              </span>
-            </div>
-            <div className="ma-detail-item">
-              <UserIcon />
-              <span className="ma-detail-label">Staff:</span>
-              <span className="ma-detail-value">{a.staffName} ({a.staffRole})</span>
-            </div>
-            <div className="ma-detail-item">
-              <TagIcon />
-              <span className="ma-detail-label">Code:</span>
-              <span className="ma-detail-value">{a.sessionId || a.id}</span>
-            </div>
-          </div>
-          {a.status === 'cancelled' && (
-            <div className="ma-cancelled-message">
-              This service has been cancelled.
-            </div>
-          )}
-        </div>
-
-        {validationError?.id === a.id && (
-          <div style={{
-            background: "rgba(231,76,60,0.08)", border: "1px solid rgba(231,76,60,0.3)",
-            borderRadius: "6px", padding: "10px 14px", margin: "0 0 8px",
-            fontSize: "12px", color: "#c0392b", display: "flex", gap: "8px"
-          }}>
-            <span>⏳</span><span>{validationError.message}</span>
-          </div>
-        )}
-
-        <div className="ma-card-footer">
-          <span className="ma-assigned-date">Assigned: {getFormatDate(a.createdAt)}</span>
-          {a.status === 'active' && a.type !== 'service' && (
-            <button
-              className="ma-action-btn"
-              onClick={() => handleMarkAsComplete(a.id, a.sessionId, a.endDate, a.type)}
-            >
-              Mark as Done
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
 }
 
 export default MyAssignments;
