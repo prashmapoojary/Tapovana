@@ -55,6 +55,7 @@ function Bookings() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
+  const [memberships, setMemberships] = useState([]);
 
   // Drawer state
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -95,6 +96,28 @@ function Bookings() {
       }
     };
     fetchServices();
+  }, []);
+
+  // ─── Fetch membership data for profile photos ───
+  useEffect(() => {
+    const fetchMemberships = async () => {
+      try {
+        const res = await apiFetch("https://tapoclg.onrender.com/api/membership");
+        if (res && (res.success || Array.isArray(res))) {
+          const rawList = res.memberships || res.data || (Array.isArray(res) ? res : []);
+          const mappedMembers = rawList.map((m) => ({
+            id: m.id || m.user_id,
+            name: m.name || m.customer_name,
+            email: m.email || m.customer_email,
+            profile_photo_url: m.profile_photo_url || m.profile_pic || null
+          }));
+          setMemberships(mappedMembers);
+        }
+      } catch (err) {
+        console.error("Failed to fetch memberships:", err);
+      }
+    };
+    fetchMemberships();
   }, []);
 
   // ─── Close action menu on click outside ───
@@ -331,10 +354,44 @@ function Bookings() {
               <div className="bk-drawer-section">
                 <h4 className="bk-section-title">Customer</h4>
                 <div className="bk-profile-card">
-                  <img src={DefaultAvatar} className="bk-avatar" alt="" />
-                  <div>
-                    <div className="bk-name">{selectedBooking.user_name || "Guest User"}</div>
-                  </div>
+                  {(() => {
+                    // Find membership by customer name or email
+                    const customerName = selectedBooking.user_name || "";
+                    const customerEmail = selectedBooking.user_email || "";
+                    const membership = memberships.find(m => 
+                      (m.name && m.name.toLowerCase() === customerName.toLowerCase()) || 
+                      (m.email && m.email.toLowerCase() === customerEmail.toLowerCase())
+                    );
+                    let avatarSrc = DefaultAvatar;
+                    
+                    if (membership?.profile_photo_url) {
+                      const pic = membership.profile_photo_url;
+                      if (pic.startsWith("http")) {
+                        avatarSrc = pic;
+                      } else {
+                        avatarSrc = `https://tapoclg.onrender.com${pic.startsWith("/") ? "" : "/"}${pic}`;
+                      }
+                    }
+
+                    const handleImageError = (e) => {
+                      e.target.onerror = null;
+                      e.target.src = DefaultAvatar;
+                    };
+
+                    return (
+                      <>
+                        <img 
+                          src={avatarSrc} 
+                          className="bk-avatar" 
+                          alt="" 
+                          onError={handleImageError} 
+                        />
+                        <div>
+                          <div className="bk-name">{selectedBooking.user_name || "Guest User"}</div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
 
                 <div className="bk-service-card" style={{ marginTop: "24px" }}>

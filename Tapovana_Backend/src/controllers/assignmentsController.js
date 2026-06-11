@@ -6,8 +6,7 @@ const getMyAssignments = async (req, res) => {
 
         const userResult = await query(
             `SELECT tm.id, tm.first_name, tm.last_name, tm.email,
-              tm.availability_status, tm.allocation_details,
-              r.name AS role
+              tm.availability_status, r.name AS role
        FROM team_members tm
        JOIN roles r ON r.id = tm.role_id
        WHERE tm.id = $1`,
@@ -19,54 +18,32 @@ const getMyAssignments = async (req, res) => {
         }
 
         const user = userResult.rows[0];
-        const allocDetails = user.allocation_details;
 
-        // Also find allocations from services table
-        const servicesResult = await query(
-            `SELECT id, name, category, created_at
-       FROM services
-       WHERE assigned_staff_ids @> $1::jsonb`,
-            [JSON.stringify([userId])]
+        // Now get all allocations from allocations table for this staff member
+        const allocResult = await query(
+            `SELECT id, staff_id, type, session_title, session_id, 
+                    start_date, end_date, booking_time, status, created_at
+       FROM allocations
+       WHERE staff_id = $1`,
+            [userId]
         );
 
         const assignments = [];
-
-        // From allocation_details in team_members
-        if (allocDetails && allocDetails.type === 'service') {
+        for (const row of allocResult.rows) {
             assignments.push({
-                id: allocDetails.id || allocDetails.sessionId,
-                type: 'service',
+                id: row.id,
+                type: row.type,
                 staffId: userId,
                 staffName: `${user.first_name} ${user.last_name}`.trim(),
                 staffRole: user.role,
-                sessionTitle: allocDetails.sessionTitle || 'Service',
-                sessionId: allocDetails.sessionId,
-                startDate: allocDetails.startDate,
-                endDate: allocDetails.endDate,
-                status: user.availability_status === 'Allocated' ? 'active' : 'expired',
-                createdAt: allocDetails.startDate
+                sessionTitle: row.session_title,
+                sessionId: row.session_id,
+                startDate: row.start_date,
+                endDate: row.end_date,
+                bookingTime: row.booking_time,
+                status: row.status,
+                createdAt: row.created_at
             });
-        }
-
-        // From services table assigned_staff_ids
-        for (const svc of servicesResult.rows) {
-            // Avoid duplicates
-            const exists = assignments.find(a => a.sessionId === svc.id);
-            if (!exists) {
-                assignments.push({
-                    id: `srv-${svc.id}`,
-                    type: 'service',
-                    staffId: userId,
-                    staffName: `${user.first_name} ${user.last_name}`.trim(),
-                    staffRole: user.role,
-                    sessionTitle: svc.name,
-                    sessionId: svc.id,
-                    startDate: svc.created_at,
-                    endDate: null,
-                    status: user.availability_status === 'Allocated' ? 'active' : 'expired',
-                    createdAt: svc.created_at
-                });
-            }
         }
 
         return res.json({ success: true, assignments, user });

@@ -3,6 +3,7 @@ import "./Membership.css";
 import { apiFetch } from "../api/http";
 import ActionIcon from "../assets/Button.svg";
 import DefaultAvatar from "../assets/profileIconDefault.png";
+import EnrollMemberDrawer from "./EnrollMemberDrawer";
 
 // ── Tier Configuration (user-only benefits — simplified from role-based) ────
 const TIER_CONFIG = {
@@ -23,29 +24,7 @@ const TIER_CONFIG = {
   }
 };
 
-// ── Dummy data fallback (role removed — membership is user-only) ────────────
-const DUMMY_MEMBERS = [
-  { id: "MEM-001", name: "Priya Sharma", email: "priya.s@gmail.com", phone: "+91 98765 43210", tier: "GOLD", joinDate: "2024-03-15", expiryDate: "2025-03-15", sessions: 24, totalSpent: 12450, status: "active", profilePhoto: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-002", name: "Rahul Verma", email: "rahul.v@gmail.com", phone: "+91 87654 32109", tier: "PLATINUM", joinDate: "2023-11-20", expiryDate: "2025-11-20", sessions: 67, totalSpent: 38900, status: "active", profilePhoto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-003", name: "Ananya Krishnan", email: "ananya.k@gmail.com", phone: "+91 76543 21098", tier: "SILVER", joinDate: "2024-06-01", expiryDate: "2025-06-01", sessions: 12, totalSpent: 5800, status: "active", profilePhoto: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-004", name: "Vikram Nair", email: "vikram.n@gmail.com", phone: "+91 65432 10987", tier: "PLATINUM", joinDate: "2023-09-10", expiryDate: "2025-09-10", sessions: 89, totalSpent: 52100, status: "active", profilePhoto: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-005", name: "Meera Pillai", email: "meera.p@gmail.com", phone: "+91 54321 09876", tier: "SILVER", joinDate: "2024-01-20", expiryDate: "2025-01-20", sessions: 8, totalSpent: 3200, status: "active", profilePhoto: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-006", name: "Arun Kumar", email: "arun.k@gmail.com", phone: "+91 43210 98765", tier: "GOLD", joinDate: "2024-02-14", expiryDate: "2025-02-14", sessions: 31, totalSpent: 15600, status: "active", profilePhoto: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-007", name: "Sunita Reddy", email: "sunita.r@gmail.com", phone: "+91 32109 87654", tier: "SILVER", joinDate: "2024-07-08", expiryDate: "2025-07-08", sessions: 6, totalSpent: 2100, status: "active", profilePhoto: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-008", name: "Deepak Menon", email: "deepak.m@gmail.com", phone: "+91 21098 76543", tier: "GOLD", joinDate: "2023-12-05", expiryDate: "2024-12-05", sessions: 45, totalSpent: 21800, status: "expired", profilePhoto: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-009", name: "Kavitha Nambiar", email: "kavitha.n@gmail.com", phone: "+91 10987 65432", tier: "PLATINUM", joinDate: "2024-04-22", expiryDate: "2025-04-22", sessions: 52, totalSpent: 31200, status: "active", profilePhoto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-010", name: "Suresh Babu", email: "suresh.b@gmail.com", phone: "+91 99887 76655", tier: "SILVER", joinDate: "2024-08-15", expiryDate: "2025-08-15", sessions: 4, totalSpent: 1500, status: "active", profilePhoto: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-011", name: "Lakshmi Iyer", email: "lakshmi.i@gmail.com", phone: "+91 88776 65544", tier: "GOLD", joinDate: "2024-05-30", expiryDate: "2025-05-30", sessions: 19, totalSpent: 9400, status: "active", profilePhoto: "https://images.unsplash.com/photo-1554151228-14d9def656e4?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-012", name: "Rajan Pillai", email: "rajan.p@gmail.com", phone: "+91 77665 54433", tier: "PLATINUM", joinDate: "2023-10-15", expiryDate: "2024-10-15", sessions: 76, totalSpent: 44500, status: "expired", profilePhoto: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-013", name: "Divya Nair", email: "divya.n@gmail.com", phone: "+91 66554 43322", tier: "SILVER", joinDate: "2024-09-01", expiryDate: "2025-09-01", sessions: 3, totalSpent: 900, status: "active", profilePhoto: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-014", name: "Mohan Das", email: "mohan.d@gmail.com", phone: "+91 55443 32211", tier: "GOLD", joinDate: "2024-01-10", expiryDate: "2025-01-10", sessions: 27, totalSpent: 13200, status: "active", profilePhoto: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-015", name: "Sita Ramesh", email: "sita.r@gmail.com", phone: "+91 44332 21100", tier: "SILVER", joinDate: "2024-10-05", expiryDate: "2025-10-05", sessions: 2, totalSpent: 600, status: "active", profilePhoto: "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-016", name: "Kiran Hegde", email: "kiran.h@gmail.com", phone: "+91 33221 10099", tier: "GOLD", joinDate: "2024-04-18", expiryDate: "2025-04-18", sessions: 36, totalSpent: 18900, status: "active", profilePhoto: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-017", name: "Pooja Singh", email: "pooja.s@gmail.com", phone: "+91 22110 09988", tier: "SILVER", joinDate: "2024-11-01", expiryDate: "2025-11-01", sessions: 1, totalSpent: 400, status: "active", profilePhoto: "https://images.unsplash.com/photo-1548142813-c348350df52b?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-018", name: "Ganesh Iyer", email: "ganesh.i@gmail.com", phone: "+91 11009 98877", tier: "PLATINUM", joinDate: "2024-02-28", expiryDate: "2025-02-28", sessions: 44, totalSpent: 26800, status: "active", profilePhoto: "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-019", name: "Nitin Kumar", email: "nitin.k@gmail.com", phone: "+91 99887 66554", tier: "GOLD", joinDate: "2024-05-15", expiryDate: "2025-05-15", sessions: 0, totalSpent: 0, status: "pending", profilePhoto: "https://images.unsplash.com/photo-1513956589380-bad6acb9b9d4?auto=format&fit=crop&q=80&w=120" },
-  { id: "MEM-020", name: "Smriti Rao", email: "smriti.r@gmail.com", phone: "+91 88776 55443", tier: "SILVER", joinDate: "2024-06-01", expiryDate: "2025-06-01", sessions: 0, totalSpent: 0, status: "pending", profilePhoto: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&q=80&w=120" },
-];
+
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function getInitials(name) {
@@ -165,7 +144,7 @@ export default function Membership() {
       // Check if response is successful or is an array (some APIs return raw array)
       if (res && (res.success || Array.isArray(res))) {
         const rawList = res.memberships || res.data || (Array.isArray(res) ? res : []);
-        const mappedMembers = rawList.map((m, index) => {
+        const mappedMembers = rawList.map((m) => {
           const rawTier = m.tier || m.membership_name;
           const tier = mapTier(rawTier);
 
@@ -174,30 +153,11 @@ export default function Membership() {
             join = new Date(m.start_date);
           } else if (m.purchase_date) {
             join = new Date(m.purchase_date);
-          } else {
-            join = new Date();
           }
 
           let expiry = null;
           if (m.end_date) {
             expiry = new Date(m.end_date);
-          } else {
-            expiry = new Date(join);
-            expiry.setFullYear(expiry.getFullYear() + 1);
-          }
-
-          let photoUrl = null;
-          const pic = m.profile_photo_url || m.profile_pic || m.profilePhoto;
-          if (pic) {
-            if (pic.startsWith("http")) {
-              photoUrl = pic;
-            } else {
-              photoUrl = `https://tapoclg.onrender.com${pic.startsWith("/") ? "" : "/"}${pic}`;
-            }
-          } else {
-            const gender = index % 2 === 0 ? "women" : "men";
-            const num = (index % 50) + 1;
-            photoUrl = `https://randomuser.me/api/portraits/${gender}/${num}.jpg`;
           }
 
           return {
@@ -206,19 +166,21 @@ export default function Membership() {
             email: m.email || m.customer_email || "-",
             phone: m.phone || "-",
             tier: tier,
-            profilePhoto: photoUrl,
-            joinDate: join.toISOString().split("T")[0],
-            expiryDate: expiry.toISOString().split("T")[0],
+            joinDate: join ? join.toISOString().split("T")[0] : null,
+            expiryDate: expiry ? expiry.toISOString().split("T")[0] : null,
             sessions: m.available_credits || m.sessions || 0,
-            totalSpent: TIER_CONFIG[tier]?.price || m.totalSpent || 0,
-            status: m.status || "active"
+            totalSpent: m.totalSpent || 0,
+            status: m.status || "active",
+            profile_photo_url: m.profile_photo_url || m.profile_pic || null
           };
         });
         setMembers(mappedMembers);
-      } else throw new Error();
+      } else {
+        setMembers([]);
+      }
     } catch {
-      setMembers(DUMMY_MEMBERS);
-      showToast("Failed to load live data. Showing demo data.", "error");
+      setMembers([]);
+      showToast("Failed to load members.", "error");
     } finally {
       setDataLoading(false);
     }
@@ -525,6 +487,14 @@ export default function Membership() {
         </div>
       )}
 
+      {/* ── Enroll Member Drawer ── */}
+      <EnrollMemberDrawer
+        isOpen={showEnrollModal}
+        onClose={() => setShowEnrollModal(false)}
+        onSaved={fetchMembers}
+        onShowToast={showToast}
+      />
+
       {/* ── Confirm modal ── */}
       {confirmModal.visible && (
         <div className="global-alert-overlay" style={{ zIndex: 10002, position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -603,7 +573,7 @@ export default function Membership() {
               <button className="mem-detail-close" onClick={() => setEditingTier(null)} aria-label="Close Tier Editor">✕</button>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 8 }}>
+            <div className="mem-detail-body" style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 8 }}>
               {/* Price */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "#7b8a9a", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginBottom: 8 }}>
@@ -656,7 +626,7 @@ export default function Membership() {
             </div>
 
             {/* Footer */}
-            <div style={{ borderTop: "1px solid #f1f3f6", padding: "20px 0 0 0", display: "flex", gap: 12, marginTop: "auto" }}>
+            <div className="mem-detail-footer">
               <button
                 onClick={() => setEditingTier(null)}
                 style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #CDA751", background: "white", color: "#CDA751", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
@@ -710,9 +680,31 @@ export default function Membership() {
           <div className="mem-detail-overlay" onClick={() => setSelectedMember(null)}>
             <div className="mem-detail-panel" onClick={e => e.stopPropagation()}>
               <div className="mem-detail-header">
-                <div className="mem-detail-avatar" style={{ background: tierConfig[selectedMember.tier].bg, color: tierConfig[selectedMember.tier].color }}>
-                  {getInitials(selectedMember.name)}
-                </div>
+                {(() => {
+                  let avatarSrc = DefaultAvatar;
+                  if (selectedMember.profile_photo_url) {
+                    const pic = selectedMember.profile_photo_url;
+                    if (pic.startsWith("http")) {
+                      avatarSrc = pic;
+                    } else {
+                      avatarSrc = `https://tapoclg.onrender.com${pic.startsWith("/") ? "" : "/"}${pic}`;
+                    }
+                  }
+
+                  const handleImageError = (e) => {
+                    e.target.onerror = null;
+                    e.target.src = DefaultAvatar;
+                  };
+
+                  return (
+                    <img
+                      src={avatarSrc}
+                      alt="Profile"
+                      className="mem-detail-avatar-img"
+                      onError={handleImageError}
+                    />
+                  );
+                })()}
                 <div>
                   <div className="mem-detail-name">{selectedMember.name}</div>
                   <div className="mem-detail-id">{selectedMember.id}</div>
@@ -720,60 +712,64 @@ export default function Membership() {
                 <button className="mem-detail-close" onClick={() => setSelectedMember(null)} aria-label="Close Membership Details">✕</button>
               </div>
 
-              <div className="mem-detail-stats">
-                <div className="mem-detail-stat">
-                  <div className="mem-detail-stat-value">{selectedMember.sessions}</div>
-                  <div className="mem-detail-stat-label">Sessions</div>
-                </div>
-                <div className="mem-detail-stat">
-                  <div className="mem-detail-stat-value">₹{((selectedMember.totalSpent || 0) / 1000).toFixed(1)}K</div>
-                  <div className="mem-detail-stat-label">Total Spent</div>
-                </div>
-                <div className="mem-detail-stat">
-                  <div className="mem-detail-stat-value">
-                    {(() => {
-                      const days = daysUntilExpiry(selectedMember.expiryDate);
-                      return days > 0 ? days : "Expired";
-                    })()}
+              <div className="mem-detail-body">
+                <div className="mem-detail-stats">
+                  <div className="mem-detail-stat">
+                    <div className="mem-detail-stat-value">{selectedMember.sessions}</div>
+                    <div className="mem-detail-stat-label">Sessions</div>
                   </div>
-                  <div className="mem-detail-stat-label">Days Left</div>
+                  <div className="mem-detail-stat">
+                    <div className="mem-detail-stat-value">₹{((selectedMember.totalSpent || 0) / 1000).toFixed(1)}K</div>
+                    <div className="mem-detail-stat-label">Total Spent</div>
+                  </div>
+                  <div className="mem-detail-stat">
+                    <div className="mem-detail-stat-value">
+                      {(() => {
+                        const days = daysUntilExpiry(selectedMember.expiryDate);
+                        return days > 0 ? days : "Expired";
+                      })()}
+                    </div>
+                    <div className="mem-detail-stat-label">Days Left</div>
+                  </div>
+                </div>
+
+                <div className="mem-detail-info">
+                  <div className="mem-detail-row"><span>Email</span><span>{selectedMember.email}</span></div>
+                  <div className="mem-detail-row"><span>Phone</span><span>{selectedMember.phone}</span></div>
+                  <div className="mem-detail-row"><span>Joined</span><span>{formatDate(selectedMember.joinDate)}</span></div>
+                  <div className="mem-detail-row"><span>Expiry</span><span>{formatDate(selectedMember.expiryDate)}</span></div>
+                  <div className="mem-detail-row"><span>Status</span><span className={`mem-status-pill ${selectedMember.status}`}>{selectedMember.status}</span></div>
+                </div>
+
+                <div className="mem-upgrade-section">
+                  <div className="mem-upgrade-label">Change Membership Tier</div>
+                  <div className="mem-tier-select-group">
+                    {Object.entries(tierConfig).map(([key, cfg]) => (
+                      <div
+                        key={key}
+                        className={`mem-tier-option ${newTier === key ? "selected" : ""}`}
+                        style={newTier === key ? { borderColor: cfg.color, background: cfg.bg } : {}}
+                        onClick={() => setNewTier(key)}
+                      >
+                        <span style={{ color: newTier === key ? cfg.color : "#4a5568", fontWeight: 600 }}>{cfg.label}</span>
+                        <span style={{ fontSize: "11px", color: "#a0aec0" }}>₹{cfg.price.toLocaleString("en-IN")}/yr</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mem-upgrade-benefits">
+                    <div className="mem-upgrade-benefits-title">Included Benefits</div>
+                    {tierConfig[newTier]?.benefits?.map((b, i) => (
+                      <div key={i} className="mem-benefit-row">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={tierConfig[newTier].color} strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+                        {b}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              <div className="mem-detail-info">
-                <div className="mem-detail-row"><span>Email</span><span>{selectedMember.email}</span></div>
-                <div className="mem-detail-row"><span>Phone</span><span>{selectedMember.phone}</span></div>
-                <div className="mem-detail-row"><span>Joined</span><span>{formatDate(selectedMember.joinDate)}</span></div>
-                <div className="mem-detail-row"><span>Expiry</span><span>{formatDate(selectedMember.expiryDate)}</span></div>
-                <div className="mem-detail-row"><span>Status</span><span className={`mem-status-pill ${selectedMember.status}`}>{selectedMember.status}</span></div>
-              </div>
-
-              <div className="mem-upgrade-section">
-                <div className="mem-upgrade-label">Change Membership Tier</div>
-                <div className="mem-tier-select-group">
-                  {Object.entries(tierConfig).map(([key, cfg]) => (
-                    <div
-                      key={key}
-                      className={`mem-tier-option ${newTier === key ? "selected" : ""}`}
-                      style={newTier === key ? { borderColor: cfg.color, background: cfg.bg } : {}}
-                      onClick={() => setNewTier(key)}
-                    >
-                      <span style={{ color: newTier === key ? cfg.color : "#4a5568", fontWeight: 600 }}>{cfg.label}</span>
-                      <span style={{ fontSize: "11px", color: "#a0aec0" }}>₹{cfg.price.toLocaleString("en-IN")}/yr</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mem-upgrade-benefits">
-                  <div className="mem-upgrade-benefits-title">Included Benefits</div>
-                  {tierConfig[newTier]?.benefits?.map((b, i) => (
-                    <div key={i} className="mem-benefit-row">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={tierConfig[newTier].color} strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-                      {b}
-                    </div>
-                  ))}
-                </div>
-
+              <div className="mem-detail-footer" style={{ paddingTop: 0 }}>
                 {upgradeSuccess ? (
                   <div className="mem-success-msg">✅ Tier updated successfully!</div>
                 ) : (
@@ -829,13 +825,26 @@ export default function Membership() {
                         >
                           <td onClick={() => { setSelectedMember(m); setNewTier(m.tier); setUpgradeSuccess(false); }} style={{ cursor: "pointer" }}>
                             <div className="user-cell">
-                              <img
-                                src={m.profilePhoto || DefaultAvatar}
-                                alt="profile"
-                                className="user-avatar"
-                                onError={handleImageError}
-                                style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0" }}
-                              />
+                              {(() => {
+                                let avatarSrc = DefaultAvatar;
+                                if (m.profile_photo_url) {
+                                  const pic = m.profile_photo_url;
+                                  if (pic.startsWith("http")) {
+                                    avatarSrc = pic;
+                                  } else {
+                                    avatarSrc = `https://tapoclg.onrender.com${pic.startsWith("/") ? "" : "/"}${pic}`;
+                                  }
+                                }
+                                return (
+                                  <img
+                                    src={avatarSrc}
+                                    alt="profile"
+                                    className="user-avatar"
+                                    style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0" }}
+                                    onError={handleImageError}
+                                  />
+                                );
+                              })()}
                               <div className="mem-name" style={{ fontWeight: 600 }}>{m.name || "Unknown"}</div>
                             </div>
                           </td>
@@ -861,7 +870,13 @@ export default function Membership() {
                                 src={ActionIcon}
                                 className="action-icon"
                                 alt="Actions"
-                                style={{ cursor: "pointer" }}
+                                style={{ 
+                                  cursor: "pointer", 
+                                  filter: "grayscale(100%)", 
+                                  transition: "filter 0.2s" 
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.filter = "grayscale(0%)"}
+                                onMouseLeave={(e) => e.currentTarget.style.filter = "grayscale(100%)"}
                                 onClick={(e) => { e.stopPropagation(); setOpenActionMenu(openActionMenu === m.id ? null : m.id); }}
                               />
                               {openActionMenu === m.id && (
@@ -870,7 +885,7 @@ export default function Membership() {
                                   <div onClick={(e) => { e.stopPropagation(); setSelectedMember(m); setNewTier(m.tier); setUpgradeSuccess(false); setOpenActionMenu(null); }}
                                     style={actionItemStyle}
                                     onMouseEnter={e => e.currentTarget.style.background = "#f7fafc"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                                    👁 View
+                                    View
                                   </div>
 
                                   {/* Pending actions */}
@@ -879,12 +894,12 @@ export default function Membership() {
                                       <div onClick={(e) => handleAccept(e, m.id)}
                                         style={{ ...actionItemStyle, color: "#27ae60" }}
                                         onMouseEnter={e => e.currentTarget.style.background = "#f0fff4"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                                        ✓ Accept
+                                        Accept
                                       </div>
                                       <div onClick={(e) => handleReject(e, m.id)}
                                         style={{ ...actionItemStyle, color: "#e53e3e" }}
                                         onMouseEnter={e => e.currentTarget.style.background = "#fff5f5"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                                        ✕ Reject
+                                        Reject
                                       </div>
                                     </>
                                   )}
@@ -894,7 +909,7 @@ export default function Membership() {
                                     <div onClick={(e) => handleDeactivate(e, m.id)}
                                       style={{ ...actionItemStyle, color: "#e67e22" }}
                                       onMouseEnter={e => e.currentTarget.style.background = "#fffaf0"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                                      ⏸ Deactivate
+                                      Deactivate
                                     </div>
                                   )}
 
@@ -903,7 +918,7 @@ export default function Membership() {
                                     <div onClick={(e) => handleRenew(e, m.id)}
                                       style={{ ...actionItemStyle, color: "#2d8cf0" }}
                                       onMouseEnter={e => e.currentTarget.style.background = "#f0f7ff"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                                      🔄 Renew
+                                      Renew
                                     </div>
                                   )}
 
@@ -911,7 +926,7 @@ export default function Membership() {
                                   <div onClick={(e) => handleDelete(e, m.id)}
                                     style={{ ...actionItemStyle, color: "#e53e3e", borderTop: "1px solid #f1f3f6" }}
                                     onMouseEnter={e => e.currentTarget.style.background = "#fff5f5"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                                    🗑 Delete
+                                    Delete
                                   </div>
                                 </div>
                               )}
@@ -961,94 +976,7 @@ export default function Membership() {
         </div>
       </div>
 
-      {/* ── Enroll Member Modal (user-only, no role/discounts) ── */}
-      {showEnrollModal && (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={() => setShowEnrollModal(false)}
-        >
-          <div
-            style={{ background: "white", borderRadius: 20, width: 460, maxWidth: "95vw", padding: 32, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", gap: 20 }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#2d3748" }}>Enroll New Member</h2>
-                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#a0aec0" }}>Add a customer to a membership plan</p>
-              </div>
-              <button onClick={() => setShowEnrollModal(false)} style={{ background: "none", border: "none", fontSize: 18, color: "#a0aec0", cursor: "pointer" }} aria-label="Close Enroll Modal">✕</button>
-            </div>
 
-            {/* Full Name */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 12, fontWeight: 700, color: "#4a5568", textTransform: "uppercase", letterSpacing: "0.4px" }}>Full Name *</label>
-              <input
-                value={enrollForm.name}
-                onChange={e => setEnrollForm(p => ({ ...p, name: e.target.value }))}
-                style={inputStyle} placeholder="e.g. Priya Sharma"
-              />
-            </div>
-
-            {/* Email */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 12, fontWeight: 700, color: "#4a5568", textTransform: "uppercase", letterSpacing: "0.4px" }}>Email *</label>
-              <input
-                type="email"
-                value={enrollForm.email}
-                onChange={e => setEnrollForm(p => ({ ...p, email: e.target.value }))}
-                style={inputStyle} placeholder="priya@example.com"
-              />
-            </div>
-
-            {/* Phone */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 12, fontWeight: 700, color: "#4a5568", textTransform: "uppercase", letterSpacing: "0.4px" }}>Phone</label>
-              <input
-                type="tel"
-                value={enrollForm.phone}
-                onChange={e => setEnrollForm(p => ({ ...p, phone: e.target.value }))}
-                style={inputStyle} placeholder="+91 98765 43210"
-              />
-            </div>
-
-            {/* Tier Selection */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <label style={{ fontSize: 12, fontWeight: 700, color: "#4a5568", textTransform: "uppercase", letterSpacing: "0.4px" }}>Membership Tier *</label>
-              <div style={{ display: "flex", gap: 8 }}>
-                {Object.entries(tierConfig).map(([key, cfg]) => (
-                  <div
-                    key={key}
-                    onClick={() => setEnrollForm(p => ({ ...p, tier: key }))}
-                    style={{
-                      flex: 1, padding: "12px 8px", borderRadius: 10, textAlign: "center", cursor: "pointer",
-                      border: `2px solid ${enrollForm.tier === key ? cfg.color : "#e2e8f0"}`,
-                      background: enrollForm.tier === key ? cfg.bg : "white",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: 700, color: enrollForm.tier === key ? cfg.color : "#4a5568" }}>{cfg.label}</div>
-                    <div style={{ fontSize: 10, color: "#a0aec0", marginTop: 2 }}>₹{cfg.price.toLocaleString("en-IN")}/yr</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {enrollError && <div style={{ color: "#e74c3c", fontSize: 13, fontWeight: 600 }}>⚠️ {enrollError}</div>}
-
-            <div style={{ display: "flex", gap: 12 }}>
-              <button
-                onClick={() => setShowEnrollModal(false)}
-                style={{ flex: 1, padding: 11, borderRadius: 10, border: "1.5px solid #CDA751", background: "white", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#CDA751" }}
-              >Cancel</button>
-              <button
-                onClick={handleEnroll}
-                disabled={enrollSaving}
-                style={{ flex: 2, padding: 11, borderRadius: 10, border: "none", background: "#CDA751", color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer" }}
-              >{enrollSaving ? "Enrolling..." : "✓ Enroll Member"}</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── View Benefits Modal (fixed — benefits is now a flat array) ── */}
       {viewBenefitsTier && (

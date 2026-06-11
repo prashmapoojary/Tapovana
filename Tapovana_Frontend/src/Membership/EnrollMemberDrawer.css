@@ -1,0 +1,467 @@
+
+/* EnrollMemberDrawer.css - Copy of AddMemberDrawer.css for consistent styling */
+
+/* Blur Overlay Rules */
+.drawer-overlay {
+  position: fixed;
+  top: 85px;
+  /* below topbar */
+  left: 200px;
+  /* right of sidebar */
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.10);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 6;
+  /* above sidebar (5) and page content, below topbar (10) */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.drawer-overlay.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Drawer Panel Rules */
+.drawer-panel {
+  position: fixed;
+  top: 85px;
+  right: -420px;
+  /* offscreen when closed */
+  width: 380px;
+  height: calc(100vh - 85px);
+  z-index: 450;
+  /* above overlay (6), below topbar (10) - wait, instruction says "z-index: 450 — above everything including the overlay". Actually topbar is 10, so 450 is higher than 10. That's what the prompt asked ("z-index: 450 — above everything including the overlay"). */
+  background: #F8F7F6;
+  box-shadow: 0px 25px 50px -12px #00000040;
+  transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-panel.open {
+  right: 0;
+}
+
+/* Header (sticky top) */
+.drawer-header {
+  position: sticky;
+  top: 0;
+  z-index: 500;
+  background: #F8F7F6;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #E8E2D9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.drawer-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.drawer-title-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drawer-title-icon img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.drawer-close-btn {
+  font-size: 18px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #555;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+
+.drawer-close-btn:hover {
+  color: #CDA751;
+}
+
+/* Scrollable Body */
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+/* Section divider */
+.drawer-divider {
+  border: none;
+  border-top: 1px solid #E8E2D9;
+  margin: 32px 0;
+}
+
+/* Section Label */
+.section-label-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  margin-top: 36px;
+}
+
+.section-label-container:first-of-type {
+  margin-top: 4px;
+}
+
+.section-badge {
+  font-size: 11px;
+  color: #CDA751;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.section-title {
+  text-transform: uppercase;
+  color: #000000df;
+  font-size: 11.5px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  -webkit-text-stroke: 0.4px currentColor;
+}
+
+/* Profile photo upload box */
+.profile-upload-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.profile-upload-box {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
+  background: #E2E8F0;
+  border: 4px solid #FFFFFF;
+  box-shadow: 0px 4px 6px -1px #0000001A, 0px 2px 4px -2px #0000001A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.profile-upload-preview,
+.profile-upload-placeholder {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.profile-upload-input {
+  display: none;
+}
+
+.camera-badge {
+  position: absolute;
+  bottom: -21px;
+  right: -18px;
+  width: 37px;
+  height: 37px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  background: none;
+}
+
+.camera-badge-img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.profile-upload-label {
+  font-size: 8px;
+  color: #888;
+  width: 100px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Form Fields */
+.form-row {
+  margin-bottom: 16px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.input-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #404854;
+  margin-bottom: 2px;
+}
+
+.drawer-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid rgba(205, 167, 81, 0.2);
+  border-radius: 4px;
+  font-size: 13px;
+  color: #333;
+  outline: none;
+  box-sizing: border-box;
+  background: white;
+}
+
+.drawer-input::placeholder {
+  color: #aaa;
+}
+
+.drawer-input:focus {
+  border-color: #CDA751;
+  box-shadow: 0 0 0 3px rgba(205, 167, 81, 0.09);
+}
+
+.input-hint {
+  font-size: 10px;
+  color: #aaa;
+  margin-top: 4px;
+}
+
+/* Custom Select wrapper */
+.select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.drawer-select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  padding: 7px 32px 7px 10px;
+  /* Right padding for the icon */
+  border: 1px solid rgba(205, 167, 81, 0.2);
+  border-radius: 4px;
+  font-size: 13px;
+  color: #333;
+  outline: none;
+  background: white;
+  cursor: pointer;
+}
+
+.drawer-select:focus {
+  border-color: #CDA751;
+  box-shadow: 0 0 0 3px rgba(205, 167, 81, 0.09);
+}
+
+.select-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  width: 12px;
+  height: 12px;
+}
+
+/* Settings Card */
+.settings-card {
+  background: #CDA7510D;
+  border: 1px solid #CDA7511A;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-row.divider-top {
+  border-top: 1px solid #E8E2D9;
+  padding-top: 10px;
+}
+
+.settings-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.settings-subtitle {
+  font-size: 12px;
+  color: #666;
+}
+
+/* Custom Checkbox */
+.custom-checkbox-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  flex: 1;
+}
+
+.hidden-checkbox {
+  display: none;
+}
+
+.custom-checkbox {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1px solid #CCC;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.hidden-checkbox:checked+.custom-checkbox {
+  background: #CDA751;
+  border-color: #CDA751;
+}
+
+.check-icon {
+  display: none;
+}
+
+.hidden-checkbox:checked+.custom-checkbox .check-icon {
+  display: block;
+}
+
+/* Custom Toggle */
+.custom-toggle-container {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.hidden-toggle {
+  display: none;
+}
+
+.toggle-track {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: #ddd;
+  transition: background 0.3s;
+}
+
+.hidden-toggle:checked+.toggle-track {
+  background: #CDA751;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: left 0.2s;
+}
+
+.hidden-toggle:checked+.toggle-track .toggle-thumb {
+  left: 23px;
+}
+
+/* Footer (sticky bottom) */
+.drawer-footer {
+  position: sticky;
+  bottom: 0;
+  background: #F8F7F6;
+  padding: 12px 16px;
+  border-top: 1px solid #E8E2D9;
+  display: flex;
+  gap: 12px;
+  z-index: 500;
+}
+
+.btn-cancel {
+  flex: 1;
+  background: white;
+  color: #555;
+  border: 1px solid #E8E2D9;
+  border-radius: 6px;
+  padding: 9px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cancel:hover {
+  background: #CDA751;
+  border-color: #CDA751;
+  color: white;
+}
+
+.btn-save {
+  flex: 2;
+  background: #CDA751;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.2s;
+}
+
+.btn-save:hover {
+  background: #b8903f;
+}

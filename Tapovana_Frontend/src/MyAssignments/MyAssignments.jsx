@@ -3,6 +3,7 @@ import './MyAssignments.css';
 import { useAllocations } from '../utils/AllocationContext';
 import { getUser } from '../utils/session';
 import { apiFetch } from '../api/http';
+import DefaultAvatar from '../assets/profileIconDefault.png';
 
 // Icons
 const CalendarIcon = () => (
@@ -55,6 +56,7 @@ function MyAssignments() {
   const [validationError, setValidationError] = useState(null);
   const [backendAssignments, setBackendAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [memberships, setMemberships] = useState([]);
 
   const isStaffUser = loggedInUser?.role === 'DOCTOR' || loggedInUser?.role === 'THERAPIST';
 
@@ -74,6 +76,24 @@ function MyAssignments() {
       }
     };
     fetchAssignments();
+  }, []);
+
+  // ─── Fetch membership data for profile photos ───
+  useEffect(() => {
+    const fetchMemberships = async () => {
+      try {
+        const response = await fetch('https://tapoclg.onrender.com/api/membership');
+        const data = await response.json();
+        if (data.success && data.data) {
+          setMemberships(data.data);
+        } else if (Array.isArray(data)) {
+          setMemberships(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch memberships:", err);
+      }
+    };
+    fetchMemberships();
   }, []);
 
   // ─── Refresh assignments after marking complete ───
@@ -120,17 +140,17 @@ function MyAssignments() {
   // Merge backend + context allocations
   const activeAssignments = useMemo(() => {
     const fromContext = contextAllocations
-      .filter(a => a.staffId === activeStaffId)
+      .filter(a => a.staffId === activeStaffId && a.status !== 'removed')
       .map(a => ({
         ...a,
-        status: a.status === "expired" ? "expired" : a.status === "cancelled" ? "cancelled" : a.status === "removed" ? "removed" : "active"
+        status: a.status === 'expired' ? 'expired' : a.status === 'cancelled' ? 'cancelled' : 'active'
       }));
 
     const fromBackend = backendAssignments
-      .filter(a => a.staffId === activeStaffId)
+      .filter(a => a.staffId === activeStaffId && a.status !== 'removed')
       .map(a => ({
         ...a,
-        status: a.status === "expired" ? "expired" : a.status === "cancelled" ? "cancelled" : a.status === "removed" ? "removed" : "active"
+        status: a.status === 'expired' ? 'expired' : a.status === 'cancelled' ? 'cancelled' : 'active'
       }));
 
     // Merge: deduplicate by sessionId
@@ -147,9 +167,9 @@ function MyAssignments() {
 
   // Stats
   const stats = useMemo(() => {
-    const total = activeAssignments.length;
     const active = activeAssignments.filter(a => a.status === 'active').length;
-    const expired = total - active;
+    const expired = activeAssignments.filter(a => a.status === 'expired').length;
+    const total = active + expired;
     return { total, active, expired };
   }, [activeAssignments]);
 
@@ -340,78 +360,93 @@ function MyAssignments() {
         </div>
       ) : (
         <div className="ma-grid">
-          {filteredAssignments.map((a) => (
-            <div key={a.id} className={`ma-card ${a.type}`}>
-              <div className="ma-card-header">
-                <span className={`ma-card-type-tag ${a.type}`}>
-                  {a.type === 'vedic_program' ? 'Vedic Program' : a.type}
-                </span>
-                <span className={`ma-status-badge ${a.status}`}>
-                  {a.status === 'active' ? 'Active / Scheduled'
-                    : a.status === 'cancelled' ? 'This service has been cancelled.'
-                    : a.status === 'removed' ? 'You have been removed from this service.'
-                    : 'Completed'}
-                </span>
-              </div>
+          {filteredAssignments.map((a) => {
+            // Find profile photo from memberships
+            const member = memberships.find(m => {
+              const fullName = `${m.name || m.first_name || ''} ${m.last_name || ''}`.trim().toLowerCase();
+              return fullName.includes(a.staffName.toLowerCase()) || a.staffName.toLowerCase().includes(fullName);
+            });
+            const profilePhotoUrl = member?.profile_photo_url || null;
+            const handleImageError = (e) => {
+              e.target.onerror = null;
+              e.target.src = DefaultAvatar;
+            };
 
-              <div className="ma-card-body">
-                <h3 className="ma-session-title">{a.sessionTitle}</h3>
-                <div className="ma-details-list">
-                  <div className="ma-detail-item">
-                    <CalendarIcon />
-                    <span className="ma-detail-label">Timeline:</span>
-                    <span className="ma-detail-value">
-                      {getFormatDate(a.startDate)}
-                      {a.type === 'service' && a.bookingTime ? ` at ${a.bookingTime}` : ''}
-                      {a.endDate && a.endDate !== a.startDate ? ` - ${getFormatDate(a.endDate)}` : ''}
-                    </span>
-                  </div>
-                  <div className="ma-detail-item">
-                    <UserIcon />
-                    <span className="ma-detail-label">Staff:</span>
-                    <span className="ma-detail-value">{a.staffName} ({a.staffRole})</span>
-                  </div>
-                  <div className="ma-detail-item">
-                    <TagIcon />
-                    <span className="ma-detail-label">Code:</span>
-                    <span className="ma-detail-value">{a.sessionId || a.id}</span>
-                  </div>
+            return (
+              <div key={a.id} className={`ma-card ${a.type}`}>
+                <div className="ma-card-header">
+                  <span className={`ma-card-type-tag ${a.type}`}>
+                    {a.type === 'vedic_program' ? 'Vedic Program' : a.type}
+                  </span>
+                  <span className={`ma-status-badge ${a.status}`}>
+                    {a.status === 'active' ? 'Active / Scheduled'
+                      : a.status === 'cancelled' ? 'This service has been cancelled.'
+                      : 'Completed'}
+                  </span>
                 </div>
-                {a.status === 'cancelled' && (
-                  <div className="ma-cancelled-message">
-                    This service has been cancelled.
-                  </div>
-                )}
-                {a.status === 'removed' && (
-                  <div className="ma-cancelled-message" style={{ color: '#c0392b', background: 'rgba(192,57,43,0.07)', border: '1px solid rgba(192,57,43,0.2)', borderRadius: '6px', padding: '8px 12px', marginTop: '8px', fontSize: '13px', fontWeight: 600 }}>
-                    You have been removed from this service.
-                  </div>
-                )}
-              </div>
 
-              {validationError?.id === a.id && (
-                <div style={{
-                  background: "rgba(231,76,60,0.08)", border: "1px solid rgba(231,76,60,0.3)",
-                  borderRadius: "6px", padding: "10px 14px", margin: "0 0 8px",
-                  fontSize: "12px", color: "#c0392b", display: "flex", gap: "8px"
-                }}>
-                  <span>⏳</span><span>{validationError.message}</span>
+                <div className="ma-card-body">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    <img
+                      src={profilePhotoUrl || DefaultAvatar}
+                      alt="Profile"
+                      onError={handleImageError}
+                      style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0' }}
+                    />
+                    <h3 className="ma-session-title" style={{ margin: 0 }}>{a.sessionTitle}</h3>
+                  </div>
+                  <div className="ma-details-list">
+                    <div className="ma-detail-item">
+                      <CalendarIcon />
+                      <span className="ma-detail-label">Timeline:</span>
+                      <span className="ma-detail-value">
+                        {getFormatDate(a.startDate)}
+                        {a.type === 'service' && a.bookingTime ? ` at ${a.bookingTime}` : ''}
+                        {a.endDate && a.endDate !== a.startDate ? ` - ${getFormatDate(a.endDate)}` : ''}
+                      </span>
+                    </div>
+                    <div className="ma-detail-item">
+                      <UserIcon />
+                      <span className="ma-detail-label">Staff:</span>
+                      <span className="ma-detail-value">{a.staffName} ({a.staffRole})</span>
+                    </div>
+                    <div className="ma-detail-item">
+                      <TagIcon />
+                      <span className="ma-detail-label">Code:</span>
+                      <span className="ma-detail-value">{a.sessionId || a.id}</span>
+                    </div>
+                  </div>
+                  {a.status === 'cancelled' && (
+                    <div className="ma-cancelled-message">
+                      This service has been cancelled.
+                    </div>
+                  )}
                 </div>
-              )}
 
-              <div className="ma-card-footer">
-                <span className="ma-assigned-date">Assigned: {getFormatDate(a.createdAt)}</span>
-                {a.status === 'active' && a.type !== 'service' && (
-                  <button
-                    className="ma-action-btn"
-                    onClick={() => handleMarkAsComplete(a.id, a.sessionId, a.endDate, a.type)}
-                  >
-                    Mark as Done
-                  </button>
+                {validationError?.id === a.id && (
+                  <div style={{
+                    background: "rgba(231,76,60,0.08)", border: "1px solid rgba(231,76,60,0.3)",
+                    borderRadius: "6px", padding: "10px 14px", margin: "0 0 8px",
+                    fontSize: "12px", color: "#c0392b", display: "flex", gap: "8px"
+                  }}>
+                    <span>⏳</span><span>{validationError.message}</span>
+                  </div>
                 )}
+
+                <div className="ma-card-footer">
+                  <span className="ma-assigned-date">Assigned: {getFormatDate(a.createdAt)}</span>
+                  {a.status === 'active' && a.type !== 'service' && (
+                    <button
+                      className="ma-action-btn"
+                      onClick={() => handleMarkAsComplete(a.id, a.sessionId, a.endDate, a.type)}
+                    >
+                      Mark as Done
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
