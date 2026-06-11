@@ -90,9 +90,20 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
 }
 
-.ma-stat-icon {
-  font-size: 18px;
+.mem-tier-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 4px;
+}
+
+.mem-tier-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .ma-stat-value {
@@ -344,8 +355,9 @@
 }
 
 .ma-assigned-date {
-  font-size: 11px;
-  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5568;
 }
 
 .ma-action-btn {

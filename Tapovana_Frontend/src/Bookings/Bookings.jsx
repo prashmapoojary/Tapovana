@@ -33,7 +33,7 @@ function getServiceImageUrl(imageUrl) {
 
 
 function Bookings() {
-  const { triggerAlert, triggerConfirm, conflicts, fetchConflicts } = useAllocations();
+  const { triggerAlert, triggerConfirm, conflicts, fetchConflicts, deallocateFromSession, allocateStaff } = useAllocations();
   const userRole = useMemo(() => getUser()?.role, []);
 
   useEffect(() => {
@@ -282,6 +282,8 @@ function Bookings() {
     const isConfirmed = newStatus === 'CONFIRMED';
     const isFirstAllocation = isConfirmed && currentStatus !== 'CONFIRMED';
     const isReAllocation = isConfirmed && currentStatus === 'CONFIRMED' && staffIdsChanged;
+    const isCancelling = newStatus === 'CANCELLED';
+    const isDeallocatingStaff = isConfirmed && staffIdsChanged && (selectedBooking._allocatedStaffIds || []).length > 0;
 
     let msg;
     if (isFirstAllocation && assignedStaffIds.length > 0) {
@@ -319,7 +321,29 @@ function Bookings() {
           ));
           setSelectedBooking(updatedBooking);
 
+          // If cancelling or reallocating, deallocate the previous staff!
+          if (isCancelling || isDeallocatingStaff) {
+            deallocateFromSession(String(selectedBooking.id));
+          }
+
+          // Allocate new staff if confirming!
           if (isConfirmed && assignedStaffIds.length > 0) {
+            // Get each staff object from staffList
+            assignedStaffIds.forEach(staffId => {
+              const staff = staffList.find(s => (s.user_id || s.id) === staffId);
+              if (staff) {
+                // Create session object for allocateStaff
+                const session = {
+                  id: String(selectedBooking.id),
+                  title: selectedBooking.service_name || "Service Booking",
+                  startDate: selectedBooking.booking_date,
+                  date: selectedBooking.booking_date,
+                  endDate: selectedBooking.booking_date
+                };
+                allocateStaff(staff, session, "service");
+              }
+            });
+
             if (isReAllocation) {
               triggerAlert("Booking re-allocated. Previous staff removed, new staff assigned.", true);
             } else {
@@ -355,6 +379,8 @@ function Bookings() {
         if (res.success) {
           // Remove booking from local state
           setBookings(prev => prev.filter(b => String(b.id) !== String(booking.id)));
+          // Deallocate any staff from this booking
+          deallocateFromSession(String(booking.id));
           // If the deleted booking was in the drawer, close it
           if (selectedBooking && String(selectedBooking.id) === String(booking.id)) {
             setSelectedBooking(null);

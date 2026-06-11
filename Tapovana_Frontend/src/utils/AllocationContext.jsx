@@ -195,7 +195,14 @@ export const AllocationProvider = ({ children }) => {
         })
       }).catch(err => console.error("Error syncing deallocation to database:", err));
     }
-    setAllocations((prev) => prev.filter((a) => a.id !== allocationId));
+    setAllocations((prev) =>
+      prev.map((a) => {
+        if (a.id === allocationId) {
+          return { ...a, status: "removed" };
+        }
+        return a;
+      })
+    );
   }, [allocations]);
 
   /**
@@ -212,7 +219,14 @@ export const AllocationProvider = ({ children }) => {
         })
       }).catch(err => console.error("Error syncing deallocation to database:", err));
     });
-    setAllocations((prev) => prev.filter((a) => a.sessionId !== sessionId));
+    setAllocations((prev) =>
+      prev.map((a) => {
+        if (a.sessionId === sessionId) {
+          return { ...a, status: "removed" };
+        }
+        return a;
+      })
+    );
   }, [allocations]);
 
   /**

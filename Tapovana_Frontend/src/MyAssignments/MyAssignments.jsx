@@ -190,7 +190,7 @@ function MyAssignments() {
     }
   }, [isStaffUser]);
 
-  // Merge backend + context allocations
+  // Merge backend + context allocations - prioritize context!
   const allAssignments = useMemo(() => {
     const fromContext = contextAllocations
       .filter(a => a.staffId === activeStaffId)
@@ -206,11 +206,17 @@ function MyAssignments() {
         status: a.status === 'expired' ? 'expired' : a.status === 'cancelled' ? 'cancelled' : a.status === 'removed' ? 'removed' : 'active'
       }));
 
-    // Merge: deduplicate by sessionId
-    const merged = [...fromContext];
+    // Create a map of sessionId to context allocation for quick lookup!
+    const contextAllocMap = new Map(fromContext.map(a => [a.sessionId, a]));
+
+    const merged = [];
+    
+    // Add all context allocations first!
+    merged.push(...fromContext);
+
+    // Now check backend allocations: if no context allocation for sessionId, add it!
     for (const b of fromBackend) {
-      const exists = merged.find(m => m.sessionId === b.sessionId);
-      if (!exists) {
+      if (!contextAllocMap.has(b.sessionId)) {
         merged.push(b);
       }
     }
@@ -227,9 +233,10 @@ function MyAssignments() {
     return { total, active, expired, removed };
   }, [allAssignments]);
 
-  // Filtered assignments
+  // Filtered assignments (exclude removed ones entirely)
   const filteredAssignments = useMemo(() => {
     return allAssignments.filter(a => {
+      if (a.status === 'removed') return false;
       const matchesType = filterType === 'all' || a.type === filterType;
       const matchesStatus = filterStatus === 'all' || a.status === filterStatus;
       const matchesQuery = !searchQuery ||
@@ -319,6 +326,9 @@ function MyAssignments() {
       e.target.src = DefaultAvatar;
     };
 
+    // If status is removed, don't render the card at all!
+    if (a.status === 'removed') return null;
+
     return (
       <div key={a.id} className={`ma-card ${a.type}`}>
         <div className="ma-card-header">
@@ -328,7 +338,7 @@ function MyAssignments() {
           <span className={`ma-status-badge ${a.status}`}>
             {a.status === 'active' ? 'Active / Scheduled' 
               : a.status === 'cancelled' ? 'This service has been cancelled.' 
-              : a.status === 'removed' ? 'Removed' 
+              : a.status === 'removed' ? 'Deallocated' 
               : 'Completed'}
           </span>
         </div>
@@ -461,23 +471,31 @@ function MyAssignments() {
       {/* Stats */}
       <div className="ma-stats-grid">
         <div className="ma-stat-card">
-          <div className="ma-stat-icon total"><TagIcon /></div>
+          <div className="mem-tier-card-top">
+            <div className="mem-tier-badge" style={{ background: "#475569", color: "white" }}>Total</div>
+          </div>
           <span className="ma-stat-value">{stats.total}</span>
           <span className="ma-stat-label">Total Assigned Sessions</span>
         </div>
         <div className="ma-stat-card">
-          <div className="ma-stat-icon active"><CalendarIcon /></div>
-          <span className="ma-stat-value">{stats.active}</span>
+          <div className="mem-tier-card-top">
+            <div className="mem-tier-badge" style={{ background: "#cda751", color: "white" }}>Active</div>
+          </div>
+          <span className="ma-stat-value" style={{ color: "#cda751" }}>{stats.active}</span>
           <span className="ma-stat-label">Active / Upcoming</span>
         </div>
         <div className="ma-stat-card">
-          <div className="ma-stat-icon expired"><UserIcon /></div>
-          <span className="ma-stat-value">{stats.expired}</span>
+          <div className="mem-tier-card-top">
+            <div className="mem-tier-badge" style={{ background: "#8e9fa7", color: "white" }}>Completed</div>
+          </div>
+          <span className="ma-stat-value" style={{ color: "#8e9fa7" }}>{stats.expired}</span>
           <span className="ma-stat-label">Completed</span>
         </div>
         <div className="ma-stat-card">
-          <div className="ma-stat-icon cancelled"><InfoIcon /></div>
-          <span className="ma-stat-value">{stats.removed}</span>
+          <div className="mem-tier-card-top">
+            <div className="mem-tier-badge" style={{ background: "#64748b", color: "white" }}>Removed</div>
+          </div>
+          <span className="ma-stat-value" style={{ color: "#64748b" }}>{stats.removed}</span>
           <span className="ma-stat-label">Removed</span>
         </div>
       </div>
@@ -523,7 +541,7 @@ function MyAssignments() {
                 <div style={{ marginBottom: '32px' }}>
                   <h2 style={{ marginBottom: '16px', fontSize: '20px', fontWeight: '700', color: '#0F172A' }}>Services</h2>
                   <div className="ma-grid">
-                    {servicesAssignments.map((a) => renderAssignmentCard(a))}
+                    {servicesAssignments.map((a) => renderAssignmentCard(a)).filter(Boolean)}
                   </div>
                 </div>
               );
@@ -539,7 +557,7 @@ function MyAssignments() {
                 <div style={{ marginBottom: '32px' }}>
                   <h2 style={{ marginBottom: '16px', fontSize: '20px', fontWeight: '700', color: '#0F172A' }}>Workshops</h2>
                   <div className="ma-grid">
-                    {workshopsAssignments.map((a) => renderAssignmentCard(a))}
+                    {workshopsAssignments.map((a) => renderAssignmentCard(a)).filter(Boolean)}
                   </div>
                 </div>
               );
@@ -555,7 +573,7 @@ function MyAssignments() {
                 <div style={{ marginBottom: '32px' }}>
                   <h2 style={{ marginBottom: '16px', fontSize: '20px', fontWeight: '700', color: '#0F172A' }}>Vedic Life Package</h2>
                   <div className="ma-grid">
-                    {vedicProgramsAssignments.map((a) => renderAssignmentCard(a))}
+                    {vedicProgramsAssignments.map((a) => renderAssignmentCard(a)).filter(Boolean)}
                   </div>
                 </div>
               );
