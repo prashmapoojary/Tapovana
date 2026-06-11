@@ -11,7 +11,8 @@ const initialForm = {
   name: "",
   email: "",
   phone: "",
-  tier: "SILVER"
+  tier: "SILVER",
+  status: "pending"
 };
 
 const EnrollMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
@@ -110,6 +111,7 @@ const EnrollMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
       email: formData.email.trim().toLowerCase(),
       phone: formData.phone?.trim() || null,
       tier: formData.tier,
+      status: formData.status,
       profile_photo_source: photoSource,
       profile_photo_url: photoUrl,
       profile_photo_base64: photoBase64
@@ -319,6 +321,22 @@ const EnrollMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
                 <option value="PLATINUM">Platinum</option>
               </select>
               <img src={DropdownIcon} alt="dropdown" className="select-icon" />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="input-label">Status</label>
+              <div className="select-wrapper">
+                <select
+                  name="status"
+                  value={formData.status}
+                  className="drawer-select"
+                  disabled
+                >
+                  <option value="pending">Pending (Will Require Approval)</option>
+                </select>
+                <img src={DropdownIcon} alt="dropdown" className="select-icon" />
+              </div>
             </div>
           </div>
 

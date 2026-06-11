@@ -141,9 +141,11 @@ export default function Membership() {
     try {
       setDataLoading(true);
       const res = await apiFetch("https://tapoclg.onrender.com/api/membership");
+      console.log("Membership API response:", res); // Debug log
       // Check if response is successful or is an array (some APIs return raw array)
       if (res && (res.success || Array.isArray(res))) {
         const rawList = res.memberships || res.data || (Array.isArray(res) ? res : []);
+        console.log("Raw members list:", rawList); // Debug log
         const mappedMembers = rawList.map((m) => {
           const rawTier = m.tier || m.membership_name;
           const tier = mapTier(rawTier);
@@ -179,11 +181,13 @@ export default function Membership() {
             profile_photo_url: m.profile_photo_url || m.profile_pic || null
           };
         });
+        console.log("Mapped members:", mappedMembers); // Debug log
         setMembers(mappedMembers);
       } else {
         setMembers([]);
       }
-    } catch {
+    } catch (e) {
+      console.error("Error fetching members:", e); // Debug log
       setMembers([]);
       showToast("Failed to load members.", "error");
     } finally {
