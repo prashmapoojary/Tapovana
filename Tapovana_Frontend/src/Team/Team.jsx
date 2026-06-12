@@ -17,35 +17,6 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 const EditMemberDrawer = ({ user, onClose }) => {
   const [photoPreview, setPhotoPreview] = useState(null);
-  const { allocations: contextAllocations } = useAllocations();
-
-  // Filter allocations for this user and show only active ones (not expired/completed/removed)
-  const userAllocations = useMemo(() => {
-    const staffId = user?.user_id || user?.id;
-    const filtered = contextAllocations.filter(a => 
-      a.staffId === staffId && a.status === 'active'
-    );
-    
-    return {
-      workshops: filtered.filter(a => a.type === 'workshop'),
-      services: filtered.filter(a => a.type === 'service'),
-      vedic_programs: filtered.filter(a => a.type === 'vedic_program')
-    };
-  }, [contextAllocations, user]);
-
-  const isPractitioner = user?.role?.toUpperCase() === 'DOCTOR' || user?.role?.toUpperCase() === 'THERAPIST';
-
-  const getStatusStyle = (status) => {
-    switch (status?.toLowerCase()) {
-      case "completed": return { color: "#319795" }; // green
-      case "pending": return { color: "#b7791f" }; // yellow
-      case "cancelled": return { color: "#c53030" }; // red
-      case "in progress":
-      case "ongoing":
-      case "active": return { color: "#3182ce" }; // blue
-      default: return { color: "#CDA751" }; // gold
-    }
-  };
 
   useEffect(() => {
     if (user) {
@@ -132,89 +103,7 @@ const EditMemberDrawer = ({ user, onClose }) => {
             </div>
           </div>
 
-          {isPractitioner && (
-            <>
-              <div className="drawer-divider" />
-              
-              <div className="section-label-container">
-                <div className="section-badge">📋</div>
-                <div className="section-title">Allocations & Activities</div>
-              </div>
 
-              <div className="allocations-container" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <>
-                  <div className="allocation-group">
-                    <label className="input-label" style={{ display: "block", marginBottom: 8 }}>Workshops</label>
-                    {userAllocations.workshops.length > 0 ? (
-                      userAllocations.workshops.map(a => {
-                        const style = getStatusStyle(a.status);
-                        return (
-                          <div key={a.id} className="settings-card" style={{ marginBottom: 8 }}>
-                            <div className="settings-row">
-                              <div className="settings-info">
-                                <span className="settings-label">{a.sessionTitle}</span>
-                              </div>
-                              <div style={{ fontSize: 12, color: style.color, fontWeight: 600 }}>
-                                {a.status}
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })
-                    ) : (
-                      <div style={{ fontSize: 13, color: "#a0aec0", fontStyle: "italic" }}>No workshops assigned</div>
-                    )}
-                  </div>
-
-                  <div className="allocation-group">
-                    <label className="input-label" style={{ display: "block", marginBottom: 8 }}>Services</label>
-                    {userAllocations.services.length > 0 ? (
-                      userAllocations.services.map(a => {
-                        const style = getStatusStyle(a.status);
-                        return (
-                          <div key={a.id} className="settings-card" style={{ marginBottom: 8 }}>
-                            <div className="settings-row">
-                              <div className="settings-info">
-                                <span className="settings-label">{a.sessionTitle}</span>
-                              </div>
-                              <div style={{ fontSize: 12, color: style.color, fontWeight: 600 }}>
-                                {a.status}
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })
-                    ) : (
-                      <div style={{ fontSize: 13, color: "#a0aec0", fontStyle: "italic" }}>No services allocated</div>
-                    )}
-                  </div>
-
-                  <div className="allocation-group">
-                    <label className="input-label" style={{ display: "block", marginBottom: 8 }}>Vedic Programs</label>
-                    {userAllocations.vedic_programs.length > 0 ? (
-                      userAllocations.vedic_programs.map(a => {
-                        const style = getStatusStyle(a.status);
-                        return (
-                          <div key={a.id} className="settings-card" style={{ marginBottom: 8 }}>
-                            <div className="settings-row">
-                              <div className="settings-info">
-                                <span className="settings-label">{a.sessionTitle}</span>
-                              </div>
-                              <div style={{ fontSize: 12, color: style.color, fontWeight: 600 }}>
-                                {a.status}
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })
-                    ) : (
-                      <div style={{ fontSize: 13, color: "#a0aec0", fontStyle: "italic" }}>No programs assigned</div>
-                    )}
-                  </div>
-                </>
-              </div>
-            </>
-          )}
 
 
         </div>
