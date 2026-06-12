@@ -30,6 +30,21 @@ const ensureUpdatesTableExists = async () => {
 };
 ensureUpdatesTableExists();
 
+// Ensure deleted_booking_ids table exists
+const ensureDeletedBookingsTableExists = async () => {
+    try {
+        await query(`
+            CREATE TABLE IF NOT EXISTS deleted_booking_ids (
+                booking_id INTEGER PRIMARY KEY,
+                deleted_at TIMESTAMPTZ DEFAULT NOW()
+            );
+        `);
+    } catch (err) {
+        console.error('Error creating deleted_booking_ids table:', err);
+    }
+};
+ensureDeletedBookingsTableExists();
+
 // GET ALL BOOKINGS
 const getAllBookings = async (req, res) => {
     try {
@@ -64,15 +79,21 @@ const getAllBookings = async (req, res) => {
                 remoteBookings = localPendingRes.rows;
             }
 
-            // Filter remote bookings: keep only the ones that are not in localUpdatedBookings
+            // Get all deleted booking IDs
+            const deletedRes = await query("SELECT booking_id FROM deleted_booking_ids");
+            const deletedIds = new Set(deletedRes.rows.map(r => String(r.booking_id)));
+
+            // Filter remote bookings: keep only the ones that are not in localUpdatedBookings and NOT deleted
             const localUpdatedIds = new Set(localUpdatedBookings.map(b => String(b.id)));
             
             // Remote bookings should have PENDING status (all new/incoming entries start as Pending)
             const pendingAndNewBookings = remoteBookings
-                .filter(b => !localUpdatedIds.has(String(b.id)))
+                .filter(b => !localUpdatedIds.has(String(b.id)) && !deletedIds.has(String(b.id)))
                 .map(b => ({
                     ...b,
-                    status: 'PENDING'
+                    status: 'PENDING',
+                    therapist_id: null,
+                    therapist_name: null
                 }));
 
             // 3. Merge: Database updated bookings + Remote pending/new bookings
@@ -139,6 +160,12 @@ const getBookingById = async (req, res) => {
 
 // Helper: Ensure booking exists locally by syncing from Render if needed
 const ensureBookingExistsLocally = async (bookingId) => {
+    // Check if it was deleted locally
+    const deletedCheck = await query('SELECT 1 FROM deleted_booking_ids WHERE booking_id = $1', [parseInt(bookingId)]);
+    if (deletedCheck.rows.length) {
+        return null;
+    }
+
     const existingRes = await query('SELECT * FROM bookings WHERE id = $1', [bookingId]);
     if (existingRes.rows.length) {
         return existingRes.rows[0];
@@ -156,7 +183,7 @@ const ensureBookingExistsLocally = async (bookingId) => {
                     'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
                     [
                         remoteBooking.id, remoteBooking.user_name, remoteBooking.service_name,
-                        remoteBooking.booking_date, remoteBooking.booking_time, remoteBooking.therapist_name,
+                        remoteBooking.booking_date, remoteBooking.booking_time, null,
                         remoteBooking.note, remoteBooking.total_amount, remoteBooking.pass_details,
                         paymentStatus, 'PENDING', remoteBooking.created_at
                     ]
@@ -180,7 +207,7 @@ const ensureBookingExistsLocally = async (bookingId) => {
                     'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
                     [
                         remoteBooking.id, remoteBooking.user_name, remoteBooking.service_name,
-                        remoteBooking.booking_date, remoteBooking.booking_time, remoteBooking.therapist_name,
+                        remoteBooking.booking_date, remoteBooking.booking_time, null,
                         remoteBooking.note, remoteBooking.total_amount, remoteBooking.pass_details,
                         paymentStatus, 'PENDING', remoteBooking.created_at
                     ]
@@ -648,6 +675,10 @@ const syncFromRender = async (req, res) => {
 
         let synced = 0;
         for (const booking of data.bookings) {
+            // Check if it was deleted locally
+            const wasDeleted = await query('SELECT 1 FROM deleted_booking_ids WHERE booking_id = $1', [parseInt(booking.id)]);
+            if (wasDeleted.rows.length) continue;
+
             const existing = await query('SELECT id FROM bookings WHERE id = $1', [booking.id]);
             if (existing.rows.length) continue;
 
@@ -657,7 +688,7 @@ const syncFromRender = async (req, res) => {
                 'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
                 [
                     booking.id, booking.user_name, booking.service_name,
-                    booking.booking_date, booking.booking_time, booking.therapist_name,
+                    booking.booking_date, booking.booking_time, null,
                     booking.note, booking.total_amount, booking.pass_details,
                     paymentStatus, 'PENDING', booking.created_at
                 ]
@@ -697,22 +728,20 @@ const syncFromRender = async (req, res) => {
 const deleteBooking = async (req, res) => {
     try {
         const bookingId = req.params.id;
-        const bookingRes = await query('SELECT * FROM bookings WHERE id = $1', [bookingId]);
-        if (!bookingRes.rows.length) {
-            return res.status(404).json({ success: false, message: 'Booking not found.' });
-        }
 
-        // First, delete all allocations for this booking
-        const allocRes = await query(
-            `DELETE FROM allocations WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
-            [String(bookingId), `bk-alloc-${bookingId}-%`]
-        );
-
-        // Sync staff status for any allocated staff
+        // Sync staff status: get allocated staff before deleting allocations
         const staffToSyncRes = await query(
-            `SELECT DISTINCT staff_id FROM allocations WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
-            [String(bookingId), `bk-alloc-${bookingId}-%`]
+            `SELECT DISTINCT staff_id FROM allocations WHERE session_id = $1 AND type = 'service'`,
+            [String(bookingId)]
         );
+
+        // Delete all allocations for this booking
+        await query(
+            `DELETE FROM allocations WHERE session_id = $1 AND type = 'service'`,
+            [String(bookingId)]
+        );
+
+        // Update their availability status in team_members
         for (const row of staffToSyncRes.rows) {
             if (row.staff_id) {
                 await syncStaffMemberStatus(row.staff_id).catch(() => {});
@@ -721,6 +750,9 @@ const deleteBooking = async (req, res) => {
 
         // Now delete the booking from the local DB
         await query('DELETE FROM bookings WHERE id = $1', [bookingId]);
+
+        // Mark as deleted in our tracking table to prevent remote app sync resurrection
+        await query('INSERT INTO deleted_booking_ids (booking_id) VALUES ($1) ON CONFLICT DO NOTHING', [parseInt(bookingId)]);
 
         return res.json({ success: true, message: 'Booking deleted successfully.' });
     } catch (err) {

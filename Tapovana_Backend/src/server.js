@@ -10,6 +10,7 @@ const passwordRoutes = require("./routes/password");
 const teamRoutes = require("./routes/team");
 const serviceRoutes = require("./routes/services");
 const bookingRoutes = require("./routes/bookings");
+const membershipRoutes = require("./routes/memberships");
 const workshopRoutes = require("./routes/workshops");
 const vedicProgramRoutes = require("./routes/vedic-programs");
 
@@ -47,6 +48,7 @@ app.use("/api/admin/team", teamRoutes);
 app.use("/api/teams", teamRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/bookings", bookingRoutes);
+app.use("/api/memberships", membershipRoutes);
 app.use("/api/workshops", workshopRoutes);
 app.use("/api/vedic-programs", vedicProgramRoutes);
 
@@ -122,4 +124,4 @@ app.listen(PORT, () => {
 });
 
 // Export for compatibility
-module.exports = app;
+module.exports = app;

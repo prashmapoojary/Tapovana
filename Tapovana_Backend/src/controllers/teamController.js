@@ -820,7 +820,10 @@ const getTeamMemberAllocations = async (req, res) => {
         
         // Fetch all allocations from unified table
         const allocationsRes = await query(
-            `SELECT * FROM allocations WHERE staff_id = $1 ORDER BY start_date DESC`,
+            `SELECT a.* FROM allocations a
+             LEFT JOIN deleted_booking_ids d ON d.booking_id = CASE WHEN a.session_id ~ '^[0-9]+$' THEN CAST(a.session_id AS INTEGER) ELSE NULL END
+             WHERE a.staff_id = $1 AND d.booking_id IS NULL
+             ORDER BY a.start_date DESC`,
             [userId]
         );
 
@@ -867,6 +870,8 @@ const getAllAllocations = async (req, res) => {
              FROM allocations a
              JOIN team_members tm ON tm.id = a.staff_id
              JOIN roles r ON r.id = tm.role_id
+             LEFT JOIN deleted_booking_ids d ON d.booking_id = CASE WHEN a.session_id ~ '^[0-9]+$' THEN CAST(a.session_id AS INTEGER) ELSE NULL END
+             WHERE d.booking_id IS NULL
              ORDER BY a.start_date DESC`
         );
 

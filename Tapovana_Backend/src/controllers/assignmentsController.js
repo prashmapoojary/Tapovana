@@ -19,12 +19,13 @@ const getMyAssignments = async (req, res) => {
 
         const user = userResult.rows[0];
 
-        // Now get all allocations from allocations table for this staff member
+        // Now get all allocations from allocations table for this staff member, filtering out deleted bookings
         const allocResult = await query(
-            `SELECT id, staff_id, type, session_title, session_id, 
-                    start_date, end_date, booking_time, status, created_at
-       FROM allocations
-       WHERE staff_id = $1`,
+            `SELECT a.id, a.staff_id, a.type, a.session_title, a.session_id, 
+                    a.start_date, a.end_date, a.booking_time, a.status, a.created_at
+             FROM allocations a
+             LEFT JOIN deleted_booking_ids d ON d.booking_id = CASE WHEN a.session_id ~ '^[0-9]+$' THEN CAST(a.session_id AS INTEGER) ELSE NULL END
+             WHERE a.staff_id = $1 AND d.booking_id IS NULL`,
             [userId]
         );
 

@@ -2,7 +2,7 @@ const { query } = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
-const { sendAllocationEmail } = require('../services/emailService');
+const { sendAllocationEmail, sendWorkshopEnrollmentEmail } = require('../services/emailService');
 const { checkStaffAllocationConflict, syncStaffMemberStatus } = require('../utils/conflictChecker');
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
@@ -478,8 +478,136 @@ const completeWorkshopAllocation = async (req, res) => {
     }
 };
 
+// ENROLL USER IN WORKSHOP (Public Mobile Endpoint)
+const enrollUserInWorkshop = async (req, res) => {
+    const { id } = req.params;
+    const { name, email, phone } = req.body;
+
+    if (!name || !email) {
+        return res.status(400).json({ success: false, message: 'Name and Email are required.' });
+    }
+
+    try {
+        const wsRes = await query('SELECT * FROM workshops WHERE id = $1', [id]);
+        if (!wsRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Workshop not found.' });
+        }
+        const workshop = wsRes.rows[0];
+
+        // Capacity check
+        if (workshop.enrolled >= workshop.capacity) {
+            return res.status(400).json({ success: false, message: 'Workshop is already at full capacity.' });
+        }
+
+        // Already enrolled check
+        const attendeeCheck = await query('SELECT 1 FROM attendees WHERE workshop_id = $1 AND email = $2', [id, email.toLowerCase().trim()]);
+        if (attendeeCheck.rows.length) {
+            return res.status(400).json({ success: false, message: 'User is already enrolled in this workshop.' });
+        }
+
+        // Send confirmation notification/email FIRST
+        try {
+            await sendWorkshopEnrollmentEmail({
+                to: email.toLowerCase().trim(),
+                userName: name.trim(),
+                workshopTitle: workshop.title,
+                date: workshop.date,
+                time: workshop.time
+            });
+            console.log(`Enrollment email sent to ${email} for workshop: ${workshop.title}`);
+        } catch (emailErr) {
+            console.error('Failed to send workshop enrollment email:', emailErr);
+        }
+
+        // Insert enrollment
+        const result = await query(
+            'INSERT INTO attendees (workshop_id, name, email, phone) VALUES ($1, $2, $3, $4) RETURNING *',
+            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null]
+        );
+
+        // Update enrolled count
+        await query('UPDATE workshops SET enrolled = enrolled + 1 WHERE id = $1', [id]);
+
+        return res.status(201).json({
+            success: true,
+            message: 'Successfully enrolled in workshop.',
+            attendee: result.rows[0]
+        });
+    } catch (err) {
+        console.error('enrollUserInWorkshop error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// GET WORKSHOP ATTENDEES (Admin Endpoint)
+const getWorkshopAttendees = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await query('SELECT * FROM attendees WHERE workshop_id = $1 ORDER BY created_at DESC', [id]);
+        return res.json({ success: true, attendees: result.rows });
+    } catch (err) {
+        console.error('getWorkshopAttendees error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// UPDATE ATTENDEE ATTENDANCE STATUS (Admin Endpoint)
+const updateAttendeeAttendance = async (req, res) => {
+    const { id, attendeeId } = req.params;
+    const { status } = req.body;
+
+    if (!['enrolled', 'attended', 'absent'].includes(status)) {
+        return res.status(400).json({ success: false, message: "Status must be 'enrolled', 'attended', or 'absent'." });
+    }
+
+    try {
+        const result = await query(
+            'UPDATE attendees SET status = $1, updated_at = NOW() WHERE workshop_id = $2 AND id = $3 RETURNING *',
+            [status, id, attendeeId]
+        );
+
+        if (!result.rows.length) {
+            return res.status(404).json({ success: false, message: 'Attendee record not found.' });
+        }
+
+        return res.json({ success: true, message: 'Attendance status updated.', attendee: result.rows[0] });
+    } catch (err) {
+        console.error('updateAttendeeAttendance error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// EXPORT WORKSHOP ATTENDEES (Admin Endpoint)
+const exportWorkshopAttendees = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const wsRes = await query('SELECT title FROM workshops WHERE id = $1', [id]);
+        if (!wsRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Workshop not found.' });
+        }
+        const workshopTitle = wsRes.rows[0].title;
+
+        const result = await query('SELECT name, email, phone, status, created_at FROM attendees WHERE workshop_id = $1 ORDER BY name ASC', [id]);
+        
+        let csvContent = 'Name,Email,Phone,Status,Enrolled At\n';
+        for (const row of result.rows) {
+            const enrolledAt = row.created_at ? new Date(row.created_at).toISOString() : '';
+            csvContent += `"${row.name.replace(/"/g, '""')}","${row.email.replace(/"/g, '""')}","${(row.phone || '').replace(/"/g, '""')}","${row.status}","${enrolledAt}"\n`;
+        }
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="attendees-${workshopTitle.replace(/[^a-zA-Z0-9]/g, '_')}.csv"`);
+        return res.send(csvContent);
+    } catch (err) {
+        console.error('exportWorkshopAttendees error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
 module.exports = {
     getAllWorkshops, getWorkshopById, createWorkshop,
     updateWorkshop, deleteWorkshop,
-    updateWorkshopStaff, completeWorkshopAllocation
+    updateWorkshopStaff, completeWorkshopAllocation,
+    enrollUserInWorkshop, getWorkshopAttendees,
+    updateAttendeeAttendance, exportWorkshopAttendees
 };

@@ -951,26 +951,28 @@ function Bookings() {
                               >
                                 View
                               </div>
-                              <div
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenActionMenu(null);
-                                  handleDeleteBooking(b);
-                                }}
-                                style={{
-                                  padding: "10px 16px",
-                                  cursor: "pointer",
-                                  fontSize: "14px",
-                                  color: "#dc2626",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "8px"
-                                }}
-                                onMouseEnter={e => e.currentTarget.style.background = "#fef2f2"}
-                                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                              >
-                                Delete
-                              </div>
+                              {canEdit && (
+                                <div
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenActionMenu(null);
+                                    handleDeleteBooking(b);
+                                  }}
+                                  style={{
+                                    padding: "10px 16px",
+                                    cursor: "pointer",
+                                    fontSize: "14px",
+                                    color: "#dc2626",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px"
+                                  }}
+                                  onMouseEnter={e => e.currentTarget.style.background = "#fef2f2"}
+                                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                                >
+                                  Delete
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

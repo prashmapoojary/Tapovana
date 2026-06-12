@@ -103,23 +103,23 @@ function WorkshopCard({ w, onClick }) {
       </div>
       <div className="ws-card-body">
         <h3 className="ws-card-title">{w.title}</h3>
-        <div className="ws-card-instructor" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#7b8a9a" }}>
+        <div className="ws-card-instructor" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#7b8a9a" }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
           {w.instructor_name || w.instructor || "Not assigned"}
         </div>
         <div className="ws-card-meta">
-          <div className="ws-card-meta-item" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#7b8a9a" }}>
+          <div className="ws-card-meta-item" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#7b8a9a" }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
             {w.date ? new Date(w.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : ""} {w.time}
           </div>
-          <div className="ws-card-meta-item" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#7b8a9a" }}>
+          <div className="ws-card-meta-item" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#7b8a9a" }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
             {w.duration} mins
           </div>
         </div>
         <div className="ws-card-footer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid #f1f3f7" }}>
-          <span style={{ fontSize: 17, fontWeight: 800, color: "#2d3748" }}>₹{(w.price || 0).toLocaleString("en-IN")}</span>
-          <button className="ws-card-btn" style={{ background: liveStatus === "live" ? "#e74c3c" : cat.color, padding: "7px 16px", border: "none", borderRadius: 8, color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+          <span style={{ fontSize: 15, fontWeight: 800, color: "#2d3748" }}>₹{(w.price || 0).toLocaleString("en-IN")}</span>
+          <button className="ws-card-btn" style={{ background: liveStatus === "live" ? "#e74c3c" : cat.color, padding: "6px 12px", border: "none", borderRadius: 8, color: "white", fontSize: 11, fontWeight: 600, cursor: "pointer" }}
             onClick={e => { e.stopPropagation(); onClick({ ...w, _liveStatus: liveStatus }); }}>
             View Workshop
           </button>
@@ -161,6 +161,126 @@ export default function Workshops() {
   // Video player
   const [videoPlaying, setVideoPlaying] = useState(false);
   const videoRef = useRef(null);
+
+  // Attendees Tab and Manual Enrollment state
+  const [activeDetailTab, setActiveDetailTab] = useState("details"); // "details" or "attendees"
+  const [attendees, setAttendees] = useState([]);
+  const [attendeesLoading, setAttendeesLoading] = useState(false);
+  const [attendeesError, setAttendeesError] = useState("");
+  const [attendeeSearch, setAttendeeSearch] = useState("");
+
+  const [showManualEnroll, setShowManualEnroll] = useState(false);
+  const [manualEnrollForm, setManualEnrollForm] = useState({ name: "", email: "", phone: "" });
+  const [manualEnrollSaving, setManualEnrollSaving] = useState(false);
+  const [manualEnrollError, setManualEnrollError] = useState("");
+
+  // Fetch attendees for selected workshop
+  const fetchAttendees = async (workshopId) => {
+    try {
+      setAttendeesLoading(true);
+      setAttendeesError("");
+      const res = await apiFetch(`/api/workshops/${workshopId}/attendees`);
+      if (res.success) {
+        setAttendees(res.attendees || []);
+      } else {
+        throw new Error(res.message || "Failed to load attendees.");
+      }
+    } catch (err) {
+      setAttendeesError(err.message || "Error loading attendees.");
+    } finally {
+      setAttendeesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedWs && activeDetailTab === "attendees") {
+      fetchAttendees(selectedWs.id);
+    }
+  }, [selectedWs?.id, activeDetailTab]);
+
+  const handleManualEnroll = async () => {
+    setManualEnrollError("");
+    if (!manualEnrollForm.name.trim() || !manualEnrollForm.email.trim()) {
+      setManualEnrollError("Name and Email are required.");
+      return;
+    }
+    try {
+      setManualEnrollSaving(true);
+      const res = await apiFetch(`/api/workshops/${selectedWs.id}/enroll`, {
+        method: "POST",
+        body: JSON.stringify(manualEnrollForm)
+      });
+      if (res.success) {
+        showToast("User enrolled successfully!");
+        setManualEnrollForm({ name: "", email: "", phone: "" });
+        setShowManualEnroll(false);
+        fetchAttendees(selectedWs.id);
+        fetchWorkshops();
+        setSelectedWs(prev => ({ ...prev, enrolled: (prev.enrolled || 0) + 1 }));
+      } else {
+        throw new Error(res.message || "Enrollment failed.");
+      }
+    } catch (err) {
+      setManualEnrollError(err.message || "Failed to enroll user.");
+    } finally {
+      setManualEnrollSaving(false);
+    }
+  };
+
+  const handleMarkAttendance = async (attendeeId, status) => {
+    try {
+      const res = await apiFetch(`/api/workshops/${selectedWs.id}/attendees/${attendeeId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status })
+      });
+      if (res.success) {
+        showToast(`Marked attendee as ${status}.`);
+        setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, status } : a));
+      } else {
+        throw new Error(res.message || "Failed to update attendance.");
+      }
+    } catch (err) {
+      showToast(err.message || "Failed to update attendance.");
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const token = sessionStorage.getItem("access_token") || "";
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+      const headers = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const response = await fetch(`${API_BASE}/api/workshops/${selectedWs.id}/attendees/export`, {
+        headers
+      });
+      if (!response.ok) throw new Error("Failed to download CSV.");
+      const text = await response.text();
+      const blob = new Blob([text], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `attendees-${selectedWs.title.replace(/[^a-zA-Z0-9]/g, "_")}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      showToast("CSV exported successfully.");
+    } catch (err) {
+      showToast(err.message || "Failed to export CSV.");
+    }
+  };
+
+  const filteredAttendees = useMemo(() => {
+    return (attendees || []).filter(a => {
+      const matchSearch = !attendeeSearch || 
+        (a.name || "").toLowerCase().includes(attendeeSearch.toLowerCase()) ||
+        (a.email || "").toLowerCase().includes(attendeeSearch.toLowerCase()) ||
+        (a.phone || "").toLowerCase().includes(attendeeSearch.toLowerCase());
+      return matchSearch;
+    });
+  }, [attendees, attendeeSearch]);
 
   // ─── Fetch instructors ──────────────────────────────────────────────────
   const fetchInstructors = async () => {
@@ -227,6 +347,9 @@ export default function Workshops() {
     setSelectedWs({ ...w });
     setIsEditing(false);
     setVideoPlaying(false);
+    setActiveDetailTab("details");
+    setAttendeeSearch("");
+    setShowManualEnroll(false);
   };
 
   // ─── Close detail view ───────────────────────────────────────────────────
@@ -546,97 +669,281 @@ export default function Workshops() {
           Instructor: {ws.instructor_name || ws.instructor || "Not assigned"}
         </p>
 
-        {/* 3. Preview Section - Video Player with Cover Image */}
-        {displayVideo && (
-          <div style={{ marginBottom: 16 }}>
-            {!videoPlaying ? (
-              <div onClick={() => setVideoPlaying(true)}
-                style={{ position: "relative", width: "100%", height: 280, borderRadius: 8, overflow: "hidden", cursor: "pointer", background: "#1a1a1a" }}>
-                {displayImage ? (
-                  <img src={getImageUrl(displayImage)} alt="video cover"
-                    style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.6 }} />
-                ) : (
-                  <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #2d3748, #1a202c)" }} />
-                )}
-                {/* Play button overlay */}
-                <div style={{
-                  position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-                  width: 64, height: 64, borderRadius: "50%", background: "rgba(205,167,81,0.9)",
-                  display: "flex", alignItems: "center", justifyContent: "center"
-                }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><polygon points="6 3 20 12 6 21 6 3" /></svg>
-                </div>
-                <div style={{ position: "absolute", bottom: 12, left: 14, color: "white", fontSize: 12, background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: 4 }}>
-                  Click to play video
-                </div>
-              </div>
-            ) : (
-              <div style={{ borderRadius: 8, overflow: "hidden" }}>
-                {displayVideo.includes("youtube") || displayVideo.includes("youtu.be") ? (
-                  <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden" }}>
-                    <iframe src={displayVideo.replace("watch?v=", "embed/")} title="Workshop Video"
-                      style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
-                      allowFullScreen />
+        {/* Tabs Bar */}
+        <div style={{ display: "flex", gap: "20px", borderBottom: "1px solid #e2e8f0", marginBottom: "20px" }}>
+          <button 
+            onClick={() => setActiveDetailTab("details")}
+            style={{ 
+              background: "none", 
+              border: "none", 
+              borderBottom: activeDetailTab === "details" ? "3px solid #CDA751" : "3px solid transparent", 
+              padding: "10px 4px", 
+              fontSize: "14px", 
+              fontWeight: 600, 
+              color: activeDetailTab === "details" ? "#0F172A" : "#64748B", 
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+          >
+            Workshop Info
+          </button>
+          <button 
+            onClick={() => setActiveDetailTab("attendees")}
+            style={{ 
+              background: "none", 
+              border: "none", 
+              borderBottom: activeDetailTab === "attendees" ? "3px solid #CDA751" : "3px solid transparent", 
+              padding: "10px 4px", 
+              fontSize: "14px", 
+              fontWeight: 600, 
+              color: activeDetailTab === "attendees" ? "#0F172A" : "#64748B", 
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+          >
+            Attendees ({ws.enrolled || 0} / {ws.capacity || 20})
+          </button>
+        </div>
+
+        {activeDetailTab === "details" ? (
+          <>
+            {/* 3. Preview Section - Video Player with Cover Image */}
+            {displayVideo && (
+              <div style={{ marginBottom: 16 }}>
+                {!videoPlaying ? (
+                  <div onClick={() => setVideoPlaying(true)}
+                    style={{ position: "relative", width: "100%", height: 280, borderRadius: 8, overflow: "hidden", cursor: "pointer", background: "#1a1a1a" }}>
+                    {displayImage ? (
+                      <img src={getImageUrl(displayImage)} alt="video cover"
+                        style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.6 }} />
+                    ) : (
+                      <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #2d3748, #1a202c)" }} />
+                    )}
+                    {/* Play button overlay */}
+                    <div style={{
+                      position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+                      width: 64, height: 64, borderRadius: "50%", background: "rgba(205,167,81,0.9)",
+                      display: "flex", alignItems: "center", justifyContent: "center"
+                    }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><polygon points="6 3 20 12 6 21 6 3" /></svg>
+                    </div>
+                    <div style={{ position: "absolute", bottom: 12, left: 14, color: "white", fontSize: 12, background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: 4 }}>
+                      Click to play video
+                    </div>
                   </div>
                 ) : (
-                  <video ref={videoRef} controls autoPlay style={{ width: "100%", maxHeight: 400, borderRadius: 8 }}>
-                    <source src={displayVideo} />
-                  </video>
+                  <div style={{ borderRadius: 8, overflow: "hidden" }}>
+                    {displayVideo.includes("youtube") || displayVideo.includes("youtu.be") ? (
+                      <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden" }}>
+                        <iframe src={displayVideo.replace("watch?v=", "embed/")} title="Workshop Video"
+                          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+                          allowFullScreen />
+                      </div>
+                    ) : (
+                      <video ref={videoRef} controls autoPlay style={{ width: "100%", maxHeight: 400, borderRadius: 8 }}>
+                        <source src={displayVideo} />
+                      </video>
+                    )}
+                  </div>
                 )}
               </div>
             )}
+
+            {/* 4. Description */}
+            {!displayVideo && displayImage && (
+              <div style={{ marginBottom: 16, borderRadius: 8, overflow: "hidden" }}>
+                <img src={getImageUrl(displayImage)} alt={ws.title}
+                  style={{ width: "100%", maxHeight: 320, objectFit: "cover" }}
+                  onError={(e) => { e.target.style.display = "none"; }} />
+              </div>
+            )}
+
+            <p style={{ fontSize: 15, color: "#4a5568", lineHeight: 1.7, margin: "0 0 20px 0" }}>{ws.description}</p>
+
+            {/* 5. Workshop Details */}
+            <div style={{ background: "#f8f9fb", borderRadius: 10, padding: 16, marginBottom: 16 }}>
+              <h4 style={{ margin: "0 0 12px 0", fontSize: 15, fontWeight: 700, color: "#2d3748" }}>Workshop Details</h4>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <span style={{ fontSize: 12, color: "#a0aec0" }}>Date</span>
+                  <br />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>
+                    {ws.date ? new Date(ws.date).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" }) : "N/A"}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ fontSize: 12, color: "#a0aec0" }}>Time</span>
+                  <br />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{ws.time || "N/A"} &middot; {ws.duration} mins</span>
+                </div>
+                <div>
+                  <span style={{ fontSize: 12, color: "#a0aec0" }}>Instructor</span>
+                  <br />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{ws.instructor_name || ws.instructor || "Not assigned"}</span>
+                </div>
+                <div>
+                  <span style={{ fontSize: 12, color: "#a0aec0" }}>Price</span>
+                  <br />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>Rs{(ws.price || 0).toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 12 }}>
+              <button className="ws-modal-btn-primary" style={{ flex: 1 }} onClick={handleStartEdit}>
+                Edit Workshop
+              </button>
+              <button className="ws-modal-btn-secondary" style={{ flex: 1, color: "#e74c3c", borderColor: "rgba(231,76,60,0.3)", background: "transparent" }} onClick={handleDeleteWorkshop}>
+                Delete Workshop
+              </button>
+            </div>
+          </>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            {/* Header Actions */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{ position: "relative", display: "flex", alignItems: "center", border: "1px solid #e2e8f0", borderRadius: "8px", background: "white", padding: "6px 12px", minWidth: "220px" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2" style={{ marginRight: "8px" }}><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                  <input 
+                    type="text" 
+                    placeholder="Search attendees..." 
+                    value={attendeeSearch} 
+                    onChange={e => setAttendeeSearch(e.target.value)} 
+                    style={{ border: "none", outline: "none", fontSize: "13px", width: "100%", background: "transparent" }}
+                  />
+                </div>
+                <span style={{ fontSize: "13px", color: "#64748B", fontWeight: 500 }}>
+                  {ws.enrolled || 0} enrolled / {ws.capacity || 20} capacity
+                </span>
+              </div>
+              
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button 
+                  onClick={() => setShowManualEnroll(!showManualEnroll)}
+                  className="ws-modal-btn-secondary"
+                  style={{ padding: "8px 16px", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}
+                >
+                  {showManualEnroll ? "Close Form" : "+ Enroll User"}
+                </button>
+                <button 
+                  onClick={handleExportCSV}
+                  className="ws-modal-btn-primary"
+                  style={{ padding: "8px 16px", fontSize: "13px", background: "#CDA751", borderColor: "#CDA751", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", color: "white" }}
+                >
+                  Export CSV
+                </button>
+              </div>
+            </div>
+
+            {/* Manual Enroll Form Panel */}
+            {showManualEnroll && (
+              <div style={{ background: "#f8f9fb", border: "1px solid rgba(205,167,81,0.2)", borderRadius: "8px", padding: "16px", animation: "wsFadeIn 0.2s ease" }}>
+                <h4 style={{ margin: "0 0 12px 0", fontSize: "14px", fontWeight: 700, color: "#2d3748" }}>Enroll User Manually</h4>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <label style={{ fontSize: "11px", fontWeight: 600, color: "#404854" }}>Full Name *</label>
+                    <input 
+                      type="text" 
+                      value={manualEnrollForm.name} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, name: e.target.value }))}
+                      placeholder="e.g. John Doe"
+                      style={{ padding: "7px 10px", borderRadius: "4px", border: "1px solid #e2e8f0", fontSize: "13px", outline: "none", background: "white", width: "100%", boxSizing: "border-box" }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <label style={{ fontSize: "11px", fontWeight: 600, color: "#404854" }}>Email *</label>
+                    <input 
+                      type="email" 
+                      value={manualEnrollForm.email} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, email: e.target.value }))}
+                      placeholder="e.g. john@example.com"
+                      style={{ padding: "7px 10px", borderRadius: "4px", border: "1px solid #e2e8f0", fontSize: "13px", outline: "none", background: "white", width: "100%", boxSizing: "border-box" }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <label style={{ fontSize: "11px", fontWeight: 600, color: "#404854" }}>Phone (Optional)</label>
+                    <input 
+                      type="tel" 
+                      value={manualEnrollForm.phone} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, phone: e.target.value }))}
+                      placeholder="e.g. +91 9876543210"
+                      style={{ padding: "7px 10px", borderRadius: "4px", border: "1px solid #e2e8f0", fontSize: "13px", outline: "none", background: "white", width: "100%", boxSizing: "border-box" }}
+                    />
+                  </div>
+                </div>
+                {manualEnrollError && <div style={{ color: "#e74c3c", fontSize: "12px", fontWeight: 600, marginBottom: "8px" }}>{manualEnrollError}</div>}
+                <button 
+                  onClick={handleManualEnroll} 
+                  disabled={manualEnrollSaving}
+                  className="ws-modal-btn-primary"
+                  style={{ padding: "6px 16px", fontSize: "12px", background: "#CDA751", borderColor: "#CDA751", color: "white", cursor: "pointer" }}
+                >
+                  {manualEnrollSaving ? "Enrolling..." : "Submit Enrollment"}
+                </button>
+              </div>
+            )}
+
+            {/* Attendees List Table */}
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: "8px", background: "white", overflow: "hidden" }}>
+              {attendeesLoading ? (
+                <div style={{ padding: "30px", textAlign: "center", color: "#64748B" }}>Loading attendees...</div>
+              ) : attendeesError ? (
+                <div style={{ padding: "30px", textAlign: "center", color: "#e74c3c" }}>{attendeesError}</div>
+              ) : filteredAttendees.length === 0 ? (
+                <div style={{ padding: "40px 20px", textAlign: "center", color: "#64748B" }}>
+                  {attendeeSearch ? "No attendees match your search." : "No users enrolled in this workshop yet."}
+                </div>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                  <thead>
+                    <tr style={{ background: "#f8f9fb", borderBottom: "1px solid #e2e8f0" }}>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Name</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Email</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Phone</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Status</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAttendees.map(a => (
+                      <tr key={a.id} style={{ borderBottom: "1px solid #f1f3f7" }}>
+                        <td style={{ padding: "10px 16px", fontSize: "13px", fontWeight: 600, color: "#2d3748" }}>{a.name}</td>
+                        <td style={{ padding: "10px 16px", fontSize: "13px", color: "#4a5568" }}>{a.email}</td>
+                        <td style={{ padding: "10px 16px", fontSize: "13px", color: "#4a5568" }}>{a.phone || "-"}</td>
+                        <td style={{ padding: "10px 16px" }}>
+                          <span style={{ 
+                            fontSize: "11px", 
+                            fontWeight: 700, 
+                            padding: "3px 8px", 
+                            borderRadius: "12px",
+                            textTransform: "uppercase",
+                            background: a.status === "attended" ? "rgba(34,197,94,0.12)" : a.status === "absent" ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)",
+                            color: a.status === "attended" ? "#16a34a" : a.status === "absent" ? "#dc2626" : "#d97706"
+                          }}>
+                            {a.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: "10px 16px" }}>
+                          <select 
+                            value={a.status} 
+                            onChange={e => handleMarkAttendance(a.id, e.target.value)}
+                            style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "12px", outline: "none", cursor: "pointer", background: "white" }}
+                          >
+                            <option value="enrolled">Enrolled</option>
+                            <option value="attended">Attended</option>
+                            <option value="absent">Absent</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         )}
-
-        {/* 4. Description */}
-        {!displayVideo && displayImage && (
-          <div style={{ marginBottom: 16, borderRadius: 8, overflow: "hidden" }}>
-            <img src={getImageUrl(displayImage)} alt={ws.title}
-              style={{ width: "100%", maxHeight: 320, objectFit: "cover" }}
-              onError={(e) => { e.target.style.display = "none"; }} />
-          </div>
-        )}
-
-        <p style={{ fontSize: 15, color: "#4a5568", lineHeight: 1.7, margin: "0 0 20px 0" }}>{ws.description}</p>
-
-        {/* 5. Workshop Details */}
-        <div style={{ background: "#f8f9fb", borderRadius: 10, padding: 16, marginBottom: 16 }}>
-          <h4 style={{ margin: "0 0 12px 0", fontSize: 15, fontWeight: 700, color: "#2d3748" }}>Workshop Details</h4>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <span style={{ fontSize: 12, color: "#a0aec0" }}>Date</span>
-              <br />
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>
-                {ws.date ? new Date(ws.date).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" }) : "N/A"}
-              </span>
-            </div>
-            <div>
-              <span style={{ fontSize: 12, color: "#a0aec0" }}>Time</span>
-              <br />
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{ws.time || "N/A"} &middot; {ws.duration} mins</span>
-            </div>
-            <div>
-              <span style={{ fontSize: 12, color: "#a0aec0" }}>Instructor</span>
-              <br />
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{ws.instructor_name || ws.instructor || "Not assigned"}</span>
-            </div>
-            <div>
-              <span style={{ fontSize: 12, color: "#a0aec0" }}>Price</span>
-              <br />
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>Rs{(ws.price || 0).toLocaleString("en-IN")}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div style={{ display: "flex", gap: 12 }}>
-          <button className="ws-modal-btn-primary" style={{ flex: 1 }} onClick={handleStartEdit}>
-            Edit Workshop
-          </button>
-          <button className="ws-modal-btn-secondary" style={{ flex: 1, color: "#e74c3c", borderColor: "rgba(231,76,60,0.3)", background: "transparent" }} onClick={handleDeleteWorkshop}>
-            Delete Workshop
-          </button>
-        </div>
       </div>
     );
   };
@@ -659,12 +966,22 @@ export default function Workshops() {
           </header>
 
           <section className="ws-stats-row">
-            <div className="ws-stat-card"><div><div className="ws-stat-value">{STATS.total}</div><div className="ws-stat-label">Total Programs</div></div></div>
-            <div className="ws-stat-card"><div><div className="ws-stat-value">{STATS.upcoming}</div><div className="ws-stat-label">Upcoming</div></div></div>
-            <div className="ws-stat-card" style={{ borderLeft: STATS.live > 0 ? "4px solid #e74c3c" : "1px solid #eceff3" }}>
-              <div><div className="ws-stat-value" style={{ color: STATS.live > 0 ? "#e74c3c" : "#2d3748" }}>{STATS.live}</div><div className="ws-stat-label">Live Now</div></div>
+            <div className="ws-stat-card">
+              <div className="ws-stat-value">{STATS.total}</div>
+              <div className="ws-stat-label">Total Programs</div>
             </div>
-            <div className="ws-stat-card"><div><div className="ws-stat-value">{STATS.completed}</div><div className="ws-stat-label">Completed</div></div></div>
+            <div className="ws-stat-card">
+              <div className="ws-stat-value">{STATS.upcoming}</div>
+              <div className="ws-stat-label">Upcoming</div>
+            </div>
+            <div className="ws-stat-card" style={STATS.live > 0 ? { borderLeft: "4px solid #e74c3c" } : undefined}>
+              <div className="ws-stat-value" style={{ color: STATS.live > 0 ? "#e74c3c" : "#2d3748" }}>{STATS.live}</div>
+              <div className="ws-stat-label">Live Now</div>
+            </div>
+            <div className="ws-stat-card">
+              <div className="ws-stat-value">{STATS.completed}</div>
+              <div className="ws-stat-label">Completed</div>
+            </div>
           </section>
 
           <div className="ws-filters">

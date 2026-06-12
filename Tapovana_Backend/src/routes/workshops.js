@@ -7,7 +7,11 @@ const {
     updateWorkshop,
     deleteWorkshop,
     updateWorkshopStaff,
-    completeWorkshopAllocation
+    completeWorkshopAllocation,
+    enrollUserInWorkshop,
+    getWorkshopAttendees,
+    updateAttendeeAttendance,
+    exportWorkshopAttendees
 } = require('../controllers/workshopController');
 
 const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN')];
@@ -17,6 +21,9 @@ const staffOrAdmin = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCT
 router.get('/', getAllWorkshops);
 router.get('/:id', getWorkshopById);
 
+// Public User Enrollment (Mobile Side Simulation)
+router.post('/:id/enroll', enrollUserInWorkshop);
+
 // Admin CRUD
 router.post('/', ...adminOnly, createWorkshop);
 router.patch('/:id', ...adminOnly, updateWorkshop);
@@ -25,5 +32,10 @@ router.delete('/:id', ...adminOnly, deleteWorkshop);
 // Staff allocation
 router.patch('/:id/staff', ...adminOnly, updateWorkshopStaff);
 router.patch('/:id/complete', staffOrAdmin, completeWorkshopAllocation);
+
+// Attendee Management (Admin Side)
+router.get('/:id/attendees', ...adminOnly, getWorkshopAttendees);
+router.patch('/:id/attendees/:attendeeId', ...adminOnly, updateAttendeeAttendance);
+router.get('/:id/attendees/export', ...adminOnly, exportWorkshopAttendees);
 
 module.exports = router;

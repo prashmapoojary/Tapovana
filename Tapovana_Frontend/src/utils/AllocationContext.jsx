@@ -195,21 +195,14 @@ export const AllocationProvider = ({ children }) => {
         })
       }).catch(err => console.error("Error syncing deallocation to database:", err));
     }
-    setAllocations((prev) =>
-      prev.map((a) => {
-        if (a.id === allocationId) {
-          return { ...a, status: "removed" };
-        }
-        return a;
-      })
-    );
+    setAllocations((prev) => prev.filter((a) => a.id !== allocationId));
   }, [allocations]);
 
   /**
    * Deallocate all staff from a session
    */
   const deallocateFromSession = useCallback((sessionId) => {
-    const sessionAllocations = allocations.filter((a) => a.sessionId === sessionId);
+    const sessionAllocations = allocations.filter((a) => String(a.sessionId) === String(sessionId));
     sessionAllocations.forEach((a) => {
       apiFetch(`/api/teams/users/${a.staffId}/allocation`, {
         method: "PATCH",
@@ -219,14 +212,7 @@ export const AllocationProvider = ({ children }) => {
         })
       }).catch(err => console.error("Error syncing deallocation to database:", err));
     });
-    setAllocations((prev) =>
-      prev.map((a) => {
-        if (a.sessionId === sessionId) {
-          return { ...a, status: "removed" };
-        }
-        return a;
-      })
-    );
+    setAllocations((prev) => prev.filter((a) => String(a.sessionId) !== String(sessionId)));
   }, [allocations]);
 
   /**
@@ -234,7 +220,7 @@ export const AllocationProvider = ({ children }) => {
    */
   const getAllocatedStaffForSession = useCallback((sessionId) => {
     return allocations.filter(
-      (a) => a.sessionId === sessionId && a.status === "active"
+      (a) => String(a.sessionId) === String(sessionId) && a.status === "active"
     );
   }, [allocations]);
 

@@ -322,6 +322,36 @@ const sendUserReassignmentEmail = async ({ to, userName, details = {} }) => {
   });
 };
 
+const sendWorkshopEnrollmentEmail = async ({ to, userName, workshopTitle, date, time }) => {
+  const dateOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+  const formattedDate = date ? new Date(date).toLocaleDateString(undefined, dateOptions) : "Not specified";
+  const html = emailWrapper(`
+    <h1 style="color:#cda751;text-align:center;">Workshop Enrollment Confirmed!</h1>
+    <p style="color:#cccccc;text-align:center;">
+      Hello ${userName || 'Valued Guest'},
+    </p>
+    <p style="color:#cccccc;text-align:center;">
+      Your enrollment in the workshop <strong style="color:#cda751;">${workshopTitle}</strong> has been successfully confirmed.
+    </p>
+    <div style="background:#1e1a0e;border-left:4px solid #cda751;border-radius:6px;padding:20px 24px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-size:14px;color:#cda751;font-weight:600;">Workshop Details</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Title:</strong> ${workshopTitle}</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Date:</strong> ${formattedDate}</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Time:</strong> ${time || "N/A"}</p>
+    </div>
+    <p style="color:#888;text-align:center;font-size:13px;">
+      We look forward to seeing you at the workshop!
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Tapovana — Enrollment Confirmed: ${workshopTitle}`,
+    html,
+  });
+};
+
 module.exports = { 
   sendWelcomeEmail, 
   sendOtpEmail, 
@@ -332,5 +362,6 @@ module.exports = {
   sendBookingRemovalEmail,
   sendStaffLeaveCancellationEmail,
   sendAdminLeaveAlertEmail,
-  sendUserReassignmentEmail
+  sendUserReassignmentEmail,
+  sendWorkshopEnrollmentEmail
 };
