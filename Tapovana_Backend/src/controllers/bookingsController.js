@@ -215,10 +215,10 @@ const syncBookingAllocations = async (bookingId, newStaffIds, newStatus, booking
     if (newStatus === 'COMPLETED') allocStatus = 'expired';
     if (newStatus === 'CANCELLED') allocStatus = 'cancelled';
 
-    // Mark removed staff rows as 'removed' (so MyAssignments can show "You have been removed from this service.")
+    // Delete removed staff rows entirely from allocations
     for (const staffId of removedIds) {
         await query(
-            `UPDATE allocations SET status = 'removed' WHERE id = $1`,
+            `DELETE FROM allocations WHERE id = $1`,
             [`bk-alloc-${bookingId}-${staffId}`]
         );
     }
@@ -386,42 +386,46 @@ const updateBookingStatus = async (req, res) => {
             );
 
             // ── Notify removed staff ──
-            for (const removedId of allocDiff.removedIds) {
-                const staffInfo = staffMap[removedId];
-                if (!staffInfo) {
-                    // fetch from DB if not in the incoming list
-                    const removedRes = await query(
-                        'SELECT first_name, last_name, email FROM team_members WHERE id = $1', [removedId]
-                    );
-                    if (removedRes.rows.length) {
-                        const r = removedRes.rows[0];
+            if (!req.body.skip_notify) {
+                for (const removedId of allocDiff.removedIds) {
+                    const staffInfo = staffMap[removedId];
+                    if (!staffInfo) {
+                        // fetch from DB if not in the incoming list
+                        const removedRes = await query(
+                            'SELECT first_name, last_name, email FROM team_members WHERE id = $1', [removedId]
+                        );
+                        if (removedRes.rows.length) {
+                            const r = removedRes.rows[0];
+                            await sendBookingRemovalEmail({
+                                to: r.email,
+                                staffName: `${r.first_name} ${r.last_name}`.trim(),
+                                bookingId: booking.id,
+                                details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time, customer: booking.user_name }
+                            }).catch(e => console.error('[RemovalEmail] Error:', e));
+                        }
+                    } else {
                         await sendBookingRemovalEmail({
-                            to: r.email,
-                            staffName: `${r.first_name} ${r.last_name}`.trim(),
+                            to: staffInfo.email,
+                            staffName: staffInfo.name,
                             bookingId: booking.id,
                             details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time, customer: booking.user_name }
                         }).catch(e => console.error('[RemovalEmail] Error:', e));
                     }
-                } else {
-                    await sendBookingRemovalEmail({
-                        to: staffInfo.email,
-                        staffName: staffInfo.name,
-                        bookingId: booking.id,
-                        details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time, customer: booking.user_name }
-                    }).catch(e => console.error('[RemovalEmail] Error:', e));
                 }
             }
 
             // ── Notify newly added staff ──
-            for (const addedId of allocDiff.addedIds) {
-                const staffInfo = staffMap[addedId];
-                if (staffInfo) {
-                    await sendBookingAllocationEmail({
-                        to: staffInfo.email,
-                        staffName: staffInfo.name,
-                        bookingId: booking.id,
-                        details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time, customer: booking.user_name }
-                    }).catch(e => console.error('[AllocationEmail] Error:', e));
+            if (!req.body.skip_notify) {
+                for (const addedId of allocDiff.addedIds) {
+                    const staffInfo = staffMap[addedId];
+                    if (staffInfo) {
+                        await sendBookingAllocationEmail({
+                            to: staffInfo.email,
+                            staffName: staffInfo.name,
+                            bookingId: booking.id,
+                            details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time, customer: booking.user_name }
+                        }).catch(e => console.error('[AllocationEmail] Error:', e));
+                    }
                 }
             }
 
@@ -471,7 +475,7 @@ const updateBookingStatus = async (req, res) => {
 
         // ─── Customer email notification ──────────────────────────────────────────
         const userEmail = updatedBooking.user_email || null;
-        if (userEmail && booking.status !== newStatus) {
+        if (userEmail && booking.status !== newStatus && !req.body.skip_notify) {
             await sendBookingStatusEmail({
                 to: userEmail,
                 firstName: updatedBooking.user_name || 'Customer',
@@ -488,7 +492,7 @@ const updateBookingStatus = async (req, res) => {
         }
 
         // ─── Staff completion email (COMPLETED status) ────────────────────────────
-        if (newStatus === 'COMPLETED' && booking.status !== 'COMPLETED') {
+        if (newStatus === 'COMPLETED' && booking.status !== 'COMPLETED' && !req.body.skip_notify) {
             // Send to all previously allocated staff
             const completedAllocRows = await query(
                 `SELECT staff_id FROM allocations WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
@@ -606,7 +610,7 @@ const assignTherapist = async (req, res) => {
             await syncStaffMemberStatus(updatedBooking.therapist_id);
         }
 
-        if (wasInConflict && updatedBooking.therapist_id && updatedBooking.therapist_id !== oldTherapistId) {
+        if (wasInConflict && updatedBooking.therapist_id && updatedBooking.therapist_id !== oldTherapistId && !req.body.skip_notify) {
             const userEmail = updatedBooking.user_email || req.body.user_email || null;
             if (userEmail) {
                 const { sendUserReassignmentEmail } = require('../services/emailService');
@@ -698,9 +702,9 @@ const deleteBooking = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Booking not found.' });
         }
 
-        // First, mark all allocations as removed (so MyAssignments removes them)
+        // First, delete all allocations for this booking
         const allocRes = await query(
-            `UPDATE allocations SET status = 'removed' WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
+            `DELETE FROM allocations WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
             [String(bookingId), `bk-alloc-${bookingId}-%`]
         );
 
@@ -725,4 +729,115 @@ const deleteBooking = async (req, res) => {
     }
 };
 
-module.exports = { getAllBookings, getBookingById, updateBookingStatus, assignTherapist, syncFromRender, deleteBooking };
+// NOTIFICATION ONLY ENDPOINT (sends notification emails before DB writes)
+const sendBookingNotificationOnly = async (req, res) => {
+    const { status, staff_ids, staff_id, note } = req.body;
+    const newStatus = status ? status.toUpperCase() : null;
+
+    try {
+        const booking = await ensureBookingExistsLocally(req.params.id);
+        if (!booking) {
+            return res.status(404).json({ success: false, message: 'Booking not found.' });
+        }
+
+        // Normalize to array: prefer staff_ids, fall back to staff_id
+        let incomingStaffIds = [];
+        if (Array.isArray(staff_ids)) {
+            incomingStaffIds = staff_ids.filter(Boolean);
+        } else if (staff_id !== undefined && staff_id !== null) {
+            incomingStaffIds = [staff_id];
+        }
+
+        // Fetch existing allocations for comparison
+        const existingRows = await query(
+            `SELECT staff_id FROM allocations WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
+            [String(booking.id), `bk-alloc-${booking.id}-%`]
+        );
+        const existingStaffIds = new Set(existingRows.rows.map(r => String(r.staff_id)));
+        const newStaffIdSet = new Set(incomingStaffIds.map(id => String(id)));
+
+        const addedIds = [...newStaffIdSet].filter(id => !existingStaffIds.has(id));
+        const removedIds = [...existingStaffIds].filter(id => !newStaffIdSet.has(id));
+
+        // Fetch staff info for notifications
+        const staffIdsToFetch = [...new Set([...incomingStaffIds, ...removedIds, booking.therapist_id].filter(Boolean))];
+        const staffMap = {};
+        if (staffIdsToFetch.length > 0) {
+            const staffNamesRes = await query(
+                `SELECT id, first_name, last_name, email FROM team_members WHERE id = ANY($1::uuid[])`,
+                [staffIdsToFetch]
+            );
+            for (const row of staffNamesRes.rows) {
+                staffMap[row.id] = { name: `${row.first_name} ${row.last_name}`.trim(), email: row.email };
+            }
+        }
+
+        // 1. Notify removed staff
+        for (const removedId of removedIds) {
+            const staffInfo = staffMap[removedId];
+            if (staffInfo) {
+                await sendBookingRemovalEmail({
+                    to: staffInfo.email,
+                    staffName: staffInfo.name,
+                    bookingId: booking.id,
+                    details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time, customer: booking.user_name }
+                }).catch(e => console.error('[RemovalEmail] Notify-only error:', e));
+            }
+        }
+
+        // 2. Notify added staff
+        for (const addedId of addedIds) {
+            const staffInfo = staffMap[addedId];
+            if (staffInfo) {
+                await sendBookingAllocationEmail({
+                    to: staffInfo.email,
+                    staffName: staffInfo.name,
+                    bookingId: booking.id,
+                    details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time, customer: booking.user_name }
+                }).catch(e => console.error('[AllocationEmail] Notify-only error:', e));
+            }
+        }
+
+        // 3. Notify customer
+        const userEmail = booking.user_email || null;
+        if (userEmail && booking.status !== newStatus) {
+            const staffNames = incomingStaffIds.map(id => staffMap[id]?.name || id).join(', ');
+            await sendBookingStatusEmail({
+                to: userEmail,
+                firstName: booking.user_name || 'Customer',
+                status: newStatus,
+                details: {
+                    service: booking.service_name,
+                    date: booking.booking_date,
+                    time: booking.booking_time,
+                    staff: staffNames || booking.therapist_name,
+                    customer: booking.user_name
+                },
+                previousStatus: booking.status
+            }).catch(e => console.error('[UserEmail] Notify-only error:', e));
+        }
+
+        // 4. Staff completion email (if COMPLETED)
+        if (newStatus === 'COMPLETED' && booking.status !== 'COMPLETED') {
+            for (const row of existingRows.rows) {
+                const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [row.staff_id]);
+                if (staffRes.rows.length) {
+                    const s = staffRes.rows[0];
+                    await sendBookingStatusEmail({
+                        to: s.email,
+                        firstName: `${s.first_name} ${s.last_name}`.trim(),
+                        status: 'COMPLETED',
+                        details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time }
+                    }).catch(e => console.error('[CompletionEmail] Notify-only error:', e));
+                }
+            }
+        }
+
+        return res.json({ success: true, message: 'Notifications sent successfully.' });
+    } catch (err) {
+        console.error('sendBookingNotificationOnly error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to send notifications.', error: err.message });
+    }
+};
+
+module.exports = { getAllBookings, getBookingById, updateBookingStatus, assignTherapist, syncFromRender, deleteBooking, sendBookingNotificationOnly };

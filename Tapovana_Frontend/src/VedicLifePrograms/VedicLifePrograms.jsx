@@ -24,7 +24,7 @@ const getProgramStatus = (program) => {
 const STATUS_CONFIG = {
   upcoming: { label: "Upcoming", color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
   ongoing: { label: "Ongoing", color: "#2ecc71", bg: "rgba(46,204,113,0.1)" },
-  completed: { label: "Completed", color: "#a0aec0", bg: "rgba(160,174,192,0.1)" },
+  completed: { label: "Renewal", color: "#a0aec0", bg: "rgba(160,174,192,0.1)" },
 };
 
 const PROGRAM_COLORS = {
@@ -622,7 +622,7 @@ export default function VedicLifePrograms() {
                 <option value="ALL">Status: All</option>
                 <option value="upcoming">Upcoming</option>
                 <option value="ongoing">Ongoing</option>
-                <option value="completed">Completed</option>
+                <option value="completed">Renewal</option>
               </select>
             </div>
           </div>

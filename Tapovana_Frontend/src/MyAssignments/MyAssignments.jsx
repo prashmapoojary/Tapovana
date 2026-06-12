@@ -221,16 +221,15 @@ function MyAssignments() {
       }
     }
 
-    return merged;
+    return merged.filter(a => a.status !== 'removed');
   }, [contextAllocations, backendAssignments, activeStaffId]);
 
   // Stats
   const stats = useMemo(() => {
     const active = allAssignments.filter(a => a.status === 'active').length;
     const expired = allAssignments.filter(a => a.status === 'expired').length;
-    const removed = allAssignments.filter(a => a.status === 'removed').length;
     const total = active + expired;
-    return { total, active, expired, removed };
+    return { total, active, expired };
   }, [allAssignments]);
 
   // Filtered assignments (exclude removed ones entirely)
@@ -337,7 +336,7 @@ function MyAssignments() {
           </span>
           <span className={`ma-status-badge ${a.status}`}>
             {a.status === 'active' ? 'Active / Scheduled' 
-              : a.status === 'cancelled' ? 'This service has been cancelled.' 
+              : a.status === 'cancelled' ? 'Cancelled' 
               : a.status === 'removed' ? 'Deallocated' 
               : 'Completed'}
           </span>
@@ -392,7 +391,7 @@ function MyAssignments() {
           <div style={{
             background: "rgba(231,76,60,0.08)", border: "1px solid rgba(231,76,60,0.3)",
             borderRadius: "6px", padding: "10px 14px", margin: "0 0 8px",
-            fontSize: "12px", color: "#c0392b", display: "flex", gap: "8px"
+            fontSize: "11px", color: "#c0392b", display: "flex", gap: "8px"
           }}>
             <span>⏳</span><span>{validationError.message}</span>
           </div>
@@ -491,13 +490,6 @@ function MyAssignments() {
           <span className="ma-stat-value" style={{ color: "#8e9fa7" }}>{stats.expired}</span>
           <span className="ma-stat-label">Completed</span>
         </div>
-        <div className="ma-stat-card">
-          <div className="mem-tier-card-top">
-            <div className="mem-tier-badge" style={{ background: "#64748b", color: "white" }}>Removed</div>
-          </div>
-          <span className="ma-stat-value" style={{ color: "#64748b" }}>{stats.removed}</span>
-          <span className="ma-stat-label">Removed</span>
-        </div>
       </div>
 
       {/* Filters */}
@@ -523,7 +515,6 @@ function MyAssignments() {
             <option value="active">Active</option>
             <option value="cancelled">Cancelled</option>
             <option value="expired">Completed</option>
-            <option value="removed">Removed</option>
           </select>
         </div>
       </div>

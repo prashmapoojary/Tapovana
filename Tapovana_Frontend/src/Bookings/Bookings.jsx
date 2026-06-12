@@ -307,9 +307,17 @@ function Bookings() {
           body.staff_ids = assignedStaffIds;
         }
 
+        // Step 1: Send notifications first
+        triggerAlert("Sending notification emails to client and staff...", true);
+        await apiFetch(`/api/bookings/${selectedBooking.id}/notify`, {
+          method: "POST",
+          body: JSON.stringify(body)
+        });
+
+        // Step 2: Only after notification is sent, update backend & DB
         const res = await apiFetch(`/api/bookings/${selectedBooking.id}/status`, {
           method: "PATCH",
-          body: JSON.stringify(body)
+          body: JSON.stringify({ ...body, skip_notify: true })
         });
 
         if (res.success) {

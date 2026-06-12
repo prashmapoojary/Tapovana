@@ -444,7 +444,7 @@ const getMyAssignments = async (req, res) => {
                 startDate: alloc.start_date,
                 bookingTime: alloc.booking_time,
                 endDate: alloc.end_date,
-                status: alloc.status === 'active' ? 'active' : (alloc.status === 'cancelled' ? 'cancelled' : 'expired'),
+                status: alloc.status,
                 createdAt: alloc.created_at
             });
         }

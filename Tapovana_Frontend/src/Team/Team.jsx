@@ -19,11 +19,11 @@ const EditMemberDrawer = ({ user, onClose }) => {
   const [photoPreview, setPhotoPreview] = useState(null);
   const { allocations: contextAllocations } = useAllocations();
 
-  // Filter allocations for this user and exclude removed ones
+  // Filter allocations for this user and show only active ones (not expired/completed/removed)
   const userAllocations = useMemo(() => {
     const staffId = user?.user_id || user?.id;
     const filtered = contextAllocations.filter(a => 
-      a.staffId === staffId && a.status !== 'removed'
+      a.staffId === staffId && a.status === 'active'
     );
     
     return {

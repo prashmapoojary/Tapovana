@@ -278,12 +278,12 @@ export const AllocationProvider = ({ children }) => {
   const getStaffAllocations = useCallback((staffId) => {
     const now = new Date();
     return allocations.filter((a) => a.staffId === staffId).map((a) => {
-      if (a.type === "service") return { ...a, status: "active" };
-      const endDate = new Date(a.endDate);
-      return {
-        ...a,
-        status: endDate <= now ? "expired" : "active",
-      };
+      const endDate = new Date(a.endDate || a.startDate);
+      endDate.setHours(23, 59, 59, 999);
+      if (endDate <= now) {
+        return { ...a, status: "expired" };
+      }
+      return a;
     });
   }, [allocations]);
 
@@ -294,8 +294,8 @@ export const AllocationProvider = ({ children }) => {
     const now = new Date();
     setAllocations((prev) =>
       prev.map((a) => {
-        if (a.type === "service") return a;
-        const endDate = new Date(a.endDate);
+        const endDate = new Date(a.endDate || a.startDate);
+        endDate.setHours(23, 59, 59, 999);
         if (endDate <= now && a.status === "active") {
           apiFetch(`/api/teams/users/${a.staffId}/allocation`, {
             method: "PATCH",

@@ -67,7 +67,7 @@
 /* Stats Cards Grid — matches Membership .mem-tier-cards */
 .ma-stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -186,7 +186,7 @@
 /* Assignments Grid & Layout */
 .ma-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 20px;
 }
 
@@ -237,7 +237,7 @@
 }
 
 .ma-card-type-tag {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   padding: 4px 8px;
   border-radius: 6px;
@@ -261,7 +261,7 @@
 }
 
 .ma-status-badge {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   padding: 4px 8px;
   border-radius: 6px;
@@ -278,8 +278,9 @@
 }
 
 .ma-status-badge.cancelled {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  background: transparent;
+  color: #cda751;
+  padding: 4px 0;
 }
 
 .ma-status-badge.removed {
@@ -291,7 +292,7 @@
   margin-top: 8px;
   color: #ef4444;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 12px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -310,7 +311,7 @@
 }
 
 .ma-session-title {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   color: #0f172a;
   margin: 0;
@@ -327,7 +328,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
+  font-size: 12px;
   color: #475569;
 }
 
@@ -355,7 +356,7 @@
 }
 
 .ma-assigned-date {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #4a5568;
 }
@@ -364,7 +365,7 @@
   background: white;
   border: 1px solid #e2e8f0;
   color: #475569;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   padding: 6px 12px;
   border-radius: 6px;
@@ -437,6 +438,9 @@
 
 @media (max-width: 1200px) {
   .ma-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ma-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
