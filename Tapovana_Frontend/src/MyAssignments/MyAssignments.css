@@ -44,7 +44,7 @@
   padding: 8px 16px;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .ma-staff-selector label {
@@ -211,15 +211,18 @@
 }
 
 .ma-card.workshop::before {
-  background: #cda751; /* Gold */
+  background: #cda751;
+  /* Gold */
 }
 
 .ma-card.vedic_program::before {
-  background: #cda751; /* Gold */
+  background: #cda751;
+  /* Gold */
 }
 
 .ma-card.service::before {
-  background: #cda751; /* Gold */
+  background: #cda751;
+  /* Gold */
 }
 
 .ma-card:hover {
@@ -290,14 +293,12 @@
 
 .ma-cancelled-message {
   margin-top: 8px;
-  color: #ef4444;
+  color: #fcb0b0;
   font-weight: 600;
   font-size: 12px;
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(239, 68, 68, 0.05);
-  border: 1px solid rgba(239, 68, 68, 0.15);
   padding: 8px 12px;
   border-radius: 6px;
 }
@@ -440,6 +441,7 @@
   .ma-stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+
   .ma-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -455,22 +457,22 @@
   .my-assignments-container {
     padding: 16px;
   }
-  
+
   .ma-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
   }
-  
+
   .ma-controls {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .ma-filter-group {
     flex-wrap: wrap;
   }
-  
+
   .ma-grid {
     grid-template-columns: 1fr;
   }
