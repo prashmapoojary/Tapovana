@@ -26,7 +26,8 @@ const getAllVedicPrograms = async (req, res) => {
             consultant_name: r.consultant_id ? `${r.consultant_first_name || ''} ${r.consultant_last_name || ''}`.trim() : null,
             services: r.services,
             languages: r.languages,
-            image_url: r.image_url
+            image_url: r.image_url,
+            registrationDeadline: r.registration_deadline ? r.registration_deadline.toISOString().split('T')[0] : null
         }));
 
         return res.json({ success: true, programs });
@@ -38,7 +39,7 @@ const getAllVedicPrograms = async (req, res) => {
 
 // CREATE VEDIC PROGRAM
 const createVedicProgram = async (req, res) => {
-    const { title, type, description, duration, startDate, endDate, capacity, price, accommodations, consultant_id, services, languages, image_url } = req.body;
+    const { title, type, description, duration, startDate, endDate, capacity, price, accommodations, consultant_id, services, languages, image_url, registrationDeadline } = req.body;
 
     if (!title || !startDate || !endDate || !price) {
         return res.status(400).json({ success: false, message: 'Title, Start Date, End Date, and Price are required.' });
@@ -78,12 +79,12 @@ const createVedicProgram = async (req, res) => {
 
         const result = await query(
             `INSERT INTO vedic_programs 
-             (title, type, description, duration, start_date, end_date, capacity, price, accommodations, consultant_id, services, languages, image_url)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+             (title, type, description, duration, start_date, end_date, capacity, price, accommodations, consultant_id, services, languages, image_url, registration_deadline)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
             [
                 title.trim(), type || 'Retreat', description || null, duration || '7-days',
                 startDate, endDate, capacity || 20, price, accommodations || null,
-                consultant_id || null, JSON.stringify(services || []), JSON.stringify(languages || []), image_url || null
+                consultant_id || null, JSON.stringify(services || []), JSON.stringify(languages || []), image_url || null, registrationDeadline || null
             ]
         );
 
@@ -108,7 +109,7 @@ const createVedicProgram = async (req, res) => {
 
 // UPDATE VEDIC PROGRAM
 const updateVedicProgram = async (req, res) => {
-    const { title, type, description, duration, startDate, endDate, capacity, price, accommodations, consultant_id, services, languages, image_url } = req.body;
+    const { title, type, description, duration, startDate, endDate, capacity, price, accommodations, consultant_id, services, languages, image_url, registrationDeadline } = req.body;
     const programId = req.params.id;
 
     try {
@@ -164,6 +165,7 @@ const updateVedicProgram = async (req, res) => {
         if (services !== undefined) { fields.push('services = $' + idx++); values.push(JSON.stringify(services)); }
         if (languages !== undefined) { fields.push('languages = $' + idx++); values.push(JSON.stringify(languages)); }
         if (image_url !== undefined) { fields.push('image_url = $' + idx++); values.push(image_url); }
+        if (registrationDeadline !== undefined) { fields.push('registration_deadline = $' + idx++); values.push(registrationDeadline || null); }
 
         values.push(programId);
         const result = await query(
@@ -247,9 +249,155 @@ const updateVedicProgramStaff = async (req, res) => {
     }
 };
 
+// ENROLL USER IN VEDIC PROGRAM (Admin manual enrollment)
+const enrollUserInVedicProgram = async (req, res) => {
+    const { id } = req.params;
+    const { name, email, phone } = req.body;
+
+    if (!name || !email) {
+        return res.status(400).json({ success: false, message: 'Name and Email are required.' });
+    }
+
+    try {
+        const progRes = await query('SELECT * FROM vedic_programs WHERE id = $1', [id]);
+        if (!progRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Program not found.' });
+        }
+        const program = progRes.rows[0];
+
+        // Capacity check
+        if (program.enrolled >= program.capacity) {
+            return res.status(400).json({ success: false, message: 'Program is at full capacity.' });
+        }
+
+        // Check registration deadline if set
+        if (program.registration_deadline) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const deadline = new Date(program.registration_deadline);
+            if (today > deadline) {
+                return res.status(400).json({ success: false, message: 'Registration has closed for this program.' });
+            }
+        }
+
+        // Check if already enrolled
+        const attendeeCheck = await query('SELECT 1 FROM vedic_program_attendees WHERE program_id = $1 AND email = $2', [id, email.toLowerCase().trim()]);
+        if (attendeeCheck.rows.length) {
+            return res.status(400).json({ success: false, message: 'User is already enrolled in this program.' });
+        }
+
+        const result = await query(
+            'INSERT INTO vedic_program_attendees (program_id, name, email, phone) VALUES ($1, $2, $3, $4) RETURNING *',
+            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null]
+        );
+
+        // Update enrolled count
+        await query('UPDATE vedic_programs SET enrolled = enrolled + 1 WHERE id = $1', [id]);
+
+        return res.status(201).json({
+            success: true,
+            message: 'Successfully enrolled in program.',
+            attendee: result.rows[0]
+        });
+    } catch (err) {
+        console.error('enrollUserInVedicProgram error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// GET VEDIC PROGRAM ATTENDEES (Admin Endpoint)
+const getVedicProgramAttendees = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await query('SELECT * FROM vedic_program_attendees WHERE program_id = $1 ORDER BY created_at DESC', [id]);
+        return res.json({ success: true, attendees: result.rows });
+    } catch (err) {
+        console.error('getVedicProgramAttendees error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// UPDATE VEDIC ATTENDEE ATTENDANCE STATUS (Admin Endpoint)
+const updateVedicAttendeeAttendance = async (req, res) => {
+    const { id, attendeeId } = req.params;
+    const { status } = req.body;
+
+    if (!['enrolled', 'attended', 'absent'].includes(status)) {
+        return res.status(400).json({ success: false, message: "Status must be 'enrolled', 'attended', or 'absent'." });
+    }
+
+    try {
+        const result = await query(
+            'UPDATE vedic_program_attendees SET status = $1, updated_at = NOW() WHERE program_id = $2 AND id = $3 RETURNING *',
+            [status, id, attendeeId]
+        );
+
+        if (!result.rows.length) {
+            return res.status(404).json({ success: false, message: 'Attendee record not found.' });
+        }
+
+        return res.json({ success: true, message: 'Attendance status updated.', attendee: result.rows[0] });
+    } catch (err) {
+        console.error('updateVedicAttendeeAttendance error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// DELETE VEDIC PROGRAM ATTENDEE (Admin Endpoint)
+const deleteVedicProgramAttendee = async (req, res) => {
+    const { id, attendeeId } = req.params;
+    try {
+        const check = await query('SELECT 1 FROM vedic_program_attendees WHERE id = $1 AND program_id = $2', [attendeeId, id]);
+        if (!check.rows.length) {
+            return res.status(404).json({ success: false, message: 'Attendee record not found.' });
+        }
+
+        await query('DELETE FROM vedic_program_attendees WHERE id = $1 AND program_id = $2', [attendeeId, id]);
+        await query('UPDATE vedic_programs SET enrolled = GREATEST(0, enrolled - 1) WHERE id = $1', [id]);
+
+        const updatedRes = await query('SELECT * FROM vedic_program_attendees WHERE program_id = $1 ORDER BY created_at DESC', [id]);
+        return res.json({ success: true, message: 'Attendee deleted.', attendees: updatedRes.rows });
+    } catch (err) {
+        console.error('deleteVedicProgramAttendee error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// EXPORT VEDIC PROGRAM ATTENDEES (Admin Endpoint)
+const exportVedicProgramAttendees = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const progRes = await query('SELECT title FROM vedic_programs WHERE id = $1', [id]);
+        if (!progRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Program not found.' });
+        }
+        const title = progRes.rows[0].title;
+
+        const result = await query('SELECT name, email, phone, status, created_at FROM vedic_program_attendees WHERE program_id = $1 ORDER BY name ASC', [id]);
+        
+        let csvContent = 'Name,Email,Phone,Status,Enrolled At\n';
+        for (const row of result.rows) {
+            const enrolledAt = row.created_at ? new Date(row.created_at).toISOString() : '';
+            csvContent += `"${row.name.replace(/"/g, '""')}","${row.email.replace(/"/g, '""')}","${(row.phone || '').replace(/"/g, '""')}","${row.status}","${enrolledAt}"\n`;
+        }
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="attendees-${title.replace(/[^a-zA-Z0-9]/g, '_')}.csv"`);
+        return res.send(csvContent);
+    } catch (err) {
+        console.error('exportVedicProgramAttendees error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
 module.exports = {
     getAllVedicPrograms,
     createVedicProgram,
     updateVedicProgram,
-    updateVedicProgramStaff
+    updateVedicProgramStaff,
+    enrollUserInVedicProgram,
+    getVedicProgramAttendees,
+    updateVedicAttendeeAttendance,
+    deleteVedicProgramAttendee,
+    exportVedicProgramAttendees
 };

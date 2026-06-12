@@ -102,6 +102,8 @@
   padding: 12px 30px;
   display: flex;
   flex-direction: column;
+  min-height: 118px;
+  box-sizing: border-box;
   gap: 2px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.02);
   transition: all 0.25s ease;

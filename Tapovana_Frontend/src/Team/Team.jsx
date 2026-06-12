@@ -401,14 +401,8 @@ function Team() {
                           onClick={(e) => { e.stopPropagation(); setOpenActionMenu(openActionMenu === u.user_id ? null : u.user_id); }} />
                         {openActionMenu === u.user_id && (
                           <div style={{ position: "absolute", right: 0, top: "100%", zIndex: 1000, background: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", minWidth: "140px", overflow: "hidden" }}>
-                            <div onClick={(e) => { e.stopPropagation(); setEditingUser(u); setOpenActionMenu(null); }}
-                              style={{ padding: "10px 16px", cursor: "pointer", fontSize: "14px", color: "#2d3748", display: "flex", alignItems: "center", gap: "8px" }}
-                              onMouseEnter={e => e.currentTarget.style.background = "#f7fafc"}
-                              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                              View
-                            </div>
                             <div onClick={(e) => { e.stopPropagation(); initiateDelete(u); }}
-                              style={{ padding: "10px 16px", cursor: "pointer", fontSize: "14px", color: "#cda751", display: "flex", alignItems: "center", gap: "8px", borderTop: "1px solid #f0f0f0" }}
+                              style={{ padding: "10px 16px", cursor: "pointer", fontSize: "14px", color: "#cda751", display: "flex", alignItems: "center", gap: "8px" }}
                               onMouseEnter={e => e.currentTarget.style.background = "#fcf8ed"}
                               onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                               Delete

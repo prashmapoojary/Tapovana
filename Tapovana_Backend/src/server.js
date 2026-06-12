@@ -121,6 +121,37 @@ app.listen(PORT, () => {
         console.log("[KeepAlive] ℹ️  RENDER_EXTERNAL_URL not set — self-ping disabled (local dev mode).");
     }
     // ────────────────────────────────────────────────────────────────────────
+
+    // ── Background workshop status check & notification scheduler ───────────
+    const { autoUpdateWorkshopStatuses } = require("./controllers/workshopController");
+    // Run immediately on boot
+    autoUpdateWorkshopStatuses()
+        .then(() => console.log("[Workshop Scheduler] Initial status check complete."))
+        .catch(err => console.error("[Workshop Scheduler] Initial status check failed:", err));
+
+    // Run every 30 seconds
+    setInterval(() => {
+        autoUpdateWorkshopStatuses().catch(err => console.error("Error in background workshop status update:", err));
+    }, 30000);
+
+    // ── Monthly Refresh Job (Midnight on the 15th of every month) ───────────
+    let lastMonthlyRefreshDate = "";
+    setInterval(async () => {
+        const now = new Date();
+        const dateKey = `${now.getFullYear()}-${now.getMonth() + 1}-15`;
+        if (now.getDate() === 15 && now.getHours() === 0 && now.getMinutes() === 0) {
+            if (lastMonthlyRefreshDate !== dateKey) {
+                console.log("[Scheduler] Running monthly workshop refresh job...");
+                try {
+                    await autoUpdateWorkshopStatuses();
+                    lastMonthlyRefreshDate = dateKey;
+                } catch (err) {
+                    console.error("[Scheduler] Monthly refresh job error:", err);
+                }
+            }
+        }
+    }, 60000);
+    // ────────────────────────────────────────────────────────────────────────
 });
 
 // Export for compatibility

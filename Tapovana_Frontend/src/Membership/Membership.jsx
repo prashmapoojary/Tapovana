@@ -68,6 +68,29 @@ const BLANK_ENROLL = { name: "", email: "", phone: "", tier: "SILVER" };
 
 const RENDER_MEMBERSHIP_API = "https://tapoclg.onrender.com/api/membership";
 
+const getMemberAvatarUrl = (url, source) => {
+  if (!url) return DefaultAvatar;
+  if (url.startsWith("http") || url.startsWith("data:")) return url;
+  const base = source === "mobile" ? "https://tapoclg.onrender.com" : (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000");
+  
+  if (url.includes("uploads/")) {
+    const idx = url.indexOf("uploads/");
+    const cleanUrl = "/" + url.substring(idx);
+    return `${base}${cleanUrl}`;
+  }
+  
+  if (url.endsWith(".svg") || url.includes("avatar")) {
+    if (url.includes("/avatars/")) {
+      const idx = url.indexOf("avatars/");
+      return "/" + url.substring(idx);
+    }
+    return `/avatars/${url.replace(/^\//, "")}`;
+  }
+  
+  const cleanUrl = url.startsWith("/") ? url : "/" + url;
+  return `${base}${cleanUrl}`;
+};
+
 export default function Membership() {
   const [members, setMembers] = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
@@ -591,7 +614,7 @@ export default function Membership() {
           <div className="mem-detail-overlay" onClick={() => setSelectedMember(null)}>
             <div className="mem-detail-panel" onClick={e => e.stopPropagation()}>
               <div className="mem-detail-header">
-                <img src={DefaultAvatar} alt="Profile" className="mem-detail-avatar-img" style={{ width: 48, height: 48, borderRadius: "50%", border: "2px solid #cda751" }} />
+                <img src={getMemberAvatarUrl(selectedMember.profile_photo_url, selectedMember.source)} alt="Profile" className="mem-detail-avatar-img" style={{ width: 48, height: 48, borderRadius: "50%", border: "2px solid #cda751" }} />
                 <div>
                   <div className="mem-detail-name">{selectedMember.name}</div>
                   <div className="mem-detail-id">#{selectedMember.id}</div>
@@ -690,7 +713,7 @@ export default function Membership() {
                         <tr key={m.id} className={"mem-row " + (selectedMember?.id === m.id ? "selected" : "")}>
                           <td onClick={() => { setSelectedMember(m); setNewTier(m.tier); setUpgradeSuccess(false); }} style={{ cursor: "pointer" }}>
                             <div className="user-cell">
-                              <img src={DefaultAvatar} alt="profile" style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0" }} />
+                              <img src={getMemberAvatarUrl(m.profile_photo_url, m.source)} alt="profile" style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0" }} />
                               <div className="mem-name" style={{ fontWeight: 600 }}>{m.name || "Unknown"}</div>
                             </div>
                           </td>

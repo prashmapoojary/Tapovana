@@ -80,7 +80,8 @@ const BLANK_FORM = {
   title: "", type: "Retreat", description: "", duration: "7-days",
   startDate: "", endDate: "", capacity: 20, price: "",
   accommodations: "", consultant_id: "", consultant_name: "",
-  services: "", languages: "", image_url: "", image_base64: ""
+  services: "", languages: "", image_url: "", image_base64: "",
+  registrationDeadline: ""
 };
 
 // ─── File to base64 helper ────────────────────────────────────────────────
@@ -227,6 +228,12 @@ function ProgramForm({ form, onChange, instructors, mode }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <FormField label="Registration Deadline">
+          <input type="date" name="registrationDeadline" value={form.registrationDeadline} onChange={onChange} style={inputStyle} min={new Date().toISOString().split("T")[0]} />
+        </FormField>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <FormField label="Lead Consultant">
           <select value={form.consultant_id} onChange={e => {
             const id = e.target.value;
@@ -295,7 +302,7 @@ export default function VedicLifePrograms() {
 
   // Detail view (instead of modal)
   const [selectedProgram, setSelectedProgram] = useState(null);
-  const [detailTab, setDetailTab] = useState("info");
+  const [activeDetailTab, setActiveDetailTab] = useState("info");
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(BLANK_FORM);
   const [editSaving, setEditSaving] = useState(false);
@@ -306,6 +313,17 @@ export default function VedicLifePrograms() {
   const [addForm, setAddForm] = useState(BLANK_FORM);
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState("");
+
+  // Attendee list state
+  const [attendees, setAttendees] = useState([]);
+  const [attendeesLoading, setAttendeesLoading] = useState(false);
+  const [attendeesError, setAttendeesError] = useState("");
+  const [attendeeSearch, setAttendeeSearch] = useState("");
+  const [showManualEnroll, setShowManualEnroll] = useState(false);
+  const [manualEnrollForm, setManualEnrollForm] = useState({ name: "", email: "", phone: "" });
+  const [manualEnrollSaving, setManualEnrollSaving] = useState(false);
+  const [manualEnrollError, setManualEnrollError] = useState("");
+  const [attendeePage, setAttendeePage] = useState(1);
 
   const currentUser = useMemo(() => getUser(), []);
   const isAdmin = !currentUser || currentUser.role === "SUPER_ADMIN" || currentUser.role === "CO_ADMIN";
@@ -390,6 +408,7 @@ export default function VedicLifePrograms() {
       consultant_id: p.consultant_id || "", consultant_name: p.consultant_name || p.consultant || "",
       services: p.services ? p.services.join(", ") : "", languages: p.languages ? p.languages.join(", ") : "",
       image_url: p.image_url || p.image || "", image_base64: p.image_base64 || "",
+      registrationDeadline: p.registrationDeadline || "",
     });
     setEditError("");
     setIsEditing(true);

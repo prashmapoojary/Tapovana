@@ -322,25 +322,40 @@ const sendUserReassignmentEmail = async ({ to, userName, details = {} }) => {
   });
 };
 
-const sendWorkshopEnrollmentEmail = async ({ to, userName, workshopTitle, date, time }) => {
+const sendWorkshopEnrollmentEmail = async ({ to, userName, workshopTitle, date, time, instructorName }) => {
   const dateOptions = { year: 'numeric', month: 'long', day: 'numeric' };
   const formattedDate = date ? new Date(date).toLocaleDateString(undefined, dateOptions) : "Not specified";
+  const instructor = instructorName || "Not assigned";
+  
   const html = emailWrapper(`
     <h1 style="color:#cda751;text-align:center;">Workshop Enrollment Confirmed!</h1>
-    <p style="color:#cccccc;text-align:center;">
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
       Hello ${userName || 'Valued Guest'},
     </p>
-    <p style="color:#cccccc;text-align:center;">
-      Your enrollment in the workshop <strong style="color:#cda751;">${workshopTitle}</strong> has been successfully confirmed.
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      You have been successfully enrolled for the upcoming workshop:
     </p>
     <div style="background:#1e1a0e;border-left:4px solid #cda751;border-radius:6px;padding:20px 24px;margin:20px 0;">
-      <p style="margin:0 0 8px;font-size:14px;color:#cda751;font-weight:600;">Workshop Details</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Title:</strong> ${workshopTitle}</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Date:</strong> ${formattedDate}</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Time:</strong> ${time || "N/A"}</p>
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Workshop:</strong> ${workshopTitle}</p>
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Date & Time:</strong> ${formattedDate} at ${time || "N/A"}</p>
+      <p style="margin:0;font-size:13px;color:#ccc;"><strong>Instructor:</strong> ${instructor}</p>
     </div>
-    <p style="color:#888;text-align:center;font-size:13px;">
-      We look forward to seeing you at the workshop!
+    
+    <div style="margin:24px 0;color:#cccccc;font-size:14px;line-height:1.6;">
+      <p style="color:#cda751;font-weight:700;margin:0 0 10px 0;">What to expect:</p>
+      <ul style="margin:0;padding-left:20px;color:#cccccc;">
+        <li style="margin-bottom:6px;">You’ll receive reminders before the session starts.</li>
+        <li style="margin-bottom:6px;">Please join on time to get the full benefit.</li>
+        <li style="margin-bottom:6px;">Bring any questions or topics you’d like to discuss.</li>
+      </ul>
+    </div>
+    
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 24px 0 0 0;">
+      We look forward to seeing you there!
+    </p>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
+      Best regards,<br/>
+      <strong>Workshop Admin Team</strong>
     </p>
   `);
 
@@ -348,6 +363,108 @@ const sendWorkshopEnrollmentEmail = async ({ to, userName, workshopTitle, date, 
     from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
     to,
     subject: `Tapovana — Enrollment Confirmed: ${workshopTitle}`,
+    html,
+  });
+};
+
+const sendWorkshopRemovalEmail = async ({ to, userName, workshopTitle }) => {
+  const html = emailWrapper(`
+    <h1 style="color:#e74c3c;text-align:center;">Workshop Enrollment Removed</h1>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
+      Hello ${userName || 'Valued Guest'},
+    </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      Your enrollment in the workshop <strong style="color:#e74c3c;">${workshopTitle}</strong> has been cancelled/removed by the administrator.
+    </p>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:24px 0 0 0;">
+      If you did not request this change, please contact the admin team.
+    </p>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
+      Best regards,<br/>
+      <strong>Workshop Admin Team</strong>
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Tapovana — Workshop Enrollment Cancelled: ${workshopTitle}`,
+    html,
+  });
+};
+
+const sendWorkshopScheduledEmail = async ({ to, staffOrParticipantName, workshopTitle, date, time }) => {
+  const dateOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+  const formattedDate = date ? new Date(date).toLocaleDateString(undefined, dateOptions) : "Not specified";
+  const dateTimeStr = `${formattedDate} at ${time || "N/A"}`;
+  
+  const html = emailWrapper(`
+    <h1 style="color:#cda751;text-align:center;">Workshop Scheduled</h1>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
+      Hello ${staffOrParticipantName || 'Valued Guest'},
+    </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      Your workshop ${workshopTitle} is scheduled for ${dateTimeStr}. Please be ready to join.
+    </p>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:24px 0 0 0;">
+      Best regards,<br/>
+      <strong>Workshop Admin Team</strong>
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Workshop Scheduled – ${workshopTitle}`,
+    html,
+  });
+};
+
+const sendWorkshopOngoingEmail = async ({ to, staffOrParticipantName, workshopTitle }) => {
+  const html = emailWrapper(`
+    <h1 style="color:#2ecc71;text-align:center;">Workshop is LIVE</h1>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
+      Hello ${staffOrParticipantName || 'Valued Guest'},
+    </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      Your workshop ${workshopTitle} is now LIVE. Join immediately to participate.
+    </p>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:24px 0 0 0;">
+      Best regards,<br/>
+      <strong>Workshop Admin Team</strong>
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Workshop is LIVE – ${workshopTitle}`,
+    html,
+  });
+};
+
+const sendWorkshopDeallocationEmail = async ({ to, staffName, workshopTitle }) => {
+  const html = emailWrapper(`
+    <h1 style="color:#e74c3c;text-align:center;">Workshop Allocation Removed</h1>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
+      Hello ${staffName},
+    </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      You have been <strong style="color:#e74c3c;">removed</strong> from the workshop: <strong>${workshopTitle}</strong>.
+    </p>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
+      This workshop has been reassigned. You are no longer required for this session.
+    </p>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
+      Best regards,<br/>
+      <strong>Workshop Admin Team</strong>
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Tapovana — Removed from Workshop: ${workshopTitle}`,
     html,
   });
 };
@@ -363,5 +480,9 @@ module.exports = {
   sendStaffLeaveCancellationEmail,
   sendAdminLeaveAlertEmail,
   sendUserReassignmentEmail,
-  sendWorkshopEnrollmentEmail
+  sendWorkshopEnrollmentEmail,
+  sendWorkshopRemovalEmail,
+  sendWorkshopScheduledEmail,
+  sendWorkshopOngoingEmail,
+  sendWorkshopDeallocationEmail
 };

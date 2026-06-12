@@ -8,12 +8,29 @@ import { useAllocations } from "../utils/AllocationContext";
 const getLiveStatus = (ws) => {
   if (ws.status === "completed") return "completed";
   const now = new Date();
-  const today = now.toISOString().split('T')[0];
+  
+  // Format today's date in local YYYY-MM-DD
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const today = `${year}-${month}-${day}`;
+  
+  // Format current local time HH:MM
   const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
 
-  if (ws.date !== today) {
-    if (ws.date > today) return "upcoming";
-    if (ws.date < today) return "completed";
+  let wsDateStr = ws.date;
+  if (ws.date && typeof ws.date === 'string') {
+    wsDateStr = ws.date.split('T')[0];
+  } else if (ws.date instanceof Date) {
+    const wYear = ws.date.getFullYear();
+    const wMonth = String(ws.date.getMonth() + 1).padStart(2, '0');
+    const wDay = String(ws.date.getDate()).padStart(2, '0');
+    wsDateStr = `${wYear}-${wMonth}-${wDay}`;
+  }
+
+  if (wsDateStr !== today) {
+    if (wsDateStr > today) return "upcoming";
+    if (wsDateStr < today) return "completed";
   }
 
   const wsTime = ws.time || "";
@@ -54,7 +71,7 @@ const CATEGORY_COLORS = {
 
 const STATUS_CONFIG = {
   upcoming: { label: "Upcoming", color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
-  live: { label: "LIVE", color: "#e74c3c", bg: "rgba(231,76,60,0.15)" },
+  live: { label: "🔴 LIVE", color: "#e74c3c", bg: "rgba(231,76,60,0.15)" },
   completed: { label: "Completed", color: "#a0aec0", bg: "rgba(160,174,192,0.1)" },
 };
 
@@ -65,7 +82,7 @@ const DUMMY_WORKSHOPS = [
 
 const BLANK_FORM = {
   title: "", category: "Yoga", instructor_id: "", instructor_name: "",
-  date: "", time: "", duration: 60, capacity: 20,
+  date: "", time: "", duration: 60, capacity: 10000,
   price: "", description: "", image_url: "", image_base64: "", video_url: "", video_base64: "", video_file: null
 };
 
@@ -76,6 +93,69 @@ const fileToBase64 = (file) => new Promise((resolve, reject) => {
   reader.onerror = () => reject(reader.error);
   reader.readAsDataURL(file);
 });
+
+// ─── YouTube embed URL helper ─────────────────────────────────────────────
+const getYouTubeEmbedUrl = (url) => {
+  if (!url) return "";
+  let videoId = "";
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  if (match && match[2].length === 11) {
+    videoId = match[2];
+  }
+  return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+};
+
+// ─── Chunked Upload Helper ────────────────────────────────────────────────
+const uploadVideoInChunks = async (workshopId, file, onProgress) => {
+  const CHUNK_SIZE = 1024 * 1024; // 1MB chunk size
+  const totalSize = file.size;
+  const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
+  const filename = file.name;
+  const mimeType = file.type;
+
+  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+    const start = chunkIndex * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, totalSize);
+    const chunkBlob = file.slice(start, end);
+
+    // Read chunk blob as base64
+    const base64Data = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        // strip prefix data:*/*;base64,
+        const base64Str = result.split(",")[1];
+        resolve(base64Str);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(chunkBlob);
+    });
+
+    const body = {
+      chunkIndex,
+      chunkSize: end - start,
+      byteOffset: start,
+      totalSize,
+      filename,
+      mimeType,
+      data: base64Data
+    };
+
+    const res = await apiFetch(`/api/workshops/${workshopId}/video/chunk`, {
+      method: "POST",
+      body: JSON.stringify(body)
+    });
+
+    if (!res.success) {
+      throw new Error(res.message || `Failed to upload chunk ${chunkIndex + 1}/${totalChunks}`);
+    }
+
+    if (onProgress) {
+      onProgress(Math.round(((chunkIndex + 1) / totalChunks) * 100));
+    }
+  }
+};
 
 // ─── Workshop Card ────────────────────────────────────────────────────────
 function WorkshopCard({ w, onClick }) {
@@ -99,7 +179,7 @@ function WorkshopCard({ w, onClick }) {
           background: liveStatus === "live" ? "#e74c3c" : "#ffffff", color: liveStatus === "live" ? "#ffffff" : st.color,
           border: `1px solid ${liveStatus === "live" ? "#e74c3c" : st.color}`, fontWeight: 700, zIndex: 2,
           animation: liveStatus === "live" ? "wsPulse 1.5s infinite" : "none"
-        }}>{liveStatus === "live" ? "LIVE" : st.label}</div>
+        }}>{liveStatus === "live" ? "🔴 LIVE" : st.label}</div>
       </div>
       <div className="ws-card-body">
         <h3 className="ws-card-title">{w.title}</h3>
@@ -136,6 +216,7 @@ export default function Workshops() {
   const [dataLoading, setDataLoading] = useState(true);
   const [instructors, setInstructors] = useState([]);
   const [toast, setToast] = useState(null);
+  const [videoProgress, setVideoProgress] = useState(null);
 
   // Filters
   const [activeTab, setActiveTab] = useState("ALL");
@@ -161,6 +242,109 @@ export default function Workshops() {
   // Video player
   const [videoPlaying, setVideoPlaying] = useState(false);
   const videoRef = useRef(null);
+
+  const lastTimeRef = useRef(0);
+
+  const getElapsedLiveSeconds = (ws) => {
+    if (!ws || !ws.date) return 0;
+    const now = new Date();
+    
+    let wsYear, wsMonth, wsDay;
+    if (typeof ws.date === 'string') {
+      [wsYear, wsMonth, wsDay] = ws.date.split('T')[0].split('-').map(Number);
+    } else if (ws.date instanceof Date) {
+      wsYear = ws.date.getFullYear();
+      wsMonth = ws.date.getMonth() + 1;
+      wsDay = ws.date.getDate();
+    } else {
+      return 0;
+    }
+    
+    let hours = 0;
+    let minutes = 0;
+    if (ws.time) {
+      const match = ws.time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (match) {
+        hours = parseInt(match[1], 10);
+        minutes = parseInt(match[2], 10);
+        if (match[3].toUpperCase() === 'PM' && hours !== 12) hours += 12;
+        if (match[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
+      } else {
+        const parts = ws.time.split(':');
+        hours = parseInt(parts[0], 10) || 0;
+        minutes = parseInt(parts[1], 10) || 0;
+      }
+    }
+    
+    const startTime = new Date(wsYear, wsMonth - 1, wsDay, hours, minutes, 0, 0);
+    const elapsed = (now.getTime() - startTime.getTime()) / 1000;
+    return Math.max(0, elapsed);
+  };
+
+  const handleTimeUpdate = (e) => {
+    const video = e.target;
+    const ws = workshops.find(w => w.id === selectedWs?.id) || selectedWs;
+    const liveStatus = getLiveStatus(ws);
+    if (liveStatus === "live") {
+      const elapsed = getElapsedLiveSeconds(ws);
+      if (video.currentTime > elapsed + 1.5) {
+        video.currentTime = Math.min(elapsed, lastTimeRef.current);
+        alert("Forward seeking disabled during live session.");
+      } else {
+        lastTimeRef.current = video.currentTime;
+      }
+    }
+  };
+
+  const handleSeeking = (e) => {
+    const video = e.target;
+    const ws = workshops.find(w => w.id === selectedWs?.id) || selectedWs;
+    const liveStatus = getLiveStatus(ws);
+    if (liveStatus === "live") {
+      const elapsed = getElapsedLiveSeconds(ws);
+      if (video.currentTime > elapsed + 1.5) {
+        video.currentTime = Math.min(elapsed, lastTimeRef.current);
+        alert("Forward seeking disabled during live session.");
+      }
+    }
+  };
+
+  const handlePlay = (e) => {
+    const video = e.target;
+    const ws = workshops.find(w => w.id === selectedWs?.id) || selectedWs;
+    const liveStatus = getLiveStatus(ws);
+    if (liveStatus === "live" && !video.hasSyncedLiveTime) {
+      const elapsed = getElapsedLiveSeconds(ws);
+      if (elapsed > 0) {
+        video.currentTime = Math.min(elapsed, video.duration || elapsed);
+      }
+      video.hasSyncedLiveTime = true;
+    }
+  };
+
+  const handleLoadedMetadata = (e) => {
+    const video = e.target;
+    const ws = workshops.find(w => w.id === selectedWs?.id) || selectedWs;
+    const liveStatus = getLiveStatus(ws);
+    if (liveStatus === "live" && !video.hasSyncedLiveTime) {
+      const elapsed = getElapsedLiveSeconds(ws);
+      if (elapsed > 0) {
+        video.currentTime = Math.min(elapsed, video.duration || elapsed);
+      }
+      video.hasSyncedLiveTime = true;
+    }
+  };
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.hasSyncedLiveTime = false;
+      lastTimeRef.current = 0;
+    }
+  }, [selectedWs?.id]);
+
+  // Staff allocation attempts state
+  const [allocationAttempts, setAllocationAttempts] = useState(0);
+  const [attemptedInstructorId, setAttemptedInstructorId] = useState(null);
 
   // Attendees Tab and Manual Enrollment state
   const [activeDetailTab, setActiveDetailTab] = useState("details"); // "details" or "attendees"
@@ -200,6 +384,13 @@ export default function Workshops() {
 
   const handleManualEnroll = async () => {
     setManualEnrollError("");
+    const ws = workshops.find(w => w.id === selectedWs?.id) || selectedWs;
+    if (getLiveStatus(ws) === "completed") {
+      const errMsg = "This workshop is completed. Staff assignment and enrollment are disabled.";
+      setManualEnrollError(errMsg);
+      showToast(errMsg);
+      return;
+    }
     if (!manualEnrollForm.name.trim() || !manualEnrollForm.email.trim()) {
       setManualEnrollError("Name and Email are required.");
       return;
@@ -241,6 +432,27 @@ export default function Workshops() {
       }
     } catch (err) {
       showToast(err.message || "Failed to update attendance.");
+    }
+  };
+
+  const handleDeleteAttendee = async (attendeeId) => {
+    if (!window.confirm("Are you sure you want to delete/remove this attendee?")) {
+      return;
+    }
+    try {
+      const res = await apiFetch(`/api/workshops/${selectedWs.id}/attendees/${attendeeId}`, {
+        method: "DELETE"
+      });
+      if (res.success) {
+        showToast("Attendee deleted successfully.");
+        setAttendees(res.attendees || []);
+        fetchWorkshops();
+        setSelectedWs(prev => ({ ...prev, enrolled: Math.max(0, (prev.enrolled || 0) - 1) }));
+      } else {
+        throw new Error(res.message || "Failed to delete attendee.");
+      }
+    } catch (err) {
+      showToast(err.message || "Failed to delete attendee.");
     }
   };
 
@@ -311,13 +523,35 @@ export default function Workshops() {
 
   useEffect(() => { fetchWorkshops(); }, []);
 
-  // Auto-refresh live status every 60 seconds
+  // Auto-refresh live status every 30 seconds by fetching latest data
   useEffect(() => {
     const interval = setInterval(() => {
-      if (workshops.length > 0) setWorkshops(prev => [...prev]);
-    }, 60000);
+      fetchWorkshops();
+    }, 30000);
     return () => clearInterval(interval);
-  }, [workshops.length]);
+  }, []);
+
+  // Monthly auto-refresh page logic on the 15th of every month
+  useEffect(() => {
+    const checkMonthlyRefresh = () => {
+      const now = new Date();
+      if (now.getDate() === 15) {
+        const lastRefresh = localStorage.getItem("last_monthly_refresh_date");
+        const todayStr = now.toDateString();
+        if (lastRefresh !== todayStr) {
+          console.log("[Refresh] Midnight on the 15th detected. Clearing cache data...");
+          localStorage.removeItem("workshops_cache");
+          sessionStorage.removeItem("workshops_cache");
+          fetchWorkshops();
+          localStorage.setItem("last_monthly_refresh_date", todayStr);
+        }
+      }
+    };
+
+    checkMonthlyRefresh();
+    const refreshInterval = setInterval(checkMonthlyRefresh, 60000); // Check once a minute
+    return () => clearInterval(refreshInterval);
+  }, []);
 
   // ─── Stats ─────────────────────────────────────────────────────────────
   const STATS = useMemo(() => ({
@@ -396,6 +630,17 @@ export default function Workshops() {
     if (!editForm.title.trim()) { setEditError("Title is required"); return; }
     if (Number(editForm.price) <= 0) { setEditError("Price must be greater than 0"); return; }
 
+    const ws = workshops.find(w => w.id === selectedWs?.id) || selectedWs;
+    if (getLiveStatus(ws) === "completed") {
+      const isStaffChanged = (selectedWs?.instructor_id || null) !== (editForm.instructor_id || null);
+      if (isStaffChanged) {
+        const errMsg = "This workshop is completed. Staff assignment and enrollment are disabled.";
+        setEditError(errMsg);
+        showToast(errMsg);
+        return;
+      }
+    }
+
     try {
       setEditSaving(true);
       const body = {
@@ -406,15 +651,33 @@ export default function Workshops() {
         date: editForm.date,
         time: editForm.time,
         duration: Number(editForm.duration),
-        capacity: Number(editForm.capacity),
+        capacity: 10000,
         price: Number(editForm.price),
         description: editForm.description.trim(),
         image_url: editForm.image_base64 || editForm.image_url || null,
-        video_url: editForm.video_base64 || editForm.video_url || null,
+        video_url: editForm.video_file ? null : (editForm.video_url || null),
         assigned_staff_ids: editForm.instructor_id ? [editForm.instructor_id] : [],
       };
 
-      await apiFetch("/api/workshops/" + selectedWs.id, { method: "PATCH", body: JSON.stringify(body) });
+      const res = await apiFetch("/api/workshops/" + selectedWs.id, { method: "PATCH", body: JSON.stringify(body) });
+      if (!res.success) {
+        throw new Error(res.message || "Failed to update workshop");
+      }
+
+      // If local video file is present, upload it in chunks
+      if (editForm.video_file) {
+        setVideoProgress(0);
+        try {
+          await uploadVideoInChunks(selectedWs.id, editForm.video_file, (percent) => {
+            setVideoProgress(percent);
+          });
+        } catch (uploadErr) {
+          throw new Error(`Changes saved but video upload failed: ${uploadErr.message}`);
+        } finally {
+          setVideoProgress(null);
+        }
+      }
+
       await fetchWorkshops();
       setSelectedWs(prev => ({
         ...prev, ...editForm,
@@ -432,6 +695,11 @@ export default function Workshops() {
 
   // ─── Delete Workshop ───────────────────────────────────────────────────
   const handleDeleteWorkshop = () => {
+    const liveStatus = selectedWs._liveStatus || getLiveStatus(selectedWs);
+    if (liveStatus === "live" || liveStatus === "ongoing") {
+      showToast("Cannot delete an ongoing workshop.");
+      return;
+    }
     setShowDeleteConfirm(true);
   };
 
@@ -465,6 +733,19 @@ export default function Workshops() {
     if (!addForm.price) { setAddError("Price is required"); return; }
     if (Number(addForm.price) <= 0) { setAddError("Price must be greater than 0"); return; }
 
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+    if (addForm.date < todayStr) {
+      setAddError("Cannot schedule a workshop on a past date.");
+      return;
+    }
+
+    // Check staff allocation conflict attempts
+    if (addForm.instructor_id && addForm.instructor_id === attemptedInstructorId && allocationAttempts >= 3) {
+      setAddError("Allocation attempt 3 failed, please reassign staff.");
+      return;
+    }
+
     try {
       setAddSaving(true);
       const body = {
@@ -475,11 +756,11 @@ export default function Workshops() {
         date: addForm.date,
         time: addForm.time,
         duration: Number(addForm.duration),
-        capacity: Number(addForm.capacity) || 20,
+        capacity: 10000,
         price: Number(addForm.price),
         description: addForm.description.trim(),
         image_url: addForm.image_base64 || addForm.image_url || null,
-        video_url: addForm.video_base64 || addForm.video_url || null,
+        video_url: addForm.video_file ? null : (addForm.video_url || null),
         status: "upcoming",
         enrolled: 0,
         assigned_staff_ids: addForm.instructor_id ? [addForm.instructor_id] : [],
@@ -487,19 +768,51 @@ export default function Workshops() {
 
       const res = await apiFetch("/api/workshops", { method: "POST", body: JSON.stringify(body) });
       if (res.success) {
+        const createdWs = res.workshop;
+
+        // If local video file is present, upload it in chunks
+        if (addForm.video_file) {
+          setVideoProgress(0);
+          try {
+            await uploadVideoInChunks(createdWs.id, addForm.video_file, (percent) => {
+              setVideoProgress(percent);
+            });
+          } catch (uploadErr) {
+            throw new Error(`Workshop created but video upload failed: ${uploadErr.message}`);
+          } finally {
+            setVideoProgress(null);
+          }
+        }
+
         if (addForm.instructor_id) {
           const inst = instructors.find(i => i.user_id === addForm.instructor_id || i.id === addForm.instructor_id);
           if (inst) {
-            allocateStaff(inst, { id: res.workshop?.id || Date.now(), title: addForm.title, startDate: addForm.date, date: addForm.date, endDate: addForm.date }, "workshop");
+            allocateStaff(inst, { id: createdWs?.id || Date.now(), title: addForm.title, startDate: addForm.date, date: addForm.date, endDate: addForm.date }, "workshop");
           }
         }
         await fetchWorkshops();
         setShowAddModal(false);
         setAddForm(BLANK_FORM);
-        showToast("Workshop created successfully!");
+        showToast(res.message || "Workshop created successfully!");
+      } else {
+        throw new Error(res.message || "Failed to create workshop");
       }
     } catch (err) {
-      setAddError(err.message || "Failed to create workshop");
+      if (err.message && (err.message.toLowerCase().includes("conflict") || err.message.toLowerCase().includes("limit") || err.message.toLowerCase().includes("already allocated"))) {
+        const nextAttempt = allocationAttempts + 1;
+        setAllocationAttempts(nextAttempt);
+        setAttemptedInstructorId(addForm.instructor_id);
+        
+        if (nextAttempt === 1) {
+          setAddError("Allocation attempt 1 failed, please try again.");
+        } else if (nextAttempt === 2) {
+          setAddError("Allocation attempt 2 failed, please try again.");
+        } else {
+          setAddError("Allocation attempt 3 failed, please reassign staff.");
+        }
+      } else {
+        setAddError(err.message || "Failed to create workshop");
+      }
     } finally {
       setAddSaving(false);
     }
@@ -518,19 +831,13 @@ export default function Workshops() {
   };
 
   // ─── Video file/URL handler ─────────────────────────────────────────────
-  const handleVideoFile = async (target, file) => {
+  const handleVideoFile = (target, file) => {
     if (!file) return;
     const objectUrl = URL.createObjectURL(file);
-    try {
-      // Create base64 string for the payload
-      const base64 = await fileToBase64(file);
-      if (target === "add") {
-        setAddForm(prev => ({ ...prev, video_url: objectUrl, video_base64: base64, video_file: file }));
-      } else {
-        setEditForm(prev => ({ ...prev, video_url: objectUrl, video_base64: base64, video_file: file }));
-      }
-    } catch (err) {
-      showToast("Error reading video file.");
+    if (target === "add") {
+      setAddForm(prev => ({ ...prev, video_url: objectUrl, video_base64: "", video_file: file }));
+    } else {
+      setEditForm(prev => ({ ...prev, video_url: objectUrl, video_base64: "", video_file: file }));
     }
   };
 
@@ -541,6 +848,8 @@ export default function Workshops() {
     const name = instructor ? (instructor.first_name + " " + instructor.last_name).trim() : "";
     if (target === "add") {
       setAddForm(prev => ({ ...prev, instructor_id: instructorId, instructor_name: name }));
+      setAllocationAttempts(0);
+      setAttemptedInstructorId(instructorId);
     } else {
       setEditForm(prev => ({ ...prev, instructor_id: instructorId, instructor_name: name }));
     }
@@ -579,7 +888,7 @@ export default function Workshops() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Date</label>
-          <input type="date" value={editForm.date} onChange={e => setEditForm(p => ({ ...p, date: e.target.value }))} style={{ padding: "7px 10px", borderRadius: 4, border: "1px solid rgba(205,167,81,0.2)", fontSize: 13, color: "#333", outline: "none", fontFamily: "Manrope, sans-serif", width: "100%", boxSizing: "border-box", background: "white" }} />
+          <input type="date" value={editForm.date} onChange={e => setEditForm(p => ({ ...p, date: e.target.value }))} style={{ padding: "7px 10px", borderRadius: 4, border: "1px solid rgba(205,167,81,0.2)", fontSize: 13, color: "#333", outline: "none", fontFamily: "Manrope, sans-serif", width: "100%", boxSizing: "border-box", background: "white" }} min={new Date().toISOString().split("T")[0]} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Start Time</label>
@@ -587,14 +896,10 @@ export default function Workshops() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Duration (mins)</label>
           <input type="number" value={editForm.duration} onChange={e => setEditForm(p => ({ ...p, duration: e.target.value }))} style={{ padding: "7px 10px", borderRadius: 4, border: "1px solid rgba(205,167,81,0.2)", fontSize: 13, color: "#333", outline: "none", fontFamily: "Manrope, sans-serif", width: "100%", boxSizing: "border-box", background: "white" }} min={15} />
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Capacity</label>
-          <input type="number" value={editForm.capacity} onChange={e => setEditForm(p => ({ ...p, capacity: e.target.value }))} style={{ padding: "7px 10px", borderRadius: 4, border: "1px solid rgba(205,167,81,0.2)", fontSize: 13, color: "#333", outline: "none", fontFamily: "Manrope, sans-serif", width: "100%", boxSizing: "border-box", background: "white" }} min={1} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Price (Rs)</label>
@@ -653,8 +958,8 @@ export default function Workshops() {
   // ─── Render detail view ─────────────────────────────────────────────────
   const renderDetailView = () => {
     if (!selectedWs) return null;
-    const ws = selectedWs;
-    const liveStatus = ws._liveStatus || getLiveStatus(ws);
+    const ws = workshops.find(w => w.id === selectedWs.id) || selectedWs;
+    const liveStatus = getLiveStatus(ws);
     const displayImage = ws.image || ws.image_url || ws.image_base64;
     const displayVideo = ws.video_url;
 
@@ -701,7 +1006,7 @@ export default function Workshops() {
               transition: "all 0.2s"
             }}
           >
-            Attendees ({ws.enrolled || 0} / {ws.capacity || 20})
+            Attendees ({ws.enrolled || 0})
           </button>
         </div>
 
@@ -710,42 +1015,50 @@ export default function Workshops() {
             {/* 3. Preview Section - Video Player with Cover Image */}
             {displayVideo && (
               <div style={{ marginBottom: 16 }}>
-                {!videoPlaying ? (
-                  <div onClick={() => setVideoPlaying(true)}
-                    style={{ position: "relative", width: "100%", height: 280, borderRadius: 8, overflow: "hidden", cursor: "pointer", background: "#1a1a1a" }}>
-                    {displayImage ? (
-                      <img src={getImageUrl(displayImage)} alt="video cover"
-                        style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.6 }} />
-                    ) : (
-                      <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #2d3748, #1a202c)" }} />
-                    )}
-                    {/* Play button overlay */}
-                    <div style={{
-                      position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-                      width: 64, height: 64, borderRadius: "50%", background: "rgba(205,167,81,0.9)",
-                      display: "flex", alignItems: "center", justifyContent: "center"
+                <div style={{ position: "relative", borderRadius: 8, overflow: "hidden" }}>
+                  {liveStatus === "live" && (
+                    <div className="video-live-badge" style={{
+                      position: "absolute",
+                      top: "12px",
+                      left: "12px",
+                      background: "#e74c3c",
+                      color: "white",
+                      padding: "4px 8px",
+                      borderRadius: "4px",
+                      fontSize: "12px",
+                      fontWeight: "bold",
+                      zIndex: 10,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                      pointerEvents: "none",
+                      animation: "wsPulse 1.5s infinite"
                     }}>
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><polygon points="6 3 20 12 6 21 6 3" /></svg>
+                      <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "white" }}></span>
+                      LIVE
                     </div>
-                    <div style={{ position: "absolute", bottom: 12, left: 14, color: "white", fontSize: 12, background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: 4 }}>
-                      Click to play video
+                  )}
+                  {displayVideo.includes("youtube") || displayVideo.includes("youtu.be") ? (
+                    <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden" }}>
+                      <iframe src={getYouTubeEmbedUrl(displayVideo)} title="Workshop Video"
+                        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+                        allowFullScreen />
                     </div>
-                  </div>
-                ) : (
-                  <div style={{ borderRadius: 8, overflow: "hidden" }}>
-                    {displayVideo.includes("youtube") || displayVideo.includes("youtu.be") ? (
-                      <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden" }}>
-                        <iframe src={displayVideo.replace("watch?v=", "embed/")} title="Workshop Video"
-                          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
-                          allowFullScreen />
-                      </div>
-                    ) : (
-                      <video ref={videoRef} controls autoPlay style={{ width: "100%", maxHeight: 400, borderRadius: 8 }}>
-                        <source src={displayVideo} />
-                      </video>
-                    )}
-                  </div>
-                )}
+                  ) : (
+                    <video 
+                      ref={videoRef} 
+                      controls 
+                      onTimeUpdate={handleTimeUpdate}
+                      onSeeking={handleSeeking}
+                      onPlay={handlePlay}
+                      onLoadedMetadata={handleLoadedMetadata}
+                      style={{ width: "100%", maxHeight: 400, borderRadius: 8, display: "block" }}
+                    >
+                      <source src={displayVideo.startsWith("http") || displayVideo.startsWith("blob:") ? displayVideo : `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}${displayVideo}`} />
+                    </video>
+                  )}
+                </div>
               </div>
             )}
 
@@ -815,7 +1128,7 @@ export default function Workshops() {
                   />
                 </div>
                 <span style={{ fontSize: "13px", color: "#64748B", fontWeight: 500 }}>
-                  {ws.enrolled || 0} enrolled / {ws.capacity || 20} capacity
+                  {ws.enrolled || 0} enrolled
                 </span>
               </div>
               
@@ -928,12 +1241,19 @@ export default function Workshops() {
                         <td style={{ padding: "10px 16px" }}>
                           <select 
                             value={a.status} 
-                            onChange={e => handleMarkAttendance(a.id, e.target.value)}
+                            onChange={e => {
+                              if (e.target.value === "delete") {
+                                handleDeleteAttendee(a.id);
+                              } else {
+                                handleMarkAttendance(a.id, e.target.value);
+                              }
+                            }}
                             style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "12px", outline: "none", cursor: "pointer", background: "white" }}
                           >
                             <option value="enrolled">Enrolled</option>
                             <option value="attended">Attended</option>
                             <option value="absent">Absent</option>
+                            <option value="delete">Delete Attendee</option>
                           </select>
                         </td>
                       </tr>
@@ -959,7 +1279,7 @@ export default function Workshops() {
               <h1 className="ws-title">Workshops & Programs</h1>
               <p className="ws-subtitle">Manage wellness workshops with live streaming and instructor allocation</p>
             </div>
-            <button className="ws-add-btn" onClick={() => { setAddForm(BLANK_FORM); setAddError(""); setShowAddModal(true); }}>
+            <button className="ws-add-btn" onClick={() => { setAddForm(BLANK_FORM); setAddError(""); setAllocationAttempts(0); setAttemptedInstructorId(null); setShowAddModal(true); }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
               Add Workshop
             </button>
@@ -1035,7 +1355,7 @@ export default function Workshops() {
               <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
                 <button className="ws-modal-btn-secondary" style={{ flex: 1 }} onClick={handleCancelEdit}>Cancel</button>
                 <button className="ws-modal-btn-primary" style={{ flex: 2 }} onClick={handleSaveEdit} disabled={editSaving}>
-                  {editSaving ? "Saving..." : "Save Changes"}
+                  {editSaving ? (videoProgress !== null ? `Uploading Video ${videoProgress}%` : "Saving...") : "Save Changes"}
                 </button>
               </div>
             </div>
@@ -1102,7 +1422,7 @@ export default function Workshops() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Date</label>
-                    <input type="date" value={addForm.date} onChange={e => setAddForm(p => ({ ...p, date: e.target.value }))} className="ws-modal-input" />
+                    <input type="date" value={addForm.date} onChange={e => setAddForm(p => ({ ...p, date: e.target.value }))} className="ws-modal-input" min={new Date().toISOString().split("T")[0]} />
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Start Time</label>
@@ -1110,14 +1430,10 @@ export default function Workshops() {
                   </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Duration (mins)</label>
                     <input type="number" value={addForm.duration} onChange={e => setAddForm(p => ({ ...p, duration: e.target.value }))} className="ws-modal-input" min={15} step={15} />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Capacity</label>
-                    <input type="number" value={addForm.capacity} onChange={e => setAddForm(p => ({ ...p, capacity: e.target.value }))} className="ws-modal-input" min={1} />
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Price (Rs)</label>
@@ -1175,7 +1491,7 @@ export default function Workshops() {
                 <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
                   <button className="ws-modal-btn-secondary" style={{ flex: 1 }} onClick={() => setShowAddModal(false)}>Cancel</button>
                   <button className="ws-modal-btn-primary" style={{ flex: 2 }} onClick={handleCreateWorkshop} disabled={addSaving}>
-                    {addSaving ? "Creating..." : "Create Workshop"}
+                    {addSaving ? (videoProgress !== null ? `Uploading Video ${videoProgress}%` : "Creating...") : "Create Workshop"}
                   </button>
                 </div>
               </div>
@@ -1187,7 +1503,7 @@ export default function Workshops() {
       {/* Toast */}
       {toast && (
         <div style={{
-          position: 'fixed', top: '32px', left: '50%', transform: 'translateX(-50%)',
+          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
           background: '#CDA751', color: 'white', padding: '16px 32px',
           borderRadius: '10px', boxShadow: '0 8px 30px rgba(0,0,0,0.15)', zIndex: 2147483647,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
