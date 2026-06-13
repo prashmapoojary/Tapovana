@@ -344,6 +344,12 @@ const getWorkshopById = async (req, res) => {
 
 // CREATE WORKSHOP
 const createWorkshop = async (req, res) => {
+    const workshopId = req.body.workshop_id || req.body.id;
+    if (workshopId && req.body.email && req.body.name) {
+        req.params.id = workshopId;
+        return enrollUserInWorkshop(req, res);
+    }
+
     const { title, category, instructor, date, time, duration, capacity, price, status, description, image_url, video_url, assigned_staff_ids, customer_email } = req.body;
 
     if (!title) {

@@ -466,7 +466,7 @@ const getMyAssignments = async (req, res) => {
              FROM allocations a
              JOIN team_members tm ON tm.id = a.staff_id
              JOIN roles r ON r.id = tm.role_id
-             LEFT JOIN deleted_booking_ids d ON d.booking_id = CASE WHEN a.session_id ~ '^[0-9]+$' THEN CAST(a.session_id AS INTEGER) ELSE NULL END
+             LEFT JOIN deleted_booking_ids d ON d.booking_id = CASE WHEN a.type = 'service' AND a.session_id ~ '^[0-9]+$' THEN CAST(a.session_id AS INTEGER) ELSE NULL END
              WHERE a.staff_id = $1 AND d.booking_id IS NULL
              ORDER BY a.start_date DESC, a.created_at DESC`,
             [userId]

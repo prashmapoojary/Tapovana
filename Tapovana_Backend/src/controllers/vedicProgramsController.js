@@ -23,12 +23,34 @@ const getVedicProgramStatus = (startDate, endDate) => {
 
 const autoUpdateVedicProgramStatuses = async () => {
     try {
-        const res = await query('SELECT id, title, start_date, end_date, consultant_id FROM vedic_programs');
-        for (const p of res.rows) {
-            const status = getVedicProgramStatus(p.start_date, p.end_date);
-            const allocationId = `vp-alloc-${p.id}`;
+        const res = await query('SELECT id, title, start_date, end_date, lead_consultant_id, status FROM vedic_programs');
+        const staffToSync = new Set();
 
-            if (p.consultant_id) {
+        for (const p of res.rows) {
+            if (p.status === 'Cancelled') {
+                const currentAllocations = await query('SELECT staff_id FROM allocations WHERE id LIKE $1', [`vp-alloc-${p.id}%`]);
+                for (const row of currentAllocations.rows) {
+                    staffToSync.add(row.staff_id);
+                }
+                await query('DELETE FROM allocations WHERE id LIKE $1', [`vp-alloc-${p.id}%`]);
+                continue;
+            }
+            const calculatedStatus = getVedicProgramStatus(p.start_date, p.end_date);
+            if (p.status !== calculatedStatus) {
+                await query('UPDATE vedic_programs SET status = $1 WHERE id = $2', [calculatedStatus, p.id]);
+            }
+            
+            const prefix = `vp-alloc-${p.id}-`;
+            const existingAllocations = await query('SELECT staff_id FROM allocations WHERE id LIKE $1', [prefix + '%']);
+            for (const row of existingAllocations.rows) {
+                staffToSync.add(row.staff_id);
+            }
+
+            await query('DELETE FROM allocations WHERE id LIKE $1', [prefix + '%']);
+
+            if (p.lead_consultant_id) {
+                staffToSync.add(p.lead_consultant_id);
+                const allocId = `${prefix}lead-${p.lead_consultant_id}`;
                 await query(
                     `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, duration_minutes, status)
                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -38,11 +60,31 @@ const autoUpdateVedicProgramStatuses = async () => {
                         start_date = EXCLUDED.start_date,
                         end_date = EXCLUDED.end_date,
                         status = EXCLUDED.status`,
-                    [allocationId, p.consultant_id, 'vedic_program', p.title.trim(), String(p.id), p.start_date, p.end_date, 1440, status]
+                    [allocId, p.lead_consultant_id, 'vedic_program', p.title.trim(), String(p.id), p.start_date, p.end_date, 1440, calculatedStatus]
                 );
-            } else {
-                await query('DELETE FROM allocations WHERE id = $1', [allocationId]);
             }
+
+            const staffRes = await query('SELECT staff_id FROM vedic_program_staff WHERE program_id = $1', [p.id]);
+            for (const row of staffRes.rows) {
+                staffToSync.add(row.staff_id);
+                const allocId = `${prefix}staff-${row.staff_id}`;
+                await query(
+                    `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, duration_minutes, status)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                     ON CONFLICT (id) DO UPDATE SET
+                        staff_id = EXCLUDED.staff_id,
+                        session_title = EXCLUDED.session_title,
+                        start_date = EXCLUDED.start_date,
+                        end_date = EXCLUDED.end_date,
+                        status = EXCLUDED.status`,
+                    [allocId, row.staff_id, 'vedic_program', p.title.trim(), String(p.id), p.start_date, p.end_date, 1440, calculatedStatus]
+                );
+            }
+        }
+
+        const { syncStaffMemberStatus } = require('../utils/conflictChecker');
+        for (const staffId of staffToSync) {
+            await syncStaffMemberStatus(staffId);
         }
     } catch (err) {
         console.error('Error in autoUpdateVedicProgramStatuses:', err);
@@ -53,30 +95,52 @@ const autoUpdateVedicProgramStatuses = async () => {
 const getAllVedicPrograms = async (req, res) => {
     try {
         const result = await query(
-            'SELECT vp.*, tm.first_name AS consultant_first_name, tm.last_name AS consultant_last_name ' +
-            'FROM vedic_programs vp LEFT JOIN team_members tm ON tm.id = vp.consultant_id ORDER BY vp.created_at DESC'
+            `SELECT vp.*, tm.first_name AS consultant_first_name, tm.last_name AS consultant_last_name 
+             FROM vedic_programs vp 
+             LEFT JOIN team_members tm ON tm.id = vp.lead_consultant_id 
+             ORDER BY vp.created_at DESC`
         );
 
-        // Map database fields to keys expected by frontend
-        const programs = result.rows.map(r => ({
-            id: r.id,
-            title: r.title,
-            type: r.type,
-            description: r.description,
-            duration: r.duration,
-            startDate: r.start_date ? r.start_date.toISOString().split('T')[0] : null,
-            endDate: r.end_date ? r.end_date.toISOString().split('T')[0] : null,
-            capacity: r.capacity,
-            enrolled: r.enrolled,
-            price: parseFloat(r.price),
-            accommodations: r.accommodations,
-            consultant_id: r.consultant_id,
-            consultant_name: r.consultant_id ? `${r.consultant_first_name || ''} ${r.consultant_last_name || ''}`.trim() : null,
-            services: r.services,
-            languages: r.languages,
-            image_url: r.image_url,
-            registrationDeadline: r.registration_deadline ? r.registration_deadline.toISOString().split('T')[0] : null
-        }));
+        const programs = [];
+        for (const r of result.rows) {
+            const staffRes = await query(
+                `SELECT staff_id FROM vedic_program_staff WHERE program_id = $1`,
+                [r.id]
+            );
+            const assigned_staff_ids = staffRes.rows.map(s => s.staff_id);
+            const consultant_name = r.lead_consultant_id ? `${r.consultant_first_name || ''} ${r.consultant_last_name || ''}`.trim() : null;
+
+            let status = r.status || 'Upcoming';
+            if (status !== 'Cancelled') {
+                status = getVedicProgramStatus(r.start_date, r.end_date);
+                if (r.status !== status) {
+                    await query('UPDATE vedic_programs SET status = $1 WHERE id = $2', [status, r.id]);
+                }
+            }
+
+            programs.push({
+                id: r.id,
+                title: r.title,
+                type: r.type,
+                description: r.description,
+                duration: r.duration,
+                startDate: r.start_date ? r.start_date.toISOString().split('T')[0] : null,
+                endDate: r.end_date ? r.end_date.toISOString().split('T')[0] : null,
+                capacity: r.capacity,
+                enrolled: r.enrolled,
+                price: parseFloat(r.price),
+                accommodations: r.accommodations,
+                lead_consultant_id: r.lead_consultant_id,
+                consultant_id: r.lead_consultant_id, // back-compat for frontend
+                consultant_name: consultant_name,
+                services: r.services,
+                languages: r.languages,
+                image_url: r.image_url,
+                registrationDeadline: r.registration_deadline ? r.registration_deadline.toISOString().split('T')[0] : null,
+                status: status,
+                assigned_staff_ids
+            });
+        }
 
         return res.json({ success: true, programs });
     } catch (err) {
@@ -87,7 +151,13 @@ const getAllVedicPrograms = async (req, res) => {
 
 // CREATE VEDIC PROGRAM
 const createVedicProgram = async (req, res) => {
-    const { title, type, description, duration, startDate, endDate, capacity, price, accommodations, consultant_id, services, languages, image_url, registrationDeadline } = req.body;
+    const programId = req.body.program_id || req.body.package_id || req.body.vedic_program_id;
+    if (programId && req.body.email && req.body.name) {
+        req.params.id = programId;
+        return enrollUserInVedicProgram(req, res);
+    }
+
+    const { title, type, description, duration, startDate, endDate, capacity, price, accommodations, consultant_id, lead_consultant_id, assigned_staff_ids, services, languages, image_url, registrationDeadline } = req.body;
 
     if (!title || !startDate || !endDate || price === undefined || price === null || price === '') {
         return res.status(400).json({ success: false, message: 'Title, Start Date, End Date, and Price are required.' });
@@ -128,35 +198,35 @@ const createVedicProgram = async (req, res) => {
         }
     }
 
+    const finalLeadId = lead_consultant_id || consultant_id || null;
+
     try {
-        let consultantName = null;
-        if (consultant_id) {
+        if (finalLeadId) {
             const staffRes = await query(
-                `SELECT tm.first_name, tm.last_name, tm.status, r.name AS role_name 
+                `SELECT tm.status, r.name AS role_name 
                  FROM team_members tm
                  JOIN roles r ON tm.role_id = r.id
                  WHERE tm.id = $1`,
-                [consultant_id]
+                [finalLeadId]
             );
             if (!staffRes.rows.length) {
                 return res.status(404).json({ success: false, message: 'Selected lead consultant not found.' });
             }
             const consultant = staffRes.rows[0];
             if (consultant.status !== 'active') {
-                return res.status(400).json({ success: false, message: 'Selected consultant is not active.' });
+                return res.status(400).json({ success: false, message: 'Selected lead consultant is not active.' });
             }
             const roleLower = consultant.role_name.toLowerCase();
             if (roleLower !== 'doctor' && roleLower !== 'therapist') {
-                return res.status(400).json({ success: false, message: 'Selected consultant must have a doctor or therapist role.' });
+                return res.status(400).json({ success: false, message: 'Selected lead consultant must have a doctor or therapist role.' });
             }
-            consultantName = `${consultant.first_name} ${consultant.last_name}`.trim();
 
             const start = new Date(startDate);
             const end = new Date(endDate);
             for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toISOString().split('T')[0];
                 const conflictCheck = await checkStaffAllocationConflict({
-                    staffId: consultant_id,
+                    staffId: finalLeadId,
                     date: dateStr,
                     timeStr: '00:00',
                     durationMins: 1440,
@@ -166,7 +236,57 @@ const createVedicProgram = async (req, res) => {
                 if (conflictCheck.conflict) {
                     return res.status(400).json({
                         success: false,
-                        message: `Staff allocation failed due to daily limit or package conflict.`
+                        message: `Lead consultant allocation conflict on ${dateStr}.`
+                    });
+                }
+            }
+        }
+
+        const staffIds = Array.isArray(assigned_staff_ids) ? assigned_staff_ids.filter(id => id !== null && id !== undefined) : [];
+        if (staffIds.length > 9) {
+            return res.status(400).json({ success: false, message: 'Maximum 9 specialists can be assigned.' });
+        }
+
+        for (const staffId of staffIds) {
+            if (staffId === finalLeadId) {
+                return res.status(400).json({ success: false, message: 'Lead consultant cannot also be assigned as a specialist.' });
+            }
+
+            const staffRes = await query(
+                `SELECT tm.first_name, tm.last_name, tm.status, r.name AS role_name 
+                 FROM team_members tm
+                 JOIN roles r ON tm.role_id = r.id
+                 WHERE tm.id = $1`,
+                [staffId]
+            );
+            if (!staffRes.rows.length) {
+                return res.status(404).json({ success: false, message: `Selected specialist ID ${staffId} not found.` });
+            }
+            const s = staffRes.rows[0];
+            if (s.status !== 'active') {
+                return res.status(400).json({ success: false, message: `Specialist ${s.first_name} ${s.last_name} is not active.` });
+            }
+            const roleLower = s.role_name.toLowerCase();
+            if (roleLower !== 'doctor' && roleLower !== 'therapist') {
+                return res.status(400).json({ success: false, message: `Specialist ${s.first_name} ${s.last_name} must have a doctor or therapist role.` });
+            }
+
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().split('T')[0];
+                const conflictCheck = await checkStaffAllocationConflict({
+                    staffId,
+                    date: dateStr,
+                    timeStr: '00:00',
+                    durationMins: 1440,
+                    type: 'vedic_program'
+                });
+
+                if (conflictCheck.conflict) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Specialist ${s.first_name} ${s.last_name} has conflict on ${dateStr}.`
                     });
                 }
             }
@@ -174,18 +294,66 @@ const createVedicProgram = async (req, res) => {
 
         const result = await query(
             `INSERT INTO vedic_programs 
-             (title, type, description, duration, start_date, end_date, capacity, price, accommodations, consultant_id, services, languages, image_url, registration_deadline)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+             (title, type, description, duration, start_date, end_date, capacity, price, accommodations, lead_consultant_id, services, languages, image_url, registration_deadline, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
             [
                 title.trim(), type || 'Retreat', description || null, duration || '7-days',
                 startDate, endDate, capacityNum, priceNum, accommodations || null,
-                consultant_id || null, JSON.stringify(services || []), JSON.stringify(languages || []), image_url || null, registrationDeadline || null
+                finalLeadId, JSON.stringify(services || []), JSON.stringify(languages || []), image_url || null, registrationDeadline || null, 'Upcoming'
             ]
         );
 
+        const newProgram = result.rows[0];
+
+        for (const staffId of staffIds) {
+            await query(
+                'INSERT INTO vedic_program_staff (program_id, staff_id, role) VALUES ($1, $2, $3)',
+                [newProgram.id, staffId, 'assigned_staff']
+            );
+        }
+
+        const { sendVedicStaffAssignmentEmail } = require('../services/emailService');
+        if (finalLeadId) {
+            const leadRes = await query("SELECT first_name, last_name, email FROM team_members WHERE id = $1", [finalLeadId]);
+            if (leadRes.rows.length && leadRes.rows[0].email) {
+                try {
+                    await sendVedicStaffAssignmentEmail({
+                        to: leadRes.rows[0].email,
+                        staffName: `${leadRes.rows[0].first_name} ${leadRes.rows[0].last_name}`,
+                        programTitle: newProgram.title,
+                        role: 'Lead Consultant',
+                        startDate: newProgram.start_date,
+                        endDate: newProgram.end_date,
+                        time: newProgram.time
+                    });
+                } catch (err) {
+                    console.error('Failed to send assignment email to lead consultant:', err);
+                }
+            }
+        }
+
+        for (const staffId of staffIds) {
+            const staffRes = await query("SELECT first_name, last_name, email FROM team_members WHERE id = $1", [staffId]);
+            if (staffRes.rows.length && staffRes.rows[0].email) {
+                try {
+                    await sendVedicStaffAssignmentEmail({
+                        to: staffRes.rows[0].email,
+                        staffName: `${staffRes.rows[0].first_name} ${staffRes.rows[0].last_name}`,
+                        programTitle: newProgram.title,
+                        role: 'Specialist',
+                        startDate: newProgram.start_date,
+                        endDate: newProgram.end_date,
+                        time: newProgram.time
+                    });
+                } catch (err) {
+                    console.error('Failed to send assignment email to specialist:', err);
+                }
+            }
+        }
+
         await autoUpdateVedicProgramStatuses();
 
-        return res.status(201).json({ success: true, message: 'Vedic Program created.', program: result.rows[0] });
+        return res.status(201).json({ success: true, message: 'Vedic Program created.', program: newProgram });
     } catch (err) {
         console.error('createVedicProgram error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
@@ -194,7 +362,7 @@ const createVedicProgram = async (req, res) => {
 
 // UPDATE VEDIC PROGRAM
 const updateVedicProgram = async (req, res) => {
-    const { title, type, description, duration, startDate, endDate, capacity, price, accommodations, consultant_id, services, languages, image_url, registrationDeadline } = req.body;
+    const { title, type, description, duration, startDate, endDate, capacity, price, accommodations, consultant_id, lead_consultant_id, assigned_staff_ids, services, languages, image_url, registrationDeadline } = req.body;
     const programId = req.params.id;
 
     try {
@@ -204,9 +372,9 @@ const updateVedicProgram = async (req, res) => {
         }
         const existing = existingRes.rows[0];
 
-        const currentStatus = getVedicProgramStatus(existing.start_date, existing.end_date);
-        if (currentStatus === 'Live' || currentStatus === 'Completed') {
-            return res.status(400).json({ success: false, message: 'Cannot edit a program that is currently Live or Completed.' });
+        const currentStatus = existing.status || getVedicProgramStatus(existing.start_date, existing.end_date);
+        if (currentStatus === 'Live' || currentStatus === 'Completed' || currentStatus === 'Cancelled') {
+            return res.status(400).json({ success: false, message: 'Cannot edit a program that is currently Live, Completed, or Cancelled.' });
         }
 
         if (price !== undefined) {
@@ -255,36 +423,36 @@ const updateVedicProgram = async (req, res) => {
             }
         }
 
-        const finalConsultantId = consultant_id !== undefined ? consultant_id : existing.consultant_id;
+        const resolvedLeadId = lead_consultant_id !== undefined ? lead_consultant_id : (consultant_id !== undefined ? consultant_id : existing.lead_consultant_id);
 
-        if (consultant_id !== undefined && consultant_id !== null) {
+        if (resolvedLeadId) {
             const staffRes = await query(
                 `SELECT tm.status, r.name AS role_name 
                  FROM team_members tm
                  JOIN roles r ON tm.role_id = r.id
                  WHERE tm.id = $1`,
-                [consultant_id]
+                [resolvedLeadId]
             );
             if (!staffRes.rows.length) {
                 return res.status(404).json({ success: false, message: 'Selected lead consultant not found.' });
             }
             const consultant = staffRes.rows[0];
             if (consultant.status !== 'active') {
-                return res.status(400).json({ success: false, message: 'Selected consultant is not active.' });
+                return res.status(400).json({ success: false, message: 'Selected lead consultant is not active.' });
             }
             const roleLower = consultant.role_name.toLowerCase();
             if (roleLower !== 'doctor' && roleLower !== 'therapist') {
-                return res.status(400).json({ success: false, message: 'Selected consultant must have a doctor or therapist role.' });
+                return res.status(400).json({ success: false, message: 'Selected lead consultant must have a doctor or therapist role.' });
             }
         }
 
-        if (finalConsultantId && (finalConsultantId !== existing.consultant_id || finalStartDate !== existing.start_date || finalEndDate !== existing.end_date)) {
+        if (resolvedLeadId && (resolvedLeadId !== existing.lead_consultant_id || finalStartDate !== existing.start_date || finalEndDate !== existing.end_date)) {
             const start = new Date(finalStartDate);
             const end = new Date(finalEndDate);
             for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toISOString().split('T')[0];
                 const conflictCheck = await checkStaffAllocationConflict({
-                    staffId: finalConsultantId,
+                    staffId: resolvedLeadId,
                     date: dateStr,
                     timeStr: '00:00',
                     durationMins: 1440,
@@ -295,12 +463,69 @@ const updateVedicProgram = async (req, res) => {
                 if (conflictCheck.conflict) {
                     return res.status(400).json({
                         success: false,
-                        message: `Staff allocation failed due to daily limit or package conflict.`
+                        message: `Lead consultant allocation conflict on ${dateStr}.`
                     });
                 }
             }
         }
 
+        let finalStaffIds = null;
+        if (assigned_staff_ids !== undefined) {
+            finalStaffIds = Array.isArray(assigned_staff_ids) ? assigned_staff_ids.filter(id => id !== null && id !== undefined) : [];
+            if (finalStaffIds.length > 9) {
+                return res.status(400).json({ success: false, message: 'Maximum 9 specialists can be assigned.' });
+            }
+
+            for (const staffId of finalStaffIds) {
+                if (staffId === resolvedLeadId) {
+                    return res.status(400).json({ success: false, message: 'Lead consultant cannot also be assigned as a specialist.' });
+                }
+
+                const staffRes = await query(
+                    `SELECT tm.first_name, tm.last_name, tm.status, r.name AS role_name 
+                     FROM team_members tm
+                     JOIN roles r ON tm.role_id = r.id
+                     WHERE tm.id = $1`,
+                    [staffId]
+                );
+                if (!staffRes.rows.length) {
+                    return res.status(404).json({ success: false, message: `Specialist ID ${staffId} not found.` });
+                }
+                const s = staffRes.rows[0];
+                if (s.status !== 'active') {
+                    return res.status(400).json({ success: false, message: `Specialist ${s.first_name} ${s.last_name} is not active.` });
+                }
+                const roleLower = s.role_name.toLowerCase();
+                if (roleLower !== 'doctor' && roleLower !== 'therapist') {
+                    return res.status(400).json({ success: false, message: `Specialist ${s.first_name} ${s.last_name} must have a doctor or therapist role.` });
+                }
+
+                const start = new Date(finalStartDate);
+                const end = new Date(finalEndDate);
+                for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                    const dateStr = d.toISOString().split('T')[0];
+                    const conflictCheck = await checkStaffAllocationConflict({
+                        staffId,
+                        date: dateStr,
+                        timeStr: '00:00',
+                        durationMins: 1440,
+                        type: 'vedic_program',
+                        sessionId: programId
+                    });
+
+                    if (conflictCheck.conflict) {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Specialist ${s.first_name} ${s.last_name} has conflict on ${dateStr}.`
+                        });
+                    }
+                }
+            }
+        }
+
+        const titleChanged = title && title.trim() !== existing.title.trim();
+        const datesChanged = finalStartDate !== existing.start_date.toISOString().split('T')[0] || finalEndDate !== existing.end_date.toISOString().split('T')[0];
+        
         const fields = [];
         const values = [];
         let idx = 1;
@@ -314,7 +539,7 @@ const updateVedicProgram = async (req, res) => {
         if (capacity !== undefined) { fields.push('capacity = $' + idx++); values.push(Number(capacity)); }
         if (price !== undefined) { fields.push('price = $' + idx++); values.push(Number(price)); }
         if (accommodations !== undefined) { fields.push('accommodations = $' + idx++); values.push(accommodations); }
-        if (consultant_id !== undefined) { fields.push('consultant_id = $' + idx++); values.push(consultant_id || null); }
+        if (resolvedLeadId !== undefined) { fields.push('lead_consultant_id = $' + idx++); values.push(resolvedLeadId); }
         if (services !== undefined) { fields.push('services = $' + idx++); values.push(JSON.stringify(services)); }
         if (languages !== undefined) { fields.push('languages = $' + idx++); values.push(JSON.stringify(languages)); }
         if (image_url !== undefined) { fields.push('image_url = $' + idx++); values.push(image_url); }
@@ -326,25 +551,145 @@ const updateVedicProgram = async (req, res) => {
             values
         );
 
+        const updatedProgram = result.rows[0];
+
+        if (finalStaffIds !== null) {
+            const currentStaffRes = await query('SELECT staff_id FROM vedic_program_staff WHERE program_id = $1', [programId]);
+            const currentStaffIds = currentStaffRes.rows.map(r => r.staff_id);
+
+            await query('DELETE FROM vedic_program_staff WHERE program_id = $1', [programId]);
+            
+            const { sendVedicStaffAssignmentEmail } = require('../services/emailService');
+            for (const staffId of finalStaffIds) {
+                await query(
+                    'INSERT INTO vedic_program_staff (program_id, staff_id, role) VALUES ($1, $2, $3)',
+                    [programId, staffId, 'assigned_staff']
+                );
+
+                if (!currentStaffIds.includes(staffId)) {
+                    const staffInfo = await query('SELECT first_name, last_name, email FROM team_members WHERE id = $1', [staffId]);
+                    if (staffInfo.rows.length && staffInfo.rows[0].email) {
+                        const s = staffInfo.rows[0];
+                        try {
+                            await sendVedicStaffAssignmentEmail({
+                                to: s.email,
+                                staffName: `${s.first_name} ${s.last_name}`,
+                                programTitle: updatedProgram.title,
+                                role: 'Specialist',
+                                startDate: updatedProgram.start_date,
+                                endDate: updatedProgram.end_date,
+                                time: updatedProgram.time
+                            });
+                        } catch (err) {
+                            console.error('Failed to send assignment email:', err);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (titleChanged || datesChanged) {
+            const { sendVedicUpdateEmail } = require('../services/emailService');
+            let changesStr = '';
+            if (titleChanged) changesStr += `Title changed to: ${updatedProgram.title}\n`;
+            if (datesChanged) {
+                changesStr += `Dates updated to: ${new Date(updatedProgram.start_date).toLocaleDateString()} to ${new Date(updatedProgram.end_date).toLocaleDateString()}\n`;
+            }
+
+            const attendeesRes = await query('SELECT name, email FROM vedic_program_attendees WHERE program_id = $1 AND status NOT IN (\'cancelled\')', [programId]);
+            for (const a of attendeesRes.rows) {
+                if (a.email) {
+                    try {
+                        await sendVedicUpdateEmail({
+                            to: a.email,
+                            userName: a.name,
+                            programTitle: updatedProgram.title,
+                            changes: changesStr
+                        });
+                    } catch (err) {
+                        console.error('Failed to send update email to attendee:', err);
+                    }
+                }
+            }
+
+            if (updatedProgram.lead_consultant_id) {
+                const leadRes = await query('SELECT first_name, last_name, email FROM team_members WHERE id = $1', [updatedProgram.lead_consultant_id]);
+                if (leadRes.rows.length && leadRes.rows[0].email) {
+                    try {
+                        await sendVedicUpdateEmail({
+                            to: leadRes.rows[0].email,
+                            userName: `${leadRes.rows[0].first_name} ${leadRes.rows[0].last_name}`,
+                            programTitle: updatedProgram.title,
+                            changes: changesStr
+                        });
+                    } catch (err) {
+                        console.error('Failed to send update email to lead:', err);
+                    }
+                }
+            }
+
+            const specialistsRes = await query(
+                `SELECT tm.first_name, tm.last_name, tm.email 
+                 FROM vedic_program_staff vps
+                 JOIN team_members tm ON tm.id = vps.staff_id
+                 WHERE vps.program_id = $1`,
+                [programId]
+            );
+            for (const staff of specialistsRes.rows) {
+                if (staff.email) {
+                    try {
+                        await sendVedicUpdateEmail({
+                            to: staff.email,
+                            userName: `${staff.first_name} ${staff.last_name}`,
+                            programTitle: updatedProgram.title,
+                            changes: changesStr
+                        });
+                    } catch (err) {
+                        console.error('Failed to send update email to staff:', err);
+                    }
+                }
+            }
+        }
+
         await autoUpdateVedicProgramStatuses();
 
-        return res.json({ success: true, message: 'Vedic Program updated.', program: result.rows[0] });
+        return res.json({ success: true, message: 'Vedic Program updated.', program: updatedProgram });
     } catch (err) {
         console.error('updateVedicProgram error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
     }
 };
 
-// ALLOCATE / UPDATE STAFF FOR VEDIC PROGRAM
+// GET STAFF FOR VEDIC PROGRAM
+const getVedicProgramStaff = async (req, res) => {
+    const programId = req.params.id;
+    try {
+        const result = await query(
+            `SELECT tm.id, tm.first_name, tm.last_name, tm.email, r.name AS role_name, vps.role AS program_role
+             FROM vedic_program_staff vps
+             JOIN team_members tm ON tm.id = vps.staff_id
+             JOIN roles r ON r.id = tm.role_id
+             WHERE vps.program_id = $1`,
+            [programId]
+        );
+        return res.json({ success: true, staff: result.rows });
+    } catch (err) {
+        console.error('getVedicProgramStaff error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// ALLOCATE / UPDATE STAFF FOR VEDIC PROGRAM (Admin)
 const updateVedicProgramStaff = async (req, res) => {
     const { assigned_staff_ids } = req.body;
     const programId = req.params.id;
 
-    if (!Array.isArray(assigned_staff_ids) || assigned_staff_ids.length === 0) {
-        return res.status(400).json({ success: false, message: 'At least one lead consultant ID is required.' });
+    if (!Array.isArray(assigned_staff_ids)) {
+        return res.status(400).json({ success: false, message: 'assigned_staff_ids must be an array.' });
     }
-
-    const consultant_id = assigned_staff_ids[0];
+    if (assigned_staff_ids.length > 9) {
+        return res.status(400).json({ success: false, message: 'Maximum 9 specialists can be assigned.' });
+    }
 
     try {
         const programRes = await query('SELECT * FROM vedic_programs WHERE id = $1', [programId]);
@@ -353,58 +698,215 @@ const updateVedicProgramStaff = async (req, res) => {
         }
         const program = programRes.rows[0];
 
-        const currentStatus = getVedicProgramStatus(program.start_date, program.end_date);
-        if (currentStatus === 'Live' || currentStatus === 'Completed') {
-            return res.status(400).json({ success: false, message: 'Cannot edit or reallocate staff for a program that is currently Live or Completed.' });
+        const currentStatus = program.status || getVedicProgramStatus(program.start_date, program.end_date);
+        if (currentStatus === 'Live' || currentStatus === 'Completed' || currentStatus === 'Cancelled') {
+            return res.status(400).json({ success: false, message: 'Cannot edit or reallocate staff for a program that is Live, Completed, or Cancelled.' });
         }
 
-        const staffRes = await query(
-            `SELECT tm.status, r.name AS role_name 
-             FROM team_members tm
-             JOIN roles r ON tm.role_id = r.id
-             WHERE tm.id = $1`,
-            [consultant_id]
-        );
-        if (!staffRes.rows.length) {
-            return res.status(404).json({ success: false, message: 'Selected lead consultant not found.' });
-        }
-        const consultant = staffRes.rows[0];
-        if (consultant.status !== 'active') {
-            return res.status(400).json({ success: false, message: 'Selected consultant is not active.' });
-        }
-        const roleLower = consultant.role_name.toLowerCase();
-        if (roleLower !== 'doctor' && roleLower !== 'therapist') {
-            return res.status(400).json({ success: false, message: 'Selected consultant must have a doctor or therapist role.' });
-        }
+        const uniqueStaffIds = [...new Set(assigned_staff_ids.filter(id => id !== null && id !== undefined))];
+        for (const staffId of uniqueStaffIds) {
+            if (staffId === program.lead_consultant_id) {
+                return res.status(400).json({ success: false, message: 'Lead consultant cannot also be assigned as a specialist.' });
+            }
 
-        const start = new Date(program.start_date);
-        const end = new Date(program.end_date);
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            const dateStr = d.toISOString().split('T')[0];
-            const conflictCheck = await checkStaffAllocationConflict({
-                staffId: consultant_id,
-                date: dateStr,
-                timeStr: '00:00',
-                durationMins: 1440,
-                type: 'vedic_program',
-                sessionId: programId
-            });
+            const staffRes = await query(
+                `SELECT tm.first_name, tm.last_name, tm.email, tm.status, r.name AS role_name 
+                 FROM team_members tm
+                 JOIN roles r ON tm.role_id = r.id
+                 WHERE tm.id = $1`,
+                [staffId]
+            );
+            if (!staffRes.rows.length) {
+                return res.status(404).json({ success: false, message: `Staff member ID ${staffId} not found.` });
+            }
+            const staff = staffRes.rows[0];
+            if (staff.status !== 'active') {
+                return res.status(400).json({ success: false, message: `Staff member ${staff.first_name} ${staff.last_name} is not active.` });
+            }
+            const roleLower = staff.role_name.toLowerCase();
+            if (roleLower !== 'doctor' && roleLower !== 'therapist') {
+                return res.status(400).json({ success: false, message: `Staff member ${staff.first_name} ${staff.last_name} must have a doctor or therapist role.` });
+            }
 
-            if (conflictCheck.conflict) {
-                return res.status(400).json({
-                    success: false,
-                    message: `Staff allocation failed due to daily limit or package conflict.`
+            const start = new Date(program.start_date);
+            const end = new Date(program.end_date);
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().split('T')[0];
+                const conflictCheck = await checkStaffAllocationConflict({
+                    staffId: staffId,
+                    date: dateStr,
+                    timeStr: '00:00',
+                    durationMins: 1440,
+                    type: 'vedic_program',
+                    sessionId: programId
                 });
+
+                if (conflictCheck.conflict) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Staff allocation conflict for ${staff.first_name} ${staff.last_name} on ${dateStr}.`
+                    });
+                }
             }
         }
 
-        await query('UPDATE vedic_programs SET consultant_id = $1 WHERE id = $2', [consultant_id, programId]);
+        const currentStaffRes = await query('SELECT staff_id FROM vedic_program_staff WHERE program_id = $1', [programId]);
+        const currentStaffIds = currentStaffRes.rows.map(r => r.staff_id);
+
+        await query('DELETE FROM vedic_program_staff WHERE program_id = $1', [programId]);
+
+        const { sendVedicStaffAssignmentEmail } = require('../services/emailService');
+        for (const staffId of uniqueStaffIds) {
+            await query(
+                'INSERT INTO vedic_program_staff (program_id, staff_id, role) VALUES ($1, $2, $3)',
+                [programId, staffId, 'assigned_staff']
+            );
+
+            if (!currentStaffIds.includes(staffId)) {
+                const staffInfo = await query('SELECT first_name, last_name, email FROM team_members WHERE id = $1', [staffId]);
+                if (staffInfo.rows.length && staffInfo.rows[0].email) {
+                    const s = staffInfo.rows[0];
+                    try {
+                        await sendVedicStaffAssignmentEmail({
+                            to: s.email,
+                            staffName: `${s.first_name} ${s.last_name}`,
+                            programTitle: program.title,
+                            role: 'Specialist',
+                            startDate: program.start_date,
+                            endDate: program.end_date,
+                            time: program.time
+                        });
+                    } catch (err) {
+                        console.error('Failed to send staff assignment email:', err);
+                    }
+                }
+            }
+        }
 
         await autoUpdateVedicProgramStatuses();
 
-        return res.json({ success: true, message: 'Consultant allocated successfully.' });
+        return res.json({ success: true, message: 'Assigned staff updated successfully.' });
     } catch (err) {
         console.error('updateVedicProgramStaff error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// PUBLIC REGISTRATION ENDPOINT
+const registerAttendee = async (req, res) => {
+    const { id } = req.params;
+    const { name, email, phone } = req.body;
+
+    if (!name || !email) {
+        return res.status(400).json({ success: false, message: 'Name and Email are required.' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+        return res.status(400).json({ success: false, message: 'Invalid email format.' });
+    }
+
+    try {
+        const progRes = await query('SELECT * FROM vedic_programs WHERE id = $1', [id]);
+        if (!progRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Program not found.' });
+        }
+        const program = progRes.rows[0];
+
+        const status = program.status || getVedicProgramStatus(program.start_date, program.end_date);
+        if (status !== 'Upcoming') {
+            return res.status(400).json({ success: false, message: 'Registration is only allowed for upcoming programs.' });
+        }
+
+        if (program.enrolled >= program.capacity) {
+            return res.status(400).json({ success: false, message: 'Program is at full capacity.' });
+        }
+
+        if (program.registration_deadline) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const deadline = new Date(program.registration_deadline);
+            if (today > deadline) {
+                return res.status(400).json({ success: false, message: 'Registration has closed for this program.' });
+            }
+        }
+
+        const attendeeCheck = await query('SELECT 1 FROM vedic_program_attendees WHERE program_id = $1 AND email = $2', [id, email.toLowerCase().trim()]);
+        if (attendeeCheck.rows.length) {
+            return res.status(400).json({ success: false, message: 'You are already registered for this program.' });
+        }
+
+        const result = await query(
+            "INSERT INTO vedic_program_attendees (program_id, name, email, phone, status) VALUES ($1, $2, $3, $4, 'registered') RETURNING *",
+            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null]
+        );
+
+        await query('UPDATE vedic_programs SET enrolled = enrolled + 1 WHERE id = $1', [id]);
+
+        let assignedStaffStr = "None assigned";
+        try {
+            const staffList = [];
+            if (program.lead_consultant_id) {
+                const leadRes = await query("SELECT first_name, last_name, r.name as role_name FROM team_members tm JOIN roles r ON tm.role_id = r.id WHERE tm.id = $1", [program.lead_consultant_id]);
+                if (leadRes.rows.length) {
+                    const rName = leadRes.rows[0].role_name.toLowerCase() === 'doctor' ? 'Dr.' : 'Therapist';
+                    staffList.push(`${rName} ${leadRes.rows[0].first_name} ${leadRes.rows[0].last_name} (Lead Consultant)`);
+                }
+            }
+            const specsRes = await query(`
+                SELECT tm.first_name, tm.last_name, r.name as role_name 
+                FROM vedic_program_staff vps
+                JOIN team_members tm ON vps.staff_id = tm.id
+                JOIN roles r ON tm.role_id = r.id
+                WHERE vps.program_id = $1
+            `, [program.id]);
+            for (const row of specsRes.rows) {
+                const rName = row.role_name.toLowerCase() === 'doctor' ? 'Dr.' : 'Therapist';
+                staffList.push(`${rName} ${row.first_name} ${row.last_name} (Specialist)`);
+            }
+            if (staffList.length > 0) {
+                assignedStaffStr = staffList.join(", ");
+            }
+        } catch (staffErr) {
+            console.error('Failed to fetch assigned staff for registration email:', staffErr);
+        }
+
+        const { sendVedicRegistrationEmail, sendVedicAdminRegistrationNotification } = require('../services/emailService');
+        try {
+            await sendVedicRegistrationEmail({
+                to: email.toLowerCase().trim(),
+                userName: name.trim(),
+                programTitle: program.title,
+                startDate: program.start_date,
+                endDate: program.end_date,
+                time: program.time,
+                status: 'registered',
+                assignedStaff: assignedStaffStr
+            });
+        } catch (err) {
+            console.error('Failed to send registration confirmation email:', err);
+        }
+
+        try {
+            const adminEmail = process.env.ADMIN_EMAIL || 'prashmapoojary@gmail.com';
+            await sendVedicAdminRegistrationNotification({
+                to: adminEmail,
+                participantName: name.trim(),
+                participantEmail: email.toLowerCase().trim(),
+                participantPhone: phone ? phone.trim() : null,
+                programTitle: program.title
+            });
+        } catch (err) {
+            console.error('Failed to send admin notification email:', err);
+        }
+
+        return res.status(201).json({
+            success: true,
+            message: 'Successfully registered for the program.',
+            attendee: result.rows[0]
+        });
+    } catch (err) {
+        console.error('registerAttendee error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
     }
 };
@@ -430,18 +932,15 @@ const enrollUserInVedicProgram = async (req, res) => {
         }
         const program = progRes.rows[0];
 
-        // Status check - only allow upcoming programs
-        const status = getVedicProgramStatus(program.start_date, program.end_date);
-        if (status === 'Live' || status === 'Completed') {
-            return res.status(400).json({ success: false, message: 'Enrollment is closed as this program is already ongoing or completed.' });
+        const status = program.status || getVedicProgramStatus(program.start_date, program.end_date);
+        if (status === 'Live' || status === 'Completed' || status === 'Cancelled') {
+            return res.status(400).json({ success: false, message: 'Enrollment is closed as this program is ongoing, completed, or cancelled.' });
         }
 
-        // Capacity check
         if (program.enrolled >= program.capacity) {
             return res.status(400).json({ success: false, message: 'Program is at full capacity.' });
         }
 
-        // Check registration deadline if set
         if (program.registration_deadline) {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -451,19 +950,61 @@ const enrollUserInVedicProgram = async (req, res) => {
             }
         }
 
-        // Check if already enrolled
         const attendeeCheck = await query('SELECT 1 FROM vedic_program_attendees WHERE program_id = $1 AND email = $2', [id, email.toLowerCase().trim()]);
         if (attendeeCheck.rows.length) {
             return res.status(400).json({ success: false, message: 'User is already enrolled in this program.' });
         }
 
         const result = await query(
-            'INSERT INTO vedic_program_attendees (program_id, name, email, phone) VALUES ($1, $2, $3, $4) RETURNING *',
+            "INSERT INTO vedic_program_attendees (program_id, name, email, phone, status) VALUES ($1, $2, $3, $4, 'confirmed') RETURNING *",
             [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null]
         );
 
-        // Update enrolled count
         await query('UPDATE vedic_programs SET enrolled = enrolled + 1 WHERE id = $1', [id]);
+
+        let assignedStaffStr = "None assigned";
+        try {
+            const staffList = [];
+            if (program.lead_consultant_id) {
+                const leadRes = await query("SELECT first_name, last_name, r.name as role_name FROM team_members tm JOIN roles r ON tm.role_id = r.id WHERE tm.id = $1", [program.lead_consultant_id]);
+                if (leadRes.rows.length) {
+                    const rName = leadRes.rows[0].role_name.toLowerCase() === 'doctor' ? 'Dr.' : 'Therapist';
+                    staffList.push(`${rName} ${leadRes.rows[0].first_name} ${leadRes.rows[0].last_name} (Lead Consultant)`);
+                }
+            }
+            const specsRes = await query(`
+                SELECT tm.first_name, tm.last_name, r.name as role_name 
+                FROM vedic_program_staff vps
+                JOIN team_members tm ON vps.staff_id = tm.id
+                JOIN roles r ON tm.role_id = r.id
+                WHERE vps.program_id = $1
+            `, [program.id]);
+            for (const row of specsRes.rows) {
+                const rName = row.role_name.toLowerCase() === 'doctor' ? 'Dr.' : 'Therapist';
+                staffList.push(`${rName} ${row.first_name} ${row.last_name} (Specialist)`);
+            }
+            if (staffList.length > 0) {
+                assignedStaffStr = staffList.join(", ");
+            }
+        } catch (staffErr) {
+            console.error('Failed to fetch assigned staff for enrollment email:', staffErr);
+        }
+
+        const { sendVedicRegistrationEmail } = require('../services/emailService');
+        try {
+            await sendVedicRegistrationEmail({
+                to: email.toLowerCase().trim(),
+                userName: name.trim(),
+                programTitle: program.title,
+                startDate: program.start_date,
+                endDate: program.end_date,
+                time: program.time,
+                status: 'confirmed',
+                assignedStaff: assignedStaffStr
+            });
+        } catch (err) {
+            console.error('Failed to send enrollment email to manually added user:', err);
+        }
 
         return res.status(201).json({
             success: true,
@@ -493,8 +1034,9 @@ const updateVedicAttendeeAttendance = async (req, res) => {
     const { id, attendeeId } = req.params;
     const { status } = req.body;
 
-    if (!['enrolled', 'attended', 'absent'].includes(status)) {
-        return res.status(400).json({ success: false, message: "Status must be 'enrolled', 'attended', or 'absent'." });
+    const validStatuses = ['registered', 'confirmed', 'checked_in', 'attended', 'absent', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+        return res.status(400).json({ success: false, message: `Status must be one of: ${validStatuses.join(', ')}.` });
     }
 
     try {
@@ -510,6 +1052,112 @@ const updateVedicAttendeeAttendance = async (req, res) => {
         return res.json({ success: true, message: 'Attendance status updated.', attendee: result.rows[0] });
     } catch (err) {
         console.error('updateVedicAttendeeAttendance error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// CHECK-IN ATTENDEE (Admin Endpoint)
+const checkinAttendee = async (req, res) => {
+    const { id, attendeeId } = req.params;
+    try {
+        const check = await query('SELECT 1 FROM vedic_program_attendees WHERE id = $1 AND program_id = $2', [attendeeId, id]);
+        if (!check.rows.length) {
+            return res.status(404).json({ success: false, message: 'Attendee record not found.' });
+        }
+
+        const result = await query(
+            "UPDATE vedic_program_attendees SET status = 'checked_in', checked_in_at = NOW(), updated_at = NOW() WHERE program_id = $2 AND id = $3 RETURNING *",
+            [id, attendeeId]
+        );
+
+        return res.json({ success: true, message: 'Attendee successfully checked in.', attendee: result.rows[0] });
+    } catch (err) {
+        console.error('checkinAttendee error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// CANCEL VEDIC PROGRAM (Admin Endpoint)
+const cancelVedicProgram = async (req, res) => {
+    const programId = req.params.id;
+    try {
+        const programRes = await query('SELECT * FROM vedic_programs WHERE id = $1', [programId]);
+        if (!programRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Program not found.' });
+        }
+        const program = programRes.rows[0];
+
+        if (program.status === 'Cancelled') {
+            return res.status(400).json({ success: false, message: 'Program is already cancelled.' });
+        }
+
+        await query("UPDATE vedic_programs SET status = 'Cancelled' WHERE id = $1", [programId]);
+        await query("DELETE FROM allocations WHERE id LIKE $1", [`vp-alloc-${programId}%`]);
+
+        const attendeesRes = await query(
+            "SELECT name, email FROM vedic_program_attendees WHERE program_id = $1 AND status NOT IN ('cancelled')",
+            [programId]
+        );
+        
+        await query("UPDATE vedic_program_attendees SET status = 'cancelled', updated_at = NOW() WHERE program_id = $1 AND status NOT IN ('cancelled')", [programId]);
+
+        const { sendVedicCancellationEmail } = require('../services/emailService');
+        for (const attendee of attendeesRes.rows) {
+            if (attendee.email) {
+                try {
+                    await sendVedicCancellationEmail({
+                        to: attendee.email,
+                        userName: attendee.name,
+                        programTitle: program.title
+                    });
+                } catch (err) {
+                    console.error(`Failed to send cancellation email to attendee ${attendee.email}:`, err);
+                }
+            }
+        }
+
+        if (program.lead_consultant_id) {
+            const leadRes = await query("SELECT first_name, last_name, email FROM team_members WHERE id = $1", [program.lead_consultant_id]);
+            if (leadRes.rows.length && leadRes.rows[0].email) {
+                const lead = leadRes.rows[0];
+                try {
+                    await sendVedicCancellationEmail({
+                        to: lead.email,
+                        userName: `${lead.first_name} ${lead.last_name}`,
+                        programTitle: program.title
+                    });
+                } catch (err) {
+                    console.error('Failed to send cancellation email to lead consultant:', err);
+                }
+            }
+        }
+
+        const specialistsRes = await query(
+            `SELECT tm.first_name, tm.last_name, tm.email 
+             FROM vedic_program_staff vps
+             JOIN team_members tm ON tm.id = vps.staff_id
+             WHERE vps.program_id = $1`,
+            [programId]
+        );
+        for (const staff of specialistsRes.rows) {
+            if (staff.email) {
+                try {
+                    await sendVedicCancellationEmail({
+                        to: staff.email,
+                        userName: `${staff.first_name} ${staff.last_name}`,
+                        programTitle: program.title
+                    });
+                } catch (err) {
+                    console.error(`Failed to send cancellation email to specialist ${staff.email}:`, err);
+                }
+            }
+        }
+
+        await autoUpdateVedicProgramStatuses();
+
+        return res.json({ success: true, message: 'Vedic Program cancelled successfully.' });
+    } catch (err) {
+        console.error('cancelVedicProgram error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
     }
 };
@@ -575,13 +1223,19 @@ const deleteVedicProgram = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Cannot delete a program with active enrollments.' });
         }
 
-        const status = getVedicProgramStatus(existing.start_date, existing.end_date);
+        const status = existing.status || getVedicProgramStatus(existing.start_date, existing.end_date);
         if (status === 'Live' || status === 'Completed') {
             return res.status(400).json({ success: false, message: 'Cannot delete a program that is currently Live or Completed.' });
         }
 
-        await query('DELETE FROM allocations WHERE id = $1', [`vp-alloc-${programId}`]);
+        const currentAllocations = await query('SELECT staff_id FROM allocations WHERE id LIKE $1', [`vp-alloc-${programId}%`]);
+        await query('DELETE FROM allocations WHERE id LIKE $1', [`vp-alloc-${programId}%`]);
         await query('DELETE FROM vedic_programs WHERE id = $1', [programId]);
+
+        const { syncStaffMemberStatus } = require('../utils/conflictChecker');
+        for (const row of currentAllocations.rows) {
+            await syncStaffMemberStatus(row.staff_id);
+        }
 
         return res.json({ success: true, message: 'Vedic Program deleted successfully.' });
     } catch (err) {
@@ -590,16 +1244,123 @@ const deleteVedicProgram = async (req, res) => {
     }
 };
 
+const sendVedicProgramReminders = async () => {
+    try {
+        const { query } = require('../config/db');
+        const { sendVedicReminderEmail } = require('../services/emailService');
+
+        console.log('[Reminder Scheduler] Checking for Vedic Program reminders...');
+
+        const res = await query("SELECT id, title, start_date, lead_consultant_id, status FROM vedic_programs WHERE status = 'Upcoming'");
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        for (const p of res.rows) {
+            const startDate = new Date(p.start_date);
+            startDate.setHours(0, 0, 0, 0);
+
+            const diffTime = startDate.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 7 || diffDays === 1) {
+                console.log(`[Reminder Scheduler] Sending ${diffDays}-day reminders for: "${p.title}"`);
+
+                const attendeesRes = await query(
+                    "SELECT name, email FROM vedic_program_attendees WHERE program_id = $1 AND status IN ('registered', 'confirmed')",
+                    [p.id]
+                );
+                for (const a of attendeesRes.rows) {
+                    if (a.email) {
+                        try {
+                            await sendVedicReminderEmail({
+                                to: a.email,
+                                userName: a.name,
+                                programTitle: p.title,
+                                daysRemaining: diffDays,
+                                startDate: p.start_date,
+                                time: p.time
+                            });
+                        } catch (err) {
+                            console.error(`[Reminder Scheduler] Failed to send reminder email to attendee ${a.email}:`, err);
+                        }
+                    }
+                }
+
+                if (p.lead_consultant_id) {
+                    const leadRes = await query("SELECT first_name, last_name, email FROM team_members WHERE id = $1", [p.lead_consultant_id]);
+                    if (leadRes.rows.length && leadRes.rows[0].email) {
+                        const l = leadRes.rows[0];
+                        try {
+                            await sendVedicReminderEmail({
+                                to: l.email,
+                                userName: `${l.first_name} ${l.last_name}`,
+                                programTitle: p.title,
+                                daysRemaining: diffDays,
+                                startDate: p.start_date,
+                                time: p.time
+                            });
+                        } catch (err) {
+                            console.error(`[Reminder Scheduler] Failed to send reminder email to lead consultant ${l.email}:`, err);
+                        }
+                    }
+                }
+
+                const specialistsRes = await query(
+                    `SELECT tm.first_name, tm.last_name, tm.email 
+                     FROM vedic_program_staff vps
+                     JOIN team_members tm ON tm.id = vps.staff_id
+                     WHERE vps.program_id = $1`,
+                    [p.id]
+                );
+                for (const s of specialistsRes.rows) {
+                    if (s.email) {
+                        try {
+                            await sendVedicReminderEmail({
+                                to: s.email,
+                                userName: `${s.first_name} ${s.last_name}`,
+                                programTitle: p.title,
+                                daysRemaining: diffDays,
+                                startDate: p.start_date,
+                                time: p.time
+                            });
+                        } catch (err) {
+                            console.error(`[Reminder Scheduler] Failed to send reminder email to specialist ${s.email}:`, err);
+                        }
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error('[Reminder Scheduler] Error running reminders job:', err);
+    }
+};
+
+// MOBILE ENDPOINT HOOK FOR VEDIC PACKAGES ENROLLMENT
+const registerAttendeeFromMobile = async (req, res) => {
+    const programId = req.body.program_id || req.body.package_id || req.body.id || req.body.vedic_program_id;
+    if (!programId) {
+        return res.status(400).json({ success: false, message: 'Program ID / Package ID is required.' });
+    }
+    req.params.id = programId;
+    return registerAttendee(req, res);
+};
+
 module.exports = {
     getAllVedicPrograms,
     createVedicProgram,
     updateVedicProgram,
+    getVedicProgramStaff,
     updateVedicProgramStaff,
+    registerAttendee,
     enrollUserInVedicProgram,
     getVedicProgramAttendees,
     updateVedicAttendeeAttendance,
+    checkinAttendee,
+    cancelVedicProgram,
     deleteVedicProgramAttendee,
     exportVedicProgramAttendees,
     deleteVedicProgram,
-    autoUpdateVedicProgramStatuses
+    autoUpdateVedicProgramStatuses,
+    sendVedicProgramReminders,
+    registerAttendeeFromMobile
 };

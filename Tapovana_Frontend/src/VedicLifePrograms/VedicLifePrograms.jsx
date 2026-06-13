@@ -10,6 +10,7 @@ import FilterIcon from "../assets/filterIcon.svg";
 
 // ─── Status checker ─────────────────────────────────────────────────────
 const getProgramStatus = (program) => {
+  if (program.status === 'Cancelled' || program.status === 'cancelled') return 'Cancelled';
   if (!program.startDate || !program.endDate) return "upcoming";
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -25,6 +26,8 @@ const STATUS_CONFIG = {
   upcoming: { label: "Upcoming", color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
   ongoing: { label: "Ongoing", color: "#2ecc71", bg: "rgba(46,204,113,0.1)" },
   completed: { label: "Renewal", color: "#a0aec0", bg: "rgba(160,174,192,0.1)" },
+  Cancelled: { label: "Cancelled", color: "#e74c3c", bg: "rgba(231,76,60,0.1)" },
+  cancelled: { label: "Cancelled", color: "#e74c3c", bg: "rgba(231,76,60,0.1)" }
 };
 
 const PROGRAM_COLORS = {
@@ -80,6 +83,7 @@ const BLANK_FORM = {
   title: "", type: "Retreat", description: "", duration: "7-days",
   startDate: "", endDate: "", capacity: 20, price: "",
   accommodations: "", consultant_id: "", consultant_name: "",
+  assigned_staff_ids: [],
   services: "", languages: "", image_url: "", image_base64: "",
   registrationDeadline: ""
 };
@@ -92,10 +96,30 @@ const fileToBase64 = (file) => new Promise((resolve, reject) => {
   reader.readAsDataURL(file);
 });
 
+// ─── Status style helper ──────────────────────────────────────────────────
+const getAttendeeStatusStyles = (status) => {
+  switch (status) {
+    case 'attended':
+      return { bg: "rgba(34,197,94,0.12)", color: "#16a34a" };
+    case 'checked_in':
+      return { bg: "rgba(13,148,136,0.12)", color: "#0d9488" };
+    case 'confirmed':
+      return { bg: "rgba(79,70,229,0.12)", color: "#4f46e5" };
+    case 'registered':
+      return { bg: "rgba(205,167,81,0.12)", color: "#CDA751" };
+    case 'absent':
+      return { bg: "rgba(239,68,68,0.12)", color: "#dc2626" };
+    case 'cancelled':
+      return { bg: "rgba(100,116,139,0.12)", color: "#64748b" };
+    default:
+      return { bg: "rgba(205,167,81,0.12)", color: "#CDA751" };
+  }
+};
+
 // ─── Program Card ─────────────────────────────────────────────────────────
 function ProgramCard({ program, onClick }) {
   const status = getProgramStatus(program);
-  const st = STATUS_CONFIG[status];
+  const st = STATUS_CONFIG[status] || STATUS_CONFIG.upcoming;
   const typeColor = PROGRAM_COLORS[program.type] || PROGRAM_COLORS["Retreat"];
   const pct = program.capacity ? Math.round(((program.enrolled || 0) / program.capacity) * 100) : 0;
   const [imgFailed, setImgFailed] = useState(!program.image && !program.image_url && !program.image_base64);
@@ -251,8 +275,10 @@ function ProgramForm({ form, onChange, instructors, mode }) {
             const id = e.target.value;
             const inst = instructors.find(i => i.user_id === id || i.id === id);
             const name = inst ? (inst.first_name + " " + inst.last_name).trim() : "";
+            const filteredStaff = (form.assigned_staff_ids || []).filter(sid => sid !== id);
             onChange({ target: { name: "consultant_id", value: id } });
             onChange({ target: { name: "consultant_name", value: name } });
+            onChange({ target: { name: "assigned_staff_ids", value: filteredStaff } });
           }} style={inputStyle}>
             <option value="">Select Consultant...</option>
             {instructors.map(i => (
@@ -263,6 +289,50 @@ function ProgramForm({ form, onChange, instructors, mode }) {
           </select>
           {form.consultant_name && <span style={{ fontSize: 11, color: "#cda751", marginTop: 2 }}>Selected: {form.consultant_name}</span>}
         </FormField>
+
+        <FormField label="Assigned Specialists (Max 9)">
+          <div style={{ 
+            border: "1px solid rgba(205,167,81,0.2)", 
+            borderRadius: 4, 
+            padding: 10, 
+            maxHeight: 120, 
+            overflowY: "auto", 
+            background: "white" 
+          }}>
+            {instructors.filter(i => (i.user_id || i.id) !== form.consultant_id).map(i => {
+              const staffId = i.user_id || i.id;
+              const isChecked = (form.assigned_staff_ids || []).includes(staffId);
+              return (
+                <label key={staffId} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginBottom: 4, color: "#333", cursor: "pointer" }}>
+                  <input 
+                    type="checkbox" 
+                    checked={isChecked} 
+                    onChange={e => {
+                      let list = [...(form.assigned_staff_ids || [])];
+                      if (e.target.checked) {
+                        if (list.length >= 9) {
+                          alert("Maximum 9 specialists can be assigned.");
+                          return;
+                        }
+                        list.push(staffId);
+                      } else {
+                        list = list.filter(id => id !== staffId);
+                      }
+                      onChange({ target: { name: "assigned_staff_ids", value: list } });
+                    }} 
+                  />
+                  {i.first_name} {i.last_name} ({i.role === 'DOCTOR' ? 'Dr.' : 'Therapist'})
+                </label>
+              );
+            })}
+            {instructors.filter(i => (i.user_id || i.id) !== form.consultant_id).length === 0 && (
+              <span style={{ fontSize: 12, color: "#94a3b8" }}>No other active specialists available.</span>
+            )}
+          </div>
+        </FormField>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <FormField label="Accommodations">
           <input name="accommodations" value={form.accommodations} onChange={onChange} style={inputStyle} placeholder="e.g. Lakefront Cottage" />
         </FormField>
@@ -312,7 +382,7 @@ export default function VedicLifePrograms() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [toast, setToast] = useState(null);
 
-  // Detail view (instead of modal)
+  // Detail view
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [activeDetailTab, setActiveDetailTab] = useState("info");
   const [isEditing, setIsEditing] = useState(false);
@@ -335,7 +405,6 @@ export default function VedicLifePrograms() {
   const [manualEnrollForm, setManualEnrollForm] = useState({ name: "", email: "", phone: "" });
   const [manualEnrollSaving, setManualEnrollSaving] = useState(false);
   const [manualEnrollError, setManualEnrollError] = useState("");
-  const [attendeePage, setAttendeePage] = useState(1);
 
   const currentUser = useMemo(() => getUser(), []);
   const isAdmin = !currentUser || currentUser.role === "SUPER_ADMIN" || currentUser.role === "CO_ADMIN";
@@ -390,7 +459,7 @@ export default function VedicLifePrograms() {
       const status = getProgramStatus(p);
       const matchType = typeFilter === "ALL" || p.type === typeFilter;
       const matchDuration = durationFilter === "ALL" || p.duration === durationFilter;
-      const matchStatus = statusFilter === "ALL" || status === statusFilter;
+      const matchStatus = statusFilter === "ALL" || status.toLowerCase() === statusFilter.toLowerCase();
       const matchSearch = !search ||
         (p.title || "").toLowerCase().includes(search.toLowerCase()) ||
         (p.consultant_name || p.consultant || "").toLowerCase().includes(search.toLowerCase());
@@ -439,8 +508,8 @@ export default function VedicLifePrograms() {
   const handleManualEnroll = async () => {
     setManualEnrollError("");
     const programStatus = selectedProgram._status || getProgramStatus(selectedProgram);
-    if (programStatus === "ongoing" || programStatus === "completed") {
-      setManualEnrollError("Enrollment is only allowed for upcoming programs.");
+    if (programStatus === "ongoing" || programStatus === "completed" || programStatus === "Cancelled") {
+      setManualEnrollError("Enrollment is closed for this program.");
       return;
     }
 
@@ -514,6 +583,40 @@ export default function VedicLifePrograms() {
     }
   };
 
+  const handleCheckinAttendee = async (attendeeId) => {
+    try {
+      const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/attendees/${attendeeId}/checkin`, {
+        method: "PATCH"
+      });
+      if (res.success) {
+        showToast("Attendee checked in successfully!");
+        setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, status: "checked_in", checked_in_at: new Date().toISOString() } : a));
+      } else {
+        throw new Error(res.message || "Failed to check in attendee.");
+      }
+    } catch (err) {
+      showToast(err.message || "Error checking in attendee.");
+    }
+  };
+
+  const handleCancelProgram = async () => {
+    if (!window.confirm("Are you sure you want to cancel this program? All attendees and staff will be notified via email.")) return;
+    try {
+      const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/cancel`, {
+        method: "PATCH"
+      });
+      if (res.success) {
+        showToast("Program cancelled successfully.");
+        await fetchPrograms();
+        setSelectedProgram(prev => ({ ...prev, status: "Cancelled", _status: "Cancelled" }));
+      } else {
+        throw new Error(res.message || "Failed to cancel program.");
+      }
+    } catch (err) {
+      showToast(err.message || "Error cancelling program.");
+    }
+  };
+
   const handleExportCSV = () => {
     const token = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
     const url = `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api/vedic-programs/${selectedProgram.id}/attendees/export?token=${token}`;
@@ -551,8 +654,10 @@ export default function VedicLifePrograms() {
       duration: p.duration || "7-days", startDate: p.startDate || "", endDate: p.endDate || "",
       capacity: p.capacity || 20, price: p.price || "",
       accommodations: p.accommodations || "",
-      consultant_id: p.consultant_id || "", consultant_name: p.consultant_name || p.consultant || "",
-      services: p.services ? p.services.join(", ") : "", languages: p.languages ? p.languages.join(", ") : "",
+      consultant_id: p.lead_consultant_id || p.consultant_id || "", consultant_name: p.consultant_name || p.consultant || "",
+      assigned_staff_ids: p.assigned_staff_ids || [],
+      services: p.services ? (Array.isArray(p.services) ? p.services.join(", ") : p.services) : "",
+      languages: p.languages ? (Array.isArray(p.languages) ? p.languages.join(", ") : p.languages) : "",
       image_url: p.image_url || p.image || "", image_base64: p.image_base64 || "",
       registrationDeadline: p.registrationDeadline || "",
     });
@@ -574,6 +679,7 @@ export default function VedicLifePrograms() {
     if (!editForm.capacity || Number(editForm.capacity) < 1) { setEditError("Capacity must be at least 1"); return; }
     if (Number(editForm.capacity) < (selectedProgram.enrolled || 0)) { setEditError(`Capacity cannot be less than the number of enrolled attendees (${selectedProgram.enrolled || 0})`); return; }
     if (!editForm.consultant_id) { setEditError("Please select a lead consultant"); return; }
+    if (editForm.assigned_staff_ids && editForm.assigned_staff_ids.length > 9) { setEditError("Maximum 9 specialists can be assigned."); return; }
 
     if (editForm.registrationDeadline) {
       if (editForm.registrationDeadline < todayStr) { setEditError("Registration deadline must be today or in the future"); return; }
@@ -588,17 +694,25 @@ export default function VedicLifePrograms() {
         startDate: editForm.startDate, endDate: editForm.endDate,
         capacity: Number(editForm.capacity), price: Number(editForm.price),
         accommodations: editForm.accommodations,
-        consultant_id: editForm.consultant_id, consultant: editForm.consultant_name,
+        consultant_id: editForm.consultant_id,
+        lead_consultant_id: editForm.consultant_id,
+        consultant: editForm.consultant_name,
         services: editForm.services ? editForm.services.split(",").map(s => s.trim()) : [],
         languages: editForm.languages ? editForm.languages.split(",").map(l => l.trim()) : [],
         image_url: editForm.image_base64 || editForm.image_url || null,
         registrationDeadline: editForm.registrationDeadline || null,
-        assigned_staff_ids: editForm.consultant_id ? [editForm.consultant_id] : [],
+        assigned_staff_ids: editForm.assigned_staff_ids || [],
       };
 
       await apiFetch("/api/vedic-programs/" + selectedProgram.id, { method: "PATCH", body: JSON.stringify(body) });
       await fetchPrograms();
-      setSelectedProgram(prev => ({ ...prev, ...editForm, _status: getProgramStatus({ ...prev, ...editForm }) }));
+      setSelectedProgram(prev => ({ 
+        ...prev, 
+        ...editForm, 
+        lead_consultant_id: editForm.consultant_id, 
+        assigned_staff_ids: editForm.assigned_staff_ids, 
+        _status: getProgramStatus({ ...prev, ...editForm }) 
+      }));
       setIsEditing(false);
       showToast("Program updated successfully!");
     } catch (err) {
@@ -619,6 +733,7 @@ export default function VedicLifePrograms() {
     if (addForm.price === "" || Number(addForm.price) < 0) { setAddError("Price must be greater than or equal to 0"); return; }
     if (!addForm.capacity || Number(addForm.capacity) < 1) { setAddError("Capacity must be at least 1"); return; }
     if (!addForm.consultant_id) { setAddError("Please select a lead consultant"); return; }
+    if (addForm.assigned_staff_ids && addForm.assigned_staff_ids.length > 9) { setAddError("Maximum 9 specialists can be assigned."); return; }
 
     if (addForm.registrationDeadline) {
       if (addForm.registrationDeadline < todayStr) { setAddError("Registration deadline must be today or in the future"); return; }
@@ -633,12 +748,14 @@ export default function VedicLifePrograms() {
         startDate: addForm.startDate, endDate: addForm.endDate,
         capacity: Number(addForm.capacity), price: Number(addForm.price),
         accommodations: addForm.accommodations,
-        consultant_id: addForm.consultant_id, consultant: addForm.consultant_name,
+        consultant_id: addForm.consultant_id,
+        lead_consultant_id: addForm.consultant_id,
+        consultant: addForm.consultant_name,
         services: addForm.services ? addForm.services.split(",").map(s => s.trim()) : [],
         languages: addForm.languages ? addForm.languages.split(",").map(l => l.trim()) : [],
         image_url: addForm.image_base64 || addForm.image_url || null,
         enrolled: 0,
-        assigned_staff_ids: addForm.consultant_id ? [addForm.consultant_id] : [],
+        assigned_staff_ids: addForm.assigned_staff_ids || [],
       };
 
       const res = await apiFetch("/api/vedic-programs", { method: "POST", body: JSON.stringify(body) });
@@ -667,15 +784,15 @@ export default function VedicLifePrograms() {
     try {
       await apiFetch("/api/vedic-programs/" + selectedProgram.id + "/staff", {
         method: "PATCH",
-        body: JSON.stringify({ assigned_staff_ids: [selectedProgram.consultant_id] })
+        body: JSON.stringify({ assigned_staff_ids: selectedProgram.assigned_staff_ids || [] })
       });
       const inst = instructors.find(i => i.user_id === selectedProgram.consultant_id || i.id === selectedProgram.consultant_id);
       if (inst) {
         allocateStaff(inst, { id: selectedProgram.id, title: selectedProgram.title, startDate: selectedProgram.startDate, date: selectedProgram.startDate, endDate: selectedProgram.endDate }, "vedic_program");
       }
-      showToast("Instructor allocated and notified via email!");
+      showToast("Instructors allocated and notified via email!");
     } catch (err) {
-      triggerAlert(err.message || "Failed to allocate instructor");
+      triggerAlert(err.message || "Failed to allocate instructors");
     }
   };
 
@@ -686,8 +803,11 @@ export default function VedicLifePrograms() {
     if (!selectedProgram) return null;
     const p = selectedProgram;
     const status = p._status || getProgramStatus(p);
-    const st = STATUS_CONFIG[status];
+    const st = STATUS_CONFIG[status] || STATUS_CONFIG.upcoming;
     const displayImage = p.image || p.image_url || p.image_base64;
+
+    const leadConsultant = instructors.find(i => i.user_id === p.consultant_id || i.id === p.consultant_id);
+    const specialists = (p.assigned_staff_ids || []).map(id => instructors.find(i => i.user_id === id || i.id === id)).filter(Boolean);
 
     return (
       <div style={{ padding: "24px 28px", overflowY: "auto", maxHeight: "65vh" }}>
@@ -720,6 +840,22 @@ export default function VedicLifePrograms() {
           >
             Program Info
           </button>
+          <button 
+            onClick={() => setActiveDetailTab("staff")}
+            style={{ 
+              background: "none", 
+              border: "none", 
+              borderBottom: activeDetailTab === "staff" ? "3px solid #CDA751" : "3px solid transparent", 
+              padding: "10px 4px", 
+              fontSize: "14px", 
+              fontWeight: 600, 
+              color: activeDetailTab === "staff" ? "#0F172A" : "#64748B", 
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+          >
+            Assigned Staff
+          </button>
           {isAdmin && (
             <button 
               onClick={() => setActiveDetailTab("attendees")}
@@ -740,7 +876,7 @@ export default function VedicLifePrograms() {
           )}
         </div>
 
-        {activeDetailTab === "info" ? (
+        {activeDetailTab === "info" && (
           <>
             {displayImage && (
               <div style={{ marginBottom: 14, borderRadius: 8, overflow: "hidden" }}>
@@ -765,25 +901,74 @@ export default function VedicLifePrograms() {
               </div>
             </div>
 
-            <div className="vedic-modal-actions" style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              {status === "upcoming" ? (
+            <div className="vedic-modal-actions" style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 20 }}>
+              {status !== "Cancelled" && status !== "completed" ? (
                 <>
-                  <button className="vedic-btn-cancel" style={{ flex: 1 }} onClick={handleStartEdit}>Edit Program</button>
+                  {status === "upcoming" && <button className="vedic-btn-cancel" style={{ flex: 1 }} onClick={handleStartEdit}>Edit Program</button>}
                   <button className="vedic-btn-allocate" style={{ flex: 1.5 }} onClick={handleAllocateInstructor}>
                     {p.consultant_id ? "Re-allocate Instructor" : "Allocate Consultant"}
                   </button>
-                  <button className="vedic-btn-cancel" style={{ flex: 1, borderColor: "#e74c3c", color: "#e74c3c" }} onClick={handleDeleteProgram}>
-                    Delete Program
+                  <button className="vedic-btn-cancel" style={{ flex: 1, borderColor: "#e74c3c", color: "#e74c3c" }} onClick={handleCancelProgram}>
+                    Cancel Program
                   </button>
+                  {status === "upcoming" && (
+                    <button className="vedic-btn-cancel" style={{ flex: 1, borderColor: "#e74c3c", color: "#e74c3c", background: "#fdf2f2" }} onClick={handleDeleteProgram}>
+                      Delete Program
+                    </button>
+                  )}
                 </>
               ) : (
                 <span style={{ fontSize: 13, color: "#718096", fontStyle: "italic" }}>
-                  This program is ongoing or completed and cannot be edited, deleted, or reallocated.
+                  This program is completed or cancelled and cannot be edited, cancelled, or allocated.
                 </span>
               )}
             </div>
           </>
-        ) : (
+        )}
+
+        {activeDetailTab === "staff" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div>
+              <h4 style={{ margin: "0 0 10px 0", fontSize: 14, fontWeight: 700, color: "#2d3748", borderBottom: "1px solid #e2e8f0", paddingBottom: 6 }}>Lead Consultant</h4>
+              {leadConsultant ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#f8f9fb", padding: 12, borderRadius: 8, borderLeft: "4px solid #CDA751" }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#CDA751", color: "white", display: "flex", alignItems: "center", justifyItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>
+                    {leadConsultant.first_name[0]}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#2d3748" }}>{leadConsultant.first_name} {leadConsultant.last_name}</div>
+                    <div style={{ fontSize: 11, color: "#7b8a9a" }}>{leadConsultant.role} • {leadConsultant.specialization || "Ayurveda"}</div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: "#7b8a9a", fontStyle: "italic" }}>No Lead Consultant assigned.</div>
+              )}
+            </div>
+
+            <div>
+              <h4 style={{ margin: "10px 0 10px 0", fontSize: 14, fontWeight: 700, color: "#2d3748", borderBottom: "1px solid #e2e8f0", paddingBottom: 6 }}>Specialists ({specialists.length})</h4>
+              {specialists.length > 0 ? (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  {specialists.map(s => (
+                    <div key={s.user_id || s.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "#f8f9fb", padding: 12, borderRadius: 8 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#e2e8f0", color: "#475569", display: "flex", alignItems: "center", justifyItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>
+                        {s.first_name[0]}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#2d3748" }}>{s.first_name} {s.last_name}</div>
+                        <div style={{ fontSize: 11, color: "#7b8a9a" }}>{s.role} • {s.specialization || "Therapist"}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: "#7b8a9a", fontStyle: "italic" }}>No specialists assigned yet.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeDetailTab === "attendees" && isAdmin && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {/* Header controls for Attendees */}
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
@@ -886,44 +1071,69 @@ export default function VedicLifePrograms() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredAttendees.map(a => (
-                      <tr key={a.id} style={{ borderBottom: "1px solid #f1f3f7" }}>
-                        <td style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#2d3748" }}>{a.name}</td>
-                        <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>{a.email}</td>
-                        <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>{a.phone || "-"}</td>
-                        <td style={{ padding: "10px 16px" }}>
-                          <span style={{ 
-                            fontSize: 11, 
-                            fontWeight: 700, 
-                            padding: "3px 8px", 
-                            borderRadius: 12,
-                            textTransform: "uppercase",
-                            background: a.status === "attended" ? "rgba(34,197,94,0.12)" : a.status === "absent" ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)",
-                            color: a.status === "attended" ? "#16a34a" : a.status === "absent" ? "#dc2626" : "#d97706"
-                          }}>
-                            {a.status}
-                          </span>
-                        </td>
-                        <td style={{ padding: "10px 16px" }}>
-                          <select 
-                            value={a.status} 
-                            onChange={e => {
-                              if (e.target.value === "delete") {
-                                handleDeleteAttendee(a.id);
-                              } else {
-                                handleMarkAttendance(a.id, e.target.value);
-                              }
-                            }}
-                            style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #e2e8f0", fontSize: 12, outline: "none", cursor: "pointer", background: "white" }}
-                          >
-                            <option value="enrolled">Enrolled</option>
-                            <option value="attended">Attended</option>
-                            <option value="absent">Absent</option>
-                            <option value="delete">Delete Attendee</option>
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredAttendees.map(a => {
+                      const statusStyles = getAttendeeStatusStyles(a.status);
+                      return (
+                        <tr key={a.id} style={{ borderBottom: "1px solid #f1f3f7" }}>
+                          <td style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#2d3748" }}>{a.name}</td>
+                          <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>{a.email}</td>
+                          <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>{a.phone || "-"}</td>
+                          <td style={{ padding: "10px 16px" }}>
+                            <span style={{ 
+                              fontSize: 11, 
+                              fontWeight: 700, 
+                              padding: "3px 8px", 
+                              borderRadius: 12,
+                              textTransform: "uppercase",
+                              background: statusStyles.bg,
+                              color: statusStyles.color
+                            }}>
+                              {a.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: "10px 16px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              {(a.status === "registered" || a.status === "confirmed") && (
+                                <button 
+                                  onClick={() => handleCheckinAttendee(a.id)}
+                                  style={{ 
+                                    background: "#CDA751", 
+                                    color: "white", 
+                                    border: "none", 
+                                    borderRadius: 4, 
+                                    padding: "4px 8px", 
+                                    fontSize: 11, 
+                                    fontWeight: 600, 
+                                    cursor: "pointer" 
+                                  }}
+                                >
+                                  Check In
+                                </button>
+                              )}
+                              <select 
+                                value={a.status} 
+                                onChange={e => {
+                                  if (e.target.value === "delete") {
+                                    handleDeleteAttendee(a.id);
+                                  } else {
+                                    handleMarkAttendance(a.id, e.target.value);
+                                  }
+                                }}
+                                style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #e2e8f0", fontSize: 12, outline: "none", cursor: "pointer", background: "white" }}
+                              >
+                                <option value="registered">Registered</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="checked_in">Checked In</option>
+                                <option value="attended">Attended</option>
+                                <option value="absent">Absent</option>
+                                <option value="cancelled">Cancelled</option>
+                                <option value="delete">Delete Attendee</option>
+                              </select>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
@@ -1017,6 +1227,7 @@ export default function VedicLifePrograms() {
                 <option value="upcoming">Upcoming</option>
                 <option value="ongoing">Ongoing</option>
                 <option value="completed">Renewal</option>
+                <option value="Cancelled">Cancelled</option>
               </select>
             </div>
           </div>

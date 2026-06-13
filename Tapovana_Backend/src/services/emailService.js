@@ -434,11 +434,11 @@ const sendWorkshopEnrollmentEmail = async ({ to, userName, workshopTitle, date, 
     </div>
     
     <div style="margin:24px 0;color:#cccccc;font-size:14px;line-height:1.6;">
-      <p style="color:#cda751;font-weight:700;margin:0 0 10px 0;">What to expect:</p>
+      <p style="color:#cda751;font-weight:700;margin:0 0 10px 0;">Instructions for participation:</p>
       <ul style="margin:0;padding-left:20px;color:#cccccc;">
-        <li style="margin-bottom:6px;">You’ll receive reminders before the session starts.</li>
-        <li style="margin-bottom:6px;">Please join on time to get the full benefit.</li>
-        <li style="margin-bottom:6px;">Bring any questions or topics you’d like to discuss.</li>
+        <li style="margin-bottom:6px;">Please log in 5 minutes early to test your connection.</li>
+        <li style="margin-bottom:6px;">Have a quiet space and a yoga mat or notebook ready.</li>
+        <li style="margin-bottom:6px;">Follow the instructor's guidance throughout the session.</li>
       </ul>
     </div>
     
@@ -613,6 +613,195 @@ const sendWorkshopAllocationNotificationEmail = async ({ to, staffName, workshop
   });
 };
 
+
+const sendVedicRegistrationEmail = async ({ to, userName, programTitle, startDate, endDate, time, status, assignedStaff }) => {
+  const dateOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+  const formattedStart = startDate ? new Date(startDate).toLocaleDateString(undefined, dateOptions) : "Not specified";
+  const formattedEnd = endDate ? new Date(endDate).toLocaleDateString(undefined, dateOptions) : null;
+  const dateStr = formattedEnd ? `${formattedStart} to ${formattedEnd}` : formattedStart;
+  const staff = assignedStaff || "Not assigned";
+
+  const html = emailWrapper(`
+    <h1 style="color:#cda751;text-align:center;">Vedic Program Registration</h1>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
+      Hello ${userName || 'Valued Participant'},
+    </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      Your registration for the Vedic Program <strong style="color:#cda751;">${programTitle}</strong> has been received.
+    </p>
+    <div style="background:#1e1a0e;border-left:4px solid #cda751;border-radius:6px;padding:20px 24px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Program:</strong> ${programTitle}</p>
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Date:</strong> ${dateStr}</p>
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Time:</strong> ${time || "N/A"}</p>
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Assigned Staff:</strong> ${staff}</p>
+      <p style="margin:0;font-size:13px;color:#ccc;"><strong>Status:</strong> <span style="color:#cda751;font-weight:600;text-transform:capitalize;">${status}</span></p>
+    </div>
+
+    <div style="margin:24px 0;color:#cccccc;font-size:14px;line-height:1.6;">
+      <p style="color:#cda751;font-weight:700;margin:0 0 10px 0;">Instructions for participation:</p>
+      <ul style="margin:0;padding-left:20px;color:#cccccc;">
+        <li style="margin-bottom:6px;">Please arrive 15 minutes before the scheduled start time.</li>
+        <li style="margin-bottom:6px;">Wear comfortable and appropriate clothing for physical activities.</li>
+        <li style="margin-bottom:6px;">If you have any specific medical conditions or dietary requirements, please notify your Lead Consultant in advance.</li>
+      </ul>
+    </div>
+    
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 24px 0 0 0;">
+      We look forward to embarking on this Vedic journey with you.
+    </p>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
+      Best regards,<br/>
+      <strong>Tapovana Team</strong>
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Tapovana — Vedic Program Registration: ${programTitle}`,
+    html,
+  });
+};
+
+const sendVedicAdminRegistrationNotification = async ({ to, participantName, participantEmail, participantPhone, programTitle }) => {
+  const html = emailWrapper(`
+    <h1 style="color:#cda751;text-align:center;">New Vedic Program Registration</h1>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
+      Hello Admin,
+    </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      A new participant has registered for the Vedic Program: <strong style="color:#cda751;">${programTitle}</strong>.
+    </p>
+    <div style="background:#1e1a0e;border-left:4px solid #cda751;border-radius:6px;padding:20px 24px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Participant Name:</strong> ${participantName}</p>
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Email:</strong> ${participantEmail}</p>
+      <p style="margin:0;font-size:13px;color:#ccc;"><strong>Phone:</strong> ${participantPhone || 'N/A'}</p>
+    </div>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Admin Alert — New Registration: ${programTitle}`,
+    html,
+  });
+};
+
+const sendVedicStaffAssignmentEmail = async ({ to, staffName, programTitle, role, startDate, endDate, time }) => {
+  const dateOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+  const formattedStart = startDate ? new Date(startDate).toLocaleDateString(undefined, dateOptions) : "Not specified";
+  const formattedEnd = endDate ? new Date(endDate).toLocaleDateString(undefined, dateOptions) : null;
+  const dateStr = formattedEnd ? `${formattedStart} to ${formattedEnd}` : formattedStart;
+
+  const html = emailWrapper(`
+    <h1 style="color:#cda751;text-align:center;">Vedic Program Assignment</h1>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
+      Hello ${staffName},
+    </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      You have been assigned to the Vedic Program <strong style="color:#cda751;">${programTitle}</strong> as a <strong style="color:#cda751;">${role}</strong>.
+    </p>
+    <div style="background:#1e1a0e;border-left:4px solid #cda751;border-radius:6px;padding:20px 24px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Program:</strong> ${programTitle}</p>
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Role:</strong> ${role}</p>
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Date:</strong> ${dateStr}</p>
+      <p style="margin:0;font-size:13px;color:#ccc;"><strong>Time:</strong> ${time || "N/A"}</p>
+    </div>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
+      Best regards,<br/>
+      <strong>Tapovana Team</strong>
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Tapovana — Program Assignment: ${programTitle}`,
+    html,
+  });
+};
+
+const sendVedicUpdateEmail = async ({ to, userName, programTitle, changes }) => {
+  const html = emailWrapper(`
+    <h1 style="color:#cda751;text-align:center;">Vedic Program Update</h1>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
+      Hello ${userName},
+    </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      There has been an update to the Vedic Program <strong style="color:#cda751;">${programTitle}</strong>.
+    </p>
+    <div style="background:#1e1a0e;border-left:4px solid #cda751;border-radius:6px;padding:20px 24px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-size:14px;color:#cda751;font-weight:600;">Details of Changes:</p>
+      <p style="margin:0;font-size:13px;color:#ccc;white-space:pre-line;">${changes}</p>
+    </div>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
+      Best regards,<br/>
+      <strong>Tapovana Team</strong>
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Tapovana — Vedic Program Update: ${programTitle}`,
+    html,
+  });
+};
+
+const sendVedicReminderEmail = async ({ to, userName, programTitle, daysRemaining, startDate, time }) => {
+  const dateOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+  const formattedStart = startDate ? new Date(startDate).toLocaleDateString(undefined, dateOptions) : "Not specified";
+
+  const html = emailWrapper(`
+    <h1 style="color:#cda751;text-align:center;">Vedic Program Reminder</h1>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
+      Hello ${userName},
+    </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      This is a reminder that the Vedic Program <strong style="color:#cda751;">${programTitle}</strong> is scheduled in <strong style="color:#cda751;">${daysRemaining} day(s)</strong>.
+    </p>
+    <div style="background:#1e1a0e;border-left:4px solid #cda751;border-radius:6px;padding:20px 24px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Program:</strong> ${programTitle}</p>
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Start Date:</strong> ${formattedStart}</p>
+      <p style="margin:0;font-size:13px;color:#ccc;"><strong>Time:</strong> ${time || "N/A"}</p>
+    </div>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
+      Best regards,<br/>
+      <strong>Tapovana Team</strong>
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Tapovana — Program Reminder (${daysRemaining} day${daysRemaining > 1 ? 's' : ''} left): ${programTitle}`,
+    html,
+  });
+};
+
+const sendVedicCancellationEmail = async ({ to, userName, programTitle }) => {
+  const html = emailWrapper(`
+    <h1 style="color:#e74c3c;text-align:center;">Program Cancelled</h1>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
+      Hello ${userName},
+    </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      We regret to inform you that the Vedic Program <strong style="color:#e74c3c;">${programTitle}</strong> has been cancelled.
+    </p>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
+      Best regards,<br/>
+      <strong>Tapovana Team</strong>
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Tapovana — Vedic Program Cancelled: ${programTitle}`,
+    html,
+  });
+};
+
 module.exports = { 
   sendWelcomeEmail, 
   sendOtpEmail, 
@@ -632,5 +821,11 @@ module.exports = {
   sendWorkshopCompletedEmail,
   sendStaffCompletionEmail,
   sendStaffCancellationEmail,
-  sendWorkshopAllocationNotificationEmail
+  sendWorkshopAllocationNotificationEmail,
+  sendVedicRegistrationEmail,
+  sendVedicAdminRegistrationNotification,
+  sendVedicStaffAssignmentEmail,
+  sendVedicUpdateEmail,
+  sendVedicReminderEmail,
+  sendVedicCancellationEmail
 };

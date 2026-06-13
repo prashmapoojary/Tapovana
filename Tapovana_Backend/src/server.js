@@ -51,6 +51,7 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/memberships", membershipRoutes);
 app.use("/api/workshops", workshopRoutes);
 app.use("/api/vedic-programs", vedicProgramRoutes);
+app.post("/api/vedicpackages", require("./controllers/vedicProgramsController").registerAttendeeFromMobile);
 
 // ── Analytics stub (returns dummy data until real analytics are built) ────────
 app.get("/api/analytics/dashboard", (req, res) => {
@@ -205,16 +206,35 @@ app.listen(PORT, () => {
     }, 30000);
 
     // ── Background Vedic Program status check & allocations sync scheduler ──
-    const { autoUpdateVedicProgramStatuses } = require("./controllers/vedicProgramsController");
+    const { autoUpdateVedicProgramStatuses, sendVedicProgramReminders } = require("./controllers/vedicProgramsController");
     // Run immediately on boot
     autoUpdateVedicProgramStatuses()
-        .then(() => console.log("[Vedic Program Scheduler] Initial status check complete."))
-        .catch(err => console.error("[Vedic Program Scheduler] Initial status check failed:", err));
+        .then(() => {
+            console.log("[Vedic Program Scheduler] Initial status check complete.");
+            return sendVedicProgramReminders();
+        })
+        .then(() => console.log("[Vedic Program Scheduler] Initial reminders check complete."))
+        .catch(err => console.error("[Vedic Program Scheduler] Initial Vedic Program checks failed:", err));
 
     // Run every 30 seconds
     setInterval(() => {
         autoUpdateVedicProgramStatuses().catch(err => console.error("Error in background Vedic Program status update:", err));
     }, 30000);
+
+    // Run reminders check every 2 hours
+    let lastRemindersSentDate = "";
+    setInterval(async () => {
+        const now = new Date();
+        const dateKey = now.toISOString().split("T")[0];
+        if (lastRemindersSentDate !== dateKey) {
+            try {
+                await sendVedicProgramReminders();
+                lastRemindersSentDate = dateKey;
+            } catch (err) {
+                console.error("Error running daily reminders job:", err);
+            }
+        }
+    }, 2 * 60 * 60 * 1000);
 
     // ── Monthly Refresh Job (Midnight on the 15th of every month) ───────────
     let lastMonthlyRefreshDate = "";
