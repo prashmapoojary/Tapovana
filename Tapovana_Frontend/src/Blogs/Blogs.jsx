@@ -434,9 +434,9 @@ export default function Blogs({ mode }) {
       triggerAlert("Please fill all required fields correctly.");
       return;
     }
-    // 6. Description validation: Required, min length 50 chars.
+    // 6. Description validation: Required, min length 500 chars.
     const textOnly = (editBlogData.content_html || "").replace(/<[^>]*>/g, '').trim();
-    if (textOnly.length < 50) {
+    if (textOnly.length < 500) {
       triggerAlert("Please fill all required fields correctly.");
       return;
     }
