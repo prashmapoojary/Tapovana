@@ -6,9 +6,21 @@ import { useAllocations } from "../utils/AllocationContext";
 
 // ─── Live status checker ─────────────────────────────────────────────
 const getLiveStatus = (ws) => {
-  if (ws.status === "completed") return "completed";
+  const statusLower = String(ws.status || "").toLowerCase();
+  if (statusLower === "completed" || statusLower === "cancelled") return "completed";
   const now = new Date();
   
+  // If start_time and end_time are provided, use them directly
+  if (ws.start_time && ws.end_time) {
+    const startTime = new Date(ws.start_time);
+    const endTime = new Date(ws.end_time);
+    const completionTime = new Date(endTime.getTime() + 5 * 60 * 1000);
+    
+    if (now < startTime) return "upcoming";
+    if (now >= startTime && now < completionTime) return "live";
+    return "completed";
+  }
+
   // Format today's date in local YYYY-MM-DD
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -498,7 +510,10 @@ export default function Workshops() {
     try {
       const res = await apiFetch("/api/teams/users?page=1&limit=100");
       if (res.success && res.users) {
-        const docsAndTherapists = res.users.filter(u => (u.role === 'DOCTOR' || u.role === 'THERAPIST') && u.availability_status !== "On Leave");
+        const docsAndTherapists = res.users.filter(u => {
+          const roleUpper = String(u.role || "").toUpperCase();
+          return (roleUpper === 'DOCTOR' || roleUpper === 'THERAPIST') && u.availability_status !== "On Leave";
+        });
         setInstructors(docsAndTherapists);
       }
     } catch (e) { console.error(e); }
@@ -627,6 +642,7 @@ export default function Workshops() {
   const handleSaveEdit = async () => {
     setEditError("");
     if (!editForm.title.trim()) { setEditError("Title is required"); return; }
+    if (!editForm.instructor_id) { setEditError("Instructor selection is required"); return; }
     if (Number(editForm.price) <= 0) { setEditError("Price must be greater than 0"); return; }
 
     const ws = workshops.find(w => w.id === selectedWs?.id) || selectedWs;
@@ -732,6 +748,7 @@ export default function Workshops() {
   const handleCreateWorkshop = async () => {
     setAddError("");
     if (!addForm.title.trim()) { setAddError("Title is required"); return; }
+    if (!addForm.instructor_id) { setAddError("Instructor selection is required"); return; }
     if (!addForm.date) { setAddError("Date is required"); return; }
     if (!addForm.price) { setAddError("Price is required"); return; }
     if (Number(addForm.price) <= 0) { setAddError("Price must be greater than 0"); return; }
@@ -882,7 +899,7 @@ export default function Workshops() {
             <option value="">Select Instructor</option>
             {instructors.map(i => (
               <option key={i.user_id || i.id} value={i.user_id || i.id}>
-                {i.first_name} {i.last_name} ({i.role === 'DOCTOR' ? 'Dr.' : 'Therapist'})
+                {i.first_name} {i.last_name} ({String(i.role || "").toUpperCase() === 'DOCTOR' ? 'Dr.' : 'Therapist'})
               </option>
             ))}
           </select>
@@ -1416,7 +1433,7 @@ export default function Workshops() {
                       <option value="">Select Instructor</option>
                       {instructors.map(i => (
                         <option key={i.user_id || i.id} value={i.user_id || i.id}>
-                          {i.first_name} {i.last_name} ({i.role === 'DOCTOR' ? 'Dr.' : 'Therapist'})
+                          {i.first_name} {i.last_name} ({String(i.role || "").toUpperCase() === 'DOCTOR' ? 'Dr.' : 'Therapist'})
                         </option>
                       ))}
                     </select>

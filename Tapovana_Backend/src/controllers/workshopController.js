@@ -2,7 +2,7 @@ const { query } = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
-const { sendAllocationEmail, sendWorkshopEnrollmentEmail, sendWorkshopRemovalEmail, sendWorkshopScheduledEmail, sendWorkshopOngoingEmail, sendWorkshopDeallocationEmail, sendWorkshopCompletedEmail } = require('../services/emailService');
+const { sendAllocationEmail, sendWorkshopEnrollmentEmail, sendWorkshopRemovalEmail, sendWorkshopScheduledEmail, sendWorkshopOngoingEmail, sendWorkshopDeallocationEmail, sendWorkshopCompletedEmail, sendWorkshopAllocationNotificationEmail } = require('../services/emailService');
 const { checkStaffAllocationConflict, syncStaffMemberStatus } = require('../utils/conflictChecker');
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
@@ -14,47 +14,78 @@ const ensureUploadsDir = () => {
     }
 };
 
+// HELPERS: 24-hour Clock and Timezone Parsing
+const formatTime24 = (timeStr) => {
+    if (!timeStr) return "00:00";
+    const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+    if (!match) {
+        const parts = timeStr.split(':');
+        const h = parseInt(parts[0], 10) || 0;
+        const m = parseInt(parts[1], 10) || 0;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+    let hours = parseInt(match[1], 10);
+    const mins = parseInt(match[2], 10);
+    const ampm = match[3] ? match[3].toUpperCase() : null;
+    if (ampm === 'PM' && hours < 12) hours += 12;
+    if (ampm === 'AM' && hours === 12) hours = 0;
+    
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+};
+
+const parseDateTime = (dateStr, timeStr) => {
+    if (!dateStr) return null;
+    const parts = dateStr.split('T')[0].split('-');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const day = parseInt(parts[2], 10);
+
+    const formattedTime = formatTime24(timeStr);
+    const [hours, minutes] = formattedTime.split(':').map(Number);
+    
+    return new Date(year, month - 1, day, hours, minutes, 0, 0);
+};
+
+const getCapitalizedStatus = (status) => {
+    if (!status) return 'Upcoming';
+    const s = status.trim().toLowerCase();
+    if (s === 'upcoming') return 'Upcoming';
+    if (s === 'live' || s === 'ongoing') return 'Live';
+    if (s === 'completed') return 'Completed';
+    if (s === 'cancelled') return 'Cancelled';
+    return 'Upcoming';
+};
+
 // HELPER: Dynamic Status Transition & Notifications
-function getStatus(wsDate, wsTime, wsDuration) {
+function getStatus(wsDate, wsTime, wsDuration, start_time, end_time) {
     const now = new Date();
     
-    // Parse workshop date
-    const [wsYear, wsMonth, wsDay] = wsDate.split('-').map(Number);
-    
-    let hours = 0;
-    let minutes = 0;
-    if (wsTime) {
-        const match = wsTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
-        if (match) {
-            hours = parseInt(match[1], 10);
-            minutes = parseInt(match[2], 10);
-            if (match[3].toUpperCase() === 'PM' && hours !== 12) hours += 12;
-            if (match[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
-        } else {
-            const parts = wsTime.split(':');
-            hours = parseInt(parts[0], 10) || 0;
-            minutes = parseInt(parts[1], 10) || 0;
-        }
+    let startTime, endTime;
+    if (start_time && end_time) {
+        startTime = new Date(start_time);
+        endTime = new Date(end_time);
+    } else {
+        const parsed = parseDateTime(wsDate, wsTime);
+        if (!parsed) return 'Upcoming';
+        startTime = parsed;
+        const durationMins = parseInt(wsDuration, 10) || 60;
+        endTime = new Date(startTime.getTime() + durationMins * 60000);
     }
     
-    const startTime = new Date(wsYear, wsMonth - 1, wsDay, hours, minutes, 0, 0);
-    const durationMins = parseInt(wsDuration, 10) || 60;
-    const endTime = new Date(startTime.getTime() + durationMins * 60000);
     // 5-minute buffer before marking as completed
     const completionTime = new Date(endTime.getTime() + 5 * 60000);
     
     if (now < startTime) {
-        return 'upcoming';
+        return 'Upcoming';
     } else if (now >= startTime && now < completionTime) {
-        // Still 'ongoing' until endTime + 5 min buffer
-        return 'ongoing';
+        return 'Live';
     } else {
-        return 'completed';
+        return 'Completed';
     }
 }
 
 async function validateWorkshopActions(workshopId) {
-    const wsRes = await query('SELECT date, time, duration, status FROM workshops WHERE id = $1', [workshopId]);
+    const wsRes = await query('SELECT date, time, duration, status, start_time, end_time FROM workshops WHERE id = $1', [workshopId]);
     if (!wsRes.rows.length) {
         throw new Error('Workshop not found.');
     }
@@ -68,9 +99,12 @@ async function validateWorkshopActions(workshopId) {
         dateStr = `${year}-${month}-${day}`;
     }
 
-    const calculatedStatus = getStatus(dateStr, w.time, w.duration);
-    if (calculatedStatus === 'completed') {
+    const calculatedStatus = getStatus(dateStr, w.time, w.duration, w.start_time, w.end_time);
+    if (calculatedStatus === 'Completed') {
         throw new Error('This workshop is completed. Staff assignment and enrollment are disabled.');
+    }
+    if (w.status === 'Cancelled' || w.status === 'cancelled') {
+        throw new Error('This workshop has been cancelled. Staff assignment and enrollment are disabled.');
     }
 }
 
@@ -153,17 +187,16 @@ const allocateStaffToWorkshop = async (staffId, workshop) => {
         if (staffRes.rows.length) {
             const s = staffRes.rows[0];
             console.log('Attempting to send email to: ' + s.email + ' for workshop: ' + workshop.title);
-            sendAllocationEmail({
+            sendWorkshopAllocationNotificationEmail({
                 to: s.email,
-                firstName: s.first_name,
-                programName: workshop.title,
-                programType: 'Workshop',
-                startDate: workshop.date,
-                endDate: workshop.date
+                staffName: s.first_name,
+                workshopTitle: workshop.title,
+                date: workshop.date,
+                time: workshop.time
             }).then(() => {
-                console.log('Email sent successfully to ' + s.email);
+                console.log('Allocation email sent successfully to ' + s.email);
             }).catch((err) => {
-                console.error('Email send failed: ' + err.message);
+                console.error('Allocation email send failed: ' + err.message);
             });
         }
     } catch (emailErr) {
@@ -191,10 +224,9 @@ const syncWorkshopAllocations = async (workshopId) => {
 
         await query(`DELETE FROM allocations WHERE type = 'workshop' AND session_id = $1`, [String(workshopId)]);
 
-        const isCancelled = workshop.status === 'cancelled';
+        const isCancelled = workshop.status === 'Cancelled' || workshop.status === 'cancelled';
         if (!isCancelled) {
-            const isCompleted = workshop.status === 'completed';
-            const allocationStatus = isCompleted ? 'expired' : 'active';
+            const allocationStatus = workshop.status;
             const staffIds = workshop.assigned_staff_ids || [];
 
             for (const staffId of staffIds) {
@@ -309,42 +341,75 @@ const getWorkshopById = async (req, res) => {
 
 // CREATE WORKSHOP
 const createWorkshop = async (req, res) => {
-    const { title, category, instructor, date, time, duration, capacity, price, status, description, image_url, video_url, assigned_staff_ids } = req.body;
+    const { title, category, instructor, date, time, duration, capacity, price, status, description, image_url, video_url, assigned_staff_ids, customer_email } = req.body;
 
     if (!title) {
         return res.status(400).json({ success: false, message: 'Workshop title is required.' });
     }
 
-    // Restriction: Cannot select a previous date OR a past time on today's date
-    if (date) {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const todayStr = `${year}-${month}-${day}`;
-        if (date < todayStr) {
-            return res.status(400).json({ success: false, message: "Cannot schedule a workshop on a past date." });
+    if (!assigned_staff_ids || !Array.isArray(assigned_staff_ids) || assigned_staff_ids.length === 0) {
+        return res.status(400).json({ success: false, message: 'Instructor selection is required.' });
+    }
+
+    // Verify time format (AM/PM or HH:MM)
+    if (time) {
+        const timeRegex = /^([0-9]|0[0-9]|1[0-2]):[0-5][0-9]\s*(AM|PM)$/i;
+        const timeRegex24 = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+        if (!timeRegex.test(time) && !timeRegex24.test(time)) {
+            return res.status(400).json({ success: false, message: 'Invalid time format. Must be HH:MM AM/PM or HH:MM.' });
         }
-        // Block past time on today's date
-        if (date === todayStr && time) {
-            let wsHour = 0, wsMin = 0;
-            const match = time.match(/(\d+):(\d+)\s*(AM|PM)?/i);
-            if (match) {
-                wsHour = parseInt(match[1], 10);
-                wsMin = parseInt(match[2], 10);
-                const ampm = match[3] ? match[3].toUpperCase() : null;
-                if (ampm === 'PM' && wsHour !== 12) wsHour += 12;
-                if (ampm === 'AM' && wsHour === 12) wsHour = 0;
-            } else {
-                const parts = time.split(':');
-                wsHour = parseInt(parts[0], 10) || 0;
-                wsMin = parseInt(parts[1], 10) || 0;
+    }
+
+    // Verify price
+    if (price !== undefined && price !== null && price !== "") {
+        const parsedPrice = Number(price);
+        if (isNaN(parsedPrice) || parsedPrice < 0) {
+            return res.status(400).json({ success: false, message: 'Price must be a valid positive number.' });
+        }
+    }
+
+    // Verify duration
+    if (duration !== undefined && duration !== null && duration !== "") {
+        const parsedDuration = Number(duration);
+        if (isNaN(parsedDuration) || parsedDuration <= 0) {
+            return res.status(400).json({ success: false, message: 'Duration must be a positive integer.' });
+        }
+    }
+
+    // Verify capacity
+    if (capacity !== undefined && capacity !== null && capacity !== "") {
+        const parsedCapacity = Number(capacity);
+        if (isNaN(parsedCapacity) || parsedCapacity <= 0) {
+            return res.status(400).json({ success: false, message: 'Capacity must be a positive integer.' });
+        }
+    }
+
+    // Verify category whitelist
+    const allowedCategories = ['Yoga', 'Meditation', 'Nutrition', 'Ayurveda', 'Holistic'];
+    if (category && !allowedCategories.includes(category)) {
+        return res.status(400).json({ success: false, message: `Invalid category. Must be one of: ${allowedCategories.join(', ')}` });
+    }
+
+    // Verify customer_email
+    if (customer_email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(customer_email.trim())) {
+            return res.status(400).json({ success: false, message: 'Invalid customer email address format.' });
+        }
+    }
+
+    const durationMins = parseInt(duration, 10) || 60;
+    let startTime = null;
+    let endTime = null;
+
+    if (date) {
+        startTime = parseDateTime(date, time);
+        if (startTime) {
+            const now = new Date();
+            if (startTime < now) {
+                return res.status(400).json({ success: false, message: "Cannot schedule a workshop at a past date or time." });
             }
-            const wsStart = new Date();
-            wsStart.setHours(wsHour, wsMin, 0, 0);
-            if (wsStart < now) {
-                return res.status(400).json({ success: false, message: "Cannot schedule a workshop at a past time today." });
-            }
+            endTime = new Date(startTime.getTime() + durationMins * 60000);
         }
     }
 
@@ -352,6 +417,28 @@ const createWorkshop = async (req, res) => {
         const savedImageUrl = handleWorkshopImage(image_url);
         const savedVideoUrl = handleWorkshopVideo(video_url);
         const staffIds = assigned_staff_ids || [];
+
+        // Validate that assigned staff exist, are active, and are doctors or therapists
+        for (const staffId of staffIds) {
+            const staffCheck = await query(
+                `SELECT tm.id, tm.status, r.name AS role_name 
+                 FROM team_members tm
+                 JOIN roles r ON r.id = tm.role_id
+                 WHERE tm.id = $1`,
+                [staffId]
+            );
+            if (!staffCheck.rows.length) {
+                return res.status(400).json({ success: false, message: `Specialist staff ID ${staffId} does not exist.` });
+            }
+            const s = staffCheck.rows[0];
+            if (s.status !== 'active') {
+                return res.status(400).json({ success: false, message: `Specialist staff ID ${staffId} is currently inactive.` });
+            }
+            const roleNameLower = String(s.role_name || '').toLowerCase();
+            if (roleNameLower !== 'doctor' && roleNameLower !== 'therapist') {
+                return res.status(400).json({ success: false, message: `Staff member must be a DOCTOR or THERAPIST to be assigned.` });
+            }
+        }
 
         // Check for duplicates: title + date/time + instructor
         const duplicateCheck = await query(
@@ -382,7 +469,7 @@ const createWorkshop = async (req, res) => {
                 staffId,
                 date: date,
                 timeStr: time,
-                durationMins: duration || 60,
+                durationMins: durationMins,
                 type: 'workshop'
             });
 
@@ -394,15 +481,24 @@ const createWorkshop = async (req, res) => {
             }
         }
 
+        const initialStatus = status ? getCapitalizedStatus(status) : getStatus(date, time, durationMins, startTime, endTime);
+
         const result = await query(
-            'INSERT INTO workshops (title, category, instructor, date, time, duration, capacity, enrolled, price, status, description, image_url, video_url, assigned_staff_ids, created_by, allocation_count, instructor_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *',
+            `INSERT INTO workshops (
+                title, category, instructor, date, time, duration, capacity, enrolled, price, 
+                status, description, image_url, video_url, assigned_staff_ids, created_by, 
+                allocation_count, instructor_id, start_time, end_time, customer_email
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING *`,
             [
-                title.trim(), category || null, instructor || null, date || null, time || null,
-                duration || null, 10000, 0, price || null,
-                (status || 'upcoming').toLowerCase(), description || null,
+                title.trim(), category || null, instructor || null, date || null, formatTime24(time),
+                durationMins, 10000, 0, price || null,
+                initialStatus, description || null,
                 savedImageUrl, savedVideoUrl, JSON.stringify(staffIds), req.user?.id || null,
                 staffIds.length > 0 ? 1 : 0,
-                staffIds.length > 0 ? staffIds[0] : null
+                staffIds.length > 0 ? staffIds[0] : null,
+                startTime ? startTime.toISOString() : null,
+                endTime ? endTime.toISOString() : null,
+                customer_email || null
             ]
         );
 
@@ -428,7 +524,54 @@ const createWorkshop = async (req, res) => {
 
 // UPDATE WORKSHOP
 const updateWorkshop = async (req, res) => {
-    const { title, category, instructor, date, time, duration, capacity, price, status, description, image_url, video_url, assigned_staff_ids } = req.body;
+    const { title, category, instructor, date, time, duration, capacity, price, status, description, image_url, video_url, assigned_staff_ids, customer_email } = req.body;
+
+    // Verify time format if updated
+    if (time !== undefined && time !== null) {
+        const timeRegex = /^([0-9]|0[0-9]|1[0-2]):[0-5][0-9]\s*(AM|PM)$/i;
+        const timeRegex24 = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+        if (!timeRegex.test(time) && !timeRegex24.test(time)) {
+            return res.status(400).json({ success: false, message: 'Invalid time format. Must be HH:MM AM/PM or HH:MM.' });
+        }
+    }
+
+    // Verify price
+    if (price !== undefined && price !== null && price !== "") {
+        const parsedPrice = Number(price);
+        if (isNaN(parsedPrice) || parsedPrice < 0) {
+            return res.status(400).json({ success: false, message: 'Price must be a valid positive number.' });
+        }
+    }
+
+    // Verify duration
+    if (duration !== undefined && duration !== null && duration !== "") {
+        const parsedDuration = Number(duration);
+        if (isNaN(parsedDuration) || parsedDuration <= 0) {
+            return res.status(400).json({ success: false, message: 'Duration must be a positive integer.' });
+        }
+    }
+
+    // Verify capacity
+    if (capacity !== undefined && capacity !== null && capacity !== "") {
+        const parsedCapacity = Number(capacity);
+        if (isNaN(parsedCapacity) || parsedCapacity <= 0) {
+            return res.status(400).json({ success: false, message: 'Capacity must be a positive integer.' });
+        }
+    }
+
+    // Verify category whitelist
+    const allowedCategories = ['Yoga', 'Meditation', 'Nutrition', 'Ayurveda', 'Holistic'];
+    if (category !== undefined && category !== null && !allowedCategories.includes(category)) {
+        return res.status(400).json({ success: false, message: `Invalid category. Must be one of: ${allowedCategories.join(', ')}` });
+    }
+
+    // Verify customer_email
+    if (customer_email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(customer_email.trim())) {
+            return res.status(400).json({ success: false, message: 'Invalid customer email address format.' });
+        }
+    }
 
     try {
         const existingResult = await query('SELECT * FROM workshops WHERE id = $1', [req.params.id]);
@@ -443,6 +586,105 @@ const updateWorkshop = async (req, res) => {
         const targetTime = time !== undefined ? time : existing.time;
         const targetDuration = duration !== undefined ? duration : existing.duration;
         const targetInstructor = instructor !== undefined ? instructor : existing.instructor;
+
+        // Validate that assigned staff exist, are active, and are doctors or therapists
+        if (assigned_staff_ids !== undefined) {
+            if (!Array.isArray(assigned_staff_ids) || assigned_staff_ids.length === 0) {
+                return res.status(400).json({ success: false, message: 'Instructor selection is required.' });
+            }
+            for (const staffId of assigned_staff_ids) {
+                const staffCheck = await query(
+                    `SELECT tm.id, tm.status, r.name AS role_name 
+                     FROM team_members tm
+                     JOIN roles r ON r.id = tm.role_id
+                     WHERE tm.id = $1`,
+                    [staffId]
+                );
+                if (!staffCheck.rows.length) {
+                    return res.status(400).json({ success: false, message: `Specialist staff ID ${staffId} does not exist.` });
+                }
+                const s = staffCheck.rows[0];
+                if (s.status !== 'active') {
+                    return res.status(400).json({ success: false, message: `Specialist staff ID ${staffId} is currently inactive.` });
+                }
+                const roleNameLower = String(s.role_name || '').toLowerCase();
+                if (roleNameLower !== 'doctor' && roleNameLower !== 'therapist') {
+                    return res.status(400).json({ success: false, message: `Staff member must be a DOCTOR or THERAPIST to be assigned.` });
+                }
+            }
+        }
+
+        // Recalculate start_time and end_time if date/time/duration are updated
+        let targetStartTime = existing.start_time;
+        let targetEndTime = existing.end_time;
+        if (date !== undefined || time !== undefined || duration !== undefined) {
+            const parsedStart = parseDateTime(targetDate, targetTime);
+            if (parsedStart) {
+                targetStartTime = parsedStart.toISOString();
+                const durationMins = parseInt(targetDuration, 10) || 60;
+                targetEndTime = new Date(parsedStart.getTime() + durationMins * 60000).toISOString();
+            }
+        }
+
+        // Validate date is in the future
+        if ((date !== undefined || time !== undefined) && targetStartTime) {
+            const now = new Date();
+            if (new Date(targetStartTime) < now) {
+                return res.status(400).json({ success: false, message: "Cannot schedule a workshop at a past date or time." });
+            }
+        }
+
+        const now = new Date();
+        const currentStatus = getStatus(
+            existing.date, 
+            existing.time, 
+            existing.duration, 
+            existing.start_time, 
+            existing.end_time
+        );
+
+        // Prevent editing if status is Live/Completed (except for the status update itself)
+        if (currentStatus === 'Live' || currentStatus === 'Completed') {
+            const isUpdatingOtherFields = (
+                title !== undefined || category !== undefined || instructor !== undefined ||
+                date !== undefined || time !== undefined || duration !== undefined ||
+                capacity !== undefined || price !== undefined || description !== undefined ||
+                image_url !== undefined || video_url !== undefined || assigned_staff_ids !== undefined ||
+                customer_email !== undefined
+            );
+            if (isUpdatingOtherFields) {
+                return res.status(400).json({ success: false, message: "Cannot edit a workshop that is Live or Completed." });
+            }
+        }
+
+        // Prevent editing if status is Cancelled (unless reactivating to Upcoming)
+        const dbStatus = getCapitalizedStatus(existing.status);
+        if (dbStatus === 'Cancelled') {
+            const targetStatus = status !== undefined ? getCapitalizedStatus(status) : 'Cancelled';
+            if (targetStatus !== 'Upcoming') {
+                return res.status(400).json({ success: false, message: "Cannot edit a cancelled workshop unless reactivating its status to Upcoming." });
+            }
+        }
+
+        // Status transition rules
+        if (status !== undefined) {
+            const targetStatus = getCapitalizedStatus(status);
+            if (targetStatus === 'Cancelled') {
+                if (currentStatus !== 'Upcoming') {
+                    return res.status(400).json({ success: false, message: "Cannot cancel a workshop unless its status is Upcoming." });
+                }
+            }
+            if (targetStatus === 'Completed') {
+                // Allow manual completion only after the 5-minute buffer has passed
+                const endTime = existing.end_time ? new Date(existing.end_time) : null;
+                if (endTime) {
+                    const completionTime = new Date(endTime.getTime() + 5 * 60000);
+                    if (now < completionTime) {
+                        return res.status(400).json({ success: false, message: "Cannot mark a workshop as Completed until 5 minutes after its end time has passed." });
+                    }
+                }
+            }
+        }
 
         let duplicateDetected = false;
         if (targetTitle && targetDate && targetTime) {
@@ -549,14 +791,22 @@ const updateWorkshop = async (req, res) => {
         if (category !== undefined) { fields.push('category = $' + idx++); values.push(category || null); }
         if (instructor !== undefined) { fields.push('instructor = $' + idx++); values.push(instructor?.trim() || null); }
         if (date !== undefined) { fields.push('date = $' + idx++); values.push(date || null); }
-        if (time !== undefined) { fields.push('time = $' + idx++); values.push(time || null); }
+        if (time !== undefined) { fields.push('time = $' + idx++); values.push(formatTime24(time)); }
         if (duration !== undefined) { fields.push('duration = $' + idx++); values.push(duration || null); }
         if (capacity !== undefined) { fields.push('capacity = $' + idx++); values.push(capacity || null); }
         if (price !== undefined) { fields.push('price = $' + idx++); values.push(price || null); }
-        if (status !== undefined) { fields.push('status = $' + idx++); values.push(status?.toLowerCase() || null); }
+        if (status !== undefined) { fields.push('status = $' + idx++); values.push(getCapitalizedStatus(status)); }
         if (description !== undefined) { fields.push('description = $' + idx++); values.push(description || null); }
         if (savedImageUrl !== undefined) { fields.push('image_url = $' + idx++); values.push(savedImageUrl); }
         if (savedVideoUrl !== undefined) { fields.push('video_url = $' + idx++); values.push(savedVideoUrl); }
+        if (customer_email !== undefined) { fields.push('customer_email = $' + idx++); values.push(customer_email || null); }
+
+        if (date !== undefined || time !== undefined || duration !== undefined) {
+            fields.push('start_time = $' + idx++);
+            values.push(targetStartTime);
+            fields.push('end_time = $' + idx++);
+            values.push(targetEndTime);
+        }
 
         if (assigned_staff_ids !== undefined) {
             fields.push('assigned_staff_ids = $' + idx++);
@@ -575,7 +825,12 @@ const updateWorkshop = async (req, res) => {
                 await deallocateStaffMember(staffId);
             }
 
-            const allocData = { ...existing, title: title || existing.title, date: date || existing.date };
+            const allocData = { 
+                ...existing, 
+                title: title || existing.title, 
+                date: date || existing.date,
+                time: time || existing.time 
+            };
             for (const staffId of addedStaff) {
                 await allocateStaffToWorkshop(staffId, allocData);
             }
@@ -623,12 +878,19 @@ const deleteWorkshop = async (req, res) => {
             dateStr = `${year}-${month}-${day}`;
         }
 
-        const calculatedStatus = getStatus(dateStr, workshop.time, workshop.duration);
-        if (calculatedStatus === 'ongoing') {
+        const calculatedStatus = getStatus(dateStr, workshop.time, workshop.duration, workshop.start_time, workshop.end_time);
+        if (calculatedStatus === 'Live') {
             return res.status(400).json({ success: false, message: "Cannot delete a live/ongoing workshop." });
         }
-        if (calculatedStatus === 'completed') {
+        if (calculatedStatus === 'Completed') {
             return res.status(400).json({ success: false, message: "Cannot delete a completed workshop. Only upcoming workshops can be deleted." });
+        }
+
+        if (workshop.enrolled > 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Cannot delete a workshop that has enrolled attendees. Please cancel the workshop or unenroll attendees first to prevent data loss." 
+            });
         }
 
         const oldStaffIds = workshop.assigned_staff_ids || [];
@@ -956,9 +1218,9 @@ const exportWorkshopAttendees = async (req, res) => {
 const autoUpdateWorkshopStatuses = async () => {
     try {
         const res = await query(`
-            SELECT id, title, date, time, duration, status, assigned_staff_ids, upcoming_notified, ongoing_notified, completed_notified 
+            SELECT id, title, date, time, duration, status, assigned_staff_ids, start_time, end_time, upcoming_notified, ongoing_notified, completed_notified 
             FROM workshops 
-            WHERE status != 'completed' OR (status = 'completed' AND completed_notified = FALSE)
+            WHERE status NOT IN ('Completed', 'completed') OR (status IN ('Completed', 'completed') AND completed_notified = FALSE)
         `);
         for (const w of res.rows) {
             let dateStr = w.date;
@@ -969,14 +1231,14 @@ const autoUpdateWorkshopStatuses = async () => {
                 dateStr = `${year}-${month}-${day}`;
             }
 
-            const newStatus = getStatus(dateStr, w.time, w.duration);
+            const newStatus = getStatus(dateStr, w.time, w.duration, w.start_time, w.end_time);
             
             let upNotified = w.upcoming_notified;
             let onNotified = w.ongoing_notified;
             let compNotified = w.completed_notified || false;
             
-            // 1. Send scheduled notifications if upcoming and not notified
-            if (newStatus === 'upcoming' && !upNotified) {
+            // 1. Send scheduled notifications if Upcoming and not notified
+            if (newStatus === 'Upcoming' && !upNotified) {
                 // Send to attendees
                 const attendeesRes = await query('SELECT email, name FROM attendees WHERE workshop_id = $1', [w.id]);
                 for (const att of attendeesRes.rows) {
@@ -1011,8 +1273,8 @@ const autoUpdateWorkshopStatuses = async () => {
                 upNotified = true;
             }
             
-            // 2. Send live/ongoing notifications if ongoing and not notified
-            if (newStatus === 'ongoing' && !onNotified) {
+            // 2. Send live/ongoing notifications if Live and not notified
+            if (newStatus === 'Live' && !onNotified) {
                 const attendeesRes = await query('SELECT email, name FROM attendees WHERE workshop_id = $1', [w.id]);
                 for (const att of attendeesRes.rows) {
                     try {
@@ -1041,8 +1303,8 @@ const autoUpdateWorkshopStatuses = async () => {
                 onNotified = true;
             }
 
-            // 3. Send completed notifications if newly completed and not yet notified
-            if (newStatus === 'completed' && !compNotified) {
+            // 3. Send completed notifications if newly Completed and not yet notified
+            if (newStatus === 'Completed' && !compNotified) {
                 const attendeesRes = await query('SELECT email, name FROM attendees WHERE workshop_id = $1', [w.id]);
                 for (const att of attendeesRes.rows) {
                     try {
@@ -1079,9 +1341,9 @@ const autoUpdateWorkshopStatuses = async () => {
             if (newStatus !== w.status) {
                 try {
                     await query(
-                        `INSERT INTO workshop_audit_log (workshop_id, old_status, new_status, changed_by)
-                         VALUES ($1, $2, $3, $4)`,
-                        [w.id, w.status, newStatus, 'system']
+                        `INSERT INTO workshop_audit_log (workshop_id, old_status, new_status, changed_by, status_change)
+                         VALUES ($1, $2, $3, $4, $5)`,
+                        [w.id, w.status, newStatus, 'system', `${w.status} -> ${newStatus}`]
                     );
                 } catch (auditErr) {
                     console.error('Failed to write workshop audit log:', auditErr.message);
@@ -1095,6 +1357,8 @@ const autoUpdateWorkshopStatuses = async () => {
                      WHERE id = $5`,
                     [newStatus, upNotified, onNotified, compNotified, w.id]
                 );
+                // Sync status change to allocations table immediately
+                await syncWorkshopAllocations(w.id);
             }
         }
     } catch (err) {

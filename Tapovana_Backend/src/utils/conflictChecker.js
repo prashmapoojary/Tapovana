@@ -42,7 +42,7 @@ const checkStaffAllocationConflict = async ({
         `SELECT id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes 
          FROM allocations 
          WHERE staff_id = $1 
-           AND status = 'active'
+           AND status NOT IN ('Completed', 'completed', 'expired', 'cancelled', 'removed', 'Cancelled')
            AND (
              ((type = 'vedic_program' OR type = 'vedic_package') AND start_date::date <= $2::date AND end_date::date >= $2::date)
              OR (type != 'vedic_program' AND type != 'vedic_package' AND start_date::date = $2::date)
@@ -142,7 +142,7 @@ const syncStaffMemberStatus = async (staffId) => {
     try {
         const activeAllocRes = await query(
             `SELECT * FROM allocations 
-             WHERE staff_id = $1 AND status = 'active'
+             WHERE staff_id = $1 AND status NOT IN ('Completed', 'completed', 'expired', 'cancelled', 'removed', 'Cancelled')
              ORDER BY start_date DESC, created_at DESC 
              LIMIT 1`,
             [staffId]
@@ -191,7 +191,7 @@ const getReplacementSuggestions = async (type, date, timeStr, durationMins, sess
              FROM team_members tm
              JOIN roles r ON r.id = tm.role_id
              WHERE tm.status = 'active'
-               AND r.name IN ('doctor', 'therapist')`
+               AND LOWER(r.name) IN ('doctor', 'therapist')`
         );
 
         const suggestions = [];

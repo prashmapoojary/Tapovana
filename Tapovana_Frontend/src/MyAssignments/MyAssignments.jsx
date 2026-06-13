@@ -197,22 +197,37 @@ function MyAssignments() {
   const allAssignments = useMemo(() => {
     const fromContext = contextAllocations
       .filter(a => a.staffId === activeStaffId)
-      .map(a => ({
-        ...a,
-        status: a.status === 'expired' ? 'expired' : a.status === 'cancelled' ? 'cancelled' : a.status === 'removed' ? 'removed' : 'active'
-      }));
+      .map(a => {
+        const sLower = String(a.status || "").toLowerCase();
+        let mappedStatus = 'active';
+        if (sLower === 'expired' || sLower === 'completed') mappedStatus = 'expired';
+        else if (sLower === 'cancelled') mappedStatus = 'cancelled';
+        else if (sLower === 'removed') mappedStatus = 'removed';
+        else if (sLower === 'pending') mappedStatus = 'pending';
+        else if (sLower === 'upcoming') mappedStatus = 'Upcoming';
+        else if (sLower === 'live') mappedStatus = 'Live';
+        return {
+          ...a,
+          status: mappedStatus
+        };
+      });
 
     const fromBackend = backendAssignments
       .filter(a => a.staffId === activeStaffId)
-      .map(a => ({
-        ...a,
-        status: a.status === 'pending'
-          ? 'pending'
-          : a.status === 'expired' ? 'expired'
-          : a.status === 'cancelled' ? 'cancelled'
-          : a.status === 'removed' ? 'removed'
-          : 'active'
-      }));
+      .map(a => {
+        const sLower = String(a.status || "").toLowerCase();
+        let mappedStatus = 'active';
+        if (sLower === 'expired' || sLower === 'completed') mappedStatus = 'expired';
+        else if (sLower === 'cancelled') mappedStatus = 'cancelled';
+        else if (sLower === 'removed') mappedStatus = 'removed';
+        else if (sLower === 'pending') mappedStatus = 'pending';
+        else if (sLower === 'upcoming') mappedStatus = 'Upcoming';
+        else if (sLower === 'live') mappedStatus = 'Live';
+        return {
+          ...a,
+          status: mappedStatus
+        };
+      });
 
     // Create a map of sessionId to context allocation for quick lookup!
     const contextAllocMap = new Map(fromContext.map(a => [a.sessionId, a]));
@@ -234,7 +249,7 @@ function MyAssignments() {
 
   // Stats
   const stats = useMemo(() => {
-    const active = allAssignments.filter(a => a.status === 'active').length;
+    const active = allAssignments.filter(a => a.status === 'active' || a.status === 'Upcoming' || a.status === 'Live').length;
     const pending = allAssignments.filter(a => a.status === 'pending').length;
     const expired = allAssignments.filter(a => a.status === 'expired').length;
     const total = active + pending + expired;
@@ -246,7 +261,16 @@ function MyAssignments() {
     return allAssignments.filter(a => {
       if (a.status === 'removed') return false;
       const matchesType = filterType === 'all' || a.type === filterType;
-      const matchesStatus = filterStatus === 'all' || a.status === filterStatus;
+      
+      let matchesStatus = false;
+      if (filterStatus === 'all') {
+        matchesStatus = true;
+      } else if (filterStatus === 'active') {
+        matchesStatus = a.status === 'active' || a.status === 'Upcoming' || a.status === 'Live';
+      } else {
+        matchesStatus = a.status === filterStatus;
+      }
+      
       const matchesQuery = !searchQuery ||
         a.sessionTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (a.sessionId || '').toLowerCase().includes(searchQuery.toLowerCase());
@@ -274,6 +298,13 @@ function MyAssignments() {
     try {
       if (type === 'service' && sessionId) {
         await apiFetch(`/api/services/${sessionId}/complete`, {
+          method: 'PATCH',
+          body: JSON.stringify({ staff_id: activeStaffId })
+        });
+      }
+
+      if (type === 'workshop' && sessionId) {
+        await apiFetch(`/api/workshops/${sessionId}/complete`, {
           method: 'PATCH',
           body: JSON.stringify({ staff_id: activeStaffId })
         });
@@ -348,6 +379,8 @@ function MyAssignments() {
               : a.status === 'pending' ? 'Pending Confirmation'
               : a.status === 'cancelled' ? 'Cancelled'
               : a.status === 'removed' ? 'Deallocated'
+              : a.status === 'Upcoming' ? 'Upcoming'
+              : a.status === 'Live' ? '🔴 Live'
               : 'Completed'}
           </span>
         </div>
@@ -409,7 +442,7 @@ function MyAssignments() {
 
         <div className="ma-card-footer">
           <span className="ma-assigned-date">Assigned: {getFormatDate(a.createdAt)}</span>
-          {a.status === 'active' && a.type !== 'service' && (
+          {(a.status === 'active' || a.status === 'Upcoming' || a.status === 'Live') && (
             <button
               className="ma-action-btn"
               onClick={() => handleMarkAsComplete(a.id, a.sessionId, a.endDate, a.type)}
@@ -454,28 +487,6 @@ function MyAssignments() {
           </div>
         )}
       </div>
-
-      {/* Notification banner */}
-      {isStaffUser && stats.active > 0 && (
-        <div style={{
-          background: "linear-gradient(135deg, rgba(205,167,81,0.1) 0%, rgba(205,167,81,0.15) 100%)",
-          borderLeft: "4px solid #cda751",
-          borderRadius: "8px",
-          padding: "16px 20px",
-          marginBottom: "24px",
-          display: "flex",
-          alignItems: "center",
-          gap: "16px"
-        }}>
-          <span style={{ fontSize: "24px" }}>🔔</span>
-          <div>
-            <div style={{ fontWeight: 700, color: "#1a202c", fontSize: "14px", marginBottom: "2px" }}>In-App Notifications</div>
-            <div style={{ fontSize: "13px", color: "#4a5568" }}>
-              You have <strong>{stats.active}</strong> active session(s). Mark them as completed when done!
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Stats */}
       <div className="ma-stats-grid">

@@ -157,7 +157,7 @@ app.listen(PORT, () => {
                         const filename = uuidv4() + ext;
                         fs.writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
                         
-                        const newUrl = 'https://tapovana.onrender.com/uploads/' + filename;
+                        const newUrl = '/uploads/' + filename;
                         await query('UPDATE services SET image_url = $1 WHERE id = $2', [newUrl, row.id]);
                         console.log(`[Migration] Converted image for service: "${row.name}" -> ${newUrl}`);
                     }
@@ -165,14 +165,19 @@ app.listen(PORT, () => {
                 console.log("[Migration] Database base64 images migration complete.");
             }
 
-            // Convert relative /uploads/ paths to absolute tapovana.onrender.com paths
-            const relativeResult = await query("SELECT id, name, image_url FROM services WHERE image_url LIKE '/uploads/%'");
-            if (relativeResult.rows.length > 0) {
-                console.log(`[Migration] Found ${relativeResult.rows.length} services with relative URLs. Converting to absolute...`);
-                for (const row of relativeResult.rows) {
-                    const newUrl = 'https://tapovana.onrender.com' + row.image_url;
-                    await query('UPDATE services SET image_url = $1 WHERE id = $2', [newUrl, row.id]);
-                    console.log(`[Migration] Converted relative to absolute for: "${row.name}" -> ${newUrl}`);
+            // Convert absolute /uploads/ paths back to relative /uploads/ paths
+            const absoluteResult = await query("SELECT id, name, image_url FROM services WHERE image_url LIKE '%/uploads/%'");
+            if (absoluteResult.rows.length > 0) {
+                console.log(`[Migration] Found ${absoluteResult.rows.length} services with absolute uploads URLs. Normalizing to relative...`);
+                for (const row of absoluteResult.rows) {
+                    if (row.image_url.includes('/uploads/')) {
+                        const filename = row.image_url.split('/uploads/').pop();
+                        const newUrl = '/uploads/' + filename;
+                        if (row.image_url !== newUrl) {
+                            await query('UPDATE services SET image_url = $1 WHERE id = $2', [newUrl, row.id]);
+                            console.log(`[Migration] Converted absolute to relative for: "${row.name}" -> ${newUrl}`);
+                        }
+                    }
                 }
                 console.log("[Migration] Database relative URLs migration complete.");
             }

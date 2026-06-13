@@ -496,7 +496,7 @@ const sendWorkshopScheduledEmail = async ({ to, staffOrParticipantName, workshop
       Hello ${staffOrParticipantName || 'Valued Guest'},
     </p>
     <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
-      Your workshop ${workshopTitle} is scheduled for ${dateTimeStr}. Please be ready to join.
+      Workshop ${workshopTitle} is scheduled for ${dateTimeStr}.
     </p>
     <p style="color:#888;font-size:13px;line-height:1.5;margin:24px 0 0 0;">
       Best regards,<br/>
@@ -519,7 +519,7 @@ const sendWorkshopOngoingEmail = async ({ to, staffOrParticipantName, workshopTi
       Hello ${staffOrParticipantName || 'Valued Guest'},
     </p>
     <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
-      Your workshop ${workshopTitle} is now LIVE. Join immediately to participate.
+      Workshop ${workshopTitle} is now live.
     </p>
     <p style="color:#888;font-size:13px;line-height:1.5;margin:24px 0 0 0;">
       Best regards,<br/>
@@ -542,10 +542,7 @@ const sendWorkshopDeallocationEmail = async ({ to, staffName, workshopTitle }) =
       Hello ${staffName},
     </p>
     <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
-      You have been <strong style="color:#e74c3c;">removed</strong> from the workshop: <strong>${workshopTitle}</strong>.
-    </p>
-    <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
-      This workshop has been reassigned. You are no longer required for this session.
+      You have been deallocated from Workshop ${workshopTitle}.
     </p>
     <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
       Best regards,<br/>
@@ -573,14 +570,7 @@ const sendWorkshopCompletedEmail = async ({ to, staffOrParticipantName, workshop
       Hello ${staffOrParticipantName || 'Valued Guest'},
     </p>
     <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
-      Workshop <strong style="color:#cda751;">${workshopTitle}</strong> has been completed successfully.
-    </p>
-    <div style="background:#1e1a0e;border-left:4px solid #a0aec0;border-radius:6px;padding:20px 24px;margin:20px 0;">
-      <p style="margin:0 0 6px;font-size:13px;color:#ccc;"><strong>Workshop:</strong> ${workshopTitle}</p>
-      <p style="margin:0;font-size:13px;color:#ccc;"><strong>Held on:</strong> ${dateTimeStr}</p>
-    </div>
-    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0 0 0;">
-      Thank you for participating. We hope to see you at future sessions.
+      Workshop ${workshopTitle} has been completed successfully.
     </p>
     <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
       Best regards,<br/>
@@ -592,6 +582,33 @@ const sendWorkshopCompletedEmail = async ({ to, staffOrParticipantName, workshop
     from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
     to,
     subject: `Workshop Completed – ${workshopTitle}`,
+    html,
+  });
+};
+
+const sendWorkshopAllocationNotificationEmail = async ({ to, staffName, workshopTitle, date, time }) => {
+  const dateOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+  const formattedDate = date ? new Date(date).toLocaleDateString(undefined, dateOptions) : "Not specified";
+  const dateTimeStr = `${formattedDate} at ${time || "N/A"}`;
+
+  const html = emailWrapper(`
+    <h1 style="color:#cda751;text-align:center;">Workshop Assignment Notification</h1>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
+      Hello ${staffName},
+    </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      You have been assigned to Workshop ${workshopTitle} on ${dateTimeStr}.
+    </p>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:24px 0 0 0;">
+      Best regards,<br/>
+      <strong>Workshop Admin Team</strong>
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Tapovana — Workshop Assignment Notice: ${workshopTitle}`,
     html,
   });
 };
@@ -614,5 +631,6 @@ module.exports = {
   sendWorkshopDeallocationEmail,
   sendWorkshopCompletedEmail,
   sendStaffCompletionEmail,
-  sendStaffCancellationEmail
+  sendStaffCancellationEmail,
+  sendWorkshopAllocationNotificationEmail
 };

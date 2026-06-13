@@ -28,7 +28,7 @@ const handleServiceImage = (imageData) => {
         const filename = uuidv4() + ext;
         ensureUploadsDir();
         fs.writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
-        return 'https://tapovana.onrender.com/uploads/' + filename;
+        return '/uploads/' + filename;
     }
 
     // If it's already an http URL or relative path, keep as-is
@@ -36,7 +36,7 @@ const handleServiceImage = (imageData) => {
         return imageData;
     }
     if (imageData?.startsWith('/uploads/')) {
-        return 'https://tapovana.onrender.com' + imageData;
+        return imageData;
     }
     return imageData;
 };
