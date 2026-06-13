@@ -10,15 +10,15 @@ import FilterIcon from "../assets/filterIcon.svg";
 
 // ─── Status checker ─────────────────────────────────────────────────────
 const getProgramStatus = (program) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const start = program.startDate ? new Date(program.startDate) : null;
-  const end = program.endDate ? new Date(program.endDate) : null;
+  if (!program.startDate || !program.endDate) return "upcoming";
 
-  if (start && today < start) return "upcoming";
-  if (start && end && today >= start && today <= end) return "ongoing";
-  if (end && today > end) return "completed";
-  return "upcoming";
+  const todayStr = new Date().toISOString().split('T')[0];
+  const startStr = program.startDate.split('T')[0];
+  const endStr = program.endDate.split('T')[0];
+
+  if (todayStr < startStr) return "upcoming";
+  if (todayStr >= startStr && todayStr <= endStr) return "ongoing";
+  return "completed";
 };
 
 const STATUS_CONFIG = {
@@ -103,43 +103,55 @@ function ProgramCard({ program, onClick }) {
 
   return (
     <div className="vedic-card" onClick={() => onClick({ ...program, _status: status })}>
-      <div className="vedic-card-banner" style={{ overflow: "hidden", position: "relative", height: 180 }}>
+      <div className="vedic-card-banner" style={{ overflow: "hidden", position: "relative", height: 180, display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: 14 }}>
         {!imgFailed && displayImage ? (
           <img src={getImageUrl(displayImage)} alt={program.title} onError={() => setImgFailed(true)}
             style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 1 }} />
         ) : (
           <div style={{ background: `linear-gradient(135deg, ${typeColor.color}15, ${typeColor.color}35)`, width: "100%", height: "100%", position: "absolute", top: 0, left: 0, zIndex: 1 }} />
         )}
-        <div className="vedic-card-badges" style={{ position: "absolute", top: 12, right: 12, zIndex: 2, display: "flex", gap: 6 }}>
-          <span className="vedic-card-badge" style={{ background: st.color, color: "white", border: "none", padding: "3px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700 }}>{st.label}</span>
-          <span className="vedic-card-badge" style={{ background: "white", color: typeColor.color, border: "1px solid " + typeColor.color, padding: "3px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700 }}>{program.type}</span>
-          <span className="vedic-card-badge" style={{ background: "white", color: "#4a5568", border: "1px solid #e2e8f0", padding: "3px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>{program.duration}</span>
-        </div>
+        <div className="vedic-card-category-badge" style={{ background: typeColor.color, color: "white", zIndex: 2 }}>{program.type}</div>
+        <div className="vedic-card-status-badge" style={{
+          background: status === "ongoing" ? "#2ecc71" : "#ffffff", color: status === "ongoing" ? "#ffffff" : st.color,
+          border: `1px solid ${status === "ongoing" ? "#2ecc71" : st.color}`, fontWeight: 700, zIndex: 2,
+          animation: status === "ongoing" ? "vedicPulse 1.5s infinite" : "none"
+        }}>{st.label}</div>
       </div>
       <div className="vedic-card-body">
         <h3 className="vedic-card-title">{program.title}</h3>
-        <p className="vedic-card-description">{program.description}</p>
+        <div className="vedic-card-instructor" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#7b8a9a" }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+          {program.consultant_name || program.consultant || "Not assigned"}
+        </div>
         <div className="vedic-card-meta">
-          <div className="vedic-card-meta-item" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#7b8a9a" }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+          <div className="vedic-card-meta-item" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#7b8a9a" }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
             {program.startDate ? new Date(program.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : ""} - {program.endDate ? new Date(program.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : ""}
           </div>
-          <div className="vedic-card-meta-item" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#7b8a9a" }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-            {program.consultant_name || program.consultant || "Not assigned"}
-          </div>
-          <div style={{ width: "100%", height: 6, background: "#e2e8f0", borderRadius: 3, overflow: "hidden", marginTop: 4 }}>
-            <div style={{ width: pct + "%", height: "100%", background: pct >= 100 ? "#e74c3c" : "#cda751", borderRadius: 3 }} />
-          </div>
-          <div style={{ fontSize: 11, color: "#718096", display: "flex", justifyContent: "space-between" }}>
-            <span>{program.enrolled || 0}/{program.capacity} enrolled</span>
-            <span style={{ color: "#cda751", fontWeight: 700 }}>{pct}%</span>
+          <div className="vedic-card-meta-item" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#7b8a9a" }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+            {program.duration}
           </div>
         </div>
-        <div className="vedic-card-price">₹{(program.price || 0).toLocaleString("en-IN")}</div>
-        <button className="vedic-card-btn" onClick={(e) => { e.stopPropagation(); onClick({ ...program, _status: status }); }}>
-          View Details
-        </button>
+
+        {/* Progress Bar & Enrollment Info */}
+        <div style={{ marginTop: 2 }}>
+          <div style={{ width: "100%", height: 6, background: "#e2e8f0", borderRadius: 3, overflow: "hidden", marginTop: 4 }}>
+            <div style={{ width: pct + "%", height: "100%", background: pct >= 100 ? "#e74c3c" : "#CDA751", borderRadius: 3 }} />
+          </div>
+          <div style={{ fontSize: 11, color: "#718096", display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+            <span>{program.enrolled || 0}/{program.capacity} enrolled</span>
+            <span style={{ color: "#CDA751", fontWeight: 700 }}>{pct}%</span>
+          </div>
+        </div>
+
+        <div className="vedic-card-footer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid #f1f3f7" }}>
+          <span className="vedic-card-price" style={{ fontSize: 15, fontWeight: 800, color: "#2d3748" }}>₹{(program.price || 0).toLocaleString("en-IN")}</span>
+          <button className="vedic-card-btn" style={{ background: status === "ongoing" ? "#2ecc71" : typeColor.color, padding: "6px 12px", border: "none", borderRadius: 8, color: "white", fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+            onClick={(e) => { e.stopPropagation(); onClick({ ...program, _status: status }); }}>
+            View Details
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -389,7 +401,141 @@ export default function VedicLifePrograms() {
   const handleSelectProgram = (program) => {
     setSelectedProgram({ ...program });
     setIsEditing(false);
-    setDetailTab("info");
+    setActiveDetailTab("info");
+  };
+
+  const filteredAttendees = useMemo(() => {
+    return attendees.filter(a => {
+      const matchSearch = !attendeeSearch ||
+        (a.name || "").toLowerCase().includes(attendeeSearch.toLowerCase()) ||
+        (a.email || "").toLowerCase().includes(attendeeSearch.toLowerCase());
+      return matchSearch;
+    });
+  }, [attendees, attendeeSearch]);
+
+  const fetchAttendees = async (programId) => {
+    try {
+      setAttendeesLoading(true);
+      setAttendeesError("");
+      const res = await apiFetch(`/api/vedic-programs/${programId}/attendees`);
+      if (res.success) {
+        setAttendees(res.attendees || []);
+      } else {
+        throw new Error(res.message || "Failed to load attendees.");
+      }
+    } catch (err) {
+      setAttendeesError(err.message || "Error loading attendees.");
+    } finally {
+      setAttendeesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedProgram && activeDetailTab === "attendees") {
+      fetchAttendees(selectedProgram.id);
+    }
+  }, [selectedProgram?.id, activeDetailTab]);
+
+  const handleManualEnroll = async () => {
+    setManualEnrollError("");
+    const programStatus = selectedProgram._status || getProgramStatus(selectedProgram);
+    if (programStatus === "ongoing" || programStatus === "completed") {
+      setManualEnrollError("Enrollment is only allowed for upcoming programs.");
+      return;
+    }
+
+    if (!manualEnrollForm.name.trim() || !manualEnrollForm.email.trim()) {
+      setManualEnrollError("Name and Email are required.");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(manualEnrollForm.email.trim())) {
+      setManualEnrollError("Please enter a valid email address.");
+      return;
+    }
+
+    try {
+      setManualEnrollSaving(true);
+      const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/enroll`, {
+        method: "POST",
+        body: JSON.stringify(manualEnrollForm)
+      });
+      if (res.success) {
+        showToast("User enrolled successfully!");
+        setManualEnrollForm({ name: "", email: "", phone: "" });
+        setShowManualEnroll(false);
+        await fetchPrograms();
+        setSelectedProgram(prev => ({ ...prev, enrolled: (prev.enrolled || 0) + 1 }));
+        await fetchAttendees(selectedProgram.id);
+      } else {
+        throw new Error(res.message || "Enrollment failed.");
+      }
+    } catch (err) {
+      setManualEnrollError(err.message || "Failed to enroll user.");
+    } finally {
+      setManualEnrollSaving(false);
+    }
+  };
+
+  const handleDeleteAttendee = async (attendeeId) => {
+    if (!window.confirm("Are you sure you want to remove this attendee?")) return;
+    try {
+      const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/attendees/${attendeeId}`, {
+        method: "DELETE"
+      });
+      if (res.success) {
+        showToast("Attendee removed successfully!");
+        setAttendees(res.attendees || []);
+        await fetchPrograms();
+        setSelectedProgram(prev => ({ ...prev, enrolled: Math.max(0, (prev.enrolled || 0) - 1) }));
+      } else {
+        throw new Error(res.message || "Failed to delete attendee.");
+      }
+    } catch (err) {
+      showToast(err.message || "Error deleting attendee.");
+    }
+  };
+
+  const handleMarkAttendance = async (attendeeId, status) => {
+    try {
+      const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/attendees/${attendeeId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status })
+      });
+      if (res.success) {
+        showToast("Attendance status updated.");
+        setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, status } : a));
+      } else {
+        throw new Error(res.message || "Failed to update status.");
+      }
+    } catch (err) {
+      showToast(err.message || "Error updating attendance.");
+    }
+  };
+
+  const handleExportCSV = () => {
+    const token = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+    const url = `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api/vedic-programs/${selectedProgram.id}/attendees/export?token=${token}`;
+    window.open(url, "_blank");
+  };
+
+  const handleDeleteProgram = async () => {
+    if (!window.confirm("Are you sure you want to delete this program? This action cannot be undone.")) return;
+    try {
+      const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}`, {
+        method: "DELETE"
+      });
+      if (res.success) {
+        showToast("Program deleted successfully!");
+        setSelectedProgram(null);
+        await fetchPrograms();
+      } else {
+        throw new Error(res.message || "Failed to delete program.");
+      }
+    } catch (err) {
+      showToast(err.message || "Error deleting program.");
+    }
   };
 
   const handleCloseDetail = () => {
@@ -417,12 +563,22 @@ export default function VedicLifePrograms() {
   // ─── Save edit ──────────────────────────────────────────────────────────
   const handleSaveEdit = async () => {
     setEditError("");
+    const todayStr = new Date().toISOString().split('T')[0];
+
     if (!editForm.title.trim()) { setEditError("Title is required"); return; }
     if (!editForm.startDate) { setEditError("Start date is required"); return; }
     if (!editForm.endDate) { setEditError("End date is required"); return; }
-    if (new Date(editForm.endDate) < new Date(editForm.startDate)) { setEditError("End date must be after start date"); return; }
-    if (!editForm.price || Number(editForm.price) <= 0) { setEditError("Price must be greater than 0"); return; }
+    if (editForm.startDate < todayStr) { setEditError("Start date must be today or in the future"); return; }
+    if (editForm.endDate < editForm.startDate) { setEditError("End date must be on or after start date"); return; }
+    if (editForm.price === "" || Number(editForm.price) < 0) { setEditError("Price must be greater than or equal to 0"); return; }
+    if (!editForm.capacity || Number(editForm.capacity) < 1) { setEditError("Capacity must be at least 1"); return; }
+    if (Number(editForm.capacity) < (selectedProgram.enrolled || 0)) { setEditError(`Capacity cannot be less than the number of enrolled attendees (${selectedProgram.enrolled || 0})`); return; }
     if (!editForm.consultant_id) { setEditError("Please select a lead consultant"); return; }
+
+    if (editForm.registrationDeadline) {
+      if (editForm.registrationDeadline < todayStr) { setEditError("Registration deadline must be today or in the future"); return; }
+      if (editForm.registrationDeadline > editForm.startDate) { setEditError("Registration deadline must be on or before start date"); return; }
+    }
 
     try {
       setEditSaving(true);
@@ -436,6 +592,7 @@ export default function VedicLifePrograms() {
         services: editForm.services ? editForm.services.split(",").map(s => s.trim()) : [],
         languages: editForm.languages ? editForm.languages.split(",").map(l => l.trim()) : [],
         image_url: editForm.image_base64 || editForm.image_url || null,
+        registrationDeadline: editForm.registrationDeadline || null,
         assigned_staff_ids: editForm.consultant_id ? [editForm.consultant_id] : [],
       };
 
@@ -452,12 +609,21 @@ export default function VedicLifePrograms() {
   // ─── Create Program ─────────────────────────────────────────────────────
   const handleCreateProgram = async () => {
     setAddError("");
+    const todayStr = new Date().toISOString().split('T')[0];
+
     if (!addForm.title.trim()) { setAddError("Title is required"); return; }
     if (!addForm.startDate) { setAddError("Start date is required"); return; }
     if (!addForm.endDate) { setAddError("End date is required"); return; }
-    if (new Date(addForm.endDate) < new Date(addForm.startDate)) { setAddError("End date must be after start date"); return; }
-    if (!addForm.price || Number(addForm.price) <= 0) { setAddError("Price must be greater than 0"); return; }
+    if (addForm.startDate < todayStr) { setAddError("Start date must be today or in the future"); return; }
+    if (addForm.endDate < addForm.startDate) { setAddError("End date must be on or after start date"); return; }
+    if (addForm.price === "" || Number(addForm.price) < 0) { setAddError("Price must be greater than or equal to 0"); return; }
+    if (!addForm.capacity || Number(addForm.capacity) < 1) { setAddError("Capacity must be at least 1"); return; }
     if (!addForm.consultant_id) { setAddError("Please select a lead consultant"); return; }
+
+    if (addForm.registrationDeadline) {
+      if (addForm.registrationDeadline < todayStr) { setAddError("Registration deadline must be today or in the future"); return; }
+      if (addForm.registrationDeadline > addForm.startDate) { setAddError("Registration deadline must be on or before start date"); return; }
+    }
 
     try {
       setAddSaving(true);
@@ -536,35 +702,234 @@ export default function VedicLifePrograms() {
           Lead Consultant: {p.consultant_name || p.consultant || "Not assigned"}
         </p>
 
-        {displayImage && (
-          <div style={{ marginBottom: 14, borderRadius: 8, overflow: "hidden" }}>
-            <img src={getImageUrl(displayImage)} alt={p.title} style={{ width: "100%", maxHeight: 280, objectFit: "cover" }}
-              onError={(e) => { e.target.style.display = "none"; }} />
+        {/* Tabs Bar */}
+        <div style={{ display: "flex", gap: "20px", borderBottom: "1px solid #e2e8f0", marginBottom: "20px", marginTop: "10px" }}>
+          <button 
+            onClick={() => setActiveDetailTab("info")}
+            style={{ 
+              background: "none", 
+              border: "none", 
+              borderBottom: activeDetailTab === "info" ? "3px solid #CDA751" : "3px solid transparent", 
+              padding: "10px 4px", 
+              fontSize: "14px", 
+              fontWeight: 600, 
+              color: activeDetailTab === "info" ? "#0F172A" : "#64748B", 
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+          >
+            Program Info
+          </button>
+          {isAdmin && (
+            <button 
+              onClick={() => setActiveDetailTab("attendees")}
+              style={{ 
+                background: "none", 
+                border: "none", 
+                borderBottom: activeDetailTab === "attendees" ? "3px solid #CDA751" : "3px solid transparent", 
+                padding: "10px 4px", 
+                fontSize: "14px", 
+                fontWeight: 600, 
+                color: activeDetailTab === "attendees" ? "#0F172A" : "#64748B", 
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Attendees ({p.enrolled || 0})
+            </button>
+          )}
+        </div>
+
+        {activeDetailTab === "info" ? (
+          <>
+            {displayImage && (
+              <div style={{ marginBottom: 14, borderRadius: 8, overflow: "hidden" }}>
+                <img src={getImageUrl(displayImage)} alt={p.title} style={{ width: "100%", maxHeight: 280, objectFit: "cover" }}
+                  onError={(e) => { e.target.style.display = "none"; }} />
+              </div>
+            )}
+
+            <p style={{ fontSize: 14, color: "#4a5568", lineHeight: 1.7, margin: "0 0 16px 0" }}>{p.description}</p>
+
+            <div style={{ background: "#f8f9fb", borderRadius: 10, padding: 16, marginBottom: 16 }}>
+              <h4 style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: 700, color: "#2d3748" }}>Program Details</h4>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Start Date</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.startDate ? new Date(p.startDate).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" }) : "N/A"}</span></div>
+                <div><span style={{ fontSize: 12, color: "#a0aec0" }}>End Date</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.endDate ? new Date(p.endDate).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" }) : "N/A"}</span></div>
+                <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Duration</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.duration}</span></div>
+                <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Price</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>₹{(p.price || 0).toLocaleString("en-IN")}</span></div>
+                <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Capacity</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.enrolled || 0} / {p.capacity} enrolled</span></div>
+                <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Accommodation</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.accommodations || "Self-arranged"}</span></div>
+                <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Services</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.services ? (Array.isArray(p.services) ? p.services.join(", ") : p.services) : "General Wellness"}</span></div>
+                <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Languages</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.languages ? (Array.isArray(p.languages) ? p.languages.join(", ") : p.languages) : "English"}</span></div>
+              </div>
+            </div>
+
+            <div className="vedic-modal-actions" style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              {status === "upcoming" ? (
+                <>
+                  <button className="vedic-btn-cancel" style={{ flex: 1 }} onClick={handleStartEdit}>Edit Program</button>
+                  <button className="vedic-btn-allocate" style={{ flex: 1.5 }} onClick={handleAllocateInstructor}>
+                    {p.consultant_id ? "Re-allocate Instructor" : "Allocate Consultant"}
+                  </button>
+                  <button className="vedic-btn-cancel" style={{ flex: 1, borderColor: "#e74c3c", color: "#e74c3c" }} onClick={handleDeleteProgram}>
+                    Delete Program
+                  </button>
+                </>
+              ) : (
+                <span style={{ fontSize: 13, color: "#718096", fontStyle: "italic" }}>
+                  This program is ongoing or completed and cannot be edited, deleted, or reallocated.
+                </span>
+              )}
+            </div>
+          </>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Header controls for Attendees */}
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 12px", background: "white", flex: 1, minWidth: 200 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                <input 
+                  type="text" 
+                  placeholder="Search attendee..." 
+                  value={attendeeSearch} 
+                  onChange={e => setAttendeeSearch(e.target.value)} 
+                  style={{ border: "none", outline: "none", fontSize: 13, width: "100%", background: "transparent" }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button 
+                  onClick={handleExportCSV} 
+                  className="vedic-btn-cancel" 
+                  style={{ padding: "8px 12px", fontSize: 12 }}
+                >
+                  Export CSV
+                </button>
+                {status === "upcoming" ? (
+                  <button 
+                    onClick={() => setShowManualEnroll(!showManualEnroll)} 
+                    className="vedic-btn-allocate" 
+                    style={{ padding: "8px 12px", fontSize: 12 }}
+                  >
+                    {showManualEnroll ? "Close Form" : "+ Enroll User"}
+                  </button>
+                ) : (
+                  <span style={{ fontSize: 12, color: "#e74c3c", fontWeight: 600 }}>Enrollment Closed</span>
+                )}
+              </div>
+            </div>
+
+            {/* Manual Enrollment Form */}
+            {showManualEnroll && (
+              <div style={{ background: "#f8f9fb", borderRadius: 8, padding: 16, border: "1px solid rgba(205,167,81,0.2)" }}>
+                <h4 style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: 700, color: "#2d3748" }}>Enroll User Manually</h4>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <FormField label="Full Name">
+                    <input 
+                      type="text" 
+                      placeholder="John Doe" 
+                      value={manualEnrollForm.name} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, name: e.target.value }))}
+                      style={inputStyle}
+                    />
+                  </FormField>
+                  <FormField label="Email Address">
+                    <input 
+                      type="email" 
+                      placeholder="john@example.com" 
+                      value={manualEnrollForm.email} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, email: e.target.value }))}
+                      style={inputStyle}
+                    />
+                  </FormField>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 12 }}>
+                  <FormField label="Phone Number (Optional)">
+                    <input 
+                      type="text" 
+                      placeholder="9876543210" 
+                      value={manualEnrollForm.phone} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, phone: e.target.value }))}
+                      style={inputStyle}
+                    />
+                  </FormField>
+                </div>
+                {manualEnrollError && <div style={{ color: "#e74c3c", fontSize: 12, fontWeight: 600, marginBottom: 8 }}>{manualEnrollError}</div>}
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button className="vedic-btn-cancel" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => setShowManualEnroll(false)}>Cancel</button>
+                  <button className="vedic-btn-allocate" style={{ padding: "6px 12px", fontSize: 12 }} onClick={handleManualEnroll} disabled={manualEnrollSaving}>
+                    {manualEnrollSaving ? "Enrolling..." : "Submit Enrollment"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Attendees Table */}
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, background: "white", overflow: "hidden" }}>
+              {attendeesLoading ? (
+                <div style={{ padding: 30, textAlign: "center", color: "#64748B" }}>Loading attendees...</div>
+              ) : attendeesError ? (
+                <div style={{ padding: 30, textAlign: "center", color: "#e74c3c" }}>{attendeesError}</div>
+              ) : filteredAttendees.length === 0 ? (
+                <div style={{ padding: 40, textAlign: "center", color: "#64748B" }}>
+                  {attendeeSearch ? "No attendees match your search." : "No users enrolled in this program yet."}
+                </div>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                  <thead>
+                    <tr style={{ background: "#f8f9fb", borderBottom: "1px solid #e2e8f0" }}>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Name</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Email</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Phone</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Status</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAttendees.map(a => (
+                      <tr key={a.id} style={{ borderBottom: "1px solid #f1f3f7" }}>
+                        <td style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#2d3748" }}>{a.name}</td>
+                        <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>{a.email}</td>
+                        <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>{a.phone || "-"}</td>
+                        <td style={{ padding: "10px 16px" }}>
+                          <span style={{ 
+                            fontSize: 11, 
+                            fontWeight: 700, 
+                            padding: "3px 8px", 
+                            borderRadius: 12,
+                            textTransform: "uppercase",
+                            background: a.status === "attended" ? "rgba(34,197,94,0.12)" : a.status === "absent" ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)",
+                            color: a.status === "attended" ? "#16a34a" : a.status === "absent" ? "#dc2626" : "#d97706"
+                          }}>
+                            {a.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: "10px 16px" }}>
+                          <select 
+                            value={a.status} 
+                            onChange={e => {
+                              if (e.target.value === "delete") {
+                                handleDeleteAttendee(a.id);
+                              } else {
+                                handleMarkAttendance(a.id, e.target.value);
+                              }
+                            }}
+                            style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #e2e8f0", fontSize: 12, outline: "none", cursor: "pointer", background: "white" }}
+                          >
+                            <option value="enrolled">Enrolled</option>
+                            <option value="attended">Attended</option>
+                            <option value="absent">Absent</option>
+                            <option value="delete">Delete Attendee</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         )}
-
-        <p style={{ fontSize: 14, color: "#4a5568", lineHeight: 1.7, margin: "0 0 16px 0" }}>{p.description}</p>
-
-        <div style={{ background: "#f8f9fb", borderRadius: 10, padding: 16, marginBottom: 16 }}>
-          <h4 style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: 700, color: "#2d3748" }}>Program Details</h4>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Start Date</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.startDate ? new Date(p.startDate).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" }) : "N/A"}</span></div>
-            <div><span style={{ fontSize: 12, color: "#a0aec0" }}>End Date</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.endDate ? new Date(p.endDate).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" }) : "N/A"}</span></div>
-            <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Duration</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.duration}</span></div>
-            <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Price</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>₹{(p.price || 0).toLocaleString("en-IN")}</span></div>
-            <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Capacity</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.enrolled || 0} / {p.capacity} enrolled</span></div>
-            <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Accommodation</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.accommodations || "Self-arranged"}</span></div>
-            <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Services</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.services ? (Array.isArray(p.services) ? p.services.join(", ") : p.services) : "General Wellness"}</span></div>
-            <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Languages</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.languages ? (Array.isArray(p.languages) ? p.languages.join(", ") : p.languages) : "English"}</span></div>
-          </div>
-        </div>
-
-        <div className="vedic-modal-actions" style={{ display: "flex", gap: 12 }}>
-          <button className="vedic-btn-cancel" style={{ flex: 1 }} onClick={handleStartEdit}>Edit Program</button>
-          <button className="vedic-btn-allocate" style={{ flex: 1.5 }} onClick={handleAllocateInstructor}>
-            {p.consultant_id ? "Re-allocate Instructor" : "Allocate Consultant"}
-          </button>
-        </div>
       </div>
     );
   };
@@ -608,14 +973,24 @@ export default function VedicLifePrograms() {
             )}
           </div>
 
-          <div className="vedic-stats">
-            <div className="vedic-stat-card"><div className="vedic-stat-content"><h3>Total Programs</h3><p>{stats.total}</p></div></div>
-            <div className="vedic-stat-card" style={{ borderLeft: stats.ongoing > 0 ? "4px solid #2ecc71" : "1px solid #CDA751" }}>
-              <div className="vedic-stat-content"><h3>Ongoing</h3><p style={{ color: stats.ongoing > 0 ? "#2ecc71" : "#1a202c" }}>{stats.ongoing}</p></div>
+          <section className="vedic-stats-row">
+            <div className="vedic-stat-card">
+              <div className="vedic-stat-value">{stats.total}</div>
+              <div className="vedic-stat-label">Total Programs</div>
             </div>
-            <div className="vedic-stat-card"><div className="vedic-stat-content"><h3>Upcoming</h3><p>{stats.upcoming}</p></div></div>
-            <div className="vedic-stat-card"><div className="vedic-stat-content"><h3>Revenue</h3><p>₹{(stats.revenue / 100000).toFixed(1)}L</p></div></div>
-          </div>
+            <div className="vedic-stat-card" style={stats.ongoing > 0 ? { borderLeft: "4px solid #2ecc71" } : undefined}>
+              <div className="vedic-stat-value" style={{ color: stats.ongoing > 0 ? "#2ecc71" : "#2d3748" }}>{stats.ongoing}</div>
+              <div className="vedic-stat-label">Ongoing</div>
+            </div>
+            <div className="vedic-stat-card">
+              <div className="vedic-stat-value">{stats.upcoming}</div>
+              <div className="vedic-stat-label">Upcoming</div>
+            </div>
+            <div className="vedic-stat-card">
+              <div className="vedic-stat-value">{stats.completed}</div>
+              <div className="vedic-stat-label">Completed</div>
+            </div>
+          </section>
 
           <div className="vedic-controls">
             <div className="vedic-search-box">

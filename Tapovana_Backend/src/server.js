@@ -204,6 +204,18 @@ app.listen(PORT, () => {
         autoUpdateWorkshopStatuses().catch(err => console.error("Error in background workshop status update:", err));
     }, 30000);
 
+    // ── Background Vedic Program status check & allocations sync scheduler ──
+    const { autoUpdateVedicProgramStatuses } = require("./controllers/vedicProgramsController");
+    // Run immediately on boot
+    autoUpdateVedicProgramStatuses()
+        .then(() => console.log("[Vedic Program Scheduler] Initial status check complete."))
+        .catch(err => console.error("[Vedic Program Scheduler] Initial status check failed:", err));
+
+    // Run every 30 seconds
+    setInterval(() => {
+        autoUpdateVedicProgramStatuses().catch(err => console.error("Error in background Vedic Program status update:", err));
+    }, 30000);
+
     // ── Monthly Refresh Job (Midnight on the 15th of every month) ───────────
     let lastMonthlyRefreshDate = "";
     setInterval(async () => {

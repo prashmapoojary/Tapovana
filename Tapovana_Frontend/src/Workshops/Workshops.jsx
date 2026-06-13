@@ -396,8 +396,17 @@ export default function Workshops() {
   const handleManualEnroll = async () => {
     setManualEnrollError("");
     const ws = workshops.find(w => w.id === selectedWs?.id) || selectedWs;
-    if (getLiveStatus(ws) === "completed") {
-      const errMsg = "This workshop is completed. Staff assignment and enrollment are disabled.";
+    const status = getLiveStatus(ws);
+    const dbStatus = String(ws.status || "").toLowerCase();
+    if (status === "live" || status === "completed" || dbStatus === "cancelled") {
+      let errMsg = "Staff assignment and enrollment are disabled.";
+      if (status === "live") {
+        errMsg = "This workshop is currently live. Staff assignment and enrollment are disabled.";
+      } else if (dbStatus === "cancelled") {
+        errMsg = "This workshop has been cancelled. Staff assignment and enrollment are disabled.";
+      } else if (status === "completed") {
+        errMsg = "This workshop is completed. Staff assignment and enrollment are disabled.";
+      }
       setManualEnrollError(errMsg);
       showToast(errMsg);
       return;

@@ -9,7 +9,8 @@ const {
     getVedicProgramAttendees,
     updateVedicAttendeeAttendance,
     deleteVedicProgramAttendee,
-    exportVedicProgramAttendees
+    exportVedicProgramAttendees,
+    deleteVedicProgram
 } = require('../controllers/vedicProgramsController');
 
 const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN')];
@@ -19,6 +20,7 @@ router.get('/', getAllVedicPrograms);
 router.post('/', ...adminOnly, createVedicProgram);
 router.patch('/:id', ...adminOnly, updateVedicProgram);
 router.patch('/:id/staff', ...adminOnly, updateVedicProgramStaff);
+router.delete('/:id', ...adminOnly, deleteVedicProgram);
 
 // Attendee Management (Admin Side)
 router.post('/:id/enroll', ...adminOnly, enrollUserInVedicProgram);

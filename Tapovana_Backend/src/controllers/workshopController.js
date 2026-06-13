@@ -100,6 +100,9 @@ async function validateWorkshopActions(workshopId) {
     }
 
     const calculatedStatus = getStatus(dateStr, w.time, w.duration, w.start_time, w.end_time);
+    if (calculatedStatus === 'Live') {
+        throw new Error('This workshop is currently live. Staff assignment and enrollment are disabled.');
+    }
     if (calculatedStatus === 'Completed') {
         throw new Error('This workshop is completed. Staff assignment and enrollment are disabled.');
     }
