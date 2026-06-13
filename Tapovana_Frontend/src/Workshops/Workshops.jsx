@@ -15,9 +15,6 @@ const getLiveStatus = (ws) => {
   const day = String(now.getDate()).padStart(2, '0');
   const today = `${year}-${month}-${day}`;
   
-  // Format current local time HH:MM
-  const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-
   let wsDateStr = ws.date;
   if (ws.date && typeof ws.date === 'string') {
     wsDateStr = ws.date.split('T')[0];
@@ -50,14 +47,16 @@ const getLiveStatus = (ws) => {
     }
   }
 
-  const wsStartStr = wsHour.toString().padStart(2, '0') + ":" + wsMinute.toString().padStart(2, '0');
+  // Build Date objects for start, end, and completion (end + 5 min buffer)
+  const wsStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), wsHour, wsMinute, 0, 0);
   const wsEndMins = wsHour * 60 + wsMinute + (ws.duration || 60);
-  const wsEndHour = Math.floor(wsEndMins / 60);
-  const wsEndMin = wsEndMins % 60;
-  const wsEndStr = wsEndHour.toString().padStart(2, '0') + ":" + wsEndMin.toString().padStart(2, '0');
+  const wsEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
+    Math.floor(wsEndMins / 60), wsEndMins % 60, 0, 0);
+  // 5-minute completion buffer (mirrors backend logic)
+  const wsCompletion = new Date(wsEnd.getTime() + 5 * 60 * 1000);
 
-  if (currentTime >= wsStartStr && currentTime <= wsEndStr) return "live";
-  if (currentTime < wsStartStr) return "upcoming";
+  if (now < wsStart) return "upcoming";
+  if (now >= wsStart && now < wsCompletion) return "live";
   return "completed";
 };
 
@@ -697,7 +696,11 @@ export default function Workshops() {
   const handleDeleteWorkshop = () => {
     const liveStatus = selectedWs._liveStatus || getLiveStatus(selectedWs);
     if (liveStatus === "live" || liveStatus === "ongoing") {
-      showToast("Cannot delete an ongoing workshop.");
+      showToast("Cannot delete a live/ongoing workshop.");
+      return;
+    }
+    if (liveStatus === "completed") {
+      showToast("Cannot delete a completed workshop. Only upcoming workshops can be deleted.");
       return;
     }
     setShowDeleteConfirm(true);
@@ -793,7 +796,7 @@ export default function Workshops() {
         await fetchWorkshops();
         setShowAddModal(false);
         setAddForm(BLANK_FORM);
-        showToast(res.message || "Workshop created successfully!");
+        showToast("Workshop created successfully");
       } else {
         throw new Error(res.message || "Failed to create workshop");
       }
@@ -811,8 +814,9 @@ export default function Workshops() {
           setAddError("Allocation attempt 3 failed, please reassign staff.");
         }
       } else {
-        setAddError(err.message || "Failed to create workshop");
+        setAddError(err.message || "Error creating workshop");
       }
+      showToast("Error creating workshop");
     } finally {
       setAddSaving(false);
     }

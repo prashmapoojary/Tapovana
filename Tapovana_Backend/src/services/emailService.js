@@ -139,51 +139,73 @@ const sendAllocationEmail = async ({ to, firstName, programName, programType, st
 };
 
 // ─── NEW: Booking Email Notifications ──────────────────────────────────────
-const sendBookingStatusEmail = async ({ to, firstName, status, details = {}, previousStatus = null }) => {
+const sendBookingStatusEmail = async ({ to, firstName, status, details = {} }) => {
+  const customerName = firstName || "Customer";
+  const serviceName = details.service || "N/A";
+  
+  const formattedDate = details.date ? new Date(details.date).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }) : "N/A";
+  const dateTime = `${formattedDate}, ${details.time || "N/A"}`;
+  
   let subject = "";
-  let message = "";
-  let detailsHtml = "";
-
-  const formattedDate = details.date ? new Date(details.date).toLocaleDateString() : "";
+  let bodyContent = "";
 
   if (status === "PENDING") {
-    subject = "Tapovana — Booking Pending Approval";
-    message = "Your booking request is pending approval.";
+    subject = "Booking Submitted - Pending Confirmation";
+    bodyContent = `
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">Dear ${customerName},</p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">Your booking has been submitted successfully and is currently pending confirmation.</p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">
+        <strong>Service:</strong> ${serviceName}<br/>
+        <strong>Date & Time:</strong> ${dateTime}
+      </p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 24px 0;">We will notify you once it is confirmed.</p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0;">Regards,<br/><strong style="color:#cda751;">Tapovana</strong></p>
+    `;
   } else if (status === "CONFIRMED") {
-    subject = "Tapovana — Booking Confirmed";
-    message = "Your booking has been confirmed.";
-    detailsHtml = `
-      <div style="background:#1e1a0e;border-left:4px solid #cda751;border-radius:6px;padding:20px 24px;margin:20px 0;">
-        <p style="margin:0 0 8px;font-size:14px;color:#cda751;font-weight:600;">Booking Details</p>
-        <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Service:</strong> ${details.service || "N/A"}</p>
-        <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Date:</strong> ${formattedDate}</p>
-        <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Time:</strong> ${details.time || "N/A"}</p>
-        <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Staff:</strong> ${details.staff || "Not Assigned"}</p>
-      </div>
+    subject = "Booking Confirmed";
+    const staffName = details.staff || "Not Assigned";
+    bodyContent = `
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">Dear ${customerName},</p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">Your booking has been confirmed.</p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">
+        <strong>Service:</strong> ${serviceName}<br/>
+        <strong>Date & Time:</strong> ${dateTime}<br/>
+        <strong>Assigned Staff:</strong> ${staffName}
+      </p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 24px 0;">Thank you for choosing us.</p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0;">Regards,<br/><strong style="color:#cda751;">Tapovana</strong></p>
     `;
   } else if (status === "CANCELLED") {
-    if (previousStatus === "CONFIRMED") {
-      subject = "Tapovana — Confirmed Booking Cancelled";
-      message = "Your confirmed booking has been cancelled.";
-    } else {
-      subject = "Tapovana — Booking Cancelled";
-      message = "Your booking has been cancelled.";
-    }
+    subject = "Booking Cancelled";
+    bodyContent = `
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">Dear ${customerName},</p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">Your booking has been cancelled.</p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">
+        <strong>Service:</strong> ${serviceName}<br/>
+        <strong>Date & Time:</strong> ${dateTime}
+      </p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 24px 0;">We regret the inconvenience.</p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0;">Regards,<br/><strong style="color:#cda751;">Tapovana</strong></p>
+    `;
   } else if (status === "COMPLETED") {
-    subject = "Tapovana — Booking Completed";
-    message = "Your booking has been marked as completed.";
+    subject = "Booking Completed";
+    bodyContent = `
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">Dear ${customerName},</p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">Your booking has been successfully completed.</p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">
+        <strong>Service:</strong> ${serviceName}<br/>
+        <strong>Date & Time:</strong> ${dateTime}
+      </p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 24px 0;">Thank you for your trust.</p>
+      <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0;">Regards,<br/><strong style="color:#cda751;">Tapovana</strong></p>
+    `;
   }
 
-  const html = emailWrapper(`
-    <h1 style="color:#cda751;text-align:center;">Booking Update</h1>
-    <p style="color:#cccccc;text-align:center;">
-      Hello ${firstName},
-    </p>
-    <p style="color:#cccccc;text-align:center;">
-      ${message}
-    </p>
-    ${detailsHtml}
-  `);
+  const html = emailWrapper(bodyContent);
 
   return transporter.sendMail({
     from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
@@ -194,28 +216,35 @@ const sendBookingStatusEmail = async ({ to, firstName, status, details = {}, pre
 };
 
 const sendBookingAllocationEmail = async ({ to, staffName, bookingId, details = {} }) => {
-  const formattedDate = details.date ? new Date(details.date).toLocaleDateString() : "";
-  const html = emailWrapper(`
-    <h1 style="color:#cda751;text-align:center;">New Booking Allocation</h1>
-    <p style="color:#cccccc;text-align:center;">
-      Hello ${staffName},
+  const serviceName = details.service || "N/A";
+  
+  const formattedDate = details.date ? new Date(details.date).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }) : "N/A";
+  const dateTime = `${formattedDate}, ${details.time || "N/A"}`;
+  
+  const customerName = details.customer || "Guest";
+
+  const bodyContent = `
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">Dear ${staffName},</p>
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">You have been allocated to booking ${bookingId}.</p>
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">
+      <strong>Service:</strong> ${serviceName}<br/>
+      <strong>Date & Time:</strong> ${dateTime}<br/>
+      <strong>Customer:</strong> ${customerName}
     </p>
-    <p style="color:#cccccc;text-align:center;">
-      You have been allocated to booking <strong>#${bookingId}</strong>.
-    </p>
-    <div style="background:#1e1a0e;border-left:4px solid #cda751;border-radius:6px;padding:20px 24px;margin:20px 0;">
-      <p style="margin:0 0 8px;font-size:14px;color:#cda751;font-weight:600;">Booking Details</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Service:</strong> ${details.service || "N/A"}</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Date:</strong> ${formattedDate}</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Time:</strong> ${details.time || "N/A"}</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Customer:</strong> ${details.customer || "Guest"}</p>
-    </div>
-  `);
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 24px 0;">Please check your assignments page.</p>
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0;">Regards,<br/><strong style="color:#cda751;">Tapovana</strong></p>
+  `;
+
+  const html = emailWrapper(bodyContent);
 
   return transporter.sendMail({
     from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
     to,
-    subject: `Tapovana — New Booking Allocation #${bookingId}`,
+    subject: "New Booking Allocation",
     html,
   });
 };
@@ -267,31 +296,94 @@ const sendAdminLeaveAlertEmail = async ({ to, staffName, details = [] }) => {
 };
 
 const sendBookingRemovalEmail = async ({ to, staffName, bookingId, details = {} }) => {
-  const formattedDate = details.date ? new Date(details.date).toLocaleDateString() : "";
-  const html = emailWrapper(`
-    <h1 style="color:#e74c3c;text-align:center;">Booking Allocation Removed</h1>
-    <p style="color:#cccccc;text-align:center;">
-      Hello ${staffName},
+  const serviceName = details.service || "N/A";
+  
+  const formattedDate = details.date ? new Date(details.date).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }) : "N/A";
+  const dateTime = `${formattedDate}, ${details.time || "N/A"}`;
+
+  const bodyContent = `
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">Dear ${staffName},</p>
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">You have been removed from booking ${bookingId}.</p>
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">
+      <strong>Service:</strong> ${serviceName}<br/>
+      <strong>Date & Time:</strong> ${dateTime}
     </p>
-    <p style="color:#cccccc;text-align:center;">
-      You have been <strong style="color:#e74c3c;">removed</strong> from booking <strong>#${bookingId}</strong>.
-    </p>
-    <div style="background:#2c1a1a;border-left:4px solid #e74c3c;border-radius:6px;padding:20px 24px;margin:20px 0;">
-      <p style="margin:0 0 8px;font-size:14px;color:#e74c3c;font-weight:600;">Booking Details</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Service:</strong> ${details.service || "N/A"}</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Date:</strong> ${formattedDate}</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Time:</strong> ${details.time || "N/A"}</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#ccc;"><strong>Customer:</strong> ${details.customer || "Guest"}</p>
-    </div>
-    <p style="color:#888;text-align:center;font-size:13px;">
-      This service has been reassigned. You are no longer required for this booking.
-    </p>
-  `);
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 24px 0;">A new staff member has been allocated.</p>
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0;">Regards,<br/><strong style="color:#cda751;">Tapovana</strong></p>
+  `;
+
+  const html = emailWrapper(bodyContent);
 
   return transporter.sendMail({
     from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
     to,
-    subject: `Tapovana — Removed from Booking #${bookingId}`,
+    subject: "Booking Reallocation Notice",
+    html,
+  });
+};
+
+const sendStaffCompletionEmail = async ({ to, staffName, bookingId, details = {} }) => {
+  const serviceName = details.service || "N/A";
+  
+  const formattedDate = details.date ? new Date(details.date).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }) : "N/A";
+  const dateTime = `${formattedDate}, ${details.time || "N/A"}`;
+
+  const bodyContent = `
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">Dear ${staffName},</p>
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">Booking ${bookingId} has been marked as completed.</p>
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">
+      <strong>Service:</strong> ${serviceName}<br/>
+      <strong>Date & Time:</strong> ${dateTime}
+    </p>
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 24px 0;">Thank you for your service.</p>
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0;">Regards,<br/><strong style="color:#cda751;">Tapovana</strong></p>
+  `;
+
+  const html = emailWrapper(bodyContent);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: "Booking Completed",
+    html,
+  });
+};
+
+const sendStaffCancellationEmail = async ({ to, staffName, bookingId, details = {} }) => {
+  const serviceName = details.service || "N/A";
+  
+  const formattedDate = details.date ? new Date(details.date).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }) : "N/A";
+  const dateTime = `${formattedDate}, ${details.time || "N/A"}`;
+
+  const bodyContent = `
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">Dear ${staffName},</p>
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">Booking ${bookingId} has been cancelled.</p>
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 16px 0;">
+      <strong>Service:</strong> ${serviceName}<br/>
+      <strong>Date & Time:</strong> ${dateTime}
+    </p>
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0 0 24px 0;">You are no longer allocated to this booking.</p>
+    <p style="color:#cccccc; font-size:14px; line-height:1.6; margin:0;">Regards,<br/><strong style="color:#cda751;">Tapovana</strong></p>
+  `;
+
+  const html = emailWrapper(bodyContent);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: "Booking Cancelled Notice",
     html,
   });
 };
@@ -469,6 +561,41 @@ const sendWorkshopDeallocationEmail = async ({ to, staffName, workshopTitle }) =
   });
 };
 
+// ─── Workshop Completed Email ────────────────────────────────────────────────
+const sendWorkshopCompletedEmail = async ({ to, staffOrParticipantName, workshopTitle, date, time }) => {
+  const dateOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+  const formattedDate = date ? new Date(date).toLocaleDateString(undefined, dateOptions) : 'Not specified';
+  const dateTimeStr = `${formattedDate}${time ? ' at ' + time : ''}`;
+
+  const html = emailWrapper(`
+    <h1 style="color:#a0aec0;text-align:center;">Workshop Completed</h1>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
+      Hello ${staffOrParticipantName || 'Valued Guest'},
+    </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      Workshop <strong style="color:#cda751;">${workshopTitle}</strong> has been completed successfully.
+    </p>
+    <div style="background:#1e1a0e;border-left:4px solid #a0aec0;border-radius:6px;padding:20px 24px;margin:20px 0;">
+      <p style="margin:0 0 6px;font-size:13px;color:#ccc;"><strong>Workshop:</strong> ${workshopTitle}</p>
+      <p style="margin:0;font-size:13px;color:#ccc;"><strong>Held on:</strong> ${dateTimeStr}</p>
+    </div>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0 0 0;">
+      Thank you for participating. We hope to see you at future sessions.
+    </p>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
+      Best regards,<br/>
+      <strong>Workshop Admin Team</strong>
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Workshop Completed – ${workshopTitle}`,
+    html,
+  });
+};
+
 module.exports = { 
   sendWelcomeEmail, 
   sendOtpEmail, 
@@ -484,5 +611,8 @@ module.exports = {
   sendWorkshopRemovalEmail,
   sendWorkshopScheduledEmail,
   sendWorkshopOngoingEmail,
-  sendWorkshopDeallocationEmail
+  sendWorkshopDeallocationEmail,
+  sendWorkshopCompletedEmail,
+  sendStaffCompletionEmail,
+  sendStaffCancellationEmail
 };

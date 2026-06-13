@@ -67,7 +67,7 @@
 /* Stats Cards Grid — matches Membership .mem-tier-cards */
 .ma-stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -273,6 +273,12 @@
 .ma-status-badge.active {
   background: rgba(205, 167, 81, 0.1);
   color: #cda751;
+}
+
+.ma-status-badge.pending {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .ma-status-badge.expired {

@@ -798,6 +798,7 @@ function Bookings() {
               <tr>
                 <th>ID</th>
                 <th>CUSTOMER</th>
+                <th>EMAIL</th>
                 <th>SERVICE</th>
                 <th>ASSIGNED STAFF</th>
                 <th>ROLE</th>
@@ -811,9 +812,9 @@ function Bookings() {
             </thead>
             <tbody>
               {loading && bookings.length === 0 ? (
-                <tr><td colSpan="11" className="bk-loading-cell">Loading bookings...</td></tr>
+                <tr><td colSpan="12" className="bk-loading-cell">Loading bookings...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan="11" className="bk-empty-cell">No bookings found.</td></tr>
+                <tr><td colSpan="12" className="bk-empty-cell">No bookings found.</td></tr>
               ) : (
                 filtered.map((b) => {
                   const staffInfo = getStaffDisplay(b.therapist_name);
@@ -827,6 +828,9 @@ function Bookings() {
                       <td><strong>#{b.id}</strong></td>
                       <td>
                         <div className="bk-cell-name">{b.user_name || "Guest User"}</div>
+                      </td>
+                      <td>
+                        <div className="bk-cell-email" style={{ color: '#64748b', fontSize: '13px' }}>{b.user_email || b.email || "-"}</div>
                       </td>
                       <td>{b.service_name || "N/A"}</td>
                       <td>

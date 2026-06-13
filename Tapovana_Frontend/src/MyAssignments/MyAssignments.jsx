@@ -203,7 +203,12 @@ function MyAssignments() {
       .filter(a => a.staffId === activeStaffId)
       .map(a => ({
         ...a,
-        status: a.status === 'expired' ? 'expired' : a.status === 'cancelled' ? 'cancelled' : a.status === 'removed' ? 'removed' : 'active'
+        status: a.status === 'pending'
+          ? 'pending'
+          : a.status === 'expired' ? 'expired'
+          : a.status === 'cancelled' ? 'cancelled'
+          : a.status === 'removed' ? 'removed'
+          : 'active'
       }));
 
     // Create a map of sessionId to context allocation for quick lookup!
@@ -227,9 +232,10 @@ function MyAssignments() {
   // Stats
   const stats = useMemo(() => {
     const active = allAssignments.filter(a => a.status === 'active').length;
+    const pending = allAssignments.filter(a => a.status === 'pending').length;
     const expired = allAssignments.filter(a => a.status === 'expired').length;
-    const total = active + expired;
-    return { total, active, expired };
+    const total = active + pending + expired;
+    return { total, active, pending, expired };
   }, [allAssignments]);
 
   // Filtered assignments (exclude removed ones entirely)
@@ -335,9 +341,10 @@ function MyAssignments() {
             {a.type === 'vedic_program' ? 'Vedic Program' : a.type}
           </span>
           <span className={`ma-status-badge ${a.status}`}>
-            {a.status === 'active' ? 'Active / Scheduled' 
-              : a.status === 'cancelled' ? 'Cancelled' 
-              : a.status === 'removed' ? 'Deallocated' 
+            {a.status === 'active' ? 'Active / Scheduled'
+              : a.status === 'pending' ? 'Pending Confirmation'
+              : a.status === 'cancelled' ? 'Cancelled'
+              : a.status === 'removed' ? 'Deallocated'
               : 'Completed'}
           </span>
         </div>
@@ -485,6 +492,13 @@ function MyAssignments() {
         </div>
         <div className="ma-stat-card">
           <div className="mem-tier-card-top">
+            <div className="mem-tier-badge" style={{ background: "#f59e0b", color: "white" }}>Pending</div>
+          </div>
+          <span className="ma-stat-value" style={{ color: "#f59e0b" }}>{stats.pending}</span>
+          <span className="ma-stat-label">Pending Confirmation</span>
+        </div>
+        <div className="ma-stat-card">
+          <div className="mem-tier-card-top">
             <div className="mem-tier-badge" style={{ background: "#8e9fa7", color: "white" }}>Completed</div>
           </div>
           <span className="ma-stat-value" style={{ color: "#8e9fa7" }}>{stats.expired}</span>
@@ -513,6 +527,7 @@ function MyAssignments() {
           <select className="ma-filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
             <option value="all">All Statuses</option>
             <option value="active">Active</option>
+            <option value="pending">Pending Confirmation</option>
             <option value="cancelled">Cancelled</option>
             <option value="expired">Completed</option>
           </select>

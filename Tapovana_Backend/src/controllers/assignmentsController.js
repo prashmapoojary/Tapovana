@@ -22,15 +22,21 @@ const getMyAssignments = async (req, res) => {
         // Now get all allocations from allocations table for this staff member, filtering out deleted bookings
         const allocResult = await query(
             `SELECT a.id, a.staff_id, a.type, a.session_title, a.session_id, 
-                    a.start_date, a.end_date, a.booking_time, a.status, a.created_at
+                    a.start_date, a.end_date, a.booking_time, a.status, a.created_at,
+                    b.status AS booking_status
              FROM allocations a
              LEFT JOIN deleted_booking_ids d ON d.booking_id = CASE WHEN a.session_id ~ '^[0-9]+$' THEN CAST(a.session_id AS INTEGER) ELSE NULL END
+             LEFT JOIN bookings b ON a.type = 'service' AND a.session_id ~ '^[0-9]+$' AND CAST(a.session_id AS INTEGER) = b.id
              WHERE a.staff_id = $1 AND d.booking_id IS NULL`,
             [userId]
         );
 
         const assignments = [];
         for (const row of allocResult.rows) {
+            let status = row.status;
+            if (row.type === 'service' && row.booking_status === 'PENDING') {
+                status = 'pending';
+            }
             assignments.push({
                 id: row.id,
                 type: row.type,
@@ -42,7 +48,7 @@ const getMyAssignments = async (req, res) => {
                 startDate: row.start_date,
                 endDate: row.end_date,
                 bookingTime: row.booking_time,
-                status: row.status,
+                status: status,
                 createdAt: row.created_at
             });
         }

@@ -91,6 +91,7 @@ const getAllBookings = async (req, res) => {
                 .filter(b => !localUpdatedIds.has(String(b.id)) && !deletedIds.has(String(b.id)))
                 .map(b => ({
                     ...b,
+                    user_email: b.user_email || b.email || null,
                     status: 'PENDING',
                     therapist_id: null,
                     therapist_name: null
@@ -180,12 +181,12 @@ const ensureBookingExistsLocally = async (bookingId) => {
                 const remoteBooking = data.booking;
                 const paymentStatus = 'PAID';
                 const insertResult = await query(
-                    'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
+                    'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
                     [
                         remoteBooking.id, remoteBooking.user_name, remoteBooking.service_name,
                         remoteBooking.booking_date, remoteBooking.booking_time, null,
                         remoteBooking.note, remoteBooking.total_amount, remoteBooking.pass_details,
-                        paymentStatus, 'PENDING', remoteBooking.created_at
+                        paymentStatus, 'PENDING', remoteBooking.created_at, remoteBooking.user_email || remoteBooking.email || null
                     ]
                 );
                 return insertResult.rows[0];
@@ -204,12 +205,12 @@ const ensureBookingExistsLocally = async (bookingId) => {
             if (remoteBooking) {
                 const paymentStatus = 'PAID';
                 const insertResult = await query(
-                    'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
+                    'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
                     [
                         remoteBooking.id, remoteBooking.user_name, remoteBooking.service_name,
                         remoteBooking.booking_date, remoteBooking.booking_time, null,
                         remoteBooking.note, remoteBooking.total_amount, remoteBooking.pass_details,
-                        paymentStatus, 'PENDING', remoteBooking.created_at
+                        paymentStatus, 'PENDING', remoteBooking.created_at, remoteBooking.user_email || remoteBooking.email || null
                     ]
                 );
                 return insertResult.rows[0];
@@ -412,7 +413,7 @@ const updateBookingStatus = async (req, res) => {
                 booking.id, incomingStaffIds, 'CONFIRMED', booking, duration
             );
 
-            // ── Notify removed staff ──
+            // ── Notify removed staff (Reallocation Notice) ──
             if (!req.body.skip_notify) {
                 for (const removedId of allocDiff.removedIds) {
                     const staffInfo = staffMap[removedId];
@@ -441,7 +442,7 @@ const updateBookingStatus = async (req, res) => {
                 }
             }
 
-            // ── Notify newly added staff ──
+            // ── Notify newly added staff (Allocation Email) ──
             if (!req.body.skip_notify) {
                 for (const addedId of allocDiff.addedIds) {
                     const staffInfo = staffMap[addedId];
@@ -462,17 +463,44 @@ const updateBookingStatus = async (req, res) => {
             }
 
         } else if (newStatus === 'CANCELLED') {
-            // Mark all existing allocation rows as cancelled
-            await query(
-                `UPDATE allocations SET status = 'cancelled' WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
+            // Fetch previously allocated staff before deleting
+            const allocStaffRows = await query(
+                `SELECT staff_id FROM allocations WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
                 [String(booking.id), `bk-alloc-${booking.id}-%`]
             );
+            
+            // Delete allocations entirely (Allocation removed)
+            await query(
+                `DELETE FROM allocations WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
+                [String(booking.id), `bk-alloc-${booking.id}-%`]
+            );
+            
             finalStaffId = null;
             finalStaffName = null;
 
-            // Sync any previously allocated staff
+            // Sync any previously allocated staff availability status
+            const uniqueStaffIds = new Set(allocStaffRows.rows.map(r => r.staff_id).filter(Boolean));
             if (booking.therapist_id) {
-                await syncStaffMemberStatus(booking.therapist_id).catch(() => {});
+                uniqueStaffIds.add(booking.therapist_id);
+            }
+            for (const staffId of uniqueStaffIds) {
+                await syncStaffMemberStatus(staffId).catch(() => {});
+            }
+
+            // Notify staff of cancellation
+            if (!req.body.skip_notify) {
+                for (const staffId of uniqueStaffIds) {
+                    const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
+                    if (staffRes.rows.length) {
+                        const s = staffRes.rows[0];
+                        await sendStaffCancellationEmail({
+                            to: s.email,
+                            staffName: `${s.first_name} ${s.last_name}`.trim(),
+                            bookingId: booking.id,
+                            details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time }
+                        }).catch(e => console.error('[CancellationEmail] Staff Error:', e));
+                    }
+                }
             }
 
         } else if (newStatus === 'COMPLETED') {
@@ -481,8 +509,36 @@ const updateBookingStatus = async (req, res) => {
                 `UPDATE allocations SET status = 'expired' WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
                 [String(booking.id), `bk-alloc-${booking.id}-%`]
             );
+            
+            // Fetch completed staff
+            const completedAllocRows = await query(
+                `SELECT staff_id FROM allocations WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
+                [String(booking.id), `bk-alloc-${booking.id}-%`]
+            );
+            const uniqueStaffIds = new Set(completedAllocRows.rows.map(r => r.staff_id).filter(Boolean));
             if (booking.therapist_id) {
-                await syncStaffMemberStatus(booking.therapist_id).catch(() => {});
+                uniqueStaffIds.add(booking.therapist_id);
+            }
+            
+            for (const staffId of uniqueStaffIds) {
+                await syncStaffMemberStatus(staffId).catch(() => {});
+            }
+
+            // Send completion email to staff
+            if (!req.body.skip_notify) {
+                const { sendStaffCompletionEmail } = require('../services/emailService');
+                for (const staffId of uniqueStaffIds) {
+                    const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
+                    if (staffRes.rows.length) {
+                        const s = staffRes.rows[0];
+                        await sendStaffCompletionEmail({
+                            to: s.email,
+                            staffName: `${s.first_name} ${s.last_name}`.trim(),
+                            bookingId: booking.id,
+                            details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time }
+                        }).catch(e => console.error('[CompletionEmail] Staff Error:', e));
+                    }
+                }
             }
         }
 
@@ -513,30 +569,8 @@ const updateBookingStatus = async (req, res) => {
                     time: updatedBooking.booking_time,
                     staff: updatedBooking.therapist_name,
                     customer: updatedBooking.user_name
-                },
-                previousStatus: booking.status
-            }).catch(e => console.error('[UserEmail] Error:', e));
-        }
-
-        // ─── Staff completion email (COMPLETED status) ────────────────────────────
-        if (newStatus === 'COMPLETED' && booking.status !== 'COMPLETED' && !req.body.skip_notify) {
-            // Send to all previously allocated staff
-            const completedAllocRows = await query(
-                `SELECT staff_id FROM allocations WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
-                [String(booking.id), `bk-alloc-${booking.id}-%`]
-            );
-            for (const row of completedAllocRows.rows) {
-                const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [row.staff_id]);
-                if (staffRes.rows.length) {
-                    const s = staffRes.rows[0];
-                    await sendBookingStatusEmail({
-                        to: s.email,
-                        firstName: `${s.first_name} ${s.last_name}`.trim(),
-                        status: 'COMPLETED',
-                        details: { service: updatedBooking.service_name, date: updatedBooking.booking_date, time: updatedBooking.booking_time }
-                    }).catch(e => console.error('[CompletionEmail] Error:', e));
                 }
-            }
+            }).catch(e => console.error('[UserEmail] Error:', e));
         }
 
         return res.json({ success: true, message: 'Booking status updated.', booking: updatedBooking });
@@ -556,6 +590,9 @@ const assignTherapist = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Booking not found.' });
         }
         const booking = bookingRes.rows[0];
+        if (booking.status !== 'CONFIRMED') {
+            return res.status(400).json({ success: false, message: 'Staff allocation is only available for confirmed bookings.' });
+        }
         const oldTherapistId = booking.therapist_id;
         const isReallocating = therapist_id && (therapist_id !== oldTherapistId);
 
@@ -685,12 +722,12 @@ const syncFromRender = async (req, res) => {
             const paymentStatus = 'PAID';
 
             const insertResult = await query(
-                'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
+                'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
                 [
                     booking.id, booking.user_name, booking.service_name,
                     booking.booking_date, booking.booking_time, null,
                     booking.note, booking.total_amount, booking.pass_details,
-                    paymentStatus, 'PENDING', booking.created_at
+                    paymentStatus, 'PENDING', booking.created_at, booking.user_email || booking.email || null
                 ]
             );
 
@@ -698,10 +735,7 @@ const syncFromRender = async (req, res) => {
             
             // Try to find user email and send Pending notification
             const newBooking = insertResult.rows[0];
-            let userEmail = null;
-            if (newBooking.user_email) {
-                userEmail = newBooking.user_email;
-            }
+            let userEmail = newBooking.user_email || booking.user_email || booking.email || null;
 
             if (userEmail) {
                 await sendBookingStatusEmail({
@@ -851,16 +885,34 @@ const sendBookingNotificationOnly = async (req, res) => {
 
         // 4. Staff completion email (if COMPLETED)
         if (newStatus === 'COMPLETED' && booking.status !== 'COMPLETED') {
+            const { sendStaffCompletionEmail } = require('../services/emailService');
             for (const row of existingRows.rows) {
                 const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [row.staff_id]);
                 if (staffRes.rows.length) {
                     const s = staffRes.rows[0];
-                    await sendBookingStatusEmail({
+                    await sendStaffCompletionEmail({
                         to: s.email,
-                        firstName: `${s.first_name} ${s.last_name}`.trim(),
-                        status: 'COMPLETED',
+                        staffName: `${s.first_name} ${s.last_name}`.trim(),
+                        bookingId: booking.id,
                         details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time }
                     }).catch(e => console.error('[CompletionEmail] Notify-only error:', e));
+                }
+            }
+        }
+
+        // 5. Staff cancellation email (if CANCELLED)
+        if (newStatus === 'CANCELLED' && booking.status !== 'CANCELLED') {
+            const { sendStaffCancellationEmail } = require('../services/emailService');
+            for (const row of existingRows.rows) {
+                const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [row.staff_id]);
+                if (staffRes.rows.length) {
+                    const s = staffRes.rows[0];
+                    await sendStaffCancellationEmail({
+                        to: s.email,
+                        staffName: `${s.first_name} ${s.last_name}`.trim(),
+                        bookingId: booking.id,
+                        details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time }
+                    }).catch(e => console.error('[CancellationEmail] Notify-only error:', e));
                 }
             }
         }

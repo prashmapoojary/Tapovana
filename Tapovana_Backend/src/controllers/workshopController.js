@@ -2,7 +2,7 @@ const { query } = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
-const { sendAllocationEmail, sendWorkshopEnrollmentEmail, sendWorkshopRemovalEmail, sendWorkshopScheduledEmail, sendWorkshopOngoingEmail, sendWorkshopDeallocationEmail } = require('../services/emailService');
+const { sendAllocationEmail, sendWorkshopEnrollmentEmail, sendWorkshopRemovalEmail, sendWorkshopScheduledEmail, sendWorkshopOngoingEmail, sendWorkshopDeallocationEmail, sendWorkshopCompletedEmail } = require('../services/emailService');
 const { checkStaffAllocationConflict, syncStaffMemberStatus } = require('../utils/conflictChecker');
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
@@ -40,10 +40,13 @@ function getStatus(wsDate, wsTime, wsDuration) {
     const startTime = new Date(wsYear, wsMonth - 1, wsDay, hours, minutes, 0, 0);
     const durationMins = parseInt(wsDuration, 10) || 60;
     const endTime = new Date(startTime.getTime() + durationMins * 60000);
+    // 5-minute buffer before marking as completed
+    const completionTime = new Date(endTime.getTime() + 5 * 60000);
     
     if (now < startTime) {
         return 'upcoming';
-    } else if (now >= startTime && now <= endTime) {
+    } else if (now >= startTime && now < completionTime) {
+        // Still 'ongoing' until endTime + 5 min buffer
         return 'ongoing';
     } else {
         return 'completed';
@@ -312,11 +315,36 @@ const createWorkshop = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Workshop title is required.' });
     }
 
-    // Restriction: Cannot select a previous day (timezone-safe check)
+    // Restriction: Cannot select a previous date OR a past time on today's date
     if (date) {
-        const todayStr = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
         if (date < todayStr) {
             return res.status(400).json({ success: false, message: "Cannot schedule a workshop on a past date." });
+        }
+        // Block past time on today's date
+        if (date === todayStr && time) {
+            let wsHour = 0, wsMin = 0;
+            const match = time.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+            if (match) {
+                wsHour = parseInt(match[1], 10);
+                wsMin = parseInt(match[2], 10);
+                const ampm = match[3] ? match[3].toUpperCase() : null;
+                if (ampm === 'PM' && wsHour !== 12) wsHour += 12;
+                if (ampm === 'AM' && wsHour === 12) wsHour = 0;
+            } else {
+                const parts = time.split(':');
+                wsHour = parseInt(parts[0], 10) || 0;
+                wsMin = parseInt(parts[1], 10) || 0;
+            }
+            const wsStart = new Date();
+            wsStart.setHours(wsHour, wsMin, 0, 0);
+            if (wsStart < now) {
+                return res.status(400).json({ success: false, message: "Cannot schedule a workshop at a past time today." });
+            }
         }
     }
 
@@ -597,7 +625,10 @@ const deleteWorkshop = async (req, res) => {
 
         const calculatedStatus = getStatus(dateStr, workshop.time, workshop.duration);
         if (calculatedStatus === 'ongoing') {
-            return res.status(400).json({ success: false, message: "Cannot delete an ongoing workshop." });
+            return res.status(400).json({ success: false, message: "Cannot delete a live/ongoing workshop." });
+        }
+        if (calculatedStatus === 'completed') {
+            return res.status(400).json({ success: false, message: "Cannot delete a completed workshop. Only upcoming workshops can be deleted." });
         }
 
         const oldStaffIds = workshop.assigned_staff_ids || [];
@@ -925,9 +956,9 @@ const exportWorkshopAttendees = async (req, res) => {
 const autoUpdateWorkshopStatuses = async () => {
     try {
         const res = await query(`
-            SELECT id, title, date, time, duration, status, assigned_staff_ids, upcoming_notified, ongoing_notified 
+            SELECT id, title, date, time, duration, status, assigned_staff_ids, upcoming_notified, ongoing_notified, completed_notified 
             FROM workshops 
-            WHERE status != 'completed'
+            WHERE status != 'completed' OR (status = 'completed' AND completed_notified = FALSE)
         `);
         for (const w of res.rows) {
             let dateStr = w.date;
@@ -942,19 +973,22 @@ const autoUpdateWorkshopStatuses = async () => {
             
             let upNotified = w.upcoming_notified;
             let onNotified = w.ongoing_notified;
+            let compNotified = w.completed_notified || false;
             
             // 1. Send scheduled notifications if upcoming and not notified
             if (newStatus === 'upcoming' && !upNotified) {
                 // Send to attendees
                 const attendeesRes = await query('SELECT email, name FROM attendees WHERE workshop_id = $1', [w.id]);
                 for (const att of attendeesRes.rows) {
-                    await sendWorkshopScheduledEmail({
-                        to: att.email,
-                        staffOrParticipantName: att.name,
-                        workshopTitle: w.title,
-                        date: dateStr,
-                        time: w.time
-                    });
+                    try {
+                        await sendWorkshopScheduledEmail({
+                            to: att.email,
+                            staffOrParticipantName: att.name,
+                            workshopTitle: w.title,
+                            date: dateStr,
+                            time: w.time
+                        });
+                    } catch (e) { console.error('Upcoming email (attendee) failed:', e.message); }
                 }
 
                 // Send to staff
@@ -963,27 +997,31 @@ const autoUpdateWorkshopStatuses = async () => {
                     const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
                     if (staffRes.rows.length) {
                         const s = staffRes.rows[0];
-                        await sendWorkshopScheduledEmail({
-                            to: s.email,
-                            staffOrParticipantName: `${s.first_name} ${s.last_name}`.trim(),
-                            workshopTitle: w.title,
-                            date: dateStr,
-                            time: w.time
-                        });
+                        try {
+                            await sendWorkshopScheduledEmail({
+                                to: s.email,
+                                staffOrParticipantName: `${s.first_name} ${s.last_name}`.trim(),
+                                workshopTitle: w.title,
+                                date: dateStr,
+                                time: w.time
+                            });
+                        } catch (e) { console.error('Upcoming email (staff) failed:', e.message); }
                     }
                 }
                 upNotified = true;
             }
             
-            // 2. Send ongoing notifications if ongoing and not notified
+            // 2. Send live/ongoing notifications if ongoing and not notified
             if (newStatus === 'ongoing' && !onNotified) {
                 const attendeesRes = await query('SELECT email, name FROM attendees WHERE workshop_id = $1', [w.id]);
                 for (const att of attendeesRes.rows) {
-                    await sendWorkshopOngoingEmail({
-                        to: att.email,
-                        staffOrParticipantName: att.name,
-                        workshopTitle: w.title
-                    });
+                    try {
+                        await sendWorkshopOngoingEmail({
+                            to: att.email,
+                            staffOrParticipantName: att.name,
+                            workshopTitle: w.title
+                        });
+                    } catch (e) { console.error('Live email (attendee) failed:', e.message); }
                 }
                 
                 const staffIds = w.assigned_staff_ids || [];
@@ -991,22 +1029,71 @@ const autoUpdateWorkshopStatuses = async () => {
                     const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
                     if (staffRes.rows.length) {
                         const s = staffRes.rows[0];
-                        await sendWorkshopOngoingEmail({
-                            to: s.email,
-                            staffOrParticipantName: `${s.first_name} ${s.last_name}`.trim(),
-                            workshopTitle: w.title
-                        });
+                        try {
+                            await sendWorkshopOngoingEmail({
+                                to: s.email,
+                                staffOrParticipantName: `${s.first_name} ${s.last_name}`.trim(),
+                                workshopTitle: w.title
+                            });
+                        } catch (e) { console.error('Live email (staff) failed:', e.message); }
                     }
                 }
                 onNotified = true;
             }
+
+            // 3. Send completed notifications if newly completed and not yet notified
+            if (newStatus === 'completed' && !compNotified) {
+                const attendeesRes = await query('SELECT email, name FROM attendees WHERE workshop_id = $1', [w.id]);
+                for (const att of attendeesRes.rows) {
+                    try {
+                        await sendWorkshopCompletedEmail({
+                            to: att.email,
+                            staffOrParticipantName: att.name,
+                            workshopTitle: w.title,
+                            date: dateStr,
+                            time: w.time
+                        });
+                    } catch (e) { console.error('Completed email (attendee) failed:', e.message); }
+                }
+
+                const staffIds = w.assigned_staff_ids || [];
+                for (const staffId of staffIds) {
+                    const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
+                    if (staffRes.rows.length) {
+                        const s = staffRes.rows[0];
+                        try {
+                            await sendWorkshopCompletedEmail({
+                                to: s.email,
+                                staffOrParticipantName: `${s.first_name} ${s.last_name}`.trim(),
+                                workshopTitle: w.title,
+                                date: dateStr,
+                                time: w.time
+                            });
+                        } catch (e) { console.error('Completed email (staff) failed:', e.message); }
+                    }
+                }
+                compNotified = true;
+            }
             
-            if (newStatus !== w.status || upNotified !== w.upcoming_notified || onNotified !== w.ongoing_notified) {
+            // Write audit log if status changed
+            if (newStatus !== w.status) {
+                try {
+                    await query(
+                        `INSERT INTO workshop_audit_log (workshop_id, old_status, new_status, changed_by)
+                         VALUES ($1, $2, $3, $4)`,
+                        [w.id, w.status, newStatus, 'system']
+                    );
+                } catch (auditErr) {
+                    console.error('Failed to write workshop audit log:', auditErr.message);
+                }
+            }
+
+            if (newStatus !== w.status || upNotified !== w.upcoming_notified || onNotified !== w.ongoing_notified || compNotified !== (w.completed_notified || false)) {
                 await query(
                     `UPDATE workshops 
-                     SET status = $1, upcoming_notified = $2, ongoing_notified = $3 
-                     WHERE id = $4`,
-                    [newStatus, upNotified, onNotified, w.id]
+                     SET status = $1, upcoming_notified = $2, ongoing_notified = $3, completed_notified = $4
+                     WHERE id = $5`,
+                    [newStatus, upNotified, onNotified, compNotified, w.id]
                 );
             }
         }
