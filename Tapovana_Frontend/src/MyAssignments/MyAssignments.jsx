@@ -86,16 +86,19 @@ function MyAssignments() {
   useEffect(() => {
     const fetchMemberships = async () => {
       try {
-        const res = await apiFetch("https://tapoclg.onrender.com/api/membership");
-        if (res && (res.success || Array.isArray(res))) {
-          const rawList = res.memberships || res.data || (Array.isArray(res) ? res : []);
-          const mappedMembers = rawList.map((m) => ({
-            id: m.id || m.user_id,
-            name: m.name || m.customer_name,
-            email: m.email || m.customer_email,
-            profile_photo_url: m.profile_photo_url || m.profile_pic || null
-          }));
-          setMemberships(mappedMembers);
+        const response = await fetch("https://tapoclg.onrender.com/api/membership");
+        if (response.ok) {
+          const res = await response.json();
+          if (res && (res.success || Array.isArray(res))) {
+            const rawList = res.memberships || res.data || (Array.isArray(res) ? res : []);
+            const mappedMembers = rawList.map((m) => ({
+              id: m.id || m.user_id,
+              name: m.name || m.customer_name,
+              email: m.email || m.customer_email,
+              profile_photo_url: m.profile_photo_url || m.profile_pic || null
+            }));
+            setMemberships(mappedMembers);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch memberships:", err);
@@ -489,13 +492,6 @@ function MyAssignments() {
           </div>
           <span className="ma-stat-value" style={{ color: "#cda751" }}>{stats.active}</span>
           <span className="ma-stat-label">Active / Upcoming</span>
-        </div>
-        <div className="ma-stat-card">
-          <div className="mem-tier-card-top">
-            <div className="mem-tier-badge" style={{ background: "#f59e0b", color: "white" }}>Pending</div>
-          </div>
-          <span className="ma-stat-value" style={{ color: "#f59e0b" }}>{stats.pending}</span>
-          <span className="ma-stat-label">Pending Confirmation</span>
         </div>
         <div className="ma-stat-card">
           <div className="mem-tier-card-top">

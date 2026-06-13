@@ -71,6 +71,16 @@ const getAllBookings = async (req, res) => {
                 if (response.ok) {
                     const data = await response.json();
                     remoteBookings = data.success ? (data.bookings || []) : [];
+
+                    // Dynamically backfill missing profile_pic for existing local bookings
+                    for (const rb of remoteBookings) {
+                        if (rb.profile_pic) {
+                            await query(
+                                "UPDATE bookings SET profile_pic = $1 WHERE id = $2 AND profile_pic IS NULL",
+                                [rb.profile_pic, rb.id]
+                            );
+                        }
+                    }
                 }
             } catch (fetchErr) {
                 console.error('Failed to fetch from mobile backend, falling back to local only:', fetchErr);
@@ -181,12 +191,13 @@ const ensureBookingExistsLocally = async (bookingId) => {
                 const remoteBooking = data.booking;
                 const paymentStatus = 'PAID';
                 const insertResult = await query(
-                    'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
+                    'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *',
                     [
                         remoteBooking.id, remoteBooking.user_name, remoteBooking.service_name,
                         remoteBooking.booking_date, remoteBooking.booking_time, null,
                         remoteBooking.note, remoteBooking.total_amount, remoteBooking.pass_details,
-                        paymentStatus, 'PENDING', remoteBooking.created_at, remoteBooking.user_email || remoteBooking.email || null
+                        paymentStatus, 'PENDING', remoteBooking.created_at, remoteBooking.user_email || remoteBooking.email || null,
+                        remoteBooking.profile_pic || null
                     ]
                 );
                 return insertResult.rows[0];
@@ -205,12 +216,13 @@ const ensureBookingExistsLocally = async (bookingId) => {
             if (remoteBooking) {
                 const paymentStatus = 'PAID';
                 const insertResult = await query(
-                    'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
+                    'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *',
                     [
                         remoteBooking.id, remoteBooking.user_name, remoteBooking.service_name,
                         remoteBooking.booking_date, remoteBooking.booking_time, null,
                         remoteBooking.note, remoteBooking.total_amount, remoteBooking.pass_details,
-                        paymentStatus, 'PENDING', remoteBooking.created_at, remoteBooking.user_email || remoteBooking.email || null
+                        paymentStatus, 'PENDING', remoteBooking.created_at, remoteBooking.user_email || remoteBooking.email || null,
+                        remoteBooking.profile_pic || null
                     ]
                 );
                 return insertResult.rows[0];
@@ -722,12 +734,13 @@ const syncFromRender = async (req, res) => {
             const paymentStatus = 'PAID';
 
             const insertResult = await query(
-                'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
+                'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *',
                 [
                     booking.id, booking.user_name, booking.service_name,
                     booking.booking_date, booking.booking_time, null,
                     booking.note, booking.total_amount, booking.pass_details,
-                    paymentStatus, 'PENDING', booking.created_at, booking.user_email || booking.email || null
+                    paymentStatus, 'PENDING', booking.created_at, booking.user_email || booking.email || null,
+                    booking.profile_pic || null
                 ]
             );
 

@@ -102,16 +102,19 @@ function Bookings() {
   useEffect(() => {
     const fetchMemberships = async () => {
       try {
-        const res = await apiFetch("https://tapoclg.onrender.com/api/membership");
-        if (res && (res.success || Array.isArray(res))) {
-          const rawList = res.memberships || res.data || (Array.isArray(res) ? res : []);
-          const mappedMembers = rawList.map((m) => ({
-            id: m.id || m.user_id,
-            name: m.name || m.customer_name,
-            email: m.email || m.customer_email,
-            profile_photo_url: m.profile_photo_url || m.profile_pic || null
-          }));
-          setMemberships(mappedMembers);
+        const response = await fetch("https://tapoclg.onrender.com/api/membership");
+        if (response.ok) {
+          const res = await response.json();
+          if (res && (res.success || Array.isArray(res))) {
+            const rawList = res.memberships || res.data || (Array.isArray(res) ? res : []);
+            const mappedMembers = rawList.map((m) => ({
+              id: m.id || m.user_id,
+              name: m.name || m.customer_name,
+              email: m.email || m.customer_email,
+              profile_photo_url: m.profile_photo_url || m.profile_pic || null
+            }));
+            setMemberships(mappedMembers);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch memberships:", err);
@@ -423,19 +426,26 @@ function Bookings() {
                   {(() => {
                     // Find membership by customer name or email
                     const customerName = selectedBooking.user_name || "";
-                    const customerEmail = selectedBooking.user_email || "";
+                    const customerEmail = selectedBooking.user_email || selectedBooking.email || "";
                     const membership = memberships.find(m => 
                       (m.name && m.name.toLowerCase() === customerName.toLowerCase()) || 
                       (m.email && m.email.toLowerCase() === customerEmail.toLowerCase())
                     );
                     let avatarSrc = DefaultAvatar;
                     
-                    if (membership?.profile_photo_url) {
-                      const pic = membership.profile_photo_url;
+                    if (selectedBooking.profile_pic) {
+                      const pic = selectedBooking.profile_pic;
                       if (pic.startsWith("http")) {
                         avatarSrc = pic;
                       } else {
                         avatarSrc = `https://tapoclg.onrender.com${pic.startsWith("/") ? "" : "/"}${pic}`;
+                      }
+                    } else if (membership?.profile_photo_url) {
+                      const pic = membership.profile_photo_url;
+                      if (pic.startsWith("http")) {
+                        avatarSrc = pic;
+                      } else {
+                        avatarSrc = `${LOCAL_API_BASE}${pic.startsWith("/") ? "" : "/"}${pic}`;
                       }
                     }
 
@@ -827,36 +837,7 @@ function Bookings() {
                     >
                       <td><strong>#{b.id}</strong></td>
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          {(() => {
-                            const customerEmail = b.user_email || b.email || "";
-                            const membership = memberships.find(m => 
-                              m.email && m.email.toLowerCase() === customerEmail.toLowerCase()
-                            );
-                            let avatarSrc = DefaultAvatar;
-                            if (membership?.profile_photo_url) {
-                              const pic = membership.profile_photo_url;
-                              if (pic.startsWith("http")) {
-                                avatarSrc = pic;
-                              } else {
-                                avatarSrc = `https://tapoclg.onrender.com${pic.startsWith("/") ? "" : "/"}${pic}`;
-                              }
-                            }
-                            const handleImageError = (e) => {
-                              e.target.onerror = null;
-                              e.target.src = DefaultAvatar;
-                            };
-                            return (
-                              <img 
-                                src={avatarSrc} 
-                                alt="profile" 
-                                style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0" }} 
-                                onError={handleImageError} 
-                              />
-                            );
-                          })()}
-                          <div className="bk-cell-name">{b.user_name || "Guest User"}</div>
-                        </div>
+                        <div className="bk-cell-name">{b.user_name || "Guest User"}</div>
                       </td>
                       <td>
                         <div className="bk-cell-email" style={{ color: '#64748b', fontSize: '13px' }}>{b.user_email || b.email || "-"}</div>

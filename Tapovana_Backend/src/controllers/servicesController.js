@@ -28,14 +28,28 @@ const handleServiceImage = (imageData) => {
         const filename = uuidv4() + ext;
         ensureUploadsDir();
         fs.writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
-        return '/uploads/' + filename;
+        return 'https://tapovana.onrender.com/uploads/' + filename;
     }
 
     // If it's already an http URL or relative path, keep as-is
-    if (/^https?:\/\//.test(imageData) || imageData.startsWith('/uploads/')) {
+    if (/^https?:\/\//.test(imageData)) {
         return imageData;
     }
+    if (imageData?.startsWith('/uploads/')) {
+        return 'https://tapovana.onrender.com' + imageData;
+    }
     return imageData;
+};
+
+// Helper: Make image URL absolute for mobile clients
+const getFullImageUrl = (req, imageUrl) => {
+    if (!imageUrl || typeof imageUrl !== 'string') return imageUrl;
+    if (/^https?:\/\//.test(imageUrl) || imageUrl.startsWith('data:')) {
+        return imageUrl;
+    }
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    return `${protocol}://${host}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
 };
 
 
@@ -118,9 +132,14 @@ const getAllServices = async (req, res) => {
             [...values, parseInt(limit), offset]
         );
 
+        const formattedServices = result.rows.map(row => ({
+            ...row,
+            image_url: getFullImageUrl(req, row.image_url)
+        }));
+
         return res.json({
             success: true,
-            services: result.rows,
+            services: formattedServices,
             pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) }
         });
     } catch (err) {
@@ -142,7 +161,10 @@ const getServiceById = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Service not found.' });
         }
 
-        return res.json({ success: true, service: result.rows[0] });
+        const service = result.rows[0];
+        service.image_url = getFullImageUrl(req, service.image_url);
+
+        return res.json({ success: true, service });
     } catch (err) {
         console.error('getServiceById error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
@@ -187,6 +209,8 @@ const createService = async (req, res) => {
         for (const staffId of staffIds) {
             await allocateStaffMember(staffId, service);
         }
+
+        service.image_url = getFullImageUrl(req, service.image_url);
 
         return res.status(201).json({ success: true, message: 'Service created.', service });
     } catch (err) {
@@ -286,6 +310,8 @@ const updateService = async (req, res) => {
             }
         }
 
+        updatedService.image_url = getFullImageUrl(req, updatedService.image_url);
+
         return res.json({ success: true, message: 'Service updated.', service: updatedService });
     } catch (err) {
         console.error('updateService error:', err);
@@ -355,7 +381,11 @@ const updateServiceStaff = async (req, res) => {
         }
 
         const updated = await query('SELECT * FROM services WHERE id = $1', [req.params.id]);
-        return res.json({ success: true, message: 'Staff allocations updated.', service: updated.rows[0] });
+        const updatedServiceObj = updated.rows[0];
+        if (updatedServiceObj) {
+            updatedServiceObj.image_url = getFullImageUrl(req, updatedServiceObj.image_url);
+        }
+        return res.json({ success: true, message: 'Staff allocations updated.', service: updatedServiceObj });
     } catch (err) {
         console.error('updateServiceStaff error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });

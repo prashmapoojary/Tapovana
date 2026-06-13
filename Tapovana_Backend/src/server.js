@@ -157,14 +157,24 @@ app.listen(PORT, () => {
                         const filename = uuidv4() + ext;
                         fs.writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
                         
-                        const newUrl = '/uploads/' + filename;
+                        const newUrl = 'https://tapovana.onrender.com/uploads/' + filename;
                         await query('UPDATE services SET image_url = $1 WHERE id = $2', [newUrl, row.id]);
                         console.log(`[Migration] Converted image for service: "${row.name}" -> ${newUrl}`);
                     }
                 }
                 console.log("[Migration] Database base64 images migration complete.");
-            } else {
-                console.log("[Migration] No base64 images found in services database.");
+            }
+
+            // Convert relative /uploads/ paths to absolute tapovana.onrender.com paths
+            const relativeResult = await query("SELECT id, name, image_url FROM services WHERE image_url LIKE '/uploads/%'");
+            if (relativeResult.rows.length > 0) {
+                console.log(`[Migration] Found ${relativeResult.rows.length} services with relative URLs. Converting to absolute...`);
+                for (const row of relativeResult.rows) {
+                    const newUrl = 'https://tapovana.onrender.com' + row.image_url;
+                    await query('UPDATE services SET image_url = $1 WHERE id = $2', [newUrl, row.id]);
+                    console.log(`[Migration] Converted relative to absolute for: "${row.name}" -> ${newUrl}`);
+                }
+                console.log("[Migration] Database relative URLs migration complete.");
             }
         } catch (err) {
             console.error('[Migration] Error migrating base64 images:', err);
