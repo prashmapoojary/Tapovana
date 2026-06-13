@@ -827,7 +827,36 @@ function Bookings() {
                     >
                       <td><strong>#{b.id}</strong></td>
                       <td>
-                        <div className="bk-cell-name">{b.user_name || "Guest User"}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          {(() => {
+                            const customerEmail = b.user_email || b.email || "";
+                            const membership = memberships.find(m => 
+                              m.email && m.email.toLowerCase() === customerEmail.toLowerCase()
+                            );
+                            let avatarSrc = DefaultAvatar;
+                            if (membership?.profile_photo_url) {
+                              const pic = membership.profile_photo_url;
+                              if (pic.startsWith("http")) {
+                                avatarSrc = pic;
+                              } else {
+                                avatarSrc = `https://tapoclg.onrender.com${pic.startsWith("/") ? "" : "/"}${pic}`;
+                              }
+                            }
+                            const handleImageError = (e) => {
+                              e.target.onerror = null;
+                              e.target.src = DefaultAvatar;
+                            };
+                            return (
+                              <img 
+                                src={avatarSrc} 
+                                alt="profile" 
+                                style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0" }} 
+                                onError={handleImageError} 
+                              />
+                            );
+                          })()}
+                          <div className="bk-cell-name">{b.user_name || "Guest User"}</div>
+                        </div>
                       </td>
                       <td>
                         <div className="bk-cell-email" style={{ color: '#64748b', fontSize: '13px' }}>{b.user_email || b.email || "-"}</div>

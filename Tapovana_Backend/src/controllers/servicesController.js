@@ -7,20 +7,28 @@ const { sendAllocationEmail } = require('../services/emailService');
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 
 const ensureUploadsDir = () => {
-    if (process.env.NODE_ENV === 'production') return; // Vercel filesystem is read-only
     if (!fs.existsSync(UPLOADS_DIR)) {
         fs.mkdirSync(UPLOADS_DIR, { recursive: true });
     }
 };
 
-// Helper: handle image save (always stored as base64 in DB)
+// Helper: handle image save (base64 or URL)
 const handleServiceImage = (imageData) => {
     if (!imageData || typeof imageData !== 'string') return null;
 
-    // If it's already a base64 data URI, store it directly in DB
-    const matches = imageData.match(/^data:(image\/(jpeg|png|webp|gif|svg\+xml));base64,(.+)$/);
-    if (matches) {
-        return imageData; // store as base64 string in Neon DB
+    const matches = imageData.match(/^data:(image\/(jpeg|png|webp|gif|svg\+xml));base64,([\s\S]+)$/);
+    if (matches && matches.length === 4) {
+        const mime = matches[1];
+        const extMap = {
+            'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'image/png': '.png',
+            'image/gif': '.gif', 'image/webp': '.webp', 'image/svg+xml': '.svg'
+        };
+        const ext = extMap[mime] || '.png';
+        const buffer = Buffer.from(matches[3].replace(/\s/g, ''), 'base64');
+        const filename = uuidv4() + ext;
+        ensureUploadsDir();
+        fs.writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
+        return '/uploads/' + filename;
     }
 
     // If it's already an http URL or relative path, keep as-is
@@ -29,6 +37,7 @@ const handleServiceImage = (imageData) => {
     }
     return imageData;
 };
+
 
 // Helper: Send email notification
 const sendEmailForAllocation = async (staffId, service) => {

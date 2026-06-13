@@ -5,6 +5,7 @@ import { getImageUrl } from '../utils/image';
 import { useAllocations } from '../utils/AllocationContext';
 import EditService from './EditService';
 import AddService from './AddService';
+import ActionIcon from '../assets/Button.svg';
 
 const subCategoriesMap = {
   'Body Care': ['Massages', 'Facials', 'Scrubs', 'Hydrotherapy'],
@@ -66,6 +67,7 @@ function Services() {
   
   const [selectedSubCategory, setSelectedSubCategory] = useState('All');
   const [isSubDropdownOpen, setIsSubDropdownOpen] = useState(false);
+  const [openActionMenu, setOpenActionMenu] = useState(null);
 
   // ── Refs for click-outside behavior ──
   const categoryRef = React.useRef(null);
@@ -80,9 +82,14 @@ function Services() {
         setIsSubDropdownOpen(false);
       }
     };
+    const handleCloseActionMenu = () => setOpenActionMenu(null);
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('click', handleCloseActionMenu);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('click', handleCloseActionMenu);
+    };
   }, []);
 
   // ── Edit Service navigation state ──
@@ -371,19 +378,76 @@ function Services() {
                         {service.status ? (service.status.charAt(0).toUpperCase() + service.status.slice(1).toLowerCase()) : 'Active'}
                       </span>
                     </td>
-                    <td className="td-actions">
-                      <div className="actions-cell">
-                        {/* ── Edit button: opens EditService page ── */}
-                        <button
-                          className="action-btn"
-                          title="Edit"
-                          onClick={() => setEditingService(service)}
-                        >
-                          <EditIcon />
-                        </button>
-                        <button className="action-btn" title="Delete" onClick={() => handleDelete(service)}><TrashIcon /></button>
-                      </div>
-                    </td>
+                    <td className="td-actions" style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
+                       <div style={{ position: "relative", display: "inline-block" }}>
+                         <img
+                           src={ActionIcon}
+                           className="action-icon"
+                           alt="Actions"
+                           style={{ cursor: "pointer" }}
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             setOpenActionMenu(openActionMenu === service.id ? null : service.id);
+                           }}
+                         />
+                         {openActionMenu === service.id && (
+                           <div style={{
+                             position: "absolute",
+                             right: 0,
+                             top: "100%",
+                             zIndex: 1000,
+                             background: "#fff",
+                             border: "1px solid #e2e8f0",
+                             borderRadius: "8px",
+                             boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                             minWidth: "140px",
+                             overflow: "hidden",
+                             textAlign: "left"
+                           }}>
+                             <div
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 setEditingService(service);
+                                 setOpenActionMenu(null);
+                               }}
+                               style={{
+                                 padding: "10px 16px",
+                                 cursor: "pointer",
+                                 fontSize: "14px",
+                                 color: "#2d3748",
+                                 display: "flex",
+                                 alignItems: "center",
+                                 gap: "8px"
+                               }}
+                               onMouseEnter={e => e.currentTarget.style.background = "#f7fafc"}
+                               onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                             >
+                               Edit
+                             </div>
+                             <div
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 setOpenActionMenu(null);
+                                 handleDelete(service);
+                               }}
+                               style={{
+                                 padding: "10px 16px",
+                                 cursor: "pointer",
+                                 fontSize: "14px",
+                                 color: "#dc2626",
+                                 display: "flex",
+                                 alignItems: "center",
+                                 gap: "8px"
+                               }}
+                               onMouseEnter={e => e.currentTarget.style.background = "#fef2f2"}
+                               onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                             >
+                               Delete
+                             </div>
+                           </div>
+                         )}
+                       </div>
+                     </td>
                   </tr>
                 ))
               )}
