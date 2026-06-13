@@ -1,14 +1,17 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import Quill from "quill";
+import "quill/dist/quill.snow.css";
 import "./Blogs.css";
-import { DUMMY_BLOGS } from "./mockData";
 import SearchIcon from "../assets/searchIcon.svg";
 import DropdownIcon from "../assets/dropdownIcon.svg";
-import { getUser, roleLabel } from "../utils/session";
+import { getUser } from "../utils/session";
 import { getImageUrl } from "../utils/image";
 import { useAllocations } from "../utils/AllocationContext";
+import { apiFetch } from "../api/http";
 
 const formatDate = (dateStr) => {
+  if (!dateStr) return "";
   return new Date(dateStr).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "long",
@@ -16,77 +19,128 @@ const formatDate = (dateStr) => {
   });
 };
 
-const getReadTime = (text = "") => {
-  return Math.max(3, Math.ceil(text.split(/\s+/).length / 200)) + " min read";
-};
+// ─── Quill Editor Component ──────────────────────────────────────────────
+function QuillEditor({ value, onChange }) {
+  const containerRef = useRef(null);
+  const quillRef = useRef(null);
+  const isInternalChange = useRef(false);
 
-function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove, onReject }) {
+  useEffect(() => {
+    if (containerRef.current && !quillRef.current) {
+      quillRef.current = new Quill(containerRef.current, {
+        theme: "snow",
+        modules: {
+          toolbar: [
+            [{ header: [1, 2, 3, false] }],
+            ["bold", "italic", "underline", "strike"],
+            [{ list: "ordered" }, { list: "bullet" }],
+            ["blockquote", "link", "image"],
+            ["clean"],
+          ],
+        },
+        placeholder: "Write your blog content here...",
+      });
+
+      quillRef.current.on("text-change", () => {
+        isInternalChange.current = true;
+        const html = quillRef.current.root.innerHTML;
+        onChange(html === "<p><br></p>" ? "" : html);
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (quillRef.current && !isInternalChange.current) {
+      const currentHtml = quillRef.current.root.innerHTML;
+      if (value !== currentHtml && value !== undefined) {
+        quillRef.current.root.innerHTML = value || "";
+      }
+    }
+    isInternalChange.current = false;
+  }, [value]);
+
+  return (
+    <div className="blog-quill-container">
+      <div ref={containerRef} />
+    </div>
+  );
+}
+
+// ─── Blog Card ───────────────────────────────────────────────────────────
+function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove, onReject, onArchive }) {
   const isDraft = blog.status === "draft";
   const isPending = blog.status === "pending";
   const isPublished = blog.status === "published";
   const isRejected = blog.status === "rejected";
-  const isArchived = blog.status === "archived";
 
   return (
-    <div className="blog-card" onClick={() => onClick(blog.id)}>
-      <div className="blog-card-image-wrapper">
-        <img
-          src={getImageUrl(blog.image)}
-          alt={blog.title}
-          className="blog-card-image"
-          onError={(e) => {
-            e.target.src = "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800";
-          }}
-        />
+    <div className="blog-card" onClick={() => onClick(blog.id)} style={{ display: "flex", flexDirection: "column", background: "white", borderRadius: "12px", border: "1px solid rgba(205,167,81,0.2)", overflow: "hidden", transition: "all 0.2s" }}>
+      <div className="blog-card-content" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
+        
+        {/* 1. Category/Discipline */}
+        <span className="blog-card-category" style={{ fontSize: "11px", fontWeight: "700", color: "#cda751", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+          {blog.category}
+        </span>
 
-        {(isStaff || isAdmin) && (
-          <div className={"blog-status-badge " + blog.status}>
-            {isPublished ? "Published" : isPending ? "Pending" : isDraft ? "Draft" : isRejected ? "Rejected" : "Archived"}
-          </div>
-        )}
-      </div>
+        {/* 2. Title */}
+        <h3 className="blog-card-title" style={{ margin: "0", fontSize: "15px", fontWeight: "700", color: "#1a202c", lineClamp: 2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: "1.3" }}>
+          {blog.title}
+        </h3>
 
-      <div className="blog-card-content">
-        <span className="blog-card-category">{blog.category}</span>
-        <h3 className="blog-card-title">{blog.title}</h3>
-        <p className="blog-card-summary">{blog.summary}</p>
-
-        {isRejected && blog.rejectionReason && (
-          <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#fff5f5', border: '1px solid #feb2b2', borderRadius: '6px', fontSize: '12px', color: '#c53030' }}>
-            <strong style={{ display: 'block', marginBottom: '4px' }}>Rejection Reason:</strong>
-            {blog.rejectionReason}
-          </div>
-        )}
-
-        <div className="blog-card-meta">
-          <div className="blog-card-author">
-            <div className="blog-card-author-avatar">{blog.author?.initials || "AU"}</div>
-            <span>{blog.author?.name || "Anonymous"}</span>
-          </div>
-          <div className="blog-card-meta-item">{formatDate(blog.date)}</div>
-          <div className="blog-card-meta-item">{blog.readTime}</div>
-        </div>
-
-        <div className="blog-card-footer" onClick={(e) => e.stopPropagation()}>
-          {isPublished && (
-            <button className="blog-card-read-more" onClick={() => onClick(blog.id)}>
-              Read Article
-            </button>
-          )}
-
-          {isStaff && (isDraft || isRejected) && (
-            <div className="blog-card-actions">
-              <button onClick={() => onEdit(blog)}>Edit</button>
-              <button onClick={() => onDelete(blog.id)}>Delete</button>
+        {/* 3. Image */}
+        <div className="blog-card-image-wrapper" style={{ position: "relative", borderRadius: "8px", overflow: "hidden", border: "1px solid #edf2f7", height: "135px" }}>
+          <img
+            src={getImageUrl(blog.featured_image)}
+            alt={blog.title}
+            className="blog-card-image"
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            onError={(e) => {
+              e.target.src = "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800";
+            }}
+          />
+          {(isStaff || isAdmin) && (
+            <div className={"blog-status-badge " + blog.status} style={{ fontSize: "9px", padding: "2px 6px" }}>
+              {isPublished ? "Published" : isPending ? "Pending" : isDraft ? "Draft" : isRejected ? "Rejected" : "Archived"}
             </div>
           )}
+        </div>
 
+        {/* 4. Author Name & Role */}
+        <div style={{ fontSize: "11px", fontWeight: "600", color: "#4a5568", marginTop: "1px" }}>
+          By {blog.author?.name || "Anonymous"} <span style={{ color: "#cbd5e0", margin: "0 4px" }}>|</span> <span style={{ textTransform: "uppercase", color: "#cda751", fontWeight: "700" }}>{blog.author?.role || "Specialist"}</span>
+        </div>
+
+        {/* 5. Date & Read Time */}
+        <div style={{ fontSize: "11px", color: "#718096", marginBottom: "2px" }}>
+          {formatDate(blog.published_at || blog.created_at)} · {blog.read_time}
+        </div>
+
+        {isRejected && blog.rejection_reason && (
+          <div style={{ marginTop: "4px", padding: "4px 8px", backgroundColor: "#fff5f5", border: "1px solid #feb2b2", borderRadius: "6px", fontSize: "11px", color: "#c53030" }}>
+            <strong>Reason:</strong> {blog.rejection_reason}
+          </div>
+        )}
+
+        {/* Actions Footer */}
+        <div className="blog-card-footer" onClick={(e) => e.stopPropagation()} style={{ marginTop: "auto", paddingTop: "6px", borderTop: "1px solid #edf2f7", display: "flex", gap: "4px", flexDirection: "column" }}>
+          
+          <button onClick={() => onClick(blog.id)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "7px 14px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "12px", width: "100%" }}>
+            Read Article
+          </button>
+
+          {isStaff && (isDraft || isRejected) && (
+            <div className="blog-card-actions" style={{ display: "flex", gap: "4px", width: "100%", marginTop: "2px" }}>
+              <button onClick={() => onEdit(blog)} style={{ background: "transparent", color: "#cda751", border: "1px solid #cda751", padding: "5px 10px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1 }}>Edit</button>
+              <button onClick={() => onDelete(blog.id)} style={{ background: "transparent", color: "#e53e3e", border: "1px solid #e53e3e", padding: "4px 9px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", flex: 1 }}>Delete</button>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
+// ─── Related Blogs ───────────────────────────────────────────────────────
 function RelatedBlogs({ currentBlogId, blogs, onClick }) {
   const relatedBlogs = useMemo(() => {
     return blogs
@@ -102,10 +156,10 @@ function RelatedBlogs({ currentBlogId, blogs, onClick }) {
       <div className="blog-related-grid">
         {relatedBlogs.map((blog) => (
           <div key={blog.id} className="blog-related-card" onClick={() => onClick(blog.id)}>
-            <img src={getImageUrl(blog.image)} alt={blog.title} className="blog-related-card-image" />
+            <img src={getImageUrl(blog.featured_image)} alt={blog.title} className="blog-related-card-image" />
             <div className="blog-related-card-content">
               <h4 className="blog-related-card-title">{blog.title}</h4>
-              <p className="blog-related-card-date">{formatDate(blog.date)} · {blog.readTime}</p>
+              <p className="blog-related-card-date">{formatDate(blog.published_at || blog.created_at)} · {blog.read_time}</p>
             </div>
           </div>
         ))}
@@ -114,23 +168,18 @@ function RelatedBlogs({ currentBlogId, blogs, onClick }) {
   );
 }
 
-export default function Blogs() {
+// ═════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═════════════════════════════════════════════════════════════════════════
+export default function Blogs({ mode }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const { triggerAlert, triggerConfirm } = useAllocations();
 
-  const [blogs, setBlogs] = useState(() => {
-    const savedBlogs = localStorage.getItem("tapovana_blogs");
-    if (savedBlogs) {
-      return JSON.parse(savedBlogs);
-    }
-    const initialBlogs = DUMMY_BLOGS.map((blog) => ({
-      ...blog,
-      status: "published",
-    }));
-    localStorage.setItem("tapovana_blogs", JSON.stringify(initialBlogs));
-    return initialBlogs;
-  });
+  const [blogs, setBlogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [detailBlog, setDetailBlog] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const currentUser = useMemo(() => getUser(), []);
   const role = currentUser?.role?.toUpperCase() || "";
@@ -139,257 +188,723 @@ export default function Blogs() {
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
-  const [activeTab, setActiveTab] = useState(isStaff ? "my_blogs" : isAdmin ? "published" : "published");
-  const [selectedBlog, setSelectedBlog] = useState(null);
-  const [showEditor, setShowEditor] = useState(false);
-  const [editBlogData, setEditBlogData] = useState({ title: "", category: "AYURVEDA", summary: "", body: "", image: "" });
+  const [activeTab, setActiveTab] = useState(isStaff ? "my_blogs" : isAdmin ? "all" : "published");
+  const [editingBlogId, setEditingBlogId] = useState(null);
+  const [editBlogData, setEditBlogData] = useState({
+    title: "", category: "AYURVEDA", summary: "", content_html: "",
+    featured_image: "", tags: "", seo_title: "", seo_description: "", seo_keywords: "",
+    author_name: "", author_role: ""
+  });
   const [rejectionModal, setRejectionModal] = useState({ isOpen: false, blogId: null, reason: "" });
   const [toast, setToast] = useState(null);
-
-  const persistBlogs = (updatedBlogs) => {
-    setBlogs(updatedBlogs);
-    localStorage.setItem("tapovana_blogs", JSON.stringify(updatedBlogs));
-  };
+  const [showSeo, setShowSeo] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [savingBlog, setSavingBlog] = useState(false);
+  const fileInputRef = useRef(null);
 
   const showToastMsg = (message) => {
     setToast(message);
     setTimeout(() => setToast(null), 4000);
   };
 
-  const handleApprove = (blogId) => {
-    triggerConfirm("Are you sure you want to approve and publish this blog?", () => {
-      const updatedBlogs = blogs.map((blog) =>
-        blog.id === blogId ? { ...blog, status: "published", date: blog.status === "published" ? blog.date : new Date().toISOString().split("T")[0] } : blog
-      );
-      persistBlogs(updatedBlogs);
-      showToastMsg("Blog approved and published successfully.");
-    });
-  };
-
-  const handleReject = (blogId, isArchiveAction = false) => {
-    if (isArchiveAction) {
-      triggerConfirm("Are you sure you want to archive this published article?", () => {
-        const updatedBlogs = blogs.map((b) => (b.id === blogId ? { ...b, status: "archived" } : b));
-        persistBlogs(updatedBlogs);
-        showToastMsg("Article archived successfully.");
+  // Handle initializing edit/create based on URL / mode prop
+  useEffect(() => {
+    if (mode === "create") {
+      if (!isStaff) {
+        navigate("/dashboard/blogs");
+        return;
+      }
+      setEditingBlogId(null);
+      setEditBlogData({
+        title: "", category: "AYURVEDA", summary: "", content_html: "",
+        featured_image: "", tags: "", seo_title: "", seo_description: "", seo_keywords: "",
+        author_name: `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim(),
+        author_role: currentUser?.role?.toUpperCase() === "DOCTOR" ? "Doctor" : currentUser?.role?.toUpperCase() === "THERAPIST" ? "Therapist" : ""
       });
-    } else {
-      setRejectionModal({ isOpen: true, blogId, reason: "" });
     }
-  };
+  }, [mode, isStaff, navigate, currentUser]);
 
-  const submitRejection = () => {
-    if (!rejectionModal.reason.trim()) {
-      triggerAlert("Please provide a rejection reason.");
-      return;
+  useEffect(() => {
+    if (mode === "edit" && detailBlog && String(detailBlog.id) === String(id)) {
+      setEditingBlogId(detailBlog.id);
+      setEditBlogData({
+        title: detailBlog.title || "",
+        category: detailBlog.category || "AYURVEDA",
+        summary: detailBlog.summary || "",
+        content_html: detailBlog.content_html || "",
+        featured_image: detailBlog.featured_image || "",
+        tags: detailBlog.tags?.join(", ") || "",
+        seo_title: detailBlog.seo_title || "",
+        seo_description: detailBlog.seo_description || "",
+        seo_keywords: detailBlog.seo_keywords || "",
+        author_name: detailBlog.author?.name || `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim(),
+        author_role: detailBlog.author?.role || (currentUser?.role?.toUpperCase() === "DOCTOR" ? "Doctor" : currentUser?.role?.toUpperCase() === "THERAPIST" ? "Therapist" : "")
+      });
     }
-    const updatedBlogs = blogs.map((b) => (b.id === rejectionModal.blogId ? { ...b, status: "rejected", rejectionReason: rejectionModal.reason } : b));
-    persistBlogs(updatedBlogs);
-    showToastMsg("Article rejected and notification sent to author.");
-    setRejectionModal({ isOpen: false, blogId: null, reason: "" });
-  };
+  }, [mode, detailBlog, id, currentUser]);
 
-  const handleDelete = (blogId) => {
-    triggerConfirm("Are you sure you want to permanently delete this article?", () => {
-      const updatedBlogs = blogs.filter((blog) => blog.id !== blogId);
-      persistBlogs(updatedBlogs);
-      showToastMsg("Article permanently deleted.");
-    });
-  };
+  // ─── Fetch blogs list ──────────────────────────────────────────────
+  const fetchBlogs = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (categoryFilter !== "ALL") params.set("category", categoryFilter);
+      if (search) params.set("search", search);
 
-  const handleSaveBlog = (savedBlog) => {
-    const existingBlog = blogs.find((blog) => blog.id === savedBlog.id);
+      if (isAdmin) {
+        if (activeTab === "pending") params.set("status", "pending");
+        else if (activeTab === "published") params.set("status", "published");
+        else if (activeTab === "archived") params.set("status", "archived");
+      } else if (isStaff && activeTab === "my_blogs") {
+        params.set("status", "my_blogs");
+      }
 
-    if (existingBlog && existingBlog.status === "pending" && savedBlog.status === "pending") {
-      triggerAlert("This blog is already pending review.");
-      return;
+      const data = await apiFetch(`/api/blogs?${params.toString()}`);
+      setBlogs(data.blogs || []);
+    } catch (err) {
+      console.error("Failed to fetch blogs:", err);
+      setBlogs([]);
+    } finally {
+      setLoading(false);
     }
+  }, [categoryFilter, search, activeTab, isAdmin, isStaff]);
 
-    const blogExists = blogs.some((blog) => blog.id === savedBlog.id);
-    let updatedBlogs = [];
+  useEffect(() => {
+    if (!id && !mode) fetchBlogs();
+  }, [fetchBlogs, id, mode]);
 
-    if (blogExists) {
-      updatedBlogs = blogs.map((blog) => (blog.id === savedBlog.id ? savedBlog : blog));
-      showToastMsg(savedBlog.status === "draft" ? "Draft updated successfully." : "Blog updated successfully. It is now pending admin approval.");
-    } else {
-      updatedBlogs = [savedBlog, ...blogs];
-      showToastMsg(savedBlog.status === "draft" ? "Draft saved successfully." : "Blog created successfully. It is now pending admin approval.");
+  // ─── Fetch single blog detail ──────────────────────────────────────
+  const fetchBlogDetail = useCallback(async (blogId) => {
+    try {
+      setDetailLoading(true);
+      const data = await apiFetch(`/api/blogs/${blogId}`);
+      setDetailBlog(data.blog);
+
+      // Track view
+      apiFetch(`/api/blogs/${blogId}/view`, { method: "POST" }).catch(() => {});
+    } catch (err) {
+      console.error("Failed to fetch blog detail:", err);
+      setDetailBlog(null);
+    } finally {
+      setDetailLoading(false);
     }
+  }, []);
 
-    persistBlogs(updatedBlogs);
-  };
+  useEffect(() => {
+    if (id) fetchBlogDetail(id);
+    else setDetailBlog(null);
+  }, [id, fetchBlogDetail]);
 
-  const handleEditorSubmit = (e, targetStatus) => {
-    if (e) e.preventDefault();
-    const newBlog = {
-      id: selectedBlog ? selectedBlog.id : Date.now().toString(),
-      title: editBlogData.title,
-      category: editBlogData.category,
-      summary: editBlogData.summary,
-      body: editBlogData.body,
-      image: editBlogData.image || "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800",
-      status: targetStatus,
-      author: currentUser ? { name: currentUser.name, userId: currentUser.user_id || currentUser.id, initials: currentUser.name ? currentUser.name[0] : "AU", role: currentUser.role } : { name: "Doctor", initials: "D", role: "Doctor", userId: "123" },
-      date: new Date().toISOString().split("T")[0],
-      readTime: getReadTime(editBlogData.body),
-    };
-    handleSaveBlog(newBlog);
-    setShowEditor(false);
-  };
-
+  // ─── Filtered blogs for display ────────────────────────────────────
   const filteredBlogs = useMemo(() => {
     return blogs.filter((blog) => {
-      // Role-based status filtering
-      if (!isAdmin && !isStaff && blog.status !== "published") return false;
-      
-      if (isAdmin) {
-        if (activeTab === "pending" && blog.status !== "pending") return false;
-        if (activeTab === "published" && blog.status !== "published") return false;
-        if (activeTab === "archived" && blog.status !== "archived") return false;
-      }
-
-      // Staff specific tabs
-      if (isStaff) {
+      if (isStaff && activeTab === "other_blogs") {
         const myUserId = currentUser?.user_id || currentUser?.id;
-        if (activeTab === "my_blogs" && blog.author?.userId !== myUserId) return false;
-        if (activeTab === "other_blogs") {
-          if (blog.author?.userId === myUserId) return false;
-          if (blog.status !== "published") return false;
-        }
+        if (blog.author?.id === myUserId) return false;
+        if (blog.status !== "published") return false;
       }
-
-      const matchesSearch = blog.title.toLowerCase().includes(search.toLowerCase()) || blog.summary.toLowerCase().includes(search.toLowerCase());
-      const matchesCategory = categoryFilter === "ALL" || blog.category === categoryFilter;
-
-      return matchesSearch && matchesCategory;
+      return true;
     });
-  }, [blogs, search, categoryFilter, activeTab, currentUser, isStaff, isAdmin]);
+  }, [blogs, activeTab, currentUser, isStaff]);
 
+  // ─── Handlers ──────────────────────────────────────────────────────
   const handleCardClick = (blogId) => {
     navigate("/dashboard/blogs/" + blogId);
   };
 
+  const handleApprove = (blogId) => {
+    triggerConfirm("Are you sure you want to approve and publish this blog?", async () => {
+      try {
+        await apiFetch(`/api/blogs/${blogId}/approve`, { method: "POST" });
+        showToastMsg("Blog approved and published successfully.");
+        fetchBlogs();
+      } catch (err) {
+        triggerAlert(err.message || "Failed to approve blog.");
+      }
+    });
+  };
+
+  const handleReject = (blogId) => {
+    setRejectionModal({ isOpen: true, blogId, reason: "" });
+  };
+
+  const submitRejection = async () => {
+    if (!rejectionModal.reason.trim()) {
+      triggerAlert("Please provide a rejection reason.");
+      return;
+    }
+    try {
+      await apiFetch(`/api/blogs/${rejectionModal.blogId}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ reason: rejectionModal.reason })
+      });
+      showToastMsg("Article rejected and author notified.");
+      setRejectionModal({ isOpen: false, blogId: null, reason: "" });
+      fetchBlogs();
+    } catch (err) {
+      triggerAlert(err.message || "Failed to reject blog.");
+    }
+  };
+
+  const handleArchive = (blogId) => {
+    triggerConfirm("Are you sure you want to archive this published article?", async () => {
+      try {
+        await apiFetch(`/api/blogs/${blogId}/archive`, { method: "POST" });
+        showToastMsg("Article archived successfully.");
+        fetchBlogs();
+        if (id) {
+          navigate("/dashboard/blogs");
+        }
+      } catch (err) {
+        triggerAlert(err.message || "Failed to archive blog.");
+      }
+    });
+  };
+
+  const handleDelete = (blogId) => {
+    triggerConfirm("Are you sure you want to permanently delete this article?", async () => {
+      try {
+        await apiFetch(`/api/blogs/${blogId}`, { method: "DELETE" });
+        showToastMsg("Article permanently deleted.");
+        fetchBlogs();
+      } catch (err) {
+        triggerAlert(err.message || "Failed to delete blog.");
+      }
+    });
+  };
+
+  // ─── Image upload ──────────────────────────────────────────────────
+  const handleImageFile = (file) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const data = await apiFetch("/api/uploads/blog-image", {
+          method: "POST",
+          body: JSON.stringify({ image: reader.result })
+        });
+        setEditBlogData(prev => ({ ...prev, featured_image: data.url }));
+        showToastMsg("Image uploaded successfully.");
+      } catch {
+        // Fallback: store base64 directly
+        setEditBlogData(prev => ({ ...prev, featured_image: reader.result }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer?.files?.[0];
+    handleImageFile(file);
+  };
+
+  const handleCancel = () => {
+    setEditingBlogId(null);
+    navigate("/dashboard/blogs");
+  };
+
+  // ─── Editor submit ─────────────────────────────────────────────────
+  const handleEditorSubmit = async (targetStatus) => {
+    // 1. Title validation: Required, min length 3 chars.
+    if (!editBlogData.title || editBlogData.title.trim().length < 3) {
+      triggerAlert("Please fill all required fields correctly.");
+      return;
+    }
+    // 2. Category validation: Required.
+    if (!editBlogData.category) {
+      triggerAlert("Please fill all required fields correctly.");
+      return;
+    }
+    // 3. Author Name validation: Required, alphabets only.
+    if (!editBlogData.author_name || !/^[A-Za-z\s]+$/.test(editBlogData.author_name.trim())) {
+      triggerAlert("Please fill all required fields correctly.");
+      return;
+    }
+    // 4. Role validation: Required (Doctor/Therapist).
+    const roleVal = editBlogData.author_role?.trim().toLowerCase();
+    if (roleVal !== "doctor" && roleVal !== "therapist") {
+      triggerAlert("Please fill all required fields correctly.");
+      return;
+    }
+    // 5. Image validation: Required for publishing (status = pending).
+    if (targetStatus === "pending" && !editBlogData.featured_image) {
+      triggerAlert("Please fill all required fields correctly.");
+      return;
+    }
+    // 6. Description validation: Required, min length 50 chars.
+    const textOnly = (editBlogData.content_html || "").replace(/<[^>]*>/g, '').trim();
+    if (textOnly.length < 50) {
+      triggerAlert("Please fill all required fields correctly.");
+      return;
+    }
+
+    setSavingBlog(true);
+    try {
+      const payload = {
+        title: editBlogData.title,
+        category: editBlogData.category,
+        summary: editBlogData.summary,
+        content_html: editBlogData.content_html,
+        featured_image: editBlogData.featured_image,
+        tags: editBlogData.tags ? editBlogData.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+        seo_title: editBlogData.seo_title,
+        seo_description: editBlogData.seo_description,
+        seo_keywords: editBlogData.seo_keywords,
+        status: targetStatus,
+        author_name: editBlogData.author_name,
+        author_role: editBlogData.author_role
+      };
+
+      if (editingBlogId) {
+        await apiFetch(`/api/blogs/${editingBlogId}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload)
+        });
+
+        // If submitting for review after edit
+        if (targetStatus === "pending") {
+          await apiFetch(`/api/blogs/${editingBlogId}/submit`, { method: "POST" });
+        }
+
+        showToastMsg("Changes saved successfully.");
+      } else {
+        await apiFetch("/api/blogs", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        showToastMsg(targetStatus === "draft" ? "Draft saved successfully." : "Blog created and submitted for review.");
+      }
+
+      setEditingBlogId(null);
+      navigate("/dashboard/blogs");
+    } catch (err) {
+      triggerAlert(err.message || "Failed to save blog.");
+    } finally {
+      setSavingBlog(false);
+    }
+  };
+
+  // ─── Like / Bookmark ───────────────────────────────────────────────
+  const handleToggleLike = async () => {
+    if (!currentUser) return;
+    try {
+      const data = await apiFetch(`/api/blogs/${detailBlog.id}/like`, { method: "POST" });
+      setDetailBlog(prev => ({
+        ...prev,
+        user_liked: data.liked,
+        like_count: data.liked ? prev.like_count + 1 : prev.like_count - 1
+      }));
+    } catch (err) {
+      console.error("Like error:", err);
+    }
+  };
+
+  const handleToggleBookmark = async () => {
+    if (!currentUser) return;
+    try {
+      const data = await apiFetch(`/api/blogs/${detailBlog.id}/bookmark`, { method: "POST" });
+      setDetailBlog(prev => ({
+        ...prev,
+        user_bookmarked: data.bookmarked,
+        bookmark_count: data.bookmarked ? prev.bookmark_count + 1 : prev.bookmark_count - 1
+      }));
+    } catch (err) {
+      console.error("Bookmark error:", err);
+    }
+  };
+
+  // ─── Comments ──────────────────────────────────────────────────────
+  const handleSubmitComment = async () => {
+    if (!commentText.trim()) return;
+    try {
+      await apiFetch(`/api/blogs/${detailBlog.id}/comments`, {
+        method: "POST",
+        body: JSON.stringify({ comment: commentText })
+      });
+      setCommentText("");
+      showToastMsg("Comment added.");
+      fetchBlogDetail(detailBlog.id);
+    } catch (err) {
+      triggerAlert(err.message || "Failed to add comment.");
+    }
+  };
+
+  const handleModerateComment = async (commentId, status) => {
+    try {
+      await apiFetch(`/api/blogs/${detailBlog.id}/comments/${commentId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status })
+      });
+      showToastMsg(`Comment ${status}.`);
+      fetchBlogDetail(detailBlog.id);
+    } catch (err) {
+      triggerAlert(err.message || "Failed to moderate comment.");
+    }
+  };
+
+  // ═════════════════════════════════════════════════════════════════════
+  // DETAIL VIEW
+  // ═════════════════════════════════════════════════════════════════════
   if (id) {
-    const currentBlog = blogs.find((blog) => blog.id === id);
-    if (!currentBlog) {
+    if (detailLoading) {
+      return <div className="blog-loading"><div className="blog-spinner" /></div>;
+    }
+
+    if (!detailBlog) {
       return <div className="blog-empty">Blog not found.</div>;
     }
 
     return (
-      <div className="blog-detail-container">
-        <div className="blog-detail-back" onClick={() => navigate("/dashboard/blogs")}>
+      <div className="blog-detail-container" style={{ background: "#fdfbf7", color: "#1a202c", padding: "24px" }}>
+        {toast && <div className="blog-toast">{toast}</div>}
+
+        <div className="blog-detail-back" onClick={() => navigate("/dashboard/blogs")} style={{ color: "#cda751", cursor: "pointer", fontWeight: "bold", fontSize: "15px", marginBottom: "20px" }}>
           ← Back to Blogs
         </div>
-        <article className="blog-detail-header">
-          <img src={getImageUrl(currentBlog.image)} alt={currentBlog.title} className="blog-detail-image" />
-          <div className="blog-detail-info">
-            <span className="blog-detail-category">{currentBlog.category}</span>
-            <h1 className="blog-detail-title">{currentBlog.title}</h1>
-            <div className="blog-detail-meta">
-              <div className="blog-detail-author">
-                <div className="blog-detail-author-avatar">{currentBlog.author?.initials}</div>
-                <div className="blog-detail-author-info">
-                  <h4>{currentBlog.author?.name}</h4>
-                  <p>{currentBlog.author?.role}</p>
-                </div>
-              </div>
-              <div>Published on {formatDate(currentBlog.date)}</div>
-              <div>{currentBlog.readTime}</div>
+
+        {/* Single card wrapping the entire blog */}
+        <article className="blog-detail-main" style={{ display: "flex", flexDirection: "column", gap: "16px", background: "#fff", borderRadius: "12px", border: "1px solid rgba(205,167,81,0.25)", padding: "28px", boxShadow: "0 4px 20px rgba(205,167,81,0.08)" }}>
+          
+          {/* Category/Discipline */}
+          <div className="blog-detail-category" style={{ fontSize: "14px", fontWeight: "700", color: "#cda751", textTransform: "uppercase", letterSpacing: "1px" }}>
+            {detailBlog.category}
+          </div>
+
+          {/* Title */}
+          <h1 className="blog-detail-title" style={{ fontSize: "32px", fontWeight: "800", color: "#1a202c", margin: "0" }}>
+            {detailBlog.title}
+          </h1>
+
+          {/* Image */}
+          <div className="blog-detail-image-wrapper" style={{ borderRadius: "10px", overflow: "hidden" }}>
+            <img 
+              src={getImageUrl(detailBlog.featured_image)} 
+              alt={detailBlog.title} 
+              style={{ width: "100%", maxHeight: "450px", objectFit: "cover", display: "block" }}
+              onError={(e) => {
+                e.target.src = "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800";
+              }}
+            />
+          </div>
+
+          {/* Description/Content */}
+          <section 
+            className="blog-detail-body" 
+            style={{ fontSize: "17px", lineHeight: "1.8", color: "#2d3748" }} 
+            dangerouslySetInnerHTML={{ __html: detailBlog.content_html }} 
+          />
+
+          {/* Meta Details: 2 rows, 2 columns — no separate box */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 16px", marginTop: "8px", paddingTop: "16px", borderTop: "1px solid #edf2f7", fontSize: "14px", color: "#4a5568" }}>
+            <div>
+              <strong style={{ color: "#1a202c" }}>Author:</strong> {detailBlog.author?.name || "Anonymous"}
+            </div>
+            <div>
+              <strong style={{ color: "#1a202c" }}>Role:</strong> {detailBlog.author?.role || "Specialist"}
+            </div>
+            <div>
+              <strong style={{ color: "#1a202c" }}>Date:</strong> {formatDate(detailBlog.published_at || detailBlog.created_at)}
+            </div>
+            <div>
+              <strong style={{ color: "#1a202c" }}>Read Time:</strong> {detailBlog.read_time || "3 min read"}
             </div>
           </div>
+
+          {/* Action Buttons for Admins */}
+          {isAdmin && (detailBlog.status === "pending" || detailBlog.status === "published") && (
+            <div className="blog-admin-decision-actions" style={{ display: "flex", gap: "16px", marginTop: "8px", paddingTop: "16px", borderTop: "1px solid #edf2f7" }}>
+              {detailBlog.status === "pending" ? (
+                <>
+                  <button 
+                    className="blog-btn-accept" 
+                    onClick={() => handleApprove(detailBlog.id)}
+                  >
+                    Accept
+                  </button>
+                  <button 
+                    className="blog-btn-reject" 
+                    onClick={() => handleReject(detailBlog.id)}
+                  >
+                    Reject
+                  </button>
+                </>
+              ) : (
+                <button 
+                  className="blog-btn-archive" 
+                  onClick={() => handleArchive(detailBlog.id)}
+                  style={{ background: "#718096", color: "#fff", border: "none", padding: "12px 24px", borderRadius: "8px", cursor: "pointer", fontWeight: "800", fontSize: "16px", boxShadow: "0 4px 14px rgba(113,128,150,0.3)" }}
+                >
+                  Archive Article
+                </button>
+              )}
+            </div>
+          )}
         </article>
-        <section className="blog-detail-body" dangerouslySetInnerHTML={{ __html: currentBlog.body }} />
-        <RelatedBlogs currentBlogId={currentBlog.id} blogs={blogs} onClick={handleCardClick} />
       </div>
     );
   }
 
-  return (
-    <div className="blog-container">
-      {toast && <div className="blog-toast">{toast}</div>}
+  // ═════════════════════════════════════════════════════════════════════
+  // EDITOR VIEW (Full Page)
+  // ═════════════════════════════════════════════════════════════════════
+  if (mode === "create" || mode === "edit") {
+    if (mode === "edit" && detailLoading) {
+      return <div className="blog-loading"><div className="blog-spinner" /></div>;
+    }
 
-      {rejectionModal.isOpen && (
-        <div className="blog-editor-modal-overlay">
-          <div className="blog-editor-modal" style={{ maxWidth: '400px' }}>
-            <h2>Reject Blog</h2>
-            <p style={{ color: '#718096', marginBottom: '16px', fontSize: '14px' }}>Please provide a reason for rejecting this article. This will be sent to the author.</p>
-            <textarea
-              placeholder="Rejection Reason"
-              value={rejectionModal.reason}
-              onChange={(e) => setRejectionModal({ ...rejectionModal, reason: e.target.value })}
-              className="blog-editor-form-textarea"
-              style={{ width: '100%', padding: '12px', border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '16px', fontFamily: 'inherit', resize: 'vertical' }}
-              rows={4}
-              required
-            />
-            <div className="blog-editor-actions">
-              <button type="button" onClick={() => setRejectionModal({ isOpen: false, blogId: null, reason: "" })} className="blog-editor-cancel">Cancel</button>
-              <button type="button" onClick={submitRejection} className="blog-editor-save" style={{ background: '#e53e3e' }}>Reject Article</button>
-            </div>
-          </div>
+    return (
+      <div className="blog-editor-page-container" style={{ background: "#fdfbf7", minHeight: "100vh", padding: "24px" }}>
+        {toast && <div className="blog-toast">{toast}</div>}
+
+        <div className="blog-detail-back" onClick={handleCancel} style={{ marginBottom: "20px", color: "#cda751", cursor: "pointer", fontWeight: "bold" }}>
+          ← Cancel and Go Back
         </div>
-      )}
 
-      {showEditor && (
-        <div className="blog-editor-modal-overlay">
-          <div className="blog-editor-modal">
-            <h2>{selectedBlog ? "Edit Blog" : "Create New Blog"}</h2>
-            <form onSubmit={(e) => { e.preventDefault(); handleEditorSubmit(e, e.nativeEvent.submitter.name === 'draft' ? 'draft' : 'pending'); }} className="blog-editor-form">
-              <input type="text" placeholder="Blog Title" value={editBlogData.title} onChange={(e) => setEditBlogData({ ...editBlogData, title: e.target.value })} required />
-              <select value={editBlogData.category} onChange={(e) => setEditBlogData({ ...editBlogData, category: e.target.value })} required>
+        <div className="blog-editor-card" style={{ background: "white", padding: "30px", borderRadius: "12px", border: "1px solid rgba(205,167,81,0.3)", boxShadow: "0 4px 20px rgba(205,167,81,0.05)" }}>
+          <h2 style={{ borderBottom: "2px solid #cda751", paddingBottom: "12px", color: "#1a202c", fontWeight: "800" }}>{mode === "edit" ? "Edit Blog Post" : "Create New Blog"}</h2>
+          
+          <div className="blog-editor-form" style={{ display: "flex", flexDirection: "column", gap: "20px", marginTop: "20px" }}>
+            
+            {/* 1. Category/Discipline */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Category/Discipline *</label>
+              <select
+                value={editBlogData.category}
+                onChange={(e) => setEditBlogData({ ...editBlogData, category: e.target.value })}
+                style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", background: "#fff" }}
+              >
                 <option value="AYURVEDA">Ayurveda</option>
                 <option value="YOGA">Yoga</option>
                 <option value="NUTRITION">Nutrition</option>
                 <option value="WELLNESS">Wellness</option>
               </select>
-              <textarea placeholder="Short Summary" value={editBlogData.summary} onChange={(e) => setEditBlogData({ ...editBlogData, summary: e.target.value })} required rows={2} />
-              <textarea placeholder="Full Content (HTML supported)" value={editBlogData.body} onChange={(e) => setEditBlogData({ ...editBlogData, body: e.target.value })} required rows={6} />
-              <input type="text" placeholder="Image URL (e.g. filename from /uploads or absolute URL)" value={editBlogData.image} onChange={(e) => setEditBlogData({ ...editBlogData, image: e.target.value })} />
-              
-              <div className="blog-editor-actions">
-                <button type="button" onClick={() => setShowEditor(false)} className="blog-editor-cancel">Cancel</button>
-                <button type="submit" name="draft" className="blog-editor-save" style={{background: '#718096', border: '1px solid #718096'}}>Save Draft</button>
-                <button type="submit" name="pending" className="blog-editor-save">Submit for Review</button>
+            </div>
+
+            {/* 2. Title */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Blog Title * (Min 3 chars)</label>
+              <input
+                type="text"
+                placeholder="Enter blog title..."
+                value={editBlogData.title}
+                onChange={(e) => setEditBlogData({ ...editBlogData, title: e.target.value })}
+                style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px" }}
+                required
+              />
+            </div>
+
+            {/* 3. Short Subtitle/Tagline */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Short Subtitle/Tagline</label>
+              <textarea
+                placeholder="Enter short summary or tagline..."
+                value={editBlogData.summary}
+                onChange={(e) => setEditBlogData({ ...editBlogData, summary: e.target.value })}
+                rows={2}
+                style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", fontFamily: "inherit" }}
+              />
+            </div>
+
+            {/* 4. Author Name */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Author Name * (Alphabets only)</label>
+              <input
+                type="text"
+                placeholder="Enter author name..."
+                value={editBlogData.author_name}
+                onChange={(e) => setEditBlogData({ ...editBlogData, author_name: e.target.value })}
+                style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px" }}
+                required
+              />
+            </div>
+
+            {/* 5. Role */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Role * (Doctor/Therapist)</label>
+              <select
+                value={editBlogData.author_role}
+                onChange={(e) => setEditBlogData({ ...editBlogData, author_role: e.target.value })}
+                style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", background: "#fff" }}
+              >
+                <option value="">Select Role</option>
+                <option value="Doctor">Doctor</option>
+                <option value="Therapist">Therapist</option>
+              </select>
+            </div>
+
+            {/* 6. Date */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <label style={{ fontSize: "14px", fontWeight: "700", color: "#718096" }}>Date (Auto-generated, not editable)</label>
+              <input
+                type="text"
+                value={mode === "edit" && detailBlog ? formatDate(detailBlog.created_at) : formatDate(new Date())}
+                disabled
+                style={{ width: "100%", padding: "12px", border: "1px solid #cbd5e0", borderRadius: "8px", fontSize: "14px", background: "#edf2f7", cursor: "not-allowed", color: "#4a5568" }}
+              />
+            </div>
+
+            {/* 7. Image */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Featured Image Thumbnail * (Required for publishing)</label>
+              <div
+                className={`blog-image-upload-zone ${dragOver ? "drag-over" : ""}`}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                style={{ border: "2px dashed #cbd5e0", borderRadius: "8px", padding: "20px", textAlign: "center", cursor: "pointer", background: "#fafafa" }}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => handleImageFile(e.target.files?.[0])}
+                />
+                {editBlogData.featured_image ? (
+                  <img
+                    src={getImageUrl(editBlogData.featured_image)}
+                    alt="Preview"
+                    className="blog-image-preview"
+                    style={{ maxHeight: "200px", maxWidth: "100%", objectFit: "contain", borderRadius: "6px" }}
+                  />
+                ) : (
+                  <p style={{ color: "#718096", margin: 0 }}>📷 Click or drag an image here for featured image</p>
+                )}
               </div>
-            </form>
+            </div>
+
+            {/* 8. Description/Content */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Description/Content * (Min 50 chars)</label>
+              <QuillEditor
+                value={editBlogData.content_html}
+                onChange={(html) => setEditBlogData(prev => ({ ...prev, content_html: html }))}
+              />
+            </div>
+
+            {/* SEO Fields */}
+            <button type="button" className="blog-seo-toggle" onClick={() => setShowSeo(!showSeo)} style={{ alignSelf: "flex-start", background: "transparent", border: "none", color: "#cda751", cursor: "pointer", fontWeight: "bold" }}>
+              {showSeo ? "▾" : "▸"} SEO Settings
+            </button>
+            {showSeo && (
+              <div className="blog-seo-fields" style={{ display: "flex", flexDirection: "column", gap: "12px", border: "1px solid #edf2f7", padding: "16px", borderRadius: "8px" }}>
+                <input type="text" placeholder="SEO Title" value={editBlogData.seo_title} onChange={(e) => setEditBlogData({ ...editBlogData, seo_title: e.target.value })} style={{ padding: "10px", border: "1px solid #e2e8f0", borderRadius: "6px" }} />
+                <textarea placeholder="SEO Description" value={editBlogData.seo_description} onChange={(e) => setEditBlogData({ ...editBlogData, seo_description: e.target.value })} rows={2} style={{ padding: "10px", border: "1px solid #e2e8f0", borderRadius: "6px", fontFamily: "inherit" }} />
+                <input type="text" placeholder="SEO Keywords (comma separated)" value={editBlogData.seo_keywords} onChange={(e) => setEditBlogData({ ...editBlogData, seo_keywords: e.target.value })} style={{ padding: "10px", border: "1px solid #e2e8f0", borderRadius: "6px" }} />
+              </div>
+            )}
+
+            <div className="blog-editor-actions" style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "10px", borderTop: "1px solid #edf2f7", paddingTop: "20px" }}>
+              <button type="button" onClick={handleCancel} className="blog-editor-cancel" style={{ background: "#edf2f7", color: "#4a5568", border: "none", padding: "12px 24px", borderRadius: "6px", cursor: "pointer", fontWeight: "700" }}>Cancel</button>
+              <button
+                type="button"
+                onClick={() => handleEditorSubmit("draft")}
+                className="blog-editor-save"
+                style={{ background: "#718096", color: "white", border: "none", padding: "12px 24px", borderRadius: "6px", cursor: "pointer", fontWeight: "700" }}
+                disabled={savingBlog}
+              >
+                Save Draft
+              </button>
+              <button
+                type="button"
+                onClick={() => handleEditorSubmit("pending")}
+                className="blog-editor-save"
+                style={{ background: "#cda751", color: "#fff", border: "none", padding: "12px 24px", borderRadius: "6px", cursor: "pointer", fontWeight: "800", boxShadow: "0 2px 10px rgba(205,167,81,0.2)" }}
+                disabled={savingBlog}
+              >
+                Submit for Review
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ═════════════════════════════════════════════════════════════════════
+  // LIST VIEW
+  // ═════════════════════════════════════════════════════════════════════
+  return (
+    <div className="blog-container">
+      {toast && <div className="blog-toast">{toast}</div>}
+
+      {/* Rejection Modal */}
+      {rejectionModal.isOpen && (
+        <div className="blog-editor-modal-overlay">
+          <div className="blog-editor-modal" style={{ maxWidth: "400px" }}>
+            <h2>Reject Blog</h2>
+            <p style={{ color: "#718096", marginBottom: "16px", fontSize: "14px" }}>
+              Please provide a reason for rejecting this article. This will be sent to the author.
+            </p>
+            <textarea
+              placeholder="Rejection Reason"
+              value={rejectionModal.reason}
+              onChange={(e) => setRejectionModal({ ...rejectionModal, reason: e.target.value })}
+              className="blog-editor-form-textarea"
+              style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", marginBottom: "16px", fontFamily: "inherit", resize: "vertical" }}
+              rows={4}
+              required
+            />
+            <div className="blog-editor-actions">
+              <button type="button" onClick={() => setRejectionModal({ isOpen: false, blogId: null, reason: "" })} className="blog-editor-cancel">Cancel</button>
+              <button type="button" onClick={submitRejection} className="blog-editor-save" style={{ background: "#e53e3e" }}>Reject Article</button>
+            </div>
           </div>
         </div>
       )}
 
+      {/* Page Header */}
       <div className="blog-header">
         <div className="blog-title">
           <h1>Vedic & Ayurvedic Blogs</h1>
           <p>Read about Ayurveda, Yoga, Wellness and Healthy Lifestyle</p>
         </div>
-        {isStaff && activeTab === "my_blogs" && (
-          <button style={{ background: '#cda751', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }} onClick={() => {
-            setEditBlogData({ title: "", category: "AYURVEDA", summary: "", body: "", image: "" });
-            setSelectedBlog(null);
-            setShowEditor(true);
-          }}>
+        {isStaff && (
+          <button
+            style={{ background: "#cda751", color: "white", border: "none", padding: "10px 20px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}
+            onClick={() => navigate("/dashboard/blogs/create")}
+          >
             + Create Blog
           </button>
         )}
       </div>
 
-      {isStaff && (
-        <div className="blog-tabs" style={{ display: 'flex', gap: '16px', marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-          <button
-            style={{ background: 'none', border: 'none', padding: '8px 12px', fontSize: '15px', fontWeight: '600', color: activeTab === 'my_blogs' ? '#cda751' : '#718096', borderBottom: activeTab === 'my_blogs' ? '2px solid #cda751' : '2px solid transparent', cursor: 'pointer', transition: '0.2s' }}
-            onClick={() => setActiveTab("my_blogs")}
-          >
-            My Blogs
-          </button>
-          <button
-            style={{ background: 'none', border: 'none', padding: '8px 12px', fontSize: '15px', fontWeight: '600', color: activeTab === 'other_blogs' ? '#cda751' : '#718096', borderBottom: activeTab === 'other_blogs' ? '2px solid #cda751' : '2px solid transparent', cursor: 'pointer', transition: '0.2s' }}
-            onClick={() => setActiveTab("other_blogs")}
-          >
-            Other Blogs
-          </button>
+
+
+      {/* Tabs */}
+      {isAdmin && (
+        <div className="blog-tabs">
+          {["all", "pending", "published", "archived"].map(tab => (
+            <button
+              key={tab}
+              className={`blog-tab-btn ${activeTab === tab ? "active" : ""}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
         </div>
       )}
 
+      {isStaff && (
+        <div className="blog-tabs">
+          {["my_blogs", "other_blogs"].map(tab => (
+            <button
+              key={tab}
+              className={`blog-tab-btn ${activeTab === tab ? "active" : ""}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab === "my_blogs" ? "My Blogs" : "Other Blogs"}
+            </button>
+          ))}
+        </div>
+      )}
 
+      {/* Search & Filter Controls */}
       <div className="blog-controls">
         <div className="blog-search-box">
           <img src={SearchIcon} alt="search" />
@@ -407,31 +922,31 @@ export default function Blogs() {
         </div>
       </div>
 
-      <div className="blog-grid">
-        {filteredBlogs.map((blog) => (
-          <BlogCard
-            key={blog.id}
-            blog={blog}
-            onClick={handleCardClick}
-            isStaff={isStaff && activeTab === "my_blogs"}
-            isAdmin={isAdmin}
-            onEdit={(blog) => {
-              setSelectedBlog(blog);
-              setEditBlogData({
-                title: blog.title || "",
-                category: blog.category || "AYURVEDA",
-                summary: blog.summary || "",
-                body: blog.body || "",
-                image: blog.image || ""
-              });
-              setShowEditor(true);
-            }}
-            onDelete={handleDelete}
-            onApprove={handleApprove}
-            onReject={handleReject}
-          />
-        ))}
-      </div>
+      {/* Blog Grid */}
+      {loading ? (
+        <div className="blog-loading"><div className="blog-spinner" /></div>
+      ) : filteredBlogs.length === 0 ? (
+        <div className="blog-empty">
+          <p style={{ fontSize: "16px", color: "#718096" }}>No blogs found.</p>
+        </div>
+      ) : (
+        <div className="blog-grid">
+          {filteredBlogs.map((blog) => (
+            <BlogCard
+              key={blog.id}
+              blog={blog}
+              onClick={handleCardClick}
+              isStaff={isStaff}
+              isAdmin={isAdmin}
+              onEdit={(blog) => navigate(`/dashboard/blogs/${blog.id}/edit`)}
+              onDelete={handleDelete}
+              onApprove={handleApprove}
+              onReject={handleReject}
+              onArchive={handleArchive}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

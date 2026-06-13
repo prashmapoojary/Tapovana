@@ -13,6 +13,7 @@ const bookingRoutes = require("./routes/bookings");
 const membershipRoutes = require("./routes/memberships");
 const workshopRoutes = require("./routes/workshops");
 const vedicProgramRoutes = require("./routes/vedic-programs");
+const blogsRoutes = require("./routes/blogs");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -51,6 +52,8 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/memberships", membershipRoutes);
 app.use("/api/workshops", workshopRoutes);
 app.use("/api/vedic-programs", vedicProgramRoutes);
+app.use("/api/blogs", blogsRoutes);
+app.post("/api/uploads/blog-image", require("./middleware/auth").authenticate, require("./middleware/auth").requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR', 'THERAPIST'), require("./controllers/blogsController").uploadBlogImage);
 app.post("/api/vedicpackages", require("./controllers/vedicProgramsController").registerAttendeeFromMobile);
 
 // ── Analytics stub (returns dummy data until real analytics are built) ────────
@@ -252,6 +255,18 @@ app.listen(PORT, () => {
                 }
             }
         }
+    }, 60000);
+    // ────────────────────────────────────────────────────────────────────────
+
+    // ── Background Blog Scheduled Publishing Cron ───────────────────────────
+    const { publishScheduledBlogs } = require("./controllers/blogsController");
+    publishScheduledBlogs()
+        .then(() => console.log("[Blog Scheduler] Initial scheduled blogs check complete."))
+        .catch(err => console.error("[Blog Scheduler] Initial check failed:", err));
+
+    // Run every 60 seconds
+    setInterval(() => {
+        publishScheduledBlogs().catch(err => console.error("Error in blog scheduled publishing:", err));
     }, 60000);
     // ────────────────────────────────────────────────────────────────────────
 });

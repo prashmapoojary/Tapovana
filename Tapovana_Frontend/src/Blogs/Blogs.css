@@ -334,10 +334,7 @@
 /* ----------------------------------------------------- */
 
 .blog-detail-header {
-  background: white;
-  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(205, 167, 81, 0.2);
 }
 
 .blog-detail-image {
@@ -413,11 +410,6 @@
 /* ----------------------------------------------------- */
 
 .blog-detail-body {
-  background: white;
-  border-radius: 12px;
-  padding: 32px;
-  border: 1px solid rgba(205, 167, 81, 0.2);
-
   line-height: 1.9;
   font-size: 15px;
   color: #4a5568;
@@ -588,6 +580,30 @@
 }
 
 /* ----------------------------------------------------- */
+/* Blog Editor Page */
+/* ----------------------------------------------------- */
+
+.blog-editor-page-container {
+  min-height: 100vh;
+  padding: 24px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.blog-editor-card {
+  background: white;
+  border-radius: 12px;
+  padding: 32px;
+  border: 1px solid rgba(205, 167, 81, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+/* ----------------------------------------------------- */
 /* Blog Editor Modal */
 /* ----------------------------------------------------- */
 
@@ -675,4 +691,421 @@
 
 .blog-editor-save:hover {
   background: #b59245;
+}
+
+/* ----------------------------------------------------- */
+/* Admin Tabs                                            */
+/* ----------------------------------------------------- */
+
+.blog-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #e2e8f0;
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.blog-tab-btn {
+  background: none;
+  border: none;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #718096;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: 0.2s ease;
+  white-space: nowrap;
+}
+
+.blog-tab-btn:hover {
+  color: #cda751;
+}
+
+.blog-tab-btn.active {
+  color: #cda751;
+  border-bottom-color: #cda751;
+}
+
+.blog-tab-btn .tab-count {
+  display: inline-block;
+  margin-left: 6px;
+  background: rgba(205,167,81,0.14);
+  color: #cda751;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ----------------------------------------------------- */
+/* Stats Banner                                          */
+/* ----------------------------------------------------- */
+
+.blog-stats-banner {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.blog-stat-card {
+  flex: 1;
+  min-width: 140px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px 20px;
+  text-align: center;
+}
+
+.blog-stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: #cda751;
+  margin: 0;
+}
+
+.blog-stat-label {
+  font-size: 12px;
+  color: #718096;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin: 4px 0 0;
+  letter-spacing: 0.5px;
+}
+
+/* ----------------------------------------------------- */
+/* Interactions Bar (Like, Bookmark, Views)               */
+/* ----------------------------------------------------- */
+
+.blog-detail-interactions {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  padding: 16px 28px;
+  border-top: 1px solid #edf2f7;
+  background: white;
+  border-radius: 0 0 12px 12px;
+}
+
+.blog-interaction-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #718096;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.blog-interaction-btn:hover {
+  border-color: #cda751;
+  color: #cda751;
+}
+
+.blog-interaction-btn.active {
+  background: rgba(205,167,81,0.1);
+  border-color: #cda751;
+  color: #cda751;
+}
+
+.blog-interaction-count {
+  font-size: 14px;
+  color: #718096;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ----------------------------------------------------- */
+/* Comments Section                                      */
+/* ----------------------------------------------------- */
+
+.blog-comments-section {
+  background: white;
+  border-radius: 12px;
+  padding: 24px 28px;
+  border: 1px solid rgba(205, 167, 81, 0.2);
+}
+
+.blog-comments-title {
+  margin: 0 0 20px;
+  font-size: 18px;
+  color: #1a202c;
+}
+
+.blog-comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.blog-comment-form textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+  min-height: 70px;
+}
+
+.blog-comment-form textarea:focus {
+  outline: none;
+  border-color: #cda751;
+  box-shadow: 0 0 0 3px rgba(205, 167, 81, 0.12);
+}
+
+.blog-comment-submit {
+  align-self: flex-end;
+  background: #cda751;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.blog-comment-item {
+  padding: 14px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.blog-comment-item:last-child {
+  border-bottom: none;
+}
+
+.blog-comment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.blog-comment-author {
+  font-weight: 600;
+  font-size: 13px;
+  color: #1a202c;
+}
+
+.blog-comment-date {
+  font-size: 11px;
+  color: #a0aec0;
+}
+
+.blog-comment-text {
+  font-size: 14px;
+  color: #4a5568;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.blog-comment-mod-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.blog-comment-mod-actions button {
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.blog-comment-mod-actions .approve-btn {
+  color: #2ecc71;
+  border-color: #2ecc71;
+}
+
+.blog-comment-mod-actions .reject-btn {
+  color: #e74c3c;
+  border-color: #e74c3c;
+}
+
+.blog-comment-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-left: 8px;
+}
+
+.blog-comment-status-badge.pending {
+  background: rgba(241, 196, 15, 0.15);
+  color: #d4ac0d;
+}
+
+.blog-comment-status-badge.rejected {
+  background: rgba(231, 76, 60, 0.12);
+  color: #c0392b;
+}
+
+/* ----------------------------------------------------- */
+/* Quill Editor Container                                */
+/* ----------------------------------------------------- */
+
+.blog-quill-container {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.blog-quill-container .ql-toolbar {
+  border: none;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.blog-quill-container .ql-container {
+  border: none;
+  min-height: 200px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.blog-quill-container .ql-editor {
+  min-height: 200px;
+  line-height: 1.7;
+}
+
+/* ----------------------------------------------------- */
+/* Image Upload Drop Zone                                */
+/* ----------------------------------------------------- */
+
+.blog-image-upload-zone {
+  border: 2px dashed #cbd5e0;
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: 0.2s ease;
+  background: #f8fafc;
+}
+
+.blog-image-upload-zone:hover,
+.blog-image-upload-zone.drag-over {
+  border-color: #cda751;
+  background: rgba(205, 167, 81, 0.06);
+}
+
+.blog-image-upload-zone p {
+  margin: 0;
+  color: #718096;
+  font-size: 13px;
+}
+
+.blog-image-preview {
+  margin-top: 12px;
+  border-radius: 8px;
+  max-height: 180px;
+  object-fit: cover;
+  max-width: 100%;
+}
+
+/* ----------------------------------------------------- */
+/* SEO Collapsible Section                               */
+/* ----------------------------------------------------- */
+
+.blog-seo-toggle {
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px 14px;
+  width: 100%;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5568;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.blog-seo-toggle:hover {
+  border-color: #cda751;
+  color: #cda751;
+}
+
+.blog-seo-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 0 0;
+}
+
+/* Wider editor modal for Quill */
+.blog-editor-modal.wide {
+  max-width: 860px;
+}
+
+/* ----------------------------------------------------- */
+/* Loading spinner                                       */
+/* ----------------------------------------------------- */
+
+.blog-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px;
+}
+
+.blog-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #cda751;
+  border-radius: 50%;
+  animation: blogSpin 0.7s linear infinite;
+}
+
+@keyframes blogSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ----------------------------------------------------- */
+/* Admin Accept/Reject decision buttons                  */
+/* ----------------------------------------------------- */
+
+.blog-btn-accept,
+.blog-btn-reject {
+  background-color: #cda751;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 15px;
+  width: 170px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(205, 167, 81, 0.2);
+}
+
+.blog-btn-accept:hover,
+.blog-btn-reject:hover {
+  background-color: #b89538;
+  box-shadow: 0 6px 18px rgba(205, 167, 81, 0.35);
+  transform: translateY(-1px);
 }

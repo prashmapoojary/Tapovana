@@ -114,7 +114,9 @@ function App() {
               <Route index element={<SafePage><Home /></SafePage>} />
               <Route path="profile" element={<SafePage><Profile /></SafePage>} />
               <Route path="blogs" element={<SafePage><Blogs /></SafePage>} />
+              <Route path="blogs/create" element={<SafePage><Blogs mode="create" /></SafePage>} />
               <Route path="blogs/:id" element={<SafePage><Blogs /></SafePage>} />
+              <Route path="blogs/:id/edit" element={<SafePage><Blogs mode="edit" /></SafePage>} />
               <Route path="my-assignments" element={<SafePage><MyAssignments /></SafePage>} />
               <Route path="bookings" element={<SafePage><Bookings /></SafePage>} />
               <Route path="services" element={<SafePage><Services /></SafePage>} />

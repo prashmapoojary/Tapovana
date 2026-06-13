@@ -802,6 +802,93 @@ const sendVedicCancellationEmail = async ({ to, userName, programTitle }) => {
   });
 };
 
+// ─── Blog CMS Email Templates ──────────────────────────────────────────
+const sendBlogSubmittedEmail = async ({ to, adminName, authorName, blogTitle }) => {
+  const html = emailWrapper(`
+    <h1 style="color:#cda751;text-align:center;">New Blog Submission</h1>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
+      Hello ${adminName || 'Admin'},
+    </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      A new blog article has been submitted for review by <strong style="color:#cda751;">${authorName}</strong>.
+    </p>
+    <div style="background:#1e1a0e;border-left:4px solid #cda751;border-radius:6px;padding:20px 24px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Article Title:</strong> ${blogTitle}</p>
+      <p style="margin:0;font-size:13px;color:#ccc;"><strong>Author:</strong> ${authorName}</p>
+    </div>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
+      Please log in to the admin panel to review and approve or reject this article.<br/>
+      Best regards,<br/>
+      <strong>Tapovana Team</strong>
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Tapovana — New Blog Submission: ${blogTitle}`,
+    html,
+  });
+};
+
+const sendBlogApprovedEmail = async ({ to, authorName, blogTitle }) => {
+  const html = emailWrapper(`
+    <h1 style="color:#2ecc71;text-align:center;">Blog Approved & Published!</h1>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
+      Hello ${authorName || 'Author'},
+    </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      Great news! Your blog article has been approved and is now live.
+    </p>
+    <div style="background:#0e1e13;border-left:4px solid #2ecc71;border-radius:6px;padding:20px 24px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Article:</strong> ${blogTitle}</p>
+      <p style="margin:0;font-size:13px;color:#5ecb8a;">✓ Published successfully</p>
+    </div>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
+      Best regards,<br/>
+      <strong>Tapovana Team</strong>
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Tapovana — Blog Published: ${blogTitle}`,
+    html,
+  });
+};
+
+const sendBlogRejectedEmail = async ({ to, authorName, blogTitle, reason }) => {
+  const html = emailWrapper(`
+    <h1 style="color:#e74c3c;text-align:center;">Blog Article Rejected</h1>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
+      Hello ${authorName || 'Author'},
+    </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
+      Your blog submission has been reviewed and could not be approved at this time.
+    </p>
+    <div style="background:#2c1a1a;border-left:4px solid #e74c3c;border-radius:6px;padding:20px 24px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-size:13px;color:#ccc;"><strong>Article:</strong> ${blogTitle}</p>
+      <p style="margin:0 0 8px;font-size:14px;color:#e74c3c;font-weight:600;">Reason for Rejection:</p>
+      <p style="margin:0;font-size:13px;color:#ccc;white-space:pre-line;">${reason || 'No reason provided.'}</p>
+    </div>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0 0 0;">
+      You may edit and resubmit your article from your Blogs dashboard.
+    </p>
+    <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
+      Best regards,<br/>
+      <strong>Tapovana Team</strong>
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Tapovana — Blog Rejected: ${blogTitle}`,
+    html,
+  });
+};
+
 module.exports = { 
   sendWelcomeEmail, 
   sendOtpEmail, 
@@ -827,5 +914,8 @@ module.exports = {
   sendVedicStaffAssignmentEmail,
   sendVedicUpdateEmail,
   sendVedicReminderEmail,
-  sendVedicCancellationEmail
+  sendVedicCancellationEmail,
+  sendBlogSubmittedEmail,
+  sendBlogApprovedEmail,
+  sendBlogRejectedEmail
 };
