@@ -121,19 +121,19 @@
 }
 
 .status-badge.active {
-  color: #2ecc71;
+  color: #2ecc71; /* light green */
 }
 
 .status-badge.inactive {
-  color: #e67e22;
+  color: #ffb142; /* light orange */
 }
 
 .status-badge.blocked {
-  color: #e74c3c;
+  color: #ff7675; /* light red */
 }
 
 .status-badge.archived {
-  color: #a0aec0;
+  color: #a0aec0; /* light grey */
 }
 
 /* ── Membership Badges (Gold Themed) ── */
@@ -147,19 +147,19 @@
 }
 
 .tier-badge.platinum {
-  color: #cda751;
+  color: #e5c16e; /* light gold */
 }
 
 .tier-badge.gold {
-  color: #cda751;
+  color: #e5c16e; /* light gold */
 }
 
 .tier-badge.silver {
-  color: #6b7c85;
+  color: #94a3b8; /* light slate */
 }
 
 .tier-badge.none {
-  color: #718096;
+  color: #a0aec0; /* light grey */
 }
 
 /* ── Filters (Gold Themed) ── */
@@ -1054,18 +1054,15 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  border: 1px solid #cda751;
-  border-radius: 4px;
-  padding: 2px 8px;
 }
 .status-badge-gold.active {
-  color: #2ecc71; /* Success = green text + gold border */
+  color: #2ecc71; /* light green */
 }
 .status-badge-gold.inactive {
-  color: #e74c3c; /* Error = red text + gold border */
+  color: #ff7675; /* light red */
 }
 .status-badge-gold.archived {
-  color: #7f8c8d; /* Info/Archived = grey text + gold border */
+  color: #a0aec0; /* light grey */
 }
 
 .tier-badge-gold {
@@ -1075,23 +1072,18 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  border: 1px solid #cda751;
-  border-radius: 4px;
-  padding: 2px 8px;
 }
 .tier-badge-gold.platinum {
-  color: #cda751;
-  background: rgba(205,167,81,0.08);
+  color: #e5c16e; /* light gold */
 }
 .tier-badge-gold.gold {
-  color: #cda751;
-  background: rgba(205,167,81,0.08);
+  color: #e5c16e; /* light gold */
 }
 .tier-badge-gold.silver {
-  color: #6b7c85;
+  color: #94a3b8; /* light slate */
 }
 .tier-badge-gold.none {
-  color: #718096;
+  color: #a0aec0; /* light grey */
 }
 
 .status-tag-gold {
@@ -1101,10 +1093,10 @@
   text-transform: uppercase;
 }
 .status-tag-gold.completed {
-  color: #2ecc71; /* Success = green */
+  color: #2ecc71; /* light green */
 }
 .status-tag-gold.upcoming {
-  color: #7f8c8d; /* Info = neutral */
+  color: #a0aec0; /* light grey */
 }
 
 /* Gold Theme Accent & Outline Buttons inside Drawer */

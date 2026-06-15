@@ -301,7 +301,7 @@ function Customers() {
 
               <div className="drawer-body">
                 {selectedCustomer.status === "ARCHIVED" && (
-                  <div className="cust-archived-banner" style={{ border: "1px solid #cda751", background: "rgba(205,167,81,0.05)" }}>
+                  <div className="cust-archived-banner" style={{ border: "1px solid #E8E2D9", background: "rgba(205,167,81,0.05)" }}>
                     <strong>This customer is ARCHIVED.</strong><br />
                     Archived profiles are read-only.
                   </div>
@@ -309,9 +309,9 @@ function Customers() {
 
                 {/* 1. Profile Section */}
                 <div className="cust-drawer-section">
-                  <h4 className="cust-section-title" style={{ color: "#cda751", borderBottom: "1px solid rgba(205,167,81,0.2)", paddingBottom: "6px", fontWeight: "700" }}>Profile Details</h4>
+                  <h4 className="cust-section-title" style={{ color: "#0F172A", borderBottom: "1px solid #E8E2D9", paddingBottom: "6px", fontWeight: "700" }}>Profile Details</h4>
                   <div className="cust-profile-card" style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-                    <img src={DefaultAvatar} className="cust-avatar" alt="Avatar" style={{ width: "64px", height: "64px", borderRadius: "50%", border: "2px solid #cda751" }} />
+                    <img src={DefaultAvatar} className="cust-avatar" alt="Avatar" style={{ width: "64px", height: "64px", borderRadius: "50%", border: "2px solid #E8E2D9" }} />
                     <div>
                       <div className="cust-name" style={{ fontSize: "16px", fontWeight: "700", color: "#2d3748" }}>{selectedCustomer.first_name} {selectedCustomer.last_name}</div>
                       <div className="cust-sub" style={{ color: "#718096", fontSize: "13px" }}>{selectedCustomer.email || "No Email"}</div>
@@ -330,11 +330,11 @@ function Customers() {
 
                 {/* 2. Service & Booking History Section */}
                 <div className="cust-drawer-section">
-                  <h4 className="cust-section-title" style={{ color: "#cda751", borderBottom: "1px solid rgba(205,167,81,0.2)", paddingBottom: "6px", fontWeight: "700" }}>Service & Booking History</h4>
+                  <h4 className="cust-section-title" style={{ color: "#0F172A", borderBottom: "1px solid #E8E2D9", paddingBottom: "6px", fontWeight: "700" }}>Service & Booking History</h4>
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px" }}>
                       <thead>
-                        <tr style={{ background: "rgba(205,167,81,0.05)", borderBottom: "1px solid rgba(205,167,81,0.15)" }}>
+                        <tr style={{ background: "rgba(205,167,81,0.05)", borderBottom: "1px solid #E8E2D9" }}>
                           <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Service Type</th>
                           <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Staff Assigned</th>
                           <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Date/Time</th>
@@ -361,7 +361,7 @@ function Customers() {
 
                 {/* 3. Membership & Benefits Section */}
                 <div className="cust-drawer-section">
-                  <h4 className="cust-section-title" style={{ color: "#cda751", borderBottom: "1px solid rgba(205,167,81,0.2)", paddingBottom: "6px", fontWeight: "700" }}>Membership & Benefits</h4>
+                  <h4 className="cust-section-title" style={{ color: "#0F172A", borderBottom: "1px solid #E8E2D9", paddingBottom: "6px", fontWeight: "700" }}>Membership & Benefits</h4>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "13px", color: "#4a5568" }}>
                     <div>
                       <strong>Plan Type:</strong> {selectedCustomer.membership_status === "NONE" ? "Regular Guest" : `${selectedCustomer.membership_status} Plan`}
@@ -370,7 +370,7 @@ function Customers() {
                       <strong>Renewal Date:</strong> {renewalDate}
                     </div>
                     <div style={{ gridColumn: "1 / -1" }}>
-                      <strong>Active Discounts:</strong> <span style={{ fontStyle: "italic", color: "#cda751" }}>{discounts}</span>
+                      <strong>Active Discounts:</strong> <span style={{ fontStyle: "italic", color: "#4a5568" }}>{discounts}</span>
                     </div>
                   </div>
                 </div>

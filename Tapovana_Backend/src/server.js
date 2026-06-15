@@ -14,6 +14,9 @@ const membershipRoutes = require("./routes/memberships");
 const workshopRoutes = require("./routes/workshops");
 const vedicProgramRoutes = require("./routes/vedic-programs");
 const blogsRoutes = require("./routes/blogs");
+const customerRoutes = require("./routes/customer");
+const transactionRoutes = require("./routes/transaction");
+const homeRoutes = require("./routes/home");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -72,15 +75,11 @@ app.get("/api/bookings", (req, res) => {
     res.json({ success: true, bookings: [], total: 0 });
 });
 
-// ── Customers stub (prevents 404, triggers frontend dummy fallback) ───────────
-app.get("/api/customers", (req, res) => {
-    res.json({ success: false, message: "Use dummy fallback" });
-});
-
-// ── Transactions stub (prevents 404, triggers frontend dummy fallback) ─────────
-app.get("/api/transactions", (req, res) => {
-    res.json({ success: false, message: "Use dummy fallback" });
-});
+app.use("/api/customer", customerRoutes);
+app.use("/api/customers", customerRoutes);
+app.use("/api/transaction", transactionRoutes);
+app.use("/api/transactions", transactionRoutes);
+app.use("/api/home", homeRoutes);
 
 app.use((_req, res) => {
     res.status(404).json({ success: false, message: "Endpoint not found." });

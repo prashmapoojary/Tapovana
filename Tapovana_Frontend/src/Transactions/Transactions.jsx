@@ -156,28 +156,28 @@ function Transactions() {
       {/* Financial metrics stats summary cards grid */}
       <section className="revenue-metrics-grid">
         <div className="revenue-metric-card collected">
-          <span className="revenue-card-label">Total Revenue Collected</span>
           <span className="revenue-card-value">₹{(summary.total_collected || 0).toLocaleString("en-IN")}</span>
+          <span className="revenue-card-label">Total Revenue Collected</span>
         </div>
 
         <div className="revenue-metric-card pending">
-          <span className="revenue-card-label">Pending Ledger Amount</span>
           <span className="revenue-card-value">₹{(summary.pending_amount || 0).toLocaleString("en-IN")}</span>
+          <span className="revenue-card-label">Pending Ledger Amount</span>
         </div>
 
         <div className="revenue-metric-card refunded">
-          <span className="revenue-card-label">Total Refunds Processed</span>
           <span className="revenue-card-value">₹{(summary.refunded_amount || 0).toLocaleString("en-IN")}</span>
+          <span className="revenue-card-label">Total Refunds Processed</span>
         </div>
 
         <div className="revenue-metric-card failed">
-          <span className="revenue-card-label">Failed Gateway Billing</span>
           <span className="revenue-card-value">₹{(summary.failed_amount || 0).toLocaleString("en-IN")}</span>
+          <span className="revenue-card-label">Failed Gateway Billing</span>
         </div>
 
         <div className="revenue-metric-card discount">
-          <span className="revenue-card-label">Discounts Applied</span>
           <span className="revenue-card-value">₹{(summary.discounts_applied || 0).toLocaleString("en-IN")}</span>
+          <span className="revenue-card-label">Discounts Applied</span>
         </div>
       </section>
 
@@ -373,53 +373,6 @@ function Transactions() {
               &gt;
             </button>
           </div>
-        </div>
-      </section>
-
-      {/* Payment Security & Policy Footer Card */}
-      <section className="payment-security-section">
-        <div className="security-info">
-          <div className="security-title-wrap">
-            <svg className="security-icon-gold" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-            <h3>Secure Gateway Integrations</h3>
-          </div>
-          <p>
-            All online collections are processed using end-to-end SSL encryption. Tapovana integrates directly with Razorpay and Stripe to ensure PCI-DSS compliance and secure payouts.
-          </p>
-          <div className="security-badges">
-            <div className="security-badge-card">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              </svg>
-              <span>SSL SECURED</span>
-            </div>
-            <div className="security-badge-card">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/>
-              </svg>
-              <span>PCI-DSS COMPLIANT</span>
-            </div>
-            <div className="security-badge-card">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="2" y="5" width="20" height="14" rx="2" ry="2"/>
-                <line x1="2" y1="10" x2="22" y2="10"/>
-              </svg>
-              <span>CARD PAYMENTS</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="policy-info">
-          <h3>Refund & Cancellation Policies</h3>
-          <p>
-            Standard bookings at Tapovana can be rescheduled or fully refunded up to 24 hours prior to the session. Late cancellations are subject to a 50% reservation fee. Refunds are automatically credited back via the original payment method within 5–7 working days.
-          </p>
-          <a href="#" className="policy-link-gold" onClick={(e) => { e.preventDefault(); triggerAlert("Full Wellness Booking Agreement Policy document opening in a new window."); }}>
-            View Full Billing Policy Document
-          </a>
         </div>
       </section>
     </div>

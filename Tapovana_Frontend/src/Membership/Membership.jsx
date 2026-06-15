@@ -72,13 +72,13 @@ const getMemberAvatarUrl = (url, source) => {
   if (!url) return DefaultAvatar;
   if (url.startsWith("http") || url.startsWith("data:")) return url;
   const base = source === "mobile" ? "https://tapoclg.onrender.com" : (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000");
-  
+
   if (url.includes("uploads/")) {
     const idx = url.indexOf("uploads/");
     const cleanUrl = "/" + url.substring(idx);
     return `${base}${cleanUrl}`;
   }
-  
+
   if (url.endsWith(".svg") || url.includes("avatar")) {
     if (url.includes("/avatars/")) {
       const idx = url.indexOf("avatars/");
@@ -86,7 +86,7 @@ const getMemberAvatarUrl = (url, source) => {
     }
     return `/avatars/${url.replace(/^\//, "")}`;
   }
-  
+
   const cleanUrl = url.startsWith("/") ? url : "/" + url;
   return `${base}${cleanUrl}`;
 };
