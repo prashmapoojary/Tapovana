@@ -29,7 +29,7 @@ const formatTime24 = (timeStr) => {
     const ampm = match[3] ? match[3].toUpperCase() : null;
     if (ampm === 'PM' && hours < 12) hours += 12;
     if (ampm === 'AM' && hours === 12) hours = 0;
-    
+
     return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 };
 
@@ -42,7 +42,7 @@ const parseDateTime = (dateStr, timeStr) => {
 
     const formattedTime = formatTime24(timeStr);
     const [hours, minutes] = formattedTime.split(':').map(Number);
-    
+
     return new Date(year, month - 1, day, hours, minutes, 0, 0);
 };
 
@@ -59,7 +59,7 @@ const getCapitalizedStatus = (status) => {
 // HELPER: Dynamic Status Transition & Notifications
 function getStatus(wsDate, wsTime, wsDuration, start_time, end_time) {
     const now = new Date();
-    
+
     let startTime, endTime;
     if (start_time && end_time) {
         startTime = new Date(start_time);
@@ -71,10 +71,10 @@ function getStatus(wsDate, wsTime, wsDuration, start_time, end_time) {
         const durationMins = parseInt(wsDuration, 10) || 60;
         endTime = new Date(startTime.getTime() + durationMins * 60000);
     }
-    
+
     // 5-minute buffer before marking as completed
     const completionTime = new Date(endTime.getTime() + 5 * 60000);
-    
+
     if (now < startTime) {
         return 'Upcoming';
     } else if (now >= startTime && now < completionTime) {
@@ -90,7 +90,7 @@ async function validateWorkshopActions(workshopId) {
         throw new Error('Workshop not found.');
     }
     const w = wsRes.rows[0];
-    
+
     let dateStr = w.date;
     if (w.date instanceof Date) {
         const year = w.date.getFullYear();
@@ -344,12 +344,6 @@ const getWorkshopById = async (req, res) => {
 
 // CREATE WORKSHOP
 const createWorkshop = async (req, res) => {
-    const workshopId = req.body.workshop_id || req.body.id;
-    if (workshopId && req.body.email && req.body.name) {
-        req.params.id = workshopId;
-        return enrollUserInWorkshop(req, res);
-    }
-
     const { title, category, instructor, date, time, duration, capacity, price, status, description, image_url, video_url, assigned_staff_ids, customer_email } = req.body;
 
     if (!title) {
@@ -458,10 +452,10 @@ const createWorkshop = async (req, res) => {
         if (duplicateCheck.rows.length > 0) {
             duplicateDetected = true;
             const duplicateIds = duplicateCheck.rows.map(r => r.id);
-            
+
             // Delete duplicates first to free up allocated staff and remove records
             await query('DELETE FROM workshops WHERE id = ANY($1)', [duplicateIds]);
-            
+
             // Deallocate the old staff associated with those deleted duplicates
             for (const row of duplicateCheck.rows) {
                 const oldStaff = row.assigned_staff_ids || [];
@@ -645,10 +639,10 @@ const updateWorkshop = async (req, res) => {
 
         const now = new Date();
         const currentStatus = getStatus(
-            existing.date, 
-            existing.time, 
-            existing.duration, 
-            existing.start_time, 
+            existing.date,
+            existing.time,
+            existing.duration,
+            existing.start_time,
             existing.end_time
         );
 
@@ -704,10 +698,10 @@ const updateWorkshop = async (req, res) => {
             if (duplicateCheck.rows.length > 0) {
                 duplicateDetected = true;
                 const duplicateIds = duplicateCheck.rows.map(r => r.id);
-                
+
                 // Delete duplicates first to free up allocated staff and remove records
                 await query('DELETE FROM workshops WHERE id = ANY($1)', [duplicateIds]);
-                
+
                 // Deallocate the old staff associated with those deleted duplicates
                 for (const row of duplicateCheck.rows) {
                     const oldStaff = row.assigned_staff_ids || [];
@@ -834,11 +828,11 @@ const updateWorkshop = async (req, res) => {
                 await deallocateStaffMember(staffId);
             }
 
-            const allocData = { 
-                ...existing, 
-                title: title || existing.title, 
+            const allocData = {
+                ...existing,
+                title: title || existing.title,
                 date: date || existing.date,
-                time: time || existing.time 
+                time: time || existing.time
             };
             for (const staffId of addedStaff) {
                 await allocateStaffToWorkshop(staffId, allocData);
@@ -858,10 +852,10 @@ const updateWorkshop = async (req, res) => {
         // Sync workshop allocations
         await syncWorkshopAllocations(req.params.id);
 
-        return res.json({ 
-            success: true, 
-            message: duplicateDetected ? 'Duplicate workshop removed automatically.' : 'Workshop updated.', 
-            workshop: result.rows[0] 
+        return res.json({
+            success: true,
+            message: duplicateDetected ? 'Duplicate workshop removed automatically.' : 'Workshop updated.',
+            workshop: result.rows[0]
         });
     } catch (err) {
         console.error('updateWorkshop error:', err);
@@ -896,9 +890,9 @@ const deleteWorkshop = async (req, res) => {
         }
 
         if (workshop.enrolled > 0) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "Cannot delete a workshop that has enrolled attendees. Please cancel the workshop or unenroll attendees first to prevent data loss." 
+            return res.status(400).json({
+                success: false,
+                message: "Cannot delete a workshop that has enrolled attendees. Please cancel the workshop or unenroll attendees first to prevent data loss."
             });
         }
 
@@ -960,7 +954,7 @@ const updateWorkshopStaff = async (req, res) => {
                 });
             }
             finalAllocationCount = (workshop.allocation_count || 0) + 1;
-            
+
             // Send deallocation email to old staff members
             for (const oldStaffId of oldStaffIds) {
                 if (!assigned_staff_ids.includes(oldStaffId)) {
@@ -1206,7 +1200,7 @@ const exportWorkshopAttendees = async (req, res) => {
         const workshopTitle = wsRes.rows[0].title;
 
         const result = await query('SELECT name, email, phone, status, created_at FROM attendees WHERE workshop_id = $1 ORDER BY name ASC', [id]);
-        
+
         let csvContent = 'Name,Email,Phone,Status,Enrolled At\n';
         for (const row of result.rows) {
             const enrolledAt = row.created_at ? new Date(row.created_at).toISOString() : '';
@@ -1241,11 +1235,11 @@ const autoUpdateWorkshopStatuses = async () => {
             }
 
             const newStatus = getStatus(dateStr, w.time, w.duration, w.start_time, w.end_time);
-            
+
             let upNotified = w.upcoming_notified;
             let onNotified = w.ongoing_notified;
             let compNotified = w.completed_notified || false;
-            
+
             // 1. Send scheduled notifications if Upcoming and not notified
             if (newStatus === 'Upcoming' && !upNotified) {
                 // Send to attendees
@@ -1281,7 +1275,7 @@ const autoUpdateWorkshopStatuses = async () => {
                 }
                 upNotified = true;
             }
-            
+
             // 2. Send live/ongoing notifications if Live and not notified
             if (newStatus === 'Live' && !onNotified) {
                 const attendeesRes = await query('SELECT email, name FROM attendees WHERE workshop_id = $1', [w.id]);
@@ -1294,7 +1288,7 @@ const autoUpdateWorkshopStatuses = async () => {
                         });
                     } catch (e) { console.error('Live email (attendee) failed:', e.message); }
                 }
-                
+
                 const staffIds = w.assigned_staff_ids || [];
                 for (const staffId of staffIds) {
                     const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
@@ -1345,7 +1339,7 @@ const autoUpdateWorkshopStatuses = async () => {
                 }
                 compNotified = true;
             }
-            
+
             // Write audit log if status changed
             if (newStatus !== w.status) {
                 try {

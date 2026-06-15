@@ -97,8 +97,43 @@ export const AllocationProvider = ({ children }) => {
   const getSuggestions = useCallback(async (params) => {
     return [];
   }, []);
-  
 
+  /**
+   * Simulate email notification (frontend only)
+   */
+  const simulateEmailNotification = useCallback((staff, session, sessionType) => {
+    const notification = {
+      id: `notif-${Date.now()}`,
+      staffName: `${staff.first_name || ""} ${staff.last_name || ""}`.trim(),
+      staffEmail: staff.email || "staff@tapovana.com",
+      programName: session.title,
+      programType: sessionType === "workshop" ? "Workshop" : sessionType === "service" ? "Service" : "Vedic Life Program",
+      allocationStartDate: session.date || session.start_date,
+      allocationEndDate: session.endDate || session.end_date || session.date,
+      status: "sent",
+      sentAt: new Date().toISOString(),
+      content: {
+        subject: `Allocation Confirmation: ${session.title}`,
+        body: `
+Dear ${staff.first_name},
+
+You have been allocated to the following ${sessionType === "workshop" ? "workshop" : sessionType === "service" ? "service" : "Vedic Life Program"}:
+
+Program: ${session.title}
+Start Date: ${new Date(session.startDate || session.date || session.start_date).toLocaleDateString()}
+End Date: ${new Date(session.endDate || session.end_date || session.date).toLocaleDateString()}
+
+Please ensure you are available during this period. If you have any conflicts, please notify the admin immediately.
+
+Best regards,
+Tapovana Admin Team
+        `,
+      },
+    };
+
+    setEmailNotifications((prev) => [...prev, notification]);
+    console.log("📧 Email Notification Sent:", notification);
+  }, []);
 
   /**
    * Allocate staff to a session (workshop or vedic program)
@@ -295,43 +330,6 @@ export const AllocationProvider = ({ children }) => {
         return a;
       })
     );
-  }, []);
-
-  /**
-   * Simulate email notification (frontend only)
-   */
-  const simulateEmailNotification = useCallback((staff, session, sessionType) => {
-    const notification = {
-      id: `notif-${Date.now()}`,
-      staffName: `${staff.first_name || ""} ${staff.last_name || ""}`.trim(),
-      staffEmail: staff.email || "staff@tapovana.com",
-      programName: session.title,
-      programType: sessionType === "workshop" ? "Workshop" : sessionType === "service" ? "Service" : "Vedic Life Program",
-      allocationStartDate: session.date || session.start_date,
-      allocationEndDate: session.endDate || session.end_date || session.date,
-      status: "sent",
-      sentAt: new Date().toISOString(),
-      content: {
-        subject: `Allocation Confirmation: ${session.title}`,
-        body: `
-Dear ${staff.first_name},
-
-You have been allocated to the following ${sessionType === "workshop" ? "workshop" : sessionType === "service" ? "service" : "Vedic Life Program"}:
-
-Program: ${session.title}
-Start Date: ${new Date(session.startDate || session.date || session.start_date).toLocaleDateString()}
-End Date: ${new Date(session.endDate || session.end_date || session.date).toLocaleDateString()}
-
-Please ensure you are available during this period. If you have any conflicts, please notify the admin immediately.
-
-Best regards,
-Tapovana Admin Team
-        `,
-      },
-    };
-
-    setEmailNotifications((prev) => [...prev, notification]);
-    console.log("📧 Email Notification Sent:", notification);
   }, []);
 
   /**

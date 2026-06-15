@@ -511,189 +511,7 @@ function Home() {
     }));
   }, [data]);
 
-  if (role === "DOCTOR" || role === "THERAPIST") {
-    return (
-      <div className="home-container">
-        {/* Dynamic Welcoming Header Banner */}
-        <header className="home-header" style={{ marginBottom: "28px" }}>
-          <div className="home-title">
-            <h1 style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              Welcome back, {role === "DOCTOR" ? "Dr. " : ""}{fullName || "Specialist"}
-            </h1>
-            <p>{formattedDate} • Your Dedicated Specialist Portal</p>
-          </div>
-        </header>
 
-        {/* 4 Stats Cards tailored for specialist */}
-        <section className="stats-grid">
-          <div className="stat-card bookings">
-            <div className="stat-card-header">
-              <span className="stat-card-title">Active Assignments</span>
-            </div>
-            <div>
-              <div className="stat-card-value" style={{ color: "#cda751" }}>{activeAllocations.length}</div>
-              <div className="stat-card-trend trend-up" style={{ color: "#cda751" }}>
-                <span>Active sessions in progress</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="stat-card customers">
-            <div className="stat-card-header">
-              <span className="stat-card-title">Sessions Completed</span>
-            </div>
-            <div>
-              <div className="stat-card-value" style={{ color: "#cda751" }}>{completedAllocations.length}</div>
-              <div className="stat-card-trend trend-up" style={{ color: "#cda751" }}>
-                <span>Program allocations fulfilled</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="stat-card revenue">
-            <div className="stat-card-header">
-              <span className="stat-card-title">My Published Articles</span>
-            </div>
-            <div>
-              <div className="stat-card-value" style={{ color: "#cda751" }}>{publishedBlogsCount}</div>
-              <div className="stat-card-trend trend-up" style={{ color: "#cda751" }}>
-                <span>Live public articles</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="stat-card pending">
-            <div className="stat-card-header">
-              <span className="stat-card-title">Draft &amp; Pending Blogs</span>
-            </div>
-            <div>
-              <div className="stat-card-value" style={{ color: "#cda751" }}>{pendingBlogsCount + draftBlogsCount}</div>
-              <div className="stat-card-trend trend-down" style={{ color: "#cda751" }}>
-                <span>{pendingBlogsCount} pending review · {draftBlogsCount} drafts</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Dynamic Panels */}
-        <section className="charts-grid" style={{ gridTemplateColumns: "1.2fr 0.8fr" }}>
-          {/* Timeline Schedule Card */}
-          <div className="chart-card">
-            <div className="chart-card-header" style={{ marginBottom: "14px" }}>
-              <div>
-                <h3 className="chart-card-title">My Upcoming Sessions &amp; Programs</h3>
-                <div className="chart-card-subtitle">Active client allocations committed to your schedule</div>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "8px" }}>
-              {activeAllocations.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 16px", color: "#7b8a9a", background: "#f8fafc", borderRadius: "8px", border: "1px dashed #cbd5e0" }}>
-                  <span style={{ fontSize: "36px" }}></span>
-                  <h4 style={{ margin: "12px 0 4px", fontSize: "14px", fontWeight: 700, color: "#2d3748" }}>No active sessions scheduled</h4>
-                  <p style={{ margin: 0, fontSize: "12px" }}>Enjoy your day of meditation and personal care!</p>
-                </div>
-              ) : (
-                activeAllocations.slice(0, 3).map(alloc => (
-                  <div 
-                    key={alloc.id} 
-                    style={{ 
-                      padding: "14px", border: "1px solid #eceff3", borderRadius: "12px", background: "#f8fafc",
-                      display: "flex", justifyContent: "space-between", alignItems: "center" 
-                    }}
-                  >
-                    <div>
-                      <span style={{
-                        display: "inline-block", padding: "2px 8px", background: alloc.type === "workshop" ? "#eeb93322" : "rgba(205, 167, 81, 0.12)",
-                        color: alloc.type === "workshop" ? "#b59243" : "#cda751", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
-                        textTransform: "uppercase", marginBottom: "6px"
-                      }}>
-                        {alloc.type === "workshop" ? "Workshop" : "Vedic Program"}
-                      </span>
-                      <h4 style={{ margin: "0 0 4px 0", fontSize: "14px", fontWeight: 700, color: "#2d3748" }}>{alloc.sessionTitle}</h4>
-                      <p style={{ margin: 0, fontSize: "12px", color: "#7b8a9a" }}>
-                        {new Date(alloc.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} to {new Date(alloc.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                      </p>
-                    </div>
-                    <span style={{
-                      padding: "4px 10px", background: "#2ecc7122", color: "#2ecc71", borderRadius: "20px", fontSize: "11px", fontWeight: 700
-                    }}>
-                      In Progress
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Quick Write Blog & Tracker */}
-          <div className="chart-card">
-            <div className="chart-card-header" style={{ marginBottom: "14px" }}>
-              <div>
-                <h3 className="chart-card-title">Content Creation</h3>
-                <div className="chart-card-subtitle">Manage drafts and submitted articles</div>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "4px" }}>
-              {myBlogs.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "30px 12px", color: "#7b8a9a", background: "#f8fafc", borderRadius: "8px" }}>
-                  <p style={{ margin: "0 0 10px 0", fontSize: "12px" }}>You haven't written any articles yet.</p>
-                  <button 
-                    onClick={() => navigate("/dashboard/blogs")}
-                    style={{ background: "transparent", border: "1px solid #cbd5e0", padding: "6px 12px", borderRadius: "4px", fontSize: "11px", cursor: "pointer" }}
-                  >
-                    Start your first draft
-                  </button>
-                </div>
-              ) : (
-                myBlogs.slice(0, 3).map(blog => (
-                  <div 
-                    key={blog.id} 
-                    style={{ 
-                      padding: "10px 12px", border: "1px solid #eceff3", borderRadius: "8px", display: "flex",
-                      justifyContent: "space-between", alignItems: "center" 
-                    }}
-                  >
-                    <div style={{ maxWidth: "70%" }}>
-                      <h4 style={{ margin: "0 0 2px 0", fontSize: "12.5px", fontWeight: 700, color: "#2d3748", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {blog.title}
-                      </h4>
-                      <span style={{ fontSize: "11px", color: "#7b8a9a" }}>{blog.category} · {blog.readTime}</span>
-                    </div>
-                    
-                    <span style={{
-                      padding: "3px 8px", borderRadius: "12px", fontSize: "10px", fontWeight: 700, color: "white",
-                      background: blog.status === "published" ? "#2ecc71" : blog.status === "pending" ? "#3498db" : blog.status === "draft" ? "#f1c40f" : "#e74c3c"
-                    }}>
-                      {blog.status === "published" ? "Published" : blog.status === "pending" ? "Pending" : blog.status === "draft" ? "Draft" : "Removed by Admin"}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* Quote of the Day Panel */}
-        <section 
-          style={{
-            background: "linear-gradient(135deg, rgba(205,167,81,0.06) 0%, rgba(205, 167, 81, 0.15) 100%)",
-            border: "1px solid rgba(205,167,81,0.2)", borderRadius: "16px", padding: "24px", textAlign: "center",
-            marginTop: "12px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px"
-          }}
-        >
-          <span style={{ fontSize: "28px" }}>🧘✨</span>
-          <h4 style={{ fontStyle: "italic", fontSize: "16px", fontWeight: 500, color: "#cda751", margin: "4px 0", fontFamily: "'Poppins', sans-serif" }}>
-            "{dailyQuote}"
-          </h4>
-          <span style={{ fontSize: "11px", color: "#7b8a9a", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 700 }}>
-            Daily Healing Vibe
-          </span>
-        </section>
-      </div>
-    );
-  }
 
   if (loading && !data) {
     return (
@@ -872,6 +690,7 @@ function Home() {
 
       {/* Admin Action Alerts banner */}
       {(() => {
+        if (role !== "SUPER_ADMIN" && role !== "CO_ADMIN") return null;
         const savedBlogs = localStorage.getItem("tapovana_blogs");
         const pendingBlogs = savedBlogs ? JSON.parse(savedBlogs).filter(b => b.status === "pending") : [];
         if (pendingBlogs.length > 0) {
@@ -1208,6 +1027,23 @@ function Home() {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* Quote of the Day Panel */}
+      <section 
+        style={{
+          background: "linear-gradient(135deg, rgba(205,167,81,0.06) 0%, rgba(205, 167, 81, 0.15) 100%)",
+          border: "1px solid rgba(205,167,81,0.2)", borderRadius: "16px", padding: "24px", textAlign: "center",
+          marginTop: "24px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px"
+        }}
+      >
+        <span style={{ fontSize: "28px" }}>🧘✨</span>
+        <h4 style={{ fontStyle: "italic", fontSize: "16px", fontWeight: 500, color: "#cda751", margin: "4px 0", fontFamily: "'Poppins', sans-serif" }}>
+          "{dailyQuote}"
+        </h4>
+        <span style={{ fontSize: "11px", color: "#7b8a9a", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 700 }}>
+          Daily Healing Vibe
+        </span>
       </section>
     </div>
   );

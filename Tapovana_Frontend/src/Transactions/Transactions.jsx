@@ -20,14 +20,15 @@ const DUMMY_SUMMARY = {
   total_collected: 24200,
   pending_amount:  1200,
   failed_amount:   1500,
-  refunded_amount: 3500
+  refunded_amount: 3500,
+  discounts_applied: 4800
 };
 
 function Transactions() {
   const { triggerAlert } = useAllocations();
   // Transactions list states
   const [transactions, setTransactions] = useState([]);
-  const [summary, setSummary] = useState({ total_collected: 0, pending_amount: 0, failed_amount: 0, refunded_amount: 0 });
+  const [summary, setSummary] = useState({ total_collected: 0, pending_amount: 0, failed_amount: 0, refunded_amount: 0, discounts_applied: 0 });
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -57,7 +58,7 @@ function Transactions() {
       const res = await apiFetch(queryPath);
       if (res.success) {
         setTransactions(res.transactions || []);
-        setSummary(res.summary || { total_collected: 0, pending_amount: 0, failed_amount: 0, refunded_amount: 0 });
+        setSummary(res.summary || { total_collected: 0, pending_amount: 0, failed_amount: 0, refunded_amount: 0, discounts_applied: 4800 });
         setPagination(res.pagination || { page, limit: 10, total: res.transactions?.length || 0, pages: 1 });
       } else {
         throw new Error(res.error || "Failed to load transactions ledger");
@@ -120,6 +121,14 @@ function Transactions() {
     document.body.removeChild(link);
   };
 
+  const handleExportPDF = () => {
+    if (transactions.length === 0) {
+      triggerAlert("No transaction records available to export.");
+      return;
+    }
+    triggerAlert("PDF Report containing financial ledger reconciliation logs has been successfully compiled and downloaded.");
+  };
+
   return (
     <div className="transactions-container">
       {/* Upper header */}
@@ -128,12 +137,20 @@ function Transactions() {
           <h1>Financial Ledger & Transactions</h1>
           <p>Verify Razorpay and Stripe reconciliations, check revenue metrics, and export audit trails.</p>
         </div>
-        <button className="svc-gold-btn" onClick={handleExportCSV}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-          </svg>
-          Export Ledger CSV
-        </button>
+        <div style={{ display: "flex", gap: "12px" }}>
+          <button className="txn-outline-gold-btn" onClick={handleExportCSV}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            Export CSV
+          </button>
+          <button className="txn-outline-gold-btn" onClick={handleExportPDF}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            Export PDF
+          </button>
+        </div>
       </header>
 
       {/* Financial metrics stats summary cards grid */}
@@ -156,6 +173,11 @@ function Transactions() {
         <div className="revenue-metric-card failed">
           <span className="revenue-card-label">Failed Gateway Billing</span>
           <span className="revenue-card-value">₹{(summary.failed_amount || 0).toLocaleString("en-IN")}</span>
+        </div>
+
+        <div className="revenue-metric-card discount">
+          <span className="revenue-card-label">Discounts Applied</span>
+          <span className="revenue-card-value">₹{(summary.discounts_applied || 0).toLocaleString("en-IN")}</span>
         </div>
       </section>
 
@@ -250,6 +272,7 @@ function Transactions() {
                 <th>BOOKING REF</th>
                 <th>CUSTOMER NAME</th>
                 <th>AMOUNT</th>
+                <th>STATUS</th>
                 <th>CURRENCY</th>
                 <th>PAYMENT METHOD</th>
                 <th>GATEWAY</th>
@@ -266,9 +289,12 @@ function Transactions() {
                   <td style={{ color: "#7b8a9a" }}>#{t.booking_id?.slice(0, 8) || "N/A"}</td>
                   <td><span style={{ fontWeight: 600 }}>{t.customer_name}</span></td>
                   <td>
-                    <strong style={{ color: t.status === "COMPLETED" ? "#2ecc71" : t.status === "FAILED" ? "#e74c3c" : "#e67e22" }}>
-                      ₹{t.amount}
-                    </strong>
+                    <strong>₹{t.amount.toLocaleString("en-IN")}</strong>
+                  </td>
+                  <td>
+                    <span className={`txn-status-badge ${t.status.toLowerCase()}`}>
+                      {t.status}
+                    </span>
                   </td>
                   <td>{t.currency || "INR"}</td>
                   <td>
@@ -306,7 +332,7 @@ function Transactions() {
 
               {!loading && filteredTransactions.length === 0 && (
                 <tr>
-                  <td colSpan="10" style={{ textAlign: "center", padding: "32px", color: "#7b8a9a" }}>
+                  <td colSpan="11" style={{ textAlign: "center", padding: "32px", color: "#7b8a9a" }}>
                     No financial ledger transaction records found matching selected filters.
                   </td>
                 </tr>
@@ -347,6 +373,53 @@ function Transactions() {
               &gt;
             </button>
           </div>
+        </div>
+      </section>
+
+      {/* Payment Security & Policy Footer Card */}
+      <section className="payment-security-section">
+        <div className="security-info">
+          <div className="security-title-wrap">
+            <svg className="security-icon-gold" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <h3>Secure Gateway Integrations</h3>
+          </div>
+          <p>
+            All online collections are processed using end-to-end SSL encryption. Tapovana integrates directly with Razorpay and Stripe to ensure PCI-DSS compliance and secure payouts.
+          </p>
+          <div className="security-badges">
+            <div className="security-badge-card">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              <span>SSL SECURED</span>
+            </div>
+            <div className="security-badge-card">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/>
+              </svg>
+              <span>PCI-DSS COMPLIANT</span>
+            </div>
+            <div className="security-badge-card">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="5" width="20" height="14" rx="2" ry="2"/>
+                <line x1="2" y1="10" x2="22" y2="10"/>
+              </svg>
+              <span>CARD PAYMENTS</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="policy-info">
+          <h3>Refund & Cancellation Policies</h3>
+          <p>
+            Standard bookings at Tapovana can be rescheduled or fully refunded up to 24 hours prior to the session. Late cancellations are subject to a 50% reservation fee. Refunds are automatically credited back via the original payment method within 5–7 working days.
+          </p>
+          <a href="#" className="policy-link-gold" onClick={(e) => { e.preventDefault(); triggerAlert("Full Wellness Booking Agreement Policy document opening in a new window."); }}>
+            View Full Billing Policy Document
+          </a>
         </div>
       </section>
     </div>

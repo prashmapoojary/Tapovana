@@ -123,16 +123,15 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
 
         {/* Actions Footer */}
         <div className="blog-card-footer" onClick={(e) => e.stopPropagation()} style={{ marginTop: "auto", paddingTop: "6px", borderTop: "1px solid #edf2f7", display: "flex", gap: "4px", flexDirection: "column" }}>
-          
-          <button onClick={() => onClick(blog.id)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "7px 14px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "12px", width: "100%" }}>
-            Read Article
-          </button>
-
-          {isStaff && (isDraft || isRejected) && (
-            <div className="blog-card-actions" style={{ display: "flex", gap: "4px", width: "100%", marginTop: "2px" }}>
-              <button onClick={() => onEdit(blog)} style={{ background: "transparent", color: "#cda751", border: "1px solid #cda751", padding: "5px 10px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1 }}>Edit</button>
-              <button onClick={() => onDelete(blog.id)} style={{ background: "transparent", color: "#e53e3e", border: "1px solid #e53e3e", padding: "4px 9px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", flex: 1 }}>Delete</button>
+          {isStaff && (isDraft || isRejected) ? (
+            <div className="blog-card-actions" style={{ display: "flex", gap: "6px", width: "100%", marginTop: "2px" }}>
+              <button onClick={() => onEdit(blog)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Edit</button>
+              <button onClick={() => onDelete(blog.id)} style={{ background: "transparent", color: "#cda751", border: "1px solid #cda751", padding: "5px 11px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Delete</button>
             </div>
+          ) : (
+            <button onClick={() => onClick(blog.id)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "7px 14px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "12px", width: "100%" }}>
+              Read Article
+            </button>
           )}
         </div>
       </div>
@@ -188,7 +187,7 @@ export default function Blogs({ mode }) {
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
-  const [activeTab, setActiveTab] = useState(isStaff ? "my_blogs" : isAdmin ? "all" : "published");
+  const [activeTab, setActiveTab] = useState(isStaff ? "my_blogs" : "published");
   const [editingBlogId, setEditingBlogId] = useState(null);
   const [editBlogData, setEditBlogData] = useState({
     title: "", category: "AYURVEDA", summary: "", content_html: "",
@@ -878,7 +877,7 @@ export default function Blogs({ mode }) {
       {/* Tabs */}
       {isAdmin && (
         <div className="blog-tabs">
-          {["all", "pending", "published", "archived"].map(tab => (
+          {["published", "pending", "archived"].map(tab => (
             <button
               key={tab}
               className={`blog-tab-btn ${activeTab === tab ? "active" : ""}`}

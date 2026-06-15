@@ -60,20 +60,23 @@
 }
 
 .crm-metric-bubble {
-  background: #fafbfc;
-  border: 1px solid rgba(205, 167, 81, 0.25);
-  border-radius: 12px;
-  padding: 16px;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px 30px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  transition: all 0.2s ease;
+  min-height: 118px;
+  box-sizing: border-box;
+  gap: 2px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.02);
+  transition: all 0.25s ease;
 }
 
 .crm-metric-bubble:hover {
+  border-color: #CDA751;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(205, 167, 81, 0.12);
-  border-color: #cda751;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
 }
 
 .crm-metric-label {
@@ -178,20 +181,20 @@
 
 .search-box {
   flex: 1;
-  min-width: 200px;
+  min-width: 250px;
   display: flex;
   align-items: center;
   gap: 10px;
   background: white;
-  border: 1px solid rgba(205, 167, 81, 0.25);
-  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
   padding: 10px 14px;
   transition: 0.2s ease;
 }
 
 .search-box:hover,
 .search-box:focus-within {
-  border-color: #cda751;
+  border-color: #CDA751;
   box-shadow: 0 0 0 3px rgba(205, 167, 81, 0.1);
 }
 
@@ -630,10 +633,7 @@
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  background: #fafbfc;
-  border: 1px solid rgba(205, 167, 81, 0.2);
-  border-radius: 10px;
-  padding: 14px;
+  padding: 14px 0;
 }
 
 .cust-avatar {
@@ -843,13 +843,14 @@
   width: 14px;
   height: 14px;
   cursor: pointer;
-  opacity: 0.8;
+  filter: grayscale(100%) brightness(0.6);
+  opacity: 0.6;
   transition: opacity 0.2s, filter 0.2s;
 }
 
 .action-icon:hover {
   opacity: 1;
-  filter: brightness(0) saturate(100%) invert(68%) sepia(80%) saturate(400%) hue-rotate(0deg);
+  filter: brightness(0);
 }
 
 /* ── Responsive ── */
@@ -911,7 +912,8 @@
   flex: 0 0 auto;
   width: 250px;
   min-width: unset;
-  border: 1px solid #e3e7ed;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
 }
 
 .cust-filter-dropdown {
@@ -920,8 +922,8 @@
   justify-content: space-between;
   gap: 12px;
   background: white;
-  border: 1px solid #e3e7ed;
-  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
   height: 45px;
   font-size: 14px;
   color: #2f2f2f;
@@ -938,8 +940,8 @@
   align-items: center;
   justify-content: center;
   background: white;
-  border: 1px solid #e3e7ed;
-  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
   padding: 10px;
   cursor: pointer;
 }
@@ -970,8 +972,8 @@
   justify-content: center;
   align-items: flex-start;
   background: white;
-  border: 1px solid #e3e7ed;
-  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
   height: 45px;
   padding: 0 12px;
   min-width: 125px;
@@ -1037,11 +1039,141 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 9.5px 20px;
-  border-top: none;
+  padding: 14px 20px;
+  border-top: 1px solid #f1f3f6;
   flex-shrink: 0;
-  font-size: 14px;
-  color: #64748B;
-  background: #F8F7F6;
-  border-radius: 0 0 8px 8px;
+  font-size: 13px;
+  color: #8c9aa8;
+}
+
+/* ── Gold Theme Status Badges & Buttons inside Drawer ── */
+.status-badge-gold {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border: 1px solid #cda751;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.status-badge-gold.active {
+  color: #2ecc71; /* Success = green text + gold border */
+}
+.status-badge-gold.inactive {
+  color: #e74c3c; /* Error = red text + gold border */
+}
+.status-badge-gold.archived {
+  color: #7f8c8d; /* Info/Archived = grey text + gold border */
+}
+
+.tier-badge-gold {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border: 1px solid #cda751;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.tier-badge-gold.platinum {
+  color: #cda751;
+  background: rgba(205,167,81,0.08);
+}
+.tier-badge-gold.gold {
+  color: #cda751;
+  background: rgba(205,167,81,0.08);
+}
+.tier-badge-gold.silver {
+  color: #6b7c85;
+}
+.tier-badge-gold.none {
+  color: #718096;
+}
+
+.status-tag-gold {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.status-tag-gold.completed {
+  color: #2ecc71; /* Success = green */
+}
+.status-tag-gold.upcoming {
+  color: #7f8c8d; /* Info = neutral */
+}
+
+/* Gold Theme Accent & Outline Buttons inside Drawer */
+.cust-accent-gold-btn {
+  height: 38px;
+  background: #cda751;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 16px;
+  transition: all 0.2s ease;
+  font-family: 'Manrope', sans-serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cust-accent-gold-btn:hover:not(:disabled) {
+  background: #b59243;
+  transform: translateY(-1px);
+}
+.cust-accent-gold-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #a0aec0;
+}
+
+.cust-outline-gold-btn {
+  height: 38px;
+  background: white;
+  color: #4a5568;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 16px;
+  transition: all 0.2s ease;
+  font-family: 'Manrope', sans-serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.cust-outline-gold-btn:hover:not(:disabled) {
+  color: #000000;
+  background-color: #e2e8f0;
+  border-color: #cbd5e1;
+}
+.cust-outline-gold-btn:active:not(:disabled) {
+  color: #ffffff;
+  background-color: #cda751;
+  border-color: #cda751;
+}
+.cust-outline-gold-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Toast Notification slideIn animation */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%) translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) translateY(0);
+    opacity: 1;
+  }
 }

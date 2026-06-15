@@ -169,7 +169,7 @@ const syncStaffMemberStatus = async (staffId) => {
             await query(
                 `UPDATE team_members 
                  SET availability_status = 'Available', allocation_details = NULL 
-                 WHERE id = $2`,
+                 WHERE id = $1`,
                 [staffId]
             );
         }
