@@ -17,6 +17,7 @@ const blogsRoutes = require("./routes/blogs");
 const customerRoutes = require("./routes/customer");
 const transactionRoutes = require("./routes/transaction");
 const homeRoutes = require("./routes/home");
+const mediaRoutes = require("./routes/media");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -56,6 +57,7 @@ app.use("/api/memberships", membershipRoutes);
 app.use("/api/workshops", workshopRoutes);
 app.use("/api/vedic-programs", vedicProgramRoutes);
 app.use("/api/blogs", blogsRoutes);
+app.use("/api/media", mediaRoutes);
 app.post("/api/uploads/blog-image", require("./middleware/auth").authenticate, require("./middleware/auth").requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR', 'THERAPIST'), require("./controllers/blogsController").uploadBlogImage);
 app.post("/api/vedicpackages", require("./controllers/vedicProgramsController").registerAttendeeFromMobile);
 

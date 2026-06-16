@@ -3,6 +3,7 @@ import "./Workshops.css";
 import { apiFetch } from "../api/http";
 import { getImageUrl } from "../utils/image";
 import { useAllocations } from "../utils/AllocationContext";
+import MediaPickerModal from "../components/MediaPickerModal";
 
 // ─── Live status checker ─────────────────────────────────────────────
 const getLiveStatus = (ws) => {
@@ -87,8 +88,8 @@ const STATUS_CONFIG = {
 };
 
 const DUMMY_WORKSHOPS = [
-  { id: "WS-001", title: "Morning Vinyasa Flow", category: "Yoga", date: "2026-06-15", time: "07:00 AM", duration: 90, capacity: 20, price: 1500, status: "upcoming", description: "A dynamic yoga session focused on breath-synchronized movement to energize the body and calm the mind." },
-  { id: "WS-005", title: "Pranayama Intensive", category: "Yoga", date: "2026-06-14", time: "07:00 AM", duration: 60, capacity: 20, price: 1200, status: "ongoing", description: "An intensive breathwork program covering all major pranayama techniques for vitality and longevity." },
+  { id: "WS-001", title: "Morning Vinyasa Flow", category: "Yoga", date: "2026-06-15", time: "07:00 AM", duration: 90, capacity: 20, price: 1500, status: "upcoming", image_url: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800", description: "A dynamic yoga session focused on breath-synchronized movement to energize the body and calm the mind." },
+  { id: "WS-005", title: "Pranayama Intensive", category: "Yoga", date: "2026-06-14", time: "07:00 AM", duration: 60, capacity: 20, price: 1200, status: "ongoing", image_url: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&q=80&w=800", description: "An intensive breathwork program covering all major pranayama techniques for vitality and longevity." },
 ];
 
 const BLANK_FORM = {
@@ -224,6 +225,22 @@ function WorkshopCard({ w, onClick }) {
 export default function Workshops() {
   const { allocateStaff } = useAllocations();
   const [workshops, setWorkshops] = useState([]);
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
+  const [mediaTarget, setMediaTarget] = useState(null); // 'add_image', 'add_video', 'edit_image', 'edit_video'
+  const [mediaPickerType, setMediaPickerType] = useState('image'); // 'image' or 'video'
+
+  const handleSelectStockMedia = (url) => {
+    if (mediaTarget === 'add_image') {
+      setAddForm(prev => ({ ...prev, image_url: url, image_base64: "" }));
+    } else if (mediaTarget === 'edit_image') {
+      setEditForm(prev => ({ ...prev, image_url: url, image_base64: "" }));
+    } else if (mediaTarget === 'add_video') {
+      setAddForm(prev => ({ ...prev, video_url: url, video_base64: "" }));
+    } else if (mediaTarget === 'edit_video') {
+      setEditForm(prev => ({ ...prev, video_url: url, video_base64: "" }));
+    }
+    setMediaModalOpen(false);
+  };
   const [dataLoading, setDataLoading] = useState(true);
   const [instructors, setInstructors] = useState([]);
   const [toast, setToast] = useState(null);
@@ -951,6 +968,10 @@ export default function Workshops() {
             onClick={() => document.getElementById("editImageInput")?.click()}>
             Browse Image
           </button>
+          <button type="button" className="ws-modal-btn-secondary" style={{ padding: "6px 14px", fontSize: 12, borderColor: '#CDA751', color: '#CDA751' }}
+            onClick={() => { setMediaTarget('edit_image'); setMediaPickerType('image'); setMediaModalOpen(true); }}>
+            Stock Image
+          </button>
           <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
           <input value={editForm.image_url} onChange={e => setEditForm(p => ({ ...p, image_url: e.target.value, image_base64: "" }))}
             style={{ padding: "7px 10px", borderRadius: 4, border: "1px solid rgba(205,167,81,0.2)", fontSize: 13, color: "#333", outline: "none", fontFamily: "Manrope, sans-serif", width: "100%", boxSizing: "border-box", background: "white", flex: 1 }} placeholder="https://..." />
@@ -974,6 +995,10 @@ export default function Workshops() {
           <button type="button" className="ws-modal-btn-secondary" style={{ padding: "6px 14px", fontSize: 12 }}
             onClick={() => document.getElementById("editVideoInput")?.click()}>
             Browse Video
+          </button>
+          <button type="button" className="ws-modal-btn-secondary" style={{ padding: "6px 14px", fontSize: 12, borderColor: '#CDA751', color: '#CDA751' }}
+            onClick={() => { setMediaTarget('edit_video'); setMediaPickerType('video'); setMediaModalOpen(true); }}>
+            Stock Video
           </button>
           <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
           <input value={editForm.video_url} onChange={e => setEditForm(p => ({ ...p, video_url: e.target.value, video_base64: "" }))}
@@ -1079,6 +1104,7 @@ export default function Workshops() {
                     <video 
                       ref={videoRef} 
                       controls 
+                      poster={getImageUrl(displayImage)}
                       onTimeUpdate={handleTimeUpdate}
                       onSeeking={handleSeeking}
                       onPlay={handlePlay}
@@ -1480,6 +1506,10 @@ export default function Workshops() {
                       onClick={() => document.getElementById("addImageInput")?.click()}>
                       Browse Image
                     </button>
+                    <button type="button" className="ws-modal-btn-secondary" style={{ padding: "6px 14px", fontSize: 12, borderColor: '#CDA751', color: '#CDA751' }}
+                      onClick={() => { setMediaTarget('add_image'); setMediaPickerType('image'); setMediaModalOpen(true); }}>
+                      Stock Image
+                    </button>
                     <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
                     <input value={addForm.image_url} onChange={e => setAddForm(p => ({ ...p, image_url: e.target.value, image_base64: "" }))}
                       className="ws-modal-input" style={{ flex: 1 }} placeholder="https://..." />
@@ -1503,6 +1533,10 @@ export default function Workshops() {
                     <button type="button" className="ws-modal-btn-secondary" style={{ padding: "6px 14px", fontSize: 12 }}
                       onClick={() => document.getElementById("addVideoInput")?.click()}>
                       Browse Video
+                    </button>
+                    <button type="button" className="ws-modal-btn-secondary" style={{ padding: "6px 14px", fontSize: 12, borderColor: '#CDA751', color: '#CDA751' }}
+                      onClick={() => { setMediaTarget('add_video'); setMediaPickerType('video'); setMediaModalOpen(true); }}>
+                      Stock Video
                     </button>
                     <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
                     <input value={addForm.video_url} onChange={e => setAddForm(p => ({ ...p, video_url: e.target.value, video_base64: "" }))} className="ws-modal-input" placeholder="https://youtube.com/..." style={{ flex: 1 }} />
@@ -1542,6 +1576,28 @@ export default function Workshops() {
           <div style={{ fontWeight: 700, fontSize: '15px' }}>{toast}</div>
         </div>
       )}
+
+      <MediaPickerModal 
+        isOpen={mediaModalOpen}
+        onClose={() => setMediaModalOpen(false)}
+        onSelect={handleSelectStockMedia}
+        allowVideos={mediaPickerType === 'video'}
+        title={mediaPickerType === 'image' ? "Select Unsplash Photo" : "Select Stock Video"}
+        defaultQuery={(() => {
+          const activeForm = (mediaTarget === 'add_image' || mediaTarget === 'add_video') ? addForm : editForm;
+          const cat = activeForm?.category || 'Yoga';
+          const type = mediaPickerType === 'video' ? 'Video' : 'Workshop';
+          return `${cat} ${type}`;
+        })()}
+        suggestions={(() => {
+          const activeForm = (mediaTarget === 'add_image' || mediaTarget === 'add_video') ? addForm : editForm;
+          const cat = activeForm?.category || 'Yoga';
+          if (mediaPickerType === 'video') {
+            return [`${cat} Practice`, `${cat} Class`, `${cat} Tutorial`, 'Meditation Session', 'Nature Relaxing'];
+          }
+          return [`${cat} Workshop`, `${cat} Class`, `${cat} Retreat`, 'Meditation Studio', 'Holistic Wellness'];
+        })()}
+      />
     </div>
   );
 }

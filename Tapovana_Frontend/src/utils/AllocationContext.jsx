@@ -315,9 +315,57 @@ Tapovana Admin Team
     const now = new Date();
     setAllocations((prev) =>
       prev.map((a) => {
-        const endDate = new Date(a.endDate || a.startDate);
-        endDate.setHours(23, 59, 59, 999);
-        if (endDate <= now && a.status === "active") {
+        if (!a.startDate) return a;
+        
+        let dateStr = a.startDate;
+        if (typeof dateStr === 'string' && dateStr.includes('T')) {
+          dateStr = dateStr.split('T')[0];
+        }
+        
+        let hour = 0;
+        let minute = 0;
+        
+        const timeVal = a.bookingTime || a.time;
+        if (timeVal) {
+          const timeStr = String(timeVal).trim();
+          const ampmMatch = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+          if (ampmMatch) {
+            let h = parseInt(ampmMatch[1], 10);
+            const m = parseInt(ampmMatch[2], 10);
+            const p = ampmMatch[3].toUpperCase();
+            if (p === 'PM' && h !== 12) h += 12;
+            if (p === 'AM' && h === 12) h = 0;
+            hour = h;
+            minute = m;
+          } else {
+            const parts = timeStr.split(':');
+            if (parts.length >= 2) {
+              hour = parseInt(parts[0], 10) || 0;
+              minute = parseInt(parts[1], 10) || 0;
+            }
+          }
+        } else {
+          hour = 23;
+          minute = 59;
+        }
+
+        let [year, month, day] = dateStr.split('-').map(Number);
+        if (isNaN(year) || isNaN(month) || isNaN(day)) {
+          const d = new Date(dateStr);
+          if (!isNaN(d.getTime())) {
+            year = d.getFullYear();
+            month = d.getMonth() + 1;
+            day = d.getDate();
+          }
+        }
+
+        const startDateTime = new Date(year, month - 1, day, hour, minute, 0, 0);
+        const durationMins = parseInt(a.duration || a.duration_minutes || 0, 10);
+        const addedMinutes = durationMins > 0 ? (durationMins + 30) : 30;
+        const endDateTime = new Date(startDateTime.getTime() + addedMinutes * 60 * 1000);
+
+        if (endDateTime <= now && a.status === "active") {
+          // 1. Sync allocation to database as expired/Available
           apiFetch(`/api/teams/users/${a.staffId}/allocation`, {
             method: "PATCH",
             body: JSON.stringify({
@@ -325,6 +373,20 @@ Tapovana Admin Team
               allocation_details: null
             })
           }).catch(err => console.error("Error syncing expired allocation to database:", err));
+
+          // 2. Complete the service/workshop backend record as well
+          if (a.type === 'service' && a.sessionId) {
+            apiFetch(`/api/services/${a.sessionId}/complete`, {
+              method: 'PATCH',
+              body: JSON.stringify({ staff_id: a.staffId })
+            }).catch(err => console.error("Error completing service:", err));
+          } else if (a.type === 'workshop' && a.sessionId) {
+            apiFetch(`/api/workshops/${a.sessionId}/complete`, {
+              method: 'PATCH',
+              body: JSON.stringify({ staff_id: a.staffId })
+            }).catch(err => console.error("Error completing workshop:", err));
+          }
+
           return { ...a, status: "expired" };
         }
         return a;
@@ -406,8 +468,8 @@ Tapovana Admin Team
   // ── Auto-cleanup: mark expired allocations on mount ──
   useEffect(() => {
     cleanupExpiredAllocations();
-    // Re-run every 5 minutes to keep statuses fresh
-    const interval = setInterval(cleanupExpiredAllocations, 5 * 60 * 1000);
+    // Re-run every 30 seconds to keep statuses fresh in real-time
+    const interval = setInterval(cleanupExpiredAllocations, 30 * 1000);
     return () => clearInterval(interval);
   }, [cleanupExpiredAllocations]);
 

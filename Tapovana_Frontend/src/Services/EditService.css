@@ -1,4 +1,16 @@
 /* EditService.css */
+
+/* ── Page wrapper ─────────────────────────────────────────────────────────── */
+.edit-service-page {
+    background: #FFFFFF;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: 'Manrope', sans-serif;
+}
+
+/* Legacy alias */
 .edit-service-drawer {
     background: #FFFFFF;
     height: 100%;
@@ -8,10 +20,9 @@
     font-family: 'Manrope', sans-serif;
 }
 
-/* ── Sticky Header ────────────────────────────────────────────────────────── */
+/* ── Non-scrolling Header ─────────────────────────────────────────────────── */
 .es-sticky-top {
-    position: sticky;
-    top: 0;
+    flex-shrink: 0;
     z-index: 20;
     background: #FFFFFF;
     padding-bottom: 16px;

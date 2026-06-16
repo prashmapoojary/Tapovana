@@ -4,6 +4,7 @@ import { apiFetch } from "../api/http";
 import { useAllocations } from "../utils/AllocationContext";
 import { getUser } from "../utils/session";
 import { getImageUrl } from "../utils/image";
+import MediaPickerModal from "../components/MediaPickerModal";
 import SearchIcon from "../assets/searchIcon.svg";
 import DropdownIcon from "../assets/dropdownIcon.svg";
 import FilterIcon from "../assets/filterIcon.svg";
@@ -196,7 +197,7 @@ const FormField = ({ label, children }) => (
 );
 
 // ─── Reusable Form Component ──────────────────────────────────────────────
-function ProgramForm({ form, onChange, instructors, mode }) {
+function ProgramForm({ form, onChange, instructors, mode, onSearchUnsplash }) {
   const handleDurationChange = (duration) => {
     const newForm = { ...form, duration };
     const days = DURATION_MAP[duration];
@@ -356,6 +357,10 @@ function ProgramForm({ form, onChange, instructors, mode }) {
             onClick={() => document.getElementById(mode + "ProgImage")?.click()}>
             Browse Image
           </button>
+          <button type="button" className="vedic-btn-cancel" style={{ padding: "6px 12px", fontSize: 12, borderColor: '#CDA751', color: '#CDA751' }}
+            onClick={onSearchUnsplash}>
+            Stock Image
+          </button>
           <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
           <input name="image_url" value={form.image_url} onChange={onChange} style={{ ...inputStyle, flex: 1 }} placeholder="https://..." />
         </div>
@@ -374,6 +379,17 @@ function ProgramForm({ form, onChange, instructors, mode }) {
 export default function VedicLifePrograms() {
   const { allocateStaff, triggerAlert } = useAllocations();
   const [programs, setPrograms] = useState([]);
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
+  const [mediaTarget, setMediaTarget] = useState(null); // 'add' or 'edit'
+
+  const handleSelectStockImage = (url) => {
+    if (mediaTarget === 'add') {
+      setAddForm(prev => ({ ...prev, image_url: url, image_base64: "" }));
+    } else if (mediaTarget === 'edit') {
+      setEditForm(prev => ({ ...prev, image_url: url, image_base64: "" }));
+    }
+    setMediaModalOpen(false);
+  };
   const [dataLoading, setDataLoading] = useState(true);
   const [instructors, setInstructors] = useState([]);
   const [search, setSearch] = useState("");
@@ -1148,7 +1164,7 @@ export default function VedicLifePrograms() {
   const renderEditForm = () => (
     <div style={{ padding: "24px 28px", overflowY: "auto", maxHeight: "65vh" }}>
       <h2 style={{ fontSize: 20, fontWeight: 700, color: "#2d3748", margin: "0 0 16px 0" }}>Edit Program</h2>
-      <ProgramForm form={editForm} onChange={(e) => setEditForm(p => ({ ...p, [e.target.name]: e.target.value }))} instructors={instructors} mode="edit" />
+      <ProgramForm form={editForm} onChange={(e) => setEditForm(p => ({ ...p, [e.target.name]: e.target.value }))} instructors={instructors} mode="edit" onSearchUnsplash={() => { setMediaTarget('edit'); setMediaModalOpen(true); }} />
       {editError && <div style={{ color: "#e74c3c", fontSize: 13, fontWeight: 600, marginTop: 8 }}>{editError}</div>}
       <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
         <button className="vedic-btn-cancel" style={{ flex: 1 }} onClick={() => setIsEditing(false)}>Cancel</button>
@@ -1263,7 +1279,7 @@ export default function VedicLifePrograms() {
               <button className="vedic-modal-close" onClick={() => setShowCreateModal(false)}>✕</button>
             </div>
             <div className="vedic-modal-body" style={{ maxHeight: "65vh", overflowY: "auto" }}>
-              <ProgramForm form={addForm} onChange={(e) => setAddForm(p => ({ ...p, [e.target.name]: e.target.value }))} instructors={instructors} mode="add" />
+              <ProgramForm form={addForm} onChange={(e) => setAddForm(p => ({ ...p, [e.target.name]: e.target.value }))} instructors={instructors} mode="add" onSearchUnsplash={() => { setMediaTarget('add'); setMediaModalOpen(true); }} />
               {addError && <div style={{ color: "#e74c3c", fontSize: 13, fontWeight: 600, marginTop: 8 }}>{addError}</div>}
               <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
                 <button className="vedic-btn-cancel" style={{ flex: 1 }} onClick={() => setShowCreateModal(false)}>Cancel</button>
@@ -1275,6 +1291,25 @@ export default function VedicLifePrograms() {
           </div>
         </div>
       )}
+
+      <MediaPickerModal 
+        isOpen={mediaModalOpen}
+        onClose={() => setMediaModalOpen(false)}
+        onSelect={handleSelectStockImage}
+        allowVideos={false}
+        title="Select Unsplash Image"
+        defaultQuery={(() => {
+          const form = mediaTarget === 'add' ? addForm : editForm;
+          const title = (form.title || '').toLowerCase();
+          const desc = (form.description || '').toLowerCase();
+          if (title.includes('ayurveda') || desc.includes('ayurveda') || title.includes('panchakarma')) return 'Ayurveda';
+          if (title.includes('yoga') || desc.includes('yoga') || title.includes('meditation')) return 'Yoga';
+          if (title.includes('wellness') || desc.includes('wellness')) return 'Wellness';
+          if (title.includes('holistic') || desc.includes('holistic') || title.includes('lifestyle')) return 'Holistic Lifestyle';
+          return 'Ayurveda';
+        })()}
+        suggestions={['Ayurveda', 'Yoga', 'Wellness', 'Holistic Lifestyle']}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { apiFetch } from '../api/http';
 import { getImageUrl } from '../utils/image';
 import { useAllocations } from '../utils/AllocationContext';
 import DefaultAvatar from '../assets/profileIconDefault.png';
+import MediaPickerModal from '../components/MediaPickerModal';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -92,6 +93,7 @@ const CameraPlusIcon = () => (
 function AddService({ onBack }) {
   const { isStaffAllocated, allocateStaff, deallocateStaff, allocations, triggerAlert } = useAllocations();
   const [tempServiceId] = useState(() => `srv-${Date.now()}`);
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
   // General Info
   const [serviceName, setServiceName] = useState('');
   const [category, setCategory] = useState('');
@@ -549,6 +551,15 @@ function AddService({ onBack }) {
                 onChange={handleImageUpload}
               />
 
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                <button type="button" className="es-add-benefit-btn" style={{ margin: 0, padding: '8px 12px', fontSize: '12px' }} onClick={openFilePicker}>
+                  📁 Upload Local Image
+                </button>
+                <button type="button" className="es-add-benefit-btn" style={{ margin: 0, padding: '8px 12px', fontSize: '12px', borderColor: '#CDA751', color: '#CDA751' }} onClick={() => setMediaModalOpen(true)}>
+                  📷 Choose from Unsplash
+                </button>
+              </div>
+
               {/* Slots rendering */}
               <div className="es-media-grid">
                 {galleryImages.map((src, idx) => (
@@ -678,6 +689,37 @@ function AddService({ onBack }) {
           </div>
         </div>
       </div>{/* end es-scroll-body */}
+      
+      <MediaPickerModal 
+        isOpen={mediaModalOpen}
+        onClose={() => setMediaModalOpen(false)}
+        onSelect={(url) => {
+          setGalleryImages(prev => {
+            if (prev.length >= 5) return prev;
+            return [...prev, url];
+          });
+          setMediaModalOpen(false);
+        }}
+        allowVideos={false}
+        title="Search Unsplash Images"
+        defaultQuery={(() => {
+          if (subCategory && subCategory !== 'Select Sub Category') return subCategory;
+          if (category && category !== 'Select category' && category !== 'Select Category') return category;
+          return 'wellness';
+        })()}
+        suggestions={(() => {
+          const defaultSuggestions = ['Yoga', 'Meditation', 'Ayurveda', 'Massage', 'Nutrition', 'Nature', 'Wellness', 'Spa'];
+          if (!category) return defaultSuggestions;
+          switch (category) {
+            case 'Body Care': return ['Massage', 'Facial', 'Body Scrub', 'Hydrotherapy', 'Spa'];
+            case 'Skin Care': return ['Facial', 'Skin Treatment', 'Bleach', 'Waxing', 'Skincare'];
+            case 'Hair Care': return ['Haircut', 'Hair Styling', 'Hair Spa', 'Salon'];
+            case 'Nail Care': return ['Manicure', 'Pedicure', 'Nail Art', 'Nails'];
+            case 'Styling & Make over': return ['Makeup', 'Bridal Makeover', 'Hair Styling', 'Cosmetics'];
+            default: return defaultSuggestions;
+          }
+        })()}
+      />
     </div>
   );
 }

@@ -54,7 +54,6 @@ function MyAssignments() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [validationError, setValidationError] = useState(null);
   const [backendAssignments, setBackendAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [memberships, setMemberships] = useState([]);
@@ -193,41 +192,93 @@ function MyAssignments() {
     }
   }, [isStaffUser]);
 
+  const getAssignmentEndTime = (a) => {
+    if (!a.startDate) return null;
+    
+    let dateStr = a.startDate;
+    if (typeof dateStr === 'string' && dateStr.includes('T')) {
+      dateStr = dateStr.split('T')[0];
+    }
+    
+    let hour = 0;
+    let minute = 0;
+    
+    const timeVal = a.bookingTime || a.time;
+    if (timeVal) {
+      const timeStr = String(timeVal).trim();
+      const ampmMatch = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (ampmMatch) {
+        let h = parseInt(ampmMatch[1], 10);
+        const m = parseInt(ampmMatch[2], 10);
+        const p = ampmMatch[3].toUpperCase();
+        if (p === 'PM' && h !== 12) h += 12;
+        if (p === 'AM' && h === 12) h = 0;
+        hour = h;
+        minute = m;
+      } else {
+        const parts = timeStr.split(':');
+        if (parts.length >= 2) {
+          hour = parseInt(parts[0], 10) || 0;
+          minute = parseInt(parts[1], 10) || 0;
+        }
+      }
+    } else {
+      hour = 23;
+      minute = 59;
+    }
+
+    let [year, month, day] = dateStr.split('-').map(Number);
+    if (isNaN(year) || isNaN(month) || isNaN(day)) {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        year = d.getFullYear();
+        month = d.getMonth() + 1;
+        day = d.getDate();
+      } else {
+        return null;
+      }
+    }
+
+    const startDateTime = new Date(year, month - 1, day, hour, minute, 0, 0);
+    const durationMins = parseInt(a.duration || a.duration_minutes || 0, 10);
+    const addedMinutes = durationMins > 0 ? (durationMins + 30) : 30;
+    return new Date(startDateTime.getTime() + addedMinutes * 60 * 1000);
+  };
+
   // Merge backend + context allocations - prioritize context!
   const allAssignments = useMemo(() => {
+    const now = new Date();
+    const mapAssignment = (a) => {
+      const sLower = String(a.status || "").toLowerCase();
+      let mappedStatus = 'active';
+      if (sLower === 'expired' || sLower === 'completed') mappedStatus = 'expired';
+      else if (sLower === 'cancelled') mappedStatus = 'cancelled';
+      else if (sLower === 'removed') mappedStatus = 'removed';
+      else if (sLower === 'pending') mappedStatus = 'pending';
+      else if (sLower === 'upcoming') mappedStatus = 'Upcoming';
+      else if (sLower === 'live') mappedStatus = 'Live';
+
+      // Automatically treat as expired if time + 30 minutes has passed
+      if (mappedStatus === 'active' || mappedStatus === 'Upcoming' || mappedStatus === 'Live') {
+        const endTime = getAssignmentEndTime(a);
+        if (endTime && now > endTime) {
+          mappedStatus = 'expired';
+        }
+      }
+
+      return {
+        ...a,
+        status: mappedStatus
+      };
+    };
+
     const fromContext = contextAllocations
       .filter(a => a.staffId === activeStaffId)
-      .map(a => {
-        const sLower = String(a.status || "").toLowerCase();
-        let mappedStatus = 'active';
-        if (sLower === 'expired' || sLower === 'completed') mappedStatus = 'expired';
-        else if (sLower === 'cancelled') mappedStatus = 'cancelled';
-        else if (sLower === 'removed') mappedStatus = 'removed';
-        else if (sLower === 'pending') mappedStatus = 'pending';
-        else if (sLower === 'upcoming') mappedStatus = 'Upcoming';
-        else if (sLower === 'live') mappedStatus = 'Live';
-        return {
-          ...a,
-          status: mappedStatus
-        };
-      });
+      .map(mapAssignment);
 
     const fromBackend = backendAssignments
       .filter(a => a.staffId === activeStaffId)
-      .map(a => {
-        const sLower = String(a.status || "").toLowerCase();
-        let mappedStatus = 'active';
-        if (sLower === 'expired' || sLower === 'completed') mappedStatus = 'expired';
-        else if (sLower === 'cancelled') mappedStatus = 'cancelled';
-        else if (sLower === 'removed') mappedStatus = 'removed';
-        else if (sLower === 'pending') mappedStatus = 'pending';
-        else if (sLower === 'upcoming') mappedStatus = 'Upcoming';
-        else if (sLower === 'live') mappedStatus = 'Live';
-        return {
-          ...a,
-          status: mappedStatus
-        };
-      });
+      .map(mapAssignment);
 
     // Create a map of sessionId to context allocation for quick lookup!
     const contextAllocMap = new Map(fromContext.map(a => [a.sessionId, a]));
@@ -278,45 +329,7 @@ function MyAssignments() {
     });
   }, [allAssignments, filterType, filterStatus, searchQuery]);
 
-  // ─── Handle Mark as Done ───
-  const handleMarkAsComplete = async (id, sessionId, endDate, type) => {
-    // Validate date
-    const now = new Date();
-    const end = endDate ? new Date(endDate) : now;
-    if (endDate && endDate.length <= 10) {
-      end.setHours(23, 59, 59, 999);
-    }
-    if (end > now) {
-      const formattedEnd = end.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
-      setValidationError({ id, message: `You can mark this session as done only after the end date (${formattedEnd}).` });
-      setTimeout(() => setValidationError(null), 5000);
-      return;
-    }
 
-    setValidationError(null);
-
-    try {
-      if (type === 'service' && sessionId) {
-        await apiFetch(`/api/services/${sessionId}/complete`, {
-          method: 'PATCH',
-          body: JSON.stringify({ staff_id: activeStaffId })
-        });
-      }
-
-      if (type === 'workshop' && sessionId) {
-        await apiFetch(`/api/workshops/${sessionId}/complete`, {
-          method: 'PATCH',
-          body: JSON.stringify({ staff_id: activeStaffId })
-        });
-      }
-
-      completeAllocation(id);
-      await refreshAssignments();
-      alert("✅ Session marked as Done! You are now Available.");
-    } catch (err) {
-      alert("Error completing assignment: " + err.message);
-    }
-  };
 
   const getFormatDate = (dateStr) => {
     if (!dateStr) return '';
@@ -430,26 +443,8 @@ function MyAssignments() {
           )}
         </div>
 
-        {validationError?.id === a.id && (
-          <div style={{
-            background: "rgba(231,76,60,0.08)", border: "1px solid rgba(231,76,60,0.3)",
-            borderRadius: "6px", padding: "10px 14px", margin: "0 0 8px",
-            fontSize: "11px", color: "#c0392b", display: "flex", gap: "8px"
-          }}>
-            <span>⏳</span><span>{validationError.message}</span>
-          </div>
-        )}
-
         <div className="ma-card-footer">
           <span className="ma-assigned-date">Assigned: {getFormatDate(a.createdAt)}</span>
-          {(a.status === 'active' || a.status === 'Upcoming' || a.status === 'Live') && (
-            <button
-              className="ma-action-btn"
-              onClick={() => handleMarkAsComplete(a.id, a.sessionId, a.endDate, a.type)}
-            >
-              Mark as Done
-            </button>
-          )}
         </div>
       </div>
     );

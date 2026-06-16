@@ -9,6 +9,7 @@ import { getUser } from "../utils/session";
 import { getImageUrl } from "../utils/image";
 import { useAllocations } from "../utils/AllocationContext";
 import { apiFetch } from "../api/http";
+import MediaPickerModal from "../components/MediaPickerModal";
 
 const formatDate = (dateStr) => {
   if (!dateStr) return "";
@@ -174,6 +175,7 @@ export default function Blogs({ mode }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const { triggerAlert, triggerConfirm } = useAllocations();
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
 
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -747,7 +749,13 @@ export default function Blogs({ mode }) {
 
             {/* 7. Image */}
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Featured Image Thumbnail * (Required for publishing)</label>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "4px" }}>
+                <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c", margin: 0 }}>Featured Image Thumbnail * (Required for publishing)</label>
+                <button type="button" className="blog-seo-toggle" style={{ margin: 0, fontSize: "12px", border: "1px solid #cda751", padding: "4px 10px", borderRadius: "6px" }}
+                  onClick={(e) => { e.stopPropagation(); setMediaModalOpen(true); }}>
+                  📷 Choose from Unsplash
+                </button>
+              </div>
               <div
                 className={`blog-image-upload-zone ${dragOver ? "drag-over" : ""}`}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -946,6 +954,25 @@ export default function Blogs({ mode }) {
           ))}
         </div>
       )}
+      <MediaPickerModal 
+        isOpen={mediaModalOpen}
+        onClose={() => setMediaModalOpen(false)}
+        onSelect={(url) => {
+          setEditBlogData(prev => ({ ...prev, featured_image: url }));
+          setMediaModalOpen(false);
+        }}
+        allowVideos={false}
+        title="Select Unsplash Image"
+        defaultQuery={(() => {
+          const cat = (editBlogData?.category || '').toUpperCase();
+          if (cat === 'AYURVEDA') return 'Ayurveda';
+          if (cat === 'YOGA') return 'Yoga';
+          if (cat === 'WELLNESS') return 'Wellness';
+          if (cat === 'NUTRITION') return 'Healthy Lifestyle';
+          return 'Wellness';
+        })()}
+        suggestions={['Ayurveda', 'Yoga', 'Wellness', 'Healthy Lifestyle']}
+      />
     </div>
   );
 }
