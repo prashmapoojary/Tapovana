@@ -889,6 +889,32 @@ const sendBlogRejectedEmail = async ({ to, authorName, blogTitle, reason }) => {
   });
 };
 
+const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, workshopTitle, downloadUrl }) => {
+  const html = emailWrapper(`
+    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 20px 0 10px;">Hello ${participantName},</p>
+    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 15px 0;">
+      Congratulations! You have successfully completed the workshop: ${workshopTitle}.
+    </p>
+    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 15px 0;">
+      Your certificate is now available.
+    </p>
+    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 25px 0;">
+      👉 <a href="${downloadUrl}" style="color:#cda751;font-weight:bold;text-decoration:underline;">Click here to download your certificate.</a>
+    </p>
+    <p style="color:#888;font-size:14px;line-height:1.5;margin:30px 0 0 0;">
+      Best regards,<br/>
+      Tapovana Life Space Team
+    </p>
+  `);
+
+  return transporter.sendMail({
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to,
+    subject: `Workshop Completion Certificate – Tapovana Life Space`,
+    html,
+  });
+};
+
 module.exports = { 
   sendWelcomeEmail, 
   sendOtpEmail, 
@@ -917,5 +943,6 @@ module.exports = {
   sendVedicCancellationEmail,
   sendBlogSubmittedEmail,
   sendBlogApprovedEmail,
-  sendBlogRejectedEmail
+  sendBlogRejectedEmail,
+  sendWorkshopCompletionCertificateEmail
 };

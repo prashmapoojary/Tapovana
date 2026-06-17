@@ -198,15 +198,19 @@ export default function Blogs({ mode }) {
   });
   const [rejectionModal, setRejectionModal] = useState({ isOpen: false, blogId: null, reason: "" });
   const [toast, setToast] = useState(null);
+  const [toastType, setToastType] = useState('success');
+  const toastTimerRef = useRef(null);
   const [showSeo, setShowSeo] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [savingBlog, setSavingBlog] = useState(false);
   const fileInputRef = useRef(null);
 
-  const showToastMsg = (message) => {
+  const showToastMsg = (message, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastType(type);
     setToast(message);
-    setTimeout(() => setToast(null), 4000);
+    toastTimerRef.current = setTimeout(() => { setToast(null); toastTimerRef.current = null; }, 4000);
   };
 
   // Handle initializing edit/create based on URL / mode prop
@@ -321,7 +325,7 @@ export default function Blogs({ mode }) {
         showToastMsg("Blog approved and published successfully.");
         fetchBlogs();
       } catch (err) {
-        triggerAlert(err.message || "Failed to approve blog.");
+        showToastMsg(err.message || "Failed to approve blog.", 'error');
       }
     });
   };
@@ -332,7 +336,7 @@ export default function Blogs({ mode }) {
 
   const submitRejection = async () => {
     if (!rejectionModal.reason.trim()) {
-      triggerAlert("Please provide a rejection reason.");
+      showToastMsg("Please provide a rejection reason.", 'error');
       return;
     }
     try {
@@ -344,7 +348,7 @@ export default function Blogs({ mode }) {
       setRejectionModal({ isOpen: false, blogId: null, reason: "" });
       fetchBlogs();
     } catch (err) {
-      triggerAlert(err.message || "Failed to reject blog.");
+      showToastMsg(err.message || "Failed to reject blog.", 'error');
     }
   };
 
@@ -358,7 +362,7 @@ export default function Blogs({ mode }) {
           navigate("/dashboard/blogs");
         }
       } catch (err) {
-        triggerAlert(err.message || "Failed to archive blog.");
+        showToastMsg(err.message || "Failed to archive blog.", 'error');
       }
     });
   };
@@ -370,7 +374,7 @@ export default function Blogs({ mode }) {
         showToastMsg("Article permanently deleted.");
         fetchBlogs();
       } catch (err) {
-        triggerAlert(err.message || "Failed to delete blog.");
+        showToastMsg(err.message || "Failed to delete blog.", 'error');
       }
     });
   };
@@ -411,34 +415,34 @@ export default function Blogs({ mode }) {
   const handleEditorSubmit = async (targetStatus) => {
     // 1. Title validation: Required, min length 3 chars.
     if (!editBlogData.title || editBlogData.title.trim().length < 3) {
-      triggerAlert("Please fill all required fields correctly.");
+      showToastMsg("Title is required (minimum 3 characters).", 'error');
       return;
     }
     // 2. Category validation: Required.
     if (!editBlogData.category) {
-      triggerAlert("Please fill all required fields correctly.");
+      showToastMsg("Category is required.", 'error');
       return;
     }
     // 3. Author Name validation: Required, alphabets only.
     if (!editBlogData.author_name || !/^[A-Za-z\s]+$/.test(editBlogData.author_name.trim())) {
-      triggerAlert("Please fill all required fields correctly.");
+      showToastMsg("Author name must contain only alphabets.", 'error');
       return;
     }
     // 4. Role validation: Required (Doctor/Therapist).
     const roleVal = editBlogData.author_role?.trim().toLowerCase();
     if (roleVal !== "doctor" && roleVal !== "therapist") {
-      triggerAlert("Please fill all required fields correctly.");
+      showToastMsg("Please select a valid role (Doctor/Therapist).", 'error');
       return;
     }
     // 5. Image validation: Required for publishing (status = pending).
     if (targetStatus === "pending" && !editBlogData.featured_image) {
-      triggerAlert("Please fill all required fields correctly.");
+      showToastMsg("Featured image is required for publishing.", 'error');
       return;
     }
     // 6. Description validation: Required, min length 500 chars.
     const textOnly = (editBlogData.content_html || "").replace(/<[^>]*>/g, '').trim();
     if (textOnly.length < 500) {
-      triggerAlert("Please fill all required fields correctly.");
+      showToastMsg("Content must be at least 500 characters.", 'error');
       return;
     }
 
@@ -482,7 +486,7 @@ export default function Blogs({ mode }) {
       setEditingBlogId(null);
       navigate("/dashboard/blogs");
     } catch (err) {
-      triggerAlert(err.message || "Failed to save blog.");
+      showToastMsg(err.message || "Failed to save blog.", 'error');
     } finally {
       setSavingBlog(false);
     }
@@ -529,7 +533,7 @@ export default function Blogs({ mode }) {
       showToastMsg("Comment added.");
       fetchBlogDetail(detailBlog.id);
     } catch (err) {
-      triggerAlert(err.message || "Failed to add comment.");
+      showToastMsg(err.message || "Failed to add comment.", 'error');
     }
   };
 
@@ -542,7 +546,7 @@ export default function Blogs({ mode }) {
       showToastMsg(`Comment ${status}.`);
       fetchBlogDetail(detailBlog.id);
     } catch (err) {
-      triggerAlert(err.message || "Failed to moderate comment.");
+      showToastMsg(err.message || "Failed to moderate comment.", 'error');
     }
   };
 
@@ -560,7 +564,19 @@ export default function Blogs({ mode }) {
 
     return (
       <div className="blog-detail-container" style={{ background: "#fdfbf7", color: "#1a202c", padding: "24px" }}>
-        {toast && <div className="blog-toast">{toast}</div>}
+        {toast && (
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            background: '#1A1A1A', border: '2px solid #CDA751', borderRadius: '12px',
+            padding: '18px 32px', zIndex: 2147483647, display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
+            boxShadow: '0 8px 32px rgba(205,167,81,0.25)',
+            color: toastType === 'error' ? '#EF4444' : (toastType === 'info' ? '#E2E8F0' : '#4ADE80'),
+            animation: 'blogToastFadeIn 0.3s ease-out', minWidth: 220, textAlign: 'center'
+          }}>
+            <span style={{ fontSize: 20 }}>{toastType === 'error' ? '⚠' : '✓'}</span>
+            <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.3px' }}>{toast}</span>
+          </div>
+        )}
 
         <div className="blog-detail-back" onClick={() => navigate("/dashboard/blogs")} style={{ color: "#cda751", cursor: "pointer", fontWeight: "bold", fontSize: "15px", marginBottom: "20px" }}>
           ← Back to Blogs
@@ -658,7 +674,19 @@ export default function Blogs({ mode }) {
 
     return (
       <div className="blog-editor-page-container" style={{ background: "#fdfbf7", minHeight: "100vh", padding: "24px" }}>
-        {toast && <div className="blog-toast">{toast}</div>}
+        {toast && (
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            background: '#1A1A1A', border: '2px solid #CDA751', borderRadius: '12px',
+            padding: '18px 32px', zIndex: 2147483647, display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
+            boxShadow: '0 8px 32px rgba(205,167,81,0.25)',
+            color: toastType === 'error' ? '#EF4444' : (toastType === 'info' ? '#E2E8F0' : '#4ADE80'),
+            animation: 'blogToastFadeIn 0.3s ease-out', minWidth: 220, textAlign: 'center'
+          }}>
+            <span style={{ fontSize: 20 }}>{toastType === 'error' ? '⚠' : '✓'}</span>
+            <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.3px' }}>{toast}</span>
+          </div>
+        )}
 
         <div className="blog-detail-back" onClick={handleCancel} style={{ marginBottom: "20px", color: "#cda751", cursor: "pointer", fontWeight: "bold" }}>
           ← Cancel and Go Back
@@ -753,7 +781,7 @@ export default function Blogs({ mode }) {
                 <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c", margin: 0 }}>Featured Image Thumbnail * (Required for publishing)</label>
                 <button type="button" className="blog-seo-toggle" style={{ margin: 0, fontSize: "12px", border: "1px solid #cda751", padding: "4px 10px", borderRadius: "6px" }}
                   onClick={(e) => { e.stopPropagation(); setMediaModalOpen(true); }}>
-                  📷 Choose from Unsplash
+                  📷 Choose from Pexels
                 </button>
               </div>
               <div
@@ -837,7 +865,19 @@ export default function Blogs({ mode }) {
   // ═════════════════════════════════════════════════════════════════════
   return (
     <div className="blog-container">
-      {toast && <div className="blog-toast">{toast}</div>}
+      {toast && (
+        <div style={{
+          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+          background: '#1A1A1A', border: '2px solid #CDA751', borderRadius: '12px',
+          padding: '18px 32px', zIndex: 2147483647, display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
+          boxShadow: '0 8px 32px rgba(205,167,81,0.25)',
+          color: toastType === 'error' ? '#EF4444' : (toastType === 'info' ? '#E2E8F0' : '#4ADE80'),
+          animation: 'blogToastFadeIn 0.3s ease-out', minWidth: 220, textAlign: 'center'
+        }}>
+          <span style={{ fontSize: 20 }}>{toastType === 'error' ? '⚠' : '✓'}</span>
+          <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.3px' }}>{toast}</span>
+        </div>
+      )}
 
       {/* Rejection Modal */}
       {rejectionModal.isOpen && (
@@ -954,6 +994,7 @@ export default function Blogs({ mode }) {
           ))}
         </div>
       )}
+
       <MediaPickerModal 
         isOpen={mediaModalOpen}
         onClose={() => setMediaModalOpen(false)}
@@ -962,7 +1003,10 @@ export default function Blogs({ mode }) {
           setMediaModalOpen(false);
         }}
         allowVideos={false}
-        title="Select Unsplash Image"
+        title="Select Pexels Image"
+        page_type="blogs"
+        category={editBlogData?.category || 'Ayurveda'}
+        subcategory="All"
         defaultQuery={(() => {
           const cat = (editBlogData?.category || '').toUpperCase();
           if (cat === 'AYURVEDA') return 'Ayurveda';

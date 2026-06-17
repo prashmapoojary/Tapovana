@@ -60,6 +60,7 @@ app.use("/api/blogs", blogsRoutes);
 app.use("/api/media", mediaRoutes);
 app.post("/api/uploads/blog-image", require("./middleware/auth").authenticate, require("./middleware/auth").requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR', 'THERAPIST'), require("./controllers/blogsController").uploadBlogImage);
 app.post("/api/vedicpackages", require("./controllers/vedicProgramsController").registerAttendeeFromMobile);
+app.get("/certificates/:id", require("./controllers/workshopController").downloadCertificate);
 
 // ── Analytics (returns live database metrics and trends) ────────────────────
 app.get("/api/analytics/dashboard", async (req, res) => {
@@ -301,18 +302,31 @@ app.listen(PORT, () => {
 
     // ── Background workshop status check & notification scheduler ───────────
     const { autoUpdateWorkshopStatuses } = require("./controllers/workshopController");
+    let workshopUpdateRunning = false;
     // Run immediately on boot
     autoUpdateWorkshopStatuses()
         .then(() => console.log("[Workshop Scheduler] Initial status check complete."))
         .catch(err => console.error("[Workshop Scheduler] Initial status check failed:", err));
 
-    // Run every 30 seconds
-    setInterval(() => {
-        autoUpdateWorkshopStatuses().catch(err => console.error("Error in background workshop status update:", err));
-    }, 30000);
+    // Run every 60 seconds (with overlap guard to prevent Neon pool starvation)
+    setInterval(async () => {
+        if (workshopUpdateRunning) {
+            console.warn("[Workshop Scheduler] Previous run still in progress, skipping...");
+            return;
+        }
+        workshopUpdateRunning = true;
+        try {
+            await autoUpdateWorkshopStatuses();
+        } catch (err) {
+            console.error("Error in background workshop status update:", err);
+        } finally {
+            workshopUpdateRunning = false;
+        }
+    }, 60000);
 
     // ── Background Vedic Program status check & allocations sync scheduler ──
     const { autoUpdateVedicProgramStatuses, sendVedicProgramReminders } = require("./controllers/vedicProgramsController");
+    let vedicUpdateRunning = false;
     // Run immediately on boot
     autoUpdateVedicProgramStatuses()
         .then(() => {
@@ -322,10 +336,21 @@ app.listen(PORT, () => {
         .then(() => console.log("[Vedic Program Scheduler] Initial reminders check complete."))
         .catch(err => console.error("[Vedic Program Scheduler] Initial Vedic Program checks failed:", err));
 
-    // Run every 30 seconds
-    setInterval(() => {
-        autoUpdateVedicProgramStatuses().catch(err => console.error("Error in background Vedic Program status update:", err));
-    }, 30000);
+    // Run every 60 seconds (with overlap guard)
+    setInterval(async () => {
+        if (vedicUpdateRunning) {
+            console.warn("[Vedic Program Scheduler] Previous run still in progress, skipping...");
+            return;
+        }
+        vedicUpdateRunning = true;
+        try {
+            await autoUpdateVedicProgramStatuses();
+        } catch (err) {
+            console.error("Error in background Vedic Program status update:", err);
+        } finally {
+            vedicUpdateRunning = false;
+        }
+    }, 60000);
 
     // Run reminders check every 2 hours
     let lastRemindersSentDate = "";

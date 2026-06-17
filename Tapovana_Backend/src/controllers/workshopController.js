@@ -2,7 +2,8 @@ const { query } = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
-const { sendAllocationEmail, sendWorkshopEnrollmentEmail, sendWorkshopRemovalEmail, sendWorkshopScheduledEmail, sendWorkshopOngoingEmail, sendWorkshopDeallocationEmail, sendWorkshopCompletedEmail, sendWorkshopAllocationNotificationEmail } = require('../services/emailService');
+const { sendAllocationEmail, sendWorkshopEnrollmentEmail, sendWorkshopRemovalEmail, sendWorkshopScheduledEmail, sendWorkshopOngoingEmail, sendWorkshopDeallocationEmail, sendWorkshopCompletedEmail, sendWorkshopAllocationNotificationEmail, sendWorkshopCompletionCertificateEmail } = require('../services/emailService');
+const { generateCertificatePDF } = require('../utils/pdfGenerator');
 const { checkStaffAllocationConflict, syncStaffMemberStatus } = require('../utils/conflictChecker');
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
@@ -852,6 +853,11 @@ const updateWorkshop = async (req, res) => {
         // Sync workshop allocations
         await syncWorkshopAllocations(req.params.id);
 
+        if (status !== undefined && getCapitalizedStatus(status) === 'Completed') {
+            // Run status/certificates check immediately
+            autoUpdateWorkshopStatuses().catch(err => console.error("Error in on-demand workshop completion status update:", err));
+        }
+
         return res.json({
             success: true,
             message: duplicateDetected ? 'Duplicate workshop removed automatically.' : 'Workshop updated.',
@@ -1245,15 +1251,13 @@ const autoUpdateWorkshopStatuses = async () => {
                 // Send to attendees
                 const attendeesRes = await query('SELECT email, name FROM attendees WHERE workshop_id = $1', [w.id]);
                 for (const att of attendeesRes.rows) {
-                    try {
-                        await sendWorkshopScheduledEmail({
-                            to: att.email,
-                            staffOrParticipantName: att.name,
-                            workshopTitle: w.title,
-                            date: dateStr,
-                            time: w.time
-                        });
-                    } catch (e) { console.error('Upcoming email (attendee) failed:', e.message); }
+                    sendWorkshopScheduledEmail({
+                        to: att.email,
+                        staffOrParticipantName: att.name,
+                        workshopTitle: w.title,
+                        date: dateStr,
+                        time: w.time
+                    }).catch(e => console.error('Upcoming email (attendee) failed:', e.message));
                 }
 
                 // Send to staff
@@ -1262,15 +1266,13 @@ const autoUpdateWorkshopStatuses = async () => {
                     const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
                     if (staffRes.rows.length) {
                         const s = staffRes.rows[0];
-                        try {
-                            await sendWorkshopScheduledEmail({
-                                to: s.email,
-                                staffOrParticipantName: `${s.first_name} ${s.last_name}`.trim(),
-                                workshopTitle: w.title,
-                                date: dateStr,
-                                time: w.time
-                            });
-                        } catch (e) { console.error('Upcoming email (staff) failed:', e.message); }
+                        sendWorkshopScheduledEmail({
+                            to: s.email,
+                            staffOrParticipantName: `${s.first_name} ${s.last_name}`.trim(),
+                            workshopTitle: w.title,
+                            date: dateStr,
+                            time: w.time
+                        }).catch(e => console.error('Upcoming email (staff) failed:', e.message));
                     }
                 }
                 upNotified = true;
@@ -1280,13 +1282,11 @@ const autoUpdateWorkshopStatuses = async () => {
             if (newStatus === 'Live' && !onNotified) {
                 const attendeesRes = await query('SELECT email, name FROM attendees WHERE workshop_id = $1', [w.id]);
                 for (const att of attendeesRes.rows) {
-                    try {
-                        await sendWorkshopOngoingEmail({
-                            to: att.email,
-                            staffOrParticipantName: att.name,
-                            workshopTitle: w.title
-                        });
-                    } catch (e) { console.error('Live email (attendee) failed:', e.message); }
+                    sendWorkshopOngoingEmail({
+                        to: att.email,
+                        staffOrParticipantName: att.name,
+                        workshopTitle: w.title
+                    }).catch(e => console.error('Live email (attendee) failed:', e.message));
                 }
 
                 const staffIds = w.assigned_staff_ids || [];
@@ -1294,13 +1294,11 @@ const autoUpdateWorkshopStatuses = async () => {
                     const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
                     if (staffRes.rows.length) {
                         const s = staffRes.rows[0];
-                        try {
-                            await sendWorkshopOngoingEmail({
-                                to: s.email,
-                                staffOrParticipantName: `${s.first_name} ${s.last_name}`.trim(),
-                                workshopTitle: w.title
-                            });
-                        } catch (e) { console.error('Live email (staff) failed:', e.message); }
+                        sendWorkshopOngoingEmail({
+                            to: s.email,
+                            staffOrParticipantName: `${s.first_name} ${s.last_name}`.trim(),
+                            workshopTitle: w.title
+                        }).catch(e => console.error('Live email (staff) failed:', e.message));
                     }
                 }
                 onNotified = true;
@@ -1308,17 +1306,45 @@ const autoUpdateWorkshopStatuses = async () => {
 
             // 3. Send completed notifications if newly Completed and not yet notified
             if (newStatus === 'Completed' && !compNotified) {
-                const attendeesRes = await query('SELECT email, name FROM attendees WHERE workshop_id = $1', [w.id]);
+                const attendeesRes = await query("SELECT id, email, name FROM attendees WHERE workshop_id = $1 AND status != 'absent'", [w.id]);
+                for (const att of attendeesRes.rows) {
+                    sendWorkshopCompletedEmail({
+                        to: att.email,
+                        staffOrParticipantName: att.name,
+                        workshopTitle: w.title,
+                        date: dateStr,
+                        time: w.time
+                    }).catch(e => console.error('Completed email (attendee) failed:', e.message));
+                }
+
+                // Auto-generate certificates and send completion certificate email
+                const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
                 for (const att of attendeesRes.rows) {
                     try {
-                        await sendWorkshopCompletedEmail({
+                                                const certCheck = await query('SELECT certificate_id, certificate_url FROM certificates WHERE participant_id = $1 AND workshop_id = $2', [att.id, w.id]);
+                        let certId;
+                        let certUrl = `${backendUrl}/certificates/${att.id}.pdf`;
+                        if (certCheck.rows.length > 0) {
+                            certId = certCheck.rows[0].certificate_id;
+                        } else {
+                            certId = uuidv4();
+                            await query(
+                                `INSERT INTO certificates (certificate_id, participant_id, workshop_id, certificate_url, issued_date)
+                                 VALUES ($1, $2, $3, $4, NOW())`,
+                                [certId, att.id, w.id, certUrl]
+                            );
+                        }
+
+                        sendWorkshopCompletionCertificateEmail({
                             to: att.email,
-                            staffOrParticipantName: att.name,
+                            participantName: att.name,
                             workshopTitle: w.title,
-                            date: dateStr,
-                            time: w.time
-                        });
-                    } catch (e) { console.error('Completed email (attendee) failed:', e.message); }
+                            downloadUrl: certUrl
+                        }).catch(certErr => console.error(`Error sending certificate for attendee ${att.email}:`, certErr.message));
+                        console.log(`Certificate email sent to attendee: ${att.email} for workshop: ${w.title}`);
+                    } catch (certErr) {
+                        console.error(`Error generating/sending certificate for attendee ${att.email}:`, certErr.message);
+                    }
                 }
 
                 const staffIds = w.assigned_staff_ids || [];
@@ -1326,15 +1352,13 @@ const autoUpdateWorkshopStatuses = async () => {
                     const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
                     if (staffRes.rows.length) {
                         const s = staffRes.rows[0];
-                        try {
-                            await sendWorkshopCompletedEmail({
-                                to: s.email,
-                                staffOrParticipantName: `${s.first_name} ${s.last_name}`.trim(),
-                                workshopTitle: w.title,
-                                date: dateStr,
-                                time: w.time
-                            });
-                        } catch (e) { console.error('Completed email (staff) failed:', e.message); }
+                        sendWorkshopCompletedEmail({
+                            to: s.email,
+                            staffOrParticipantName: `${s.first_name} ${s.last_name}`.trim(),
+                            workshopTitle: w.title,
+                            date: dateStr,
+                            time: w.time
+                        }).catch(e => console.error('Completed email (staff) failed:', e.message));
                     }
                 }
                 compNotified = true;
@@ -1466,6 +1490,48 @@ const streamWorkshopVideo = async (req, res) => {
     }
 };
 
+// DOWNLOAD CERTIFICATE PDF
+const downloadCertificate = async (req, res) => {
+    let id = req.params.id;
+    if (id && id.endsWith('.pdf')) {
+        id = id.slice(0, -4);
+    }
+    try {
+        const certRes = await query(`
+            SELECT c.certificate_id, c.issued_date, 
+                   a.name AS participant_name, 
+                   w.title AS workshop_title, w.date AS workshop_date
+            FROM certificates c
+            JOIN attendees a ON a.id = c.participant_id
+            JOIN workshops w ON w.id = c.workshop_id
+            WHERE c.certificate_id = $1 OR c.participant_id = $1
+        `, [id]);
+
+        if (!certRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Certificate not found.' });
+        }
+
+        const cert = certRes.rows[0];
+        
+        let dateStr = cert.workshop_date;
+        const completionDate = dateStr ? new Date(dateStr) : new Date(cert.issued_date);
+        const formattedDate = completionDate.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        const pdfBuffer = await generateCertificatePDF(cert.participant_name, cert.workshop_title, formattedDate);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="certificate.pdf"');
+        return res.send(pdfBuffer);
+    } catch (err) {
+        console.error('downloadCertificate error:', err);
+        return res.status(500).json({ success: false, message: 'Server error downloading certificate.' });
+    }
+};
+
 module.exports = {
     getAllWorkshops, getWorkshopById, createWorkshop,
     updateWorkshop, deleteWorkshop,
@@ -1473,5 +1539,5 @@ module.exports = {
     enrollUserInWorkshop, getWorkshopAttendees,
     updateAttendeeAttendance, exportWorkshopAttendees,
     deleteWorkshopAttendee, uploadVideoChunk, streamWorkshopVideo,
-    autoUpdateWorkshopStatuses
+    autoUpdateWorkshopStatuses, downloadCertificate
 };

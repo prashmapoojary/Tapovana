@@ -4,6 +4,7 @@ import { useAllocations } from '../utils/AllocationContext';
 import { getUser } from '../utils/session';
 import { apiFetch } from '../api/http';
 import { getImageUrl } from '../utils/image';
+import AnimatedNumber from '../utils/AnimatedNumber';
 import DefaultAvatar from '../assets/profileIconDefault.png';
 
 // Icons
@@ -489,22 +490,22 @@ function MyAssignments() {
           <div className="mem-tier-card-top">
             <div className="mem-tier-badge" style={{ background: "#475569", color: "white" }}>Total</div>
           </div>
-          <span className="ma-stat-value">{stats.total}</span>
           <span className="ma-stat-label">Total Assigned Sessions</span>
+          <AnimatedNumber value={stats.total} className="ma-stat-value" />
         </div>
         <div className="ma-stat-card">
           <div className="mem-tier-card-top">
             <div className="mem-tier-badge" style={{ background: "#cda751", color: "white" }}>Active</div>
           </div>
-          <span className="ma-stat-value" style={{ color: "#cda751" }}>{stats.active}</span>
           <span className="ma-stat-label">Active / Upcoming</span>
+          <AnimatedNumber value={stats.active} className="ma-stat-value" style={{ color: "#cda751" }} />
         </div>
         <div className="ma-stat-card">
           <div className="mem-tier-card-top">
             <div className="mem-tier-badge" style={{ background: "#8e9fa7", color: "white" }}>Completed</div>
           </div>
-          <span className="ma-stat-value" style={{ color: "#8e9fa7" }}>{stats.expired}</span>
           <span className="ma-stat-label">Completed</span>
+          <AnimatedNumber value={stats.expired} className="ma-stat-value" style={{ color: "#8e9fa7" }} />
         </div>
       </div>
 

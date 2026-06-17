@@ -3,6 +3,7 @@ import "./Workshops.css";
 import { apiFetch } from "../api/http";
 import { getImageUrl } from "../utils/image";
 import { useAllocations } from "../utils/AllocationContext";
+import AnimatedNumber from "../utils/AnimatedNumber";
 import MediaPickerModal from "../components/MediaPickerModal";
 
 // ─── Live status checker ─────────────────────────────────────────────
@@ -232,18 +233,28 @@ export default function Workshops() {
   const handleSelectStockMedia = (url) => {
     if (mediaTarget === 'add_image') {
       setAddForm(prev => ({ ...prev, image_url: url, image_base64: "" }));
+      setAddError("");
+      setAllocationAttempts(0);
+      setAttemptedInstructorId(null);
     } else if (mediaTarget === 'edit_image') {
       setEditForm(prev => ({ ...prev, image_url: url, image_base64: "" }));
+      setEditError("");
     } else if (mediaTarget === 'add_video') {
       setAddForm(prev => ({ ...prev, video_url: url, video_base64: "" }));
+      setAddError("");
+      setAllocationAttempts(0);
+      setAttemptedInstructorId(null);
     } else if (mediaTarget === 'edit_video') {
       setEditForm(prev => ({ ...prev, video_url: url, video_base64: "" }));
+      setEditError("");
     }
     setMediaModalOpen(false);
   };
   const [dataLoading, setDataLoading] = useState(true);
   const [instructors, setInstructors] = useState([]);
   const [toast, setToast] = useState(null);
+  const [toastType, setToastType] = useState('success');
+  const toastTimerRef = useRef(null);
   const [videoProgress, setVideoProgress] = useState(null);
 
   // Filters
@@ -385,6 +396,7 @@ export default function Workshops() {
   const [manualEnrollForm, setManualEnrollForm] = useState({ name: "", email: "", phone: "" });
   const [manualEnrollSaving, setManualEnrollSaving] = useState(false);
   const [manualEnrollError, setManualEnrollError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   // Fetch attendees for selected workshop
   const fetchAttendees = async (workshopId) => {
@@ -425,11 +437,30 @@ export default function Workshops() {
         errMsg = "This workshop is completed. Staff assignment and enrollment are disabled.";
       }
       setManualEnrollError(errMsg);
-      showToast(errMsg);
+      showToast(errMsg, 'error');
       return;
     }
     if (!manualEnrollForm.name.trim() || !manualEnrollForm.email.trim()) {
       setManualEnrollError("Name and Email are required.");
+      showToast("Validation failed. Please check inputs.", 'error');
+      return;
+    }
+    // Name: Alphabetic only
+    if (!/^[A-Za-z\s]+$/.test(manualEnrollForm.name.trim())) {
+      setManualEnrollError("Name must contain only alphabets.");
+      showToast("Validation failed. Please check inputs.", 'error');
+      return;
+    }
+    // Email: Must end with .com
+    if (!/^[^\s@]+@[^\s@]+\.com$/i.test(manualEnrollForm.email.trim())) {
+      setManualEnrollError("Email must end with .com (e.g., @gmail.com).");
+      showToast("Validation failed. Please check inputs.", 'error');
+      return;
+    }
+    // Phone: Must be exactly 10 digits (if provided)
+    if (manualEnrollForm.phone && !/^\d{10}$/.test(manualEnrollForm.phone.trim())) {
+      setManualEnrollError("Phone number must be exactly 10 digits.");
+      showToast("Validation failed. Please check inputs.", 'error');
       return;
     }
     try {
@@ -441,6 +472,7 @@ export default function Workshops() {
       if (res.success) {
         showToast("User enrolled successfully!");
         setManualEnrollForm({ name: "", email: "", phone: "" });
+        setPhoneError("");
         setShowManualEnroll(false);
         fetchAttendees(selectedWs.id);
         fetchWorkshops();
@@ -468,7 +500,7 @@ export default function Workshops() {
         throw new Error(res.message || "Failed to update attendance.");
       }
     } catch (err) {
-      showToast(err.message || "Failed to update attendance.");
+      showToast(err.message || "Failed to update attendance.", 'error');
     }
   };
 
@@ -489,7 +521,7 @@ export default function Workshops() {
         throw new Error(res.message || "Failed to delete attendee.");
       }
     } catch (err) {
-      showToast(err.message || "Failed to delete attendee.");
+      showToast(err.message || "Failed to delete attendee.", 'error');
     }
   };
 
@@ -517,7 +549,7 @@ export default function Workshops() {
       window.URL.revokeObjectURL(url);
       showToast("CSV exported successfully.");
     } catch (err) {
-      showToast(err.message || "Failed to export CSV.");
+      showToast(err.message || "Failed to export CSV.", 'error');
     }
   };
 
@@ -554,8 +586,9 @@ export default function Workshops() {
       const res = await apiFetch("/api/workshops");
       if (res.success) setWorkshops(res.workshops || []);
       else throw new Error("API returned failure");
-    } catch {
-      if (workshops.length === 0) setWorkshops(DUMMY_WORKSHOPS);
+    } catch (err) {
+      console.error("fetchWorkshops error:", err);
+      showToast(err.message || "Failed to load workshops.", 'error');
     } finally {
       setDataLoading(false);
     }
@@ -667,9 +700,34 @@ export default function Workshops() {
   // ─── Save edit ─────────────────────────────────────────────────────────
   const handleSaveEdit = async () => {
     setEditError("");
-    if (!editForm.title.trim()) { setEditError("Title is required"); return; }
-    if (!editForm.instructor_id) { setEditError("Instructor selection is required"); return; }
-    if (Number(editForm.price) <= 0) { setEditError("Price must be greater than 0"); return; }
+    if (!editForm.title.trim()) { setEditError("Title is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!editForm.instructor_id) { setEditError("Instructor selection is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (editForm.price === "" || Number(editForm.price) <= 0) { setEditError("Price must be greater than 0"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+
+    const parseDateInput = (dateStr) => {
+      if (!dateStr) return null;
+      if (dateStr instanceof Date) return dateStr;
+      const dmy = String(dateStr).match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+      if (dmy) {
+        return new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10));
+      }
+      const parsed = new Date(dateStr);
+      return isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    const selectedDateObj = parseDateInput(editForm.date);
+    if (selectedDateObj) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedMidnight = new Date(selectedDateObj);
+      selectedMidnight.setHours(0, 0, 0, 0);
+      
+      if (selectedMidnight < today) {
+        setEditError("Cannot schedule a workshop on a past date.");
+        showToast("Validation failed. Please check inputs.", 'error');
+        return;
+      }
+    }
 
     const ws = workshops.find(w => w.id === selectedWs?.id) || selectedWs;
     if (getLiveStatus(ws) === "completed") {
@@ -677,7 +735,7 @@ export default function Workshops() {
       if (isStaffChanged) {
         const errMsg = "This workshop is completed. Staff assignment and enrollment are disabled.";
         setEditError(errMsg);
-        showToast(errMsg);
+        showToast(errMsg, 'error');
         return;
       }
     }
@@ -713,7 +771,7 @@ export default function Workshops() {
             setVideoProgress(percent);
           });
         } catch (uploadErr) {
-          throw new Error(`Changes saved but video upload failed: ${uploadErr.message}`);
+          showToast(`Changes saved but video upload failed: ${uploadErr.message}`, 'error');
         } finally {
           setVideoProgress(null);
         }
@@ -738,11 +796,11 @@ export default function Workshops() {
   const handleDeleteWorkshop = () => {
     const liveStatus = selectedWs._liveStatus || getLiveStatus(selectedWs);
     if (liveStatus === "live" || liveStatus === "ongoing") {
-      showToast("Cannot delete a live/ongoing workshop.");
+      showToast("Cannot delete a live/ongoing workshop.", 'error');
       return;
     }
     if (liveStatus === "completed") {
-      showToast("Cannot delete a completed workshop. Only upcoming workshops can be deleted.");
+      showToast("Cannot delete a completed workshop. Only upcoming workshops can be deleted.", 'error');
       return;
     }
     setShowDeleteConfirm(true);
@@ -764,31 +822,66 @@ export default function Workshops() {
       setSelectedWs(null);
       showToast("Workshop deleted successfully!");
     } catch (e) {
-      showToast("Failed to delete workshop: " + e.message);
+      showToast("Failed to delete workshop: " + e.message, 'error');
     } finally {
       setEditSaving(false);
     }
   };
 
+  const handleCloseAddModal = () => {
+    setShowAddModal(false);
+    setAddForm(BLANK_FORM);
+    setAddError("");
+    setAllocationAttempts(0);
+    setAttemptedInstructorId(null);
+  };
+
+  const handleAddFormChange = (field, value) => {
+    setAddForm(prev => ({ ...prev, [field]: value }));
+    setAddError("");
+    setAllocationAttempts(0);
+    setAttemptedInstructorId(null);
+  };
+
   // ─── Create Workshop ───────────────────────────────────────────────────
   const handleCreateWorkshop = async () => {
     setAddError("");
-    if (!addForm.title.trim()) { setAddError("Title is required"); return; }
-    if (!addForm.instructor_id) { setAddError("Instructor selection is required"); return; }
-    if (!addForm.date) { setAddError("Date is required"); return; }
-    if (!addForm.price) { setAddError("Price is required"); return; }
-    if (Number(addForm.price) <= 0) { setAddError("Price must be greater than 0"); return; }
+    if (!addForm.title.trim()) { setAddError("Title is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!addForm.instructor_id) { setAddError("Instructor selection is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!addForm.date) { setAddError("Date is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!addForm.price) { setAddError("Price is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (Number(addForm.price) <= 0) { setAddError("Price must be greater than 0"); showToast("Validation failed. Please check inputs.", 'error'); return; }
 
-    const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
-    if (addForm.date < todayStr) {
-      setAddError("Cannot schedule a workshop on a past date.");
-      return;
+    const parseDateInput = (dateStr) => {
+      if (!dateStr) return null;
+      if (dateStr instanceof Date) return dateStr;
+      const dmy = String(dateStr).match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+      if (dmy) {
+        return new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10));
+      }
+      const parsed = new Date(dateStr);
+      return isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    const selectedDateObj = parseDateInput(addForm.date);
+    if (selectedDateObj) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedMidnight = new Date(selectedDateObj);
+      selectedMidnight.setHours(0, 0, 0, 0);
+      
+      if (selectedMidnight < today) {
+        setAddError("Cannot schedule a workshop on a past date.");
+        showToast("Validation failed. Please check inputs.", 'error');
+        return;
+      }
     }
 
     // Check staff allocation conflict attempts
     if (addForm.instructor_id && addForm.instructor_id === attemptedInstructorId && allocationAttempts >= 3) {
       setAddError("Allocation attempt 3 failed, please reassign staff.");
+      showToast("Validation failed. Please check inputs.", 'error');
+      setAllocationAttempts(0);
       return;
     }
 
@@ -824,7 +917,7 @@ export default function Workshops() {
               setVideoProgress(percent);
             });
           } catch (uploadErr) {
-            throw new Error(`Workshop created but video upload failed: ${uploadErr.message}`);
+            showToast(`Workshop created but video upload failed: ${uploadErr.message}`, 'error');
           } finally {
             setVideoProgress(null);
           }
@@ -859,7 +952,7 @@ export default function Workshops() {
       } else {
         setAddError(err.message || "Error creating workshop");
       }
-      showToast("Error creating workshop");
+      showToast("Error creating workshop", 'error');
     } finally {
       setAddSaving(false);
     }
@@ -868,12 +961,16 @@ export default function Workshops() {
   // ─── Image file upload handler ──────────────────────────────────────────
   const handleImageFile = async (target, file) => {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { showToast("Image must be less than 5MB"); return; }
+    if (file.size > 5 * 1024 * 1024) { showToast("Image must be less than 5MB", 'error'); return; }
     const base64 = await fileToBase64(file);
     if (target === "add") {
       setAddForm(prev => ({ ...prev, image_base64: base64, image_url: "" }));
+      setAddError("");
+      setAllocationAttempts(0);
+      setAttemptedInstructorId(null);
     } else {
       setEditForm(prev => ({ ...prev, image_base64: base64, image_url: "" }));
+      setEditError("");
     }
   };
 
@@ -883,8 +980,12 @@ export default function Workshops() {
     const objectUrl = URL.createObjectURL(file);
     if (target === "add") {
       setAddForm(prev => ({ ...prev, video_url: objectUrl, video_base64: "", video_file: file }));
+      setAddError("");
+      setAllocationAttempts(0);
+      setAttemptedInstructorId(null);
     } else {
       setEditForm(prev => ({ ...prev, video_url: objectUrl, video_base64: "", video_file: file }));
+      setEditError("");
     }
   };
 
@@ -897,12 +998,18 @@ export default function Workshops() {
       setAddForm(prev => ({ ...prev, instructor_id: instructorId, instructor_name: name }));
       setAllocationAttempts(0);
       setAttemptedInstructorId(instructorId);
+      setAddError("");
     } else {
       setEditForm(prev => ({ ...prev, instructor_id: instructorId, instructor_name: name }));
     }
   };
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
+  const showToast = (msg, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastType(type);
+    setToast(msg);
+    toastTimerRef.current = setTimeout(() => { setToast(null); toastTimerRef.current = null; }, 4000);
+  };
 
   // ─── Render edit form ──────────────────────────────────────────────────
   const renderEditForm = () => (
@@ -1190,7 +1297,11 @@ export default function Workshops() {
               
               <div style={{ display: "flex", gap: "8px" }}>
                 <button 
-                  onClick={() => setShowManualEnroll(!showManualEnroll)}
+                  onClick={() => {
+                    setShowManualEnroll(!showManualEnroll);
+                    setPhoneError("");
+                    setManualEnrollForm({ name: "", email: "", phone: "" });
+                  }}
                   className="ws-modal-btn-secondary"
                   style={{ padding: "8px 16px", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}
                 >
@@ -1236,16 +1347,29 @@ export default function Workshops() {
                     <input 
                       type="tel" 
                       value={manualEnrollForm.phone} 
-                      onChange={e => setManualEnrollForm(p => ({ ...p, phone: e.target.value }))}
-                      placeholder="e.g. +91 9876543210"
+                      onChange={e => {
+                        const cleaned = e.target.value.replace(/\D/g, "");
+                        setManualEnrollForm(p => ({ ...p, phone: cleaned }));
+                        if (cleaned.length > 0 && cleaned.length !== 10) {
+                          setPhoneError("Phone number must be exactly 10 digits");
+                        } else {
+                          setPhoneError("");
+                        }
+                      }}
+                      placeholder="e.g. 9876543210"
                       style={{ padding: "7px 10px", borderRadius: "4px", border: "1px solid #e2e8f0", fontSize: "13px", outline: "none", background: "white", width: "100%", boxSizing: "border-box" }}
                     />
+                    {phoneError && (
+                      <span className="phone-validation-error" style={{ color: "#e74c3c", fontSize: "12px", fontWeight: "600", marginTop: "4px", display: "block" }}>
+                        {phoneError}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {manualEnrollError && <div style={{ color: "#e74c3c", fontSize: "12px", fontWeight: 600, marginBottom: "8px" }}>{manualEnrollError}</div>}
                 <button 
                   onClick={handleManualEnroll} 
-                  disabled={manualEnrollSaving}
+                  disabled={manualEnrollSaving || !!phoneError}
                   className="ws-modal-btn-primary"
                   style={{ padding: "6px 16px", fontSize: "12px", background: "#CDA751", borderColor: "#CDA751", color: "white", cursor: "pointer" }}
                 >
@@ -1343,20 +1467,20 @@ export default function Workshops() {
 
           <section className="ws-stats-row">
             <div className="ws-stat-card">
-              <div className="ws-stat-value">{STATS.total}</div>
               <div className="ws-stat-label">Total Programs</div>
+              <AnimatedNumber value={STATS.total} className="ws-stat-value" />
             </div>
             <div className="ws-stat-card">
-              <div className="ws-stat-value">{STATS.upcoming}</div>
               <div className="ws-stat-label">Upcoming</div>
+              <AnimatedNumber value={STATS.upcoming} className="ws-stat-value" />
             </div>
             <div className="ws-stat-card" style={STATS.live > 0 ? { borderLeft: "4px solid #e74c3c" } : undefined}>
-              <div className="ws-stat-value" style={{ color: STATS.live > 0 ? "#e74c3c" : "#2d3748" }}>{STATS.live}</div>
               <div className="ws-stat-label">Live Now</div>
+              <AnimatedNumber value={STATS.live} className="ws-stat-value" style={{ color: STATS.live > 0 ? "#e74c3c" : "#2d3748" }} />
             </div>
             <div className="ws-stat-card">
-              <div className="ws-stat-value">{STATS.completed}</div>
               <div className="ws-stat-label">Completed</div>
+              <AnimatedNumber value={STATS.completed} className="ws-stat-value" />
             </div>
           </section>
 
@@ -1381,10 +1505,10 @@ export default function Workshops() {
           <div className="ws-result-count">
             {dataLoading ? "Loading programs..." : `${filtered.length} programs found`}
           </div>
+
         </>
       )}
 
-      {/* ── CARDS GRID (when not in detail view) ── */}
       {!selectedWs && (
         <div className="ws-grid">
           {filtered.map(w => <WorkshopCard key={w.id} w={w} onClick={handleOpenDetail} />)}
@@ -1393,6 +1517,7 @@ export default function Workshops() {
           )}
         </div>
       )}
+
 
       {/* ── DETAIL / EDIT VIEW ── */}
       {selectedWs && (
@@ -1442,23 +1567,23 @@ export default function Workshops() {
 
       {/* ── ADD MODAL ── */}
       {showAddModal && (
-        <div className="ws-modal-overlay" onClick={() => setShowAddModal(false)}>
+        <div className="ws-modal-overlay" onClick={handleCloseAddModal}>
           <div className="ws-modal" style={{ width: 620 }} onClick={e => e.stopPropagation()}>
             <div className="ws-modal-header" style={{ paddingBottom: 16, borderBottom: "1px solid #E8E2D9" }}>
               <h2 className="ws-modal-title" style={{ margin: 0 }}>Create New Workshop</h2>
-              <button className="ws-modal-close" onClick={() => setShowAddModal(false)}>X</button>
+              <button className="ws-modal-close" onClick={handleCloseAddModal}>X</button>
             </div>
             <div className="ws-modal-body" style={{ maxHeight: "60vh", overflowY: "auto" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Program Title</label>
-                  <input value={addForm.title} onChange={e => setAddForm(p => ({ ...p, title: e.target.value }))} className="ws-modal-input" placeholder="e.g. Sunset Yoga Flow" />
+                  <input value={addForm.title} onChange={e => handleAddFormChange("title", e.target.value)} className="ws-modal-input" placeholder="e.g. Sunset Yoga Flow" />
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Category</label>
-                    <select value={addForm.category} onChange={e => setAddForm(p => ({ ...p, category: e.target.value }))} className="ws-modal-input">
+                    <select value={addForm.category} onChange={e => handleAddFormChange("category", e.target.value)} className="ws-modal-input">
                       {Object.keys(CATEGORY_COLORS).map(c => <option key={c}>{c}</option>)}
                     </select>
                   </div>
@@ -1478,22 +1603,22 @@ export default function Workshops() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Date</label>
-                    <input type="date" value={addForm.date} onChange={e => setAddForm(p => ({ ...p, date: e.target.value }))} className="ws-modal-input" min={new Date().toISOString().split("T")[0]} />
+                    <input type="date" value={addForm.date} onChange={e => handleAddFormChange("date", e.target.value)} className="ws-modal-input" min={new Date().toISOString().split("T")[0]} />
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Start Time</label>
-                    <input type="time" value={addForm.time} onChange={e => setAddForm(p => ({ ...p, time: e.target.value }))} className="ws-modal-input" />
+                    <input type="time" value={addForm.time} onChange={e => handleAddFormChange("time", e.target.value)} className="ws-modal-input" />
                   </div>
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Duration (mins)</label>
-                    <input type="number" value={addForm.duration} onChange={e => setAddForm(p => ({ ...p, duration: e.target.value }))} className="ws-modal-input" min={15} step={15} />
+                    <input type="number" value={addForm.duration} onChange={e => handleAddFormChange("duration", e.target.value)} className="ws-modal-input" min={15} step={15} />
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Price (Rs)</label>
-                    <input type="number" value={addForm.price} onChange={e => setAddForm(p => ({ ...p, price: e.target.value }))} className="ws-modal-input" placeholder="1500" min={0} />
+                    <input type="number" value={addForm.price} onChange={e => handleAddFormChange("price", e.target.value)} className="ws-modal-input" placeholder="1500" min={0} />
                   </div>
                 </div>
 
@@ -1511,7 +1636,7 @@ export default function Workshops() {
                       Stock Image
                     </button>
                     <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
-                    <input value={addForm.image_url} onChange={e => setAddForm(p => ({ ...p, image_url: e.target.value, image_base64: "" }))}
+                    <input value={addForm.image_url} onChange={e => handleAddFormChange("image_url", e.target.value)}
                       className="ws-modal-input" style={{ flex: 1 }} placeholder="https://..." />
                   </div>
                   <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -1539,21 +1664,21 @@ export default function Workshops() {
                       Stock Video
                     </button>
                     <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
-                    <input value={addForm.video_url} onChange={e => setAddForm(p => ({ ...p, video_url: e.target.value, video_base64: "" }))} className="ws-modal-input" placeholder="https://youtube.com/..." style={{ flex: 1 }} />
+                    <input value={addForm.video_url} onChange={e => handleAddFormChange("video_url", e.target.value)} className="ws-modal-input" placeholder="https://youtube.com/..." style={{ flex: 1 }} />
                   </div>
                   {addForm.video_url && <span style={{ fontSize: 11, color: "#4a5568", marginTop: 4 }}>Video attached</span>}
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Description</label>
-                  <textarea value={addForm.description} onChange={e => setAddForm(p => ({ ...p, description: e.target.value }))}
+                  <textarea value={addForm.description} onChange={e => handleAddFormChange("description", e.target.value)}
                     rows={3} className="ws-modal-input" style={{ resize: "vertical" }} placeholder="Brief description..." />
                 </div>
 
                 {addError && <div style={{ color: "#e74c3c", fontSize: 13, fontWeight: 600 }}>{addError}</div>}
 
                 <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
-                  <button className="ws-modal-btn-secondary" style={{ flex: 1 }} onClick={() => setShowAddModal(false)}>Cancel</button>
+                  <button className="ws-modal-btn-secondary" style={{ flex: 1 }} onClick={handleCloseAddModal}>Cancel</button>
                   <button className="ws-modal-btn-primary" style={{ flex: 2 }} onClick={handleCreateWorkshop} disabled={addSaving}>
                     {addSaving ? (videoProgress !== null ? `Uploading Video ${videoProgress}%` : "Creating...") : "Create Workshop"}
                   </button>
@@ -1568,12 +1693,14 @@ export default function Workshops() {
       {toast && (
         <div style={{
           position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-          background: '#CDA751', color: 'white', padding: '16px 32px',
-          borderRadius: '10px', boxShadow: '0 8px 30px rgba(0,0,0,0.15)', zIndex: 2147483647,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          animation: 'wsFadeIn 0.3s ease-out'
+          background: '#1A1A1A', border: '2px solid #CDA751', borderRadius: '12px',
+          padding: '18px 32px', zIndex: 2147483647, display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
+          boxShadow: '0 8px 32px rgba(205,167,81,0.25)',
+          color: toastType === 'error' ? '#EF4444' : (toastType === 'info' ? '#E2E8F0' : '#4ADE80'),
+          animation: 'wsFadeIn 0.3s ease-out', minWidth: 220, textAlign: 'center'
         }}>
-          <div style={{ fontWeight: 700, fontSize: '15px' }}>{toast}</div>
+          <span style={{ fontSize: 20 }}>{toastType === 'error' ? '⚠' : '✓'}</span>
+          <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.3px' }}>{toast}</span>
         </div>
       )}
 
@@ -1582,7 +1709,10 @@ export default function Workshops() {
         onClose={() => setMediaModalOpen(false)}
         onSelect={handleSelectStockMedia}
         allowVideos={mediaPickerType === 'video'}
-        title={mediaPickerType === 'image' ? "Select Unsplash Photo" : "Select Stock Video"}
+        title={mediaPickerType === 'image' ? "Select Pexels Photo" : "Select Stock Video"}
+        page_type="workshops"
+        category={((mediaTarget === 'add_image' || mediaTarget === 'add_video') ? addForm : editForm)?.category || 'Yoga'}
+        subcategory="All"
         defaultQuery={(() => {
           const activeForm = (mediaTarget === 'add_image' || mediaTarget === 'add_video') ? addForm : editForm;
           const cat = activeForm?.category || 'Yoga';

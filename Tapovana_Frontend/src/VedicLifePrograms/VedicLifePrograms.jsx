@@ -6,8 +6,6 @@ import { getUser } from "../utils/session";
 import { getImageUrl } from "../utils/image";
 import MediaPickerModal from "../components/MediaPickerModal";
 import SearchIcon from "../assets/searchIcon.svg";
-import DropdownIcon from "../assets/dropdownIcon.svg";
-import FilterIcon from "../assets/filterIcon.svg";
 
 // ─── Status checker ─────────────────────────────────────────────────────
 const getProgramStatus = (program) => {
@@ -197,7 +195,7 @@ const FormField = ({ label, children }) => (
 );
 
 // ─── Reusable Form Component ──────────────────────────────────────────────
-function ProgramForm({ form, onChange, instructors, mode, onSearchUnsplash }) {
+function ProgramForm({ form, onChange, instructors, mode, onSearchPexels }) {
   const handleDurationChange = (duration) => {
     const newForm = { ...form, duration };
     const days = DURATION_MAP[duration];
@@ -358,7 +356,7 @@ function ProgramForm({ form, onChange, instructors, mode, onSearchUnsplash }) {
             Browse Image
           </button>
           <button type="button" className="vedic-btn-cancel" style={{ padding: "6px 12px", fontSize: 12, borderColor: '#CDA751', color: '#CDA751' }}
-            onClick={onSearchUnsplash}>
+            onClick={onSearchPexels}>
             Stock Image
           </button>
           <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
@@ -397,6 +395,8 @@ export default function VedicLifePrograms() {
   const [durationFilter, setDurationFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [toast, setToast] = useState(null);
+  const [toastType, setToastType] = useState('success');
+  const toastTimerRef = useRef(null);
 
   // Detail view
   const [selectedProgram, setSelectedProgram] = useState(null);
@@ -421,6 +421,7 @@ export default function VedicLifePrograms() {
   const [manualEnrollForm, setManualEnrollForm] = useState({ name: "", email: "", phone: "" });
   const [manualEnrollSaving, setManualEnrollSaving] = useState(false);
   const [manualEnrollError, setManualEnrollError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   const currentUser = useMemo(() => getUser(), []);
   const isAdmin = !currentUser || currentUser.role === "SUPER_ADMIN" || currentUser.role === "CO_ADMIN";
@@ -446,8 +447,9 @@ export default function VedicLifePrograms() {
       const res = await apiFetch("/api/vedic-programs");
       if (res.success) setPrograms(res.programs || []);
       else throw new Error("API failed");
-    } catch {
-      if (programs.length === 0) setPrograms(DUMMY_PROGRAMS);
+    } catch (err) {
+      console.error("fetchPrograms error:", err);
+      showToast(err.message || "Failed to load programs.", 'error');
     } finally { setDataLoading(false); }
   };
 
@@ -540,6 +542,14 @@ export default function VedicLifePrograms() {
       return;
     }
 
+    if (manualEnrollForm.phone && manualEnrollForm.phone.trim()) {
+      const phoneVal = manualEnrollForm.phone.trim();
+      if (!/^\d{10}$/.test(phoneVal)) {
+        setManualEnrollError("Phone number must be exactly 10 digits");
+        return;
+      }
+    }
+
     try {
       setManualEnrollSaving(true);
       const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/enroll`, {
@@ -549,6 +559,7 @@ export default function VedicLifePrograms() {
       if (res.success) {
         showToast("User enrolled successfully!");
         setManualEnrollForm({ name: "", email: "", phone: "" });
+        setPhoneError("");
         setShowManualEnroll(false);
         await fetchPrograms();
         setSelectedProgram(prev => ({ ...prev, enrolled: (prev.enrolled || 0) + 1 }));
@@ -578,7 +589,7 @@ export default function VedicLifePrograms() {
         throw new Error(res.message || "Failed to delete attendee.");
       }
     } catch (err) {
-      showToast(err.message || "Error deleting attendee.");
+      showToast(err.message || "Error deleting attendee.", 'error');
     }
   };
 
@@ -595,7 +606,7 @@ export default function VedicLifePrograms() {
         throw new Error(res.message || "Failed to update status.");
       }
     } catch (err) {
-      showToast(err.message || "Error updating attendance.");
+      showToast(err.message || "Error updating attendance.", 'error');
     }
   };
 
@@ -611,7 +622,7 @@ export default function VedicLifePrograms() {
         throw new Error(res.message || "Failed to check in attendee.");
       }
     } catch (err) {
-      showToast(err.message || "Error checking in attendee.");
+      showToast(err.message || "Error checking in attendee.", 'error');
     }
   };
 
@@ -629,7 +640,7 @@ export default function VedicLifePrograms() {
         throw new Error(res.message || "Failed to cancel program.");
       }
     } catch (err) {
-      showToast(err.message || "Error cancelling program.");
+      showToast(err.message || "Error cancelling program.", 'error');
     }
   };
 
@@ -653,7 +664,7 @@ export default function VedicLifePrograms() {
         throw new Error(res.message || "Failed to delete program.");
       }
     } catch (err) {
-      showToast(err.message || "Error deleting program.");
+      showToast(err.message || "Error deleting program.", 'error');
     }
   };
 
@@ -686,20 +697,20 @@ export default function VedicLifePrograms() {
     setEditError("");
     const todayStr = new Date().toISOString().split('T')[0];
 
-    if (!editForm.title.trim()) { setEditError("Title is required"); return; }
-    if (!editForm.startDate) { setEditError("Start date is required"); return; }
-    if (!editForm.endDate) { setEditError("End date is required"); return; }
-    if (editForm.startDate < todayStr) { setEditError("Start date must be today or in the future"); return; }
-    if (editForm.endDate < editForm.startDate) { setEditError("End date must be on or after start date"); return; }
-    if (editForm.price === "" || Number(editForm.price) < 0) { setEditError("Price must be greater than or equal to 0"); return; }
-    if (!editForm.capacity || Number(editForm.capacity) < 1) { setEditError("Capacity must be at least 1"); return; }
-    if (Number(editForm.capacity) < (selectedProgram.enrolled || 0)) { setEditError(`Capacity cannot be less than the number of enrolled attendees (${selectedProgram.enrolled || 0})`); return; }
-    if (!editForm.consultant_id) { setEditError("Please select a lead consultant"); return; }
-    if (editForm.assigned_staff_ids && editForm.assigned_staff_ids.length > 9) { setEditError("Maximum 9 specialists can be assigned."); return; }
+    if (!editForm.title.trim()) { setEditError("Title is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!editForm.startDate) { setEditError("Start date is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!editForm.endDate) { setEditError("End date is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (editForm.startDate < todayStr) { setEditError("Start date must be today or in the future"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (editForm.endDate < editForm.startDate) { setEditError("End date must be on or after start date"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (editForm.price === "" || Number(editForm.price) < 0) { setEditError("Price must be greater than or equal to 0"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!editForm.capacity || Number(editForm.capacity) < 1) { setEditError("Capacity must be at least 1"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (Number(editForm.capacity) < (selectedProgram.enrolled || 0)) { setEditError(`Capacity cannot be less than the number of enrolled attendees (${selectedProgram.enrolled || 0})`); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!editForm.consultant_id) { setEditError("Please select a lead consultant"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (editForm.assigned_staff_ids && editForm.assigned_staff_ids.length > 9) { setEditError("Maximum 9 specialists can be assigned."); showToast("Validation failed. Please check inputs.", 'error'); return; }
 
     if (editForm.registrationDeadline) {
-      if (editForm.registrationDeadline < todayStr) { setEditError("Registration deadline must be today or in the future"); return; }
-      if (editForm.registrationDeadline > editForm.startDate) { setEditError("Registration deadline must be on or before start date"); return; }
+      if (editForm.registrationDeadline < todayStr) { setEditError("Registration deadline must be today or in the future"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+      if (editForm.registrationDeadline > editForm.startDate) { setEditError("Registration deadline must be on or before start date"); showToast("Validation failed. Please check inputs.", 'error'); return; }
     }
 
     try {
@@ -741,19 +752,19 @@ export default function VedicLifePrograms() {
     setAddError("");
     const todayStr = new Date().toISOString().split('T')[0];
 
-    if (!addForm.title.trim()) { setAddError("Title is required"); return; }
-    if (!addForm.startDate) { setAddError("Start date is required"); return; }
-    if (!addForm.endDate) { setAddError("End date is required"); return; }
-    if (addForm.startDate < todayStr) { setAddError("Start date must be today or in the future"); return; }
-    if (addForm.endDate < addForm.startDate) { setAddError("End date must be on or after start date"); return; }
-    if (addForm.price === "" || Number(addForm.price) < 0) { setAddError("Price must be greater than or equal to 0"); return; }
-    if (!addForm.capacity || Number(addForm.capacity) < 1) { setAddError("Capacity must be at least 1"); return; }
-    if (!addForm.consultant_id) { setAddError("Please select a lead consultant"); return; }
-    if (addForm.assigned_staff_ids && addForm.assigned_staff_ids.length > 9) { setAddError("Maximum 9 specialists can be assigned."); return; }
+    if (!addForm.title.trim()) { setAddError("Title is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!addForm.startDate) { setAddError("Start date is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!addForm.endDate) { setAddError("End date is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (addForm.startDate < todayStr) { setAddError("Start date must be today or in the future"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (addForm.endDate < addForm.startDate) { setAddError("End date must be on or after start date"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (addForm.price === "" || Number(addForm.price) < 0) { setAddError("Price must be greater than or equal to 0"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!addForm.capacity || Number(addForm.capacity) < 1) { setAddError("Capacity must be at least 1"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!addForm.consultant_id) { setAddError("Please select a lead consultant"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (addForm.assigned_staff_ids && addForm.assigned_staff_ids.length > 9) { setAddError("Maximum 9 specialists can be assigned."); showToast("Validation failed. Please check inputs.", 'error'); return; }
 
     if (addForm.registrationDeadline) {
-      if (addForm.registrationDeadline < todayStr) { setAddError("Registration deadline must be today or in the future"); return; }
-      if (addForm.registrationDeadline > addForm.startDate) { setAddError("Registration deadline must be on or before start date"); return; }
+      if (addForm.registrationDeadline < todayStr) { setAddError("Registration deadline must be today or in the future"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+      if (addForm.registrationDeadline > addForm.startDate) { setAddError("Registration deadline must be on or before start date"); showToast("Validation failed. Please check inputs.", 'error'); return; }
     }
 
     try {
@@ -795,7 +806,7 @@ export default function VedicLifePrograms() {
   // ─── Allocate staff (from detail tab) ───────────────────────────────────
   const handleAllocateInstructor = async () => {
     if (!selectedProgram) return;
-    if (!selectedProgram.consultant_id) { showToast("Please assign a consultant first"); return; }
+    if (!selectedProgram.consultant_id) { showToast("Please assign a consultant first", 'error'); return; }
 
     try {
       await apiFetch("/api/vedic-programs/" + selectedProgram.id + "/staff", {
@@ -808,11 +819,16 @@ export default function VedicLifePrograms() {
       }
       showToast("Instructors allocated and notified via email!");
     } catch (err) {
-      triggerAlert(err.message || "Failed to allocate instructors");
+      showToast(err.message || "Failed to allocate instructors", 'error');
     }
   };
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
+  const showToast = (msg, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastType(type);
+    setToast(msg);
+    toastTimerRef.current = setTimeout(() => { setToast(null); toastTimerRef.current = null; }, 4000);
+  };
 
   // ─── Render detail view ─────────────────────────────────────────────────
   const renderDetailView = () => {
@@ -1008,7 +1024,11 @@ export default function VedicLifePrograms() {
                 </button>
                 {status === "upcoming" ? (
                   <button 
-                    onClick={() => setShowManualEnroll(!showManualEnroll)} 
+                    onClick={() => {
+                      setShowManualEnroll(!showManualEnroll);
+                      setPhoneError("");
+                      setManualEnrollForm({ name: "", email: "", phone: "" });
+                    }} 
                     className="vedic-btn-allocate" 
                     style={{ padding: "8px 12px", fontSize: 12 }}
                   >
@@ -1050,15 +1070,28 @@ export default function VedicLifePrograms() {
                       type="text" 
                       placeholder="9876543210" 
                       value={manualEnrollForm.phone} 
-                      onChange={e => setManualEnrollForm(p => ({ ...p, phone: e.target.value }))}
+                      onChange={e => {
+                        const cleaned = e.target.value.replace(/\D/g, "");
+                        setManualEnrollForm(p => ({ ...p, phone: cleaned }));
+                        if (cleaned.length > 0 && cleaned.length !== 10) {
+                          setPhoneError("Phone number must be exactly 10 digits");
+                        } else {
+                          setPhoneError("");
+                        }
+                      }}
                       style={inputStyle}
                     />
+                    {phoneError && (
+                      <span className="phone-validation-error" style={{ color: "#e74c3c", fontSize: "12px", fontWeight: "600", marginTop: "4px", display: "block" }}>
+                        {phoneError}
+                      </span>
+                    )}
                   </FormField>
                 </div>
                 {manualEnrollError && <div style={{ color: "#e74c3c", fontSize: 12, fontWeight: 600, marginBottom: 8 }}>{manualEnrollError}</div>}
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                  <button className="vedic-btn-cancel" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => setShowManualEnroll(false)}>Cancel</button>
-                  <button className="vedic-btn-allocate" style={{ padding: "6px 12px", fontSize: 12 }} onClick={handleManualEnroll} disabled={manualEnrollSaving}>
+                  <button className="vedic-btn-cancel" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setShowManualEnroll(false); setPhoneError(""); setManualEnrollForm({ name: "", email: "", phone: "" }); }}>Cancel</button>
+                  <button className="vedic-btn-allocate" style={{ padding: "6px 12px", fontSize: 12 }} onClick={handleManualEnroll} disabled={manualEnrollSaving || !!phoneError}>
                     {manualEnrollSaving ? "Enrolling..." : "Submit Enrollment"}
                   </button>
                 </div>
@@ -1164,7 +1197,7 @@ export default function VedicLifePrograms() {
   const renderEditForm = () => (
     <div style={{ padding: "24px 28px", overflowY: "auto", maxHeight: "65vh" }}>
       <h2 style={{ fontSize: 20, fontWeight: 700, color: "#2d3748", margin: "0 0 16px 0" }}>Edit Program</h2>
-      <ProgramForm form={editForm} onChange={(e) => setEditForm(p => ({ ...p, [e.target.name]: e.target.value }))} instructors={instructors} mode="edit" onSearchUnsplash={() => { setMediaTarget('edit'); setMediaModalOpen(true); }} />
+      <ProgramForm form={editForm} onChange={(e) => setEditForm(p => ({ ...p, [e.target.name]: e.target.value }))} instructors={instructors} mode="edit" onSearchPexels={() => { setMediaTarget('edit'); setMediaModalOpen(true); }} />
       {editError && <div style={{ color: "#e74c3c", fontSize: 13, fontWeight: 600, marginTop: 8 }}>{editError}</div>}
       <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
         <button className="vedic-btn-cancel" style={{ flex: 1 }} onClick={() => setIsEditing(false)}>Cancel</button>
@@ -1179,8 +1212,16 @@ export default function VedicLifePrograms() {
   return (
     <div className="vedic-container">
       {toast && (
-        <div style={{ position: 'fixed', bottom: 24, right: 24, background: '#2ecc71', color: 'white', padding: '14px 20px', borderRadius: 8, zIndex: 99999, fontWeight: 600, fontSize: 14, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-          {toast}
+        <div style={{
+          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+          background: '#1A1A1A', border: '2px solid #CDA751', borderRadius: '12px',
+          padding: '18px 32px', zIndex: 2147483647, display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
+          boxShadow: '0 8px 32px rgba(205,167,81,0.25)',
+          color: toastType === 'error' ? '#EF4444' : (toastType === 'info' ? '#E2E8F0' : '#4ADE80'),
+          animation: 'wsFadeIn 0.3s ease-out', minWidth: 220, textAlign: 'center'
+        }}>
+          <span style={{ fontSize: 20 }}>{toastType === 'error' ? '⚠' : '✓'}</span>
+          <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.3px' }}>{toast}</span>
         </div>
       )}
 
@@ -1257,6 +1298,8 @@ export default function VedicLifePrograms() {
               {filtered.map((program) => <ProgramCard key={program.id} program={program} onClick={handleSelectProgram} />)}
             </div>
           )}
+
+
         </>
       )}
 
@@ -1279,7 +1322,7 @@ export default function VedicLifePrograms() {
               <button className="vedic-modal-close" onClick={() => setShowCreateModal(false)}>✕</button>
             </div>
             <div className="vedic-modal-body" style={{ maxHeight: "65vh", overflowY: "auto" }}>
-              <ProgramForm form={addForm} onChange={(e) => setAddForm(p => ({ ...p, [e.target.name]: e.target.value }))} instructors={instructors} mode="add" onSearchUnsplash={() => { setMediaTarget('add'); setMediaModalOpen(true); }} />
+              <ProgramForm form={addForm} onChange={(e) => setAddForm(p => ({ ...p, [e.target.name]: e.target.value }))} instructors={instructors} mode="add" onSearchPexels={() => { setMediaTarget('add'); setMediaModalOpen(true); }} />
               {addError && <div style={{ color: "#e74c3c", fontSize: 13, fontWeight: 600, marginTop: 8 }}>{addError}</div>}
               <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
                 <button className="vedic-btn-cancel" style={{ flex: 1 }} onClick={() => setShowCreateModal(false)}>Cancel</button>
@@ -1297,7 +1340,10 @@ export default function VedicLifePrograms() {
         onClose={() => setMediaModalOpen(false)}
         onSelect={handleSelectStockImage}
         allowVideos={false}
-        title="Select Unsplash Image"
+        title="Select Pexels Image"
+        page_type="vedic_packages"
+        category={(mediaTarget === 'add' ? addForm : editForm)?.type || 'Ayurveda'}
+        subcategory="All"
         defaultQuery={(() => {
           const form = mediaTarget === 'add' ? addForm : editForm;
           const title = (form.title || '').toLowerCase();

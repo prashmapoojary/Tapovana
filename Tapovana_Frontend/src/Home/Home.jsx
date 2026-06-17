@@ -8,6 +8,7 @@ import CustomersIcon from "../assets/Customers.svg";
 import TransactionsIcon from "../assets/Transactions.svg";
 import { getUser, roleLabel, getToken } from "../utils/session";
 import { useAllocations } from "../utils/AllocationContext";
+import AnimatedNumber from "../utils/AnimatedNumber";
 
 // Helper map to translate raw backend service catalog IDs into gorgeous premium display names
 const SERVICE_LOOKUP = {
@@ -601,7 +602,7 @@ function Home() {
             </div>
           </div>
           <div>
-            <div className="stat-card-value">{stats.today_bookings}</div>
+            <AnimatedNumber value={stats.today_bookings} className="stat-card-value" />
             <div className="stat-card-trend trend-up">
               <span>↑ 12.5%</span> <span style={{ color: "#a0aec0" }}>vs previous period</span>
             </div>
@@ -616,7 +617,7 @@ function Home() {
             </div>
           </div>
           <div>
-            <div className="stat-card-value">₹{(stats.today_revenue || 0).toLocaleString("en-IN")}</div>
+            <AnimatedNumber value={stats.today_revenue || 0} prefix="₹" className="stat-card-value" />
             <div className="stat-card-trend trend-up">
               <span>↑ 8.4%</span> <span style={{ color: "#a0aec0" }}>vs previous period</span>
             </div>
@@ -631,7 +632,7 @@ function Home() {
             </div>
           </div>
           <div>
-            <div className="stat-card-value">{stats.active_customers}</div>
+            <AnimatedNumber value={stats.active_customers} className="stat-card-value" />
             <div className="stat-card-trend trend-up">
               <span>↑ 4.2%</span> <span style={{ color: "#a0aec0" }}>new profiles added</span>
             </div>
@@ -646,7 +647,7 @@ function Home() {
             </div>
           </div>
           <div>
-            <div className="stat-card-value">{stats.pending_bookings}</div>
+            <AnimatedNumber value={stats.pending_bookings} className="stat-card-value" />
             <div className="stat-card-trend trend-down">
               <span>↓ 15.0%</span> <span style={{ color: "#a0aec0" }}>outstanding tasks</span>
             </div>

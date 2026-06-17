@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import "./Membership.css";
 import { apiFetch } from "../api/http";
+import AnimatedNumber from "../utils/AnimatedNumber";
 import ActionIcon from "../assets/Button.svg";
 import DefaultAvatar from "../assets/profileIconDefault.png";
 import EnrollMemberDrawer from "./EnrollMemberDrawer";
@@ -68,7 +69,8 @@ const BLANK_ENROLL = { name: "", email: "", phone: "", tier: "SILVER" };
 
 const RENDER_MEMBERSHIP_API = "https://tapoclg.onrender.com/api/membership";
 
-const getMemberAvatarUrl = (url, source) => {
+const getMemberAvatarUrl = (profilePhoto, url, source) => {
+  if (profilePhoto) return profilePhoto;
   if (!url) return DefaultAvatar;
   if (url.startsWith("http") || url.startsWith("data:")) return url;
   const base = source === "mobile" ? "https://tapoclg.onrender.com" : (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000");
@@ -191,6 +193,7 @@ export default function Membership() {
               totalSpent: 0,
               status: "active",
               profile_photo_url: m.profile_pic || null,
+              profilePhoto: m.profile_pic ? (m.profile_pic.startsWith("http") ? m.profile_pic : `https://tapoclg.onrender.com${m.profile_pic.startsWith("/") ? "" : "/"}${m.profile_pic}`) : null,
               source: "mobile"
             };
           });
@@ -216,6 +219,7 @@ export default function Membership() {
             totalSpent: m.total_spent || 0,
             status: m.status || "active",
             profile_photo_url: m.profile_photo_url || null,
+            profilePhoto: m.profilePhoto || null,
             source: "admin"
           }));
         }
@@ -532,16 +536,16 @@ export default function Membership() {
           <div className="mem-tier-card-top">
             <div className="mem-tier-badge" style={{ background: "#475569", color: "white" }}>This Month</div>
           </div>
-          <div className="mem-tier-count" style={{ color: "#2d3748" }}>{tierStats.NEW_THIS_MONTH}</div>
           <div className="mem-tier-label">Members joined</div>
+          <AnimatedNumber value={tierStats.NEW_THIS_MONTH} className="mem-tier-count" style={{ color: "#2d3748" }} />
         </div>
         {Object.entries(tierConfig).map(([key, cfg]) => (
           <div key={key} className="mem-tier-card" style={{ cursor: "pointer" }} onClick={() => handleOpenTierEdit(key)}>
             <div className="mem-tier-card-top">
               <div className="mem-tier-badge" style={{ background: cfg.color, color: "white" }}>{cfg.label}</div>
             </div>
-            <div className="mem-tier-count" style={{ color: cfg.color }}>{tierStats[key]}</div>
             <div className="mem-tier-label">Active Members</div>
+            <AnimatedNumber value={tierStats[key]} className="mem-tier-count" style={{ color: cfg.color }} />
             <div className="mem-tier-price">Rs{cfg.price.toLocaleString("en-IN")}/year</div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
               <div className="mem-tier-benefits-link" style={{ color: cfg.color }}>{cfg.benefits.length} benefits</div>
@@ -614,29 +618,14 @@ export default function Membership() {
           <div className="mem-detail-overlay" onClick={() => setSelectedMember(null)}>
             <div className="mem-detail-panel" onClick={e => e.stopPropagation()}>
               <div className="mem-detail-header">
-                <img src={getMemberAvatarUrl(selectedMember.profile_photo_url, selectedMember.source)} alt="Profile" className="mem-detail-avatar-img" style={{ width: 48, height: 48, borderRadius: "50%", border: "2px solid #cda751" }} />
                 <div>
                   <div className="mem-detail-name">{selectedMember.name}</div>
-                  <div className="mem-detail-id">#{selectedMember.id}</div>
                 </div>
                 <button className="mem-detail-close" onClick={() => setSelectedMember(null)}>X</button>
               </div>
 
               <div className="mem-detail-body">
-                <div className="mem-detail-stats">
-                  <div className="mem-detail-stat">
-                    <div className="mem-detail-stat-value">{selectedMember.sessions}</div>
-                    <div className="mem-detail-stat-label">Sessions</div>
-                  </div>
-                  <div className="mem-detail-stat">
-                    <div className="mem-detail-stat-value">Rs{((selectedMember.totalSpent || 0) / 1000).toFixed(1)}K</div>
-                    <div className="mem-detail-stat-label">Total Spent</div>
-                  </div>
-                  <div className="mem-detail-stat">
-                    <div className="mem-detail-stat-value">{daysUntilExpiry(selectedMember.expiryDate) > 0 ? daysUntilExpiry(selectedMember.expiryDate) : "Expired"}</div>
-                    <div className="mem-detail-stat-label">Days Left</div>
-                  </div>
-                </div>
+
 
                 <div className="mem-detail-info">
                   <div className="mem-detail-row"><span>Email</span><span>{selectedMember.email}</span></div>
@@ -712,10 +701,7 @@ export default function Membership() {
                       return (
                         <tr key={m.id} className={"mem-row " + (selectedMember?.id === m.id ? "selected" : "")}>
                           <td onClick={() => { setSelectedMember(m); setNewTier(m.tier); setUpgradeSuccess(false); }} style={{ cursor: "pointer" }}>
-                            <div className="user-cell">
-                              <img src={getMemberAvatarUrl(m.profile_photo_url, m.source)} alt="profile" style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0" }} />
-                              <div className="mem-name" style={{ fontWeight: 600 }}>{m.name || "Unknown"}</div>
-                            </div>
+                            <div className="mem-name" style={{ fontWeight: 600 }}>{m.name || "Unknown"}</div>
                           </td>
                           <td onClick={() => { setSelectedMember(m); setNewTier(m.tier); setUpgradeSuccess(false); }} style={{ cursor: "pointer" }}>
                             <div className="mem-email">{m.email || "-"}</div>

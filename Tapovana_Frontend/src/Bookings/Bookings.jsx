@@ -107,12 +107,19 @@ function Bookings() {
           const res = await response.json();
           if (res && (res.success || Array.isArray(res))) {
             const rawList = res.memberships || res.data || (Array.isArray(res) ? res : []);
-            const mappedMembers = rawList.map((m) => ({
-              id: m.id || m.user_id,
-              name: m.name || m.customer_name,
-              email: m.email || m.customer_email,
-              profile_photo_url: m.profile_photo_url || m.profile_pic || null
-            }));
+            const mappedMembers = rawList.map((m) => {
+              let profilePhoto = m.profile_photo_url || m.profile_pic || null;
+              if (profilePhoto && !profilePhoto.startsWith("http")) {
+                profilePhoto = `https://tapoclg.onrender.com${profilePhoto.startsWith("/") ? "" : "/"}${profilePhoto}`;
+              }
+              return {
+                id: m.id || m.user_id,
+                name: m.name || m.customer_name,
+                email: m.email || m.customer_email,
+                profilePhoto: profilePhoto,
+                profile_photo_url: profilePhoto
+              };
+            });
             setMemberships(mappedMembers);
           }
         }
@@ -433,13 +440,17 @@ function Bookings() {
                     );
                     let avatarSrc = DefaultAvatar;
                     
-                    if (selectedBooking.profile_pic) {
+                    if (selectedBooking.profilePhoto) {
+                      avatarSrc = selectedBooking.profilePhoto;
+                    } else if (selectedBooking.profile_pic) {
                       const pic = selectedBooking.profile_pic;
                       if (pic.startsWith("http")) {
                         avatarSrc = pic;
                       } else {
                         avatarSrc = `https://tapoclg.onrender.com${pic.startsWith("/") ? "" : "/"}${pic}`;
                       }
+                    } else if (membership?.profilePhoto) {
+                      avatarSrc = membership.profilePhoto;
                     } else if (membership?.profile_photo_url) {
                       const pic = membership.profile_photo_url;
                       if (pic.startsWith("http")) {
@@ -478,7 +489,7 @@ function Bookings() {
                     const matchedService = servicesList.find(
                       s => (s.name || "").toLowerCase() === (selectedBooking.service_name || "").toLowerCase()
                     );
-                    const resolvedUrl = matchedService ? getServiceImageUrl(matchedService.image_url) : null;
+                    const resolvedUrl = selectedBooking.serviceImage || (matchedService ? getServiceImageUrl(matchedService.image_url) : null);
                     return resolvedUrl ? (
                       <img
                         src={resolvedUrl}

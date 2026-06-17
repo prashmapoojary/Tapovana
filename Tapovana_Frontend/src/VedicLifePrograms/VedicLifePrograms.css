@@ -724,3 +724,15 @@
     padding: 16px;
   }
 }
+
+/* ── Toast Animation ── */
+@keyframes wsFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}

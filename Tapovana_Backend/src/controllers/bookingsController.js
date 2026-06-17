@@ -1,6 +1,92 @@
 const { query } = require('../config/db');
 const { sendBookingStatusEmail, sendBookingAllocationEmail, sendBookingRemovalEmail } = require('../services/emailService');
 const { checkStaffAllocationConflict, syncStaffMemberStatus } = require('../utils/conflictChecker');
+const https = require('https');
+
+const pexelsCache = new Map();
+
+const getPexelsFallbackImage = async (queryStr) => {
+    if (!queryStr) return null;
+    const cleanQuery = queryStr.trim().toLowerCase();
+    if (pexelsCache.has(cleanQuery)) {
+        return pexelsCache.get(cleanQuery);
+    }
+    const pexelsKey = process.env.PEXELS_KEY || process.env.PEXELS_API_KEY || 'ayDlUYgPQDoXz7uZVuztXRKsNILvAitgDiUnKrWR1nwk0VBu2NbLE4v9';
+    if (!pexelsKey) return null;
+    
+    const image = await new Promise((resolve) => {
+        const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(cleanQuery)}&per_page=1`;
+        const req = https.get(url, {
+            headers: { 'Authorization': pexelsKey },
+            timeout: 3000
+        }, (res) => {
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => {
+                try {
+                    const result = JSON.parse(data);
+                    if (result.photos && result.photos.length > 0) {
+                        resolve(result.photos[0].src.large);
+                    } else {
+                        resolve(null);
+                    }
+                } catch {
+                    resolve(null);
+                }
+            });
+        });
+        req.on('error', () => resolve(null));
+    });
+    
+    if (image) {
+        pexelsCache.set(cleanQuery, image);
+    }
+    return image;
+};
+
+const getFullImageUrl = (req, imageUrl) => {
+    if (!imageUrl || typeof imageUrl !== 'string') return imageUrl;
+    if (/^https?:\/\//.test(imageUrl) || imageUrl.startsWith('data:')) {
+        return imageUrl;
+    }
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    return `${protocol}://${host}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+};
+
+const enrichBookingObject = async (req, booking) => {
+    if (!booking) return null;
+    
+    let profilePhoto = null;
+    if (booking.profile_pic) {
+        if (booking.profile_pic.startsWith('http')) {
+            profilePhoto = booking.profile_pic;
+        } else {
+            profilePhoto = `https://tapoclg.onrender.com${booking.profile_pic.startsWith('/') ? '' : '/'}${booking.profile_pic}`;
+        }
+    }
+    
+    let serviceImage = null;
+    if (booking.service_name) {
+        try {
+            const svcRes = await query('SELECT image_url FROM services WHERE LOWER(name) = LOWER($1)', [booking.service_name.trim()]);
+            if (svcRes.rows.length && svcRes.rows[0].image_url) {
+                serviceImage = svcRes.rows[0].image_url;
+            } else {
+                serviceImage = await getPexelsFallbackImage(booking.service_name);
+            }
+        } catch (err) {
+            console.error('Error fetching service image for booking:', err);
+        }
+    }
+    
+    return {
+        ...booking,
+        profilePhoto,
+        serviceImage: serviceImage ? getFullImageUrl(req, serviceImage) : null
+    };
+};
+
 
 // Ensure booking_status_updates table exists
 const ensureUpdatesTableExists = async () => {
@@ -138,10 +224,15 @@ const getAllBookings = async (req, res) => {
         const startIndex = (pg - 1) * lim;
         const paginatedBookings = allBookings.slice(startIndex, startIndex + lim);
 
+        const enrichedBookings = [];
+        for (const b of paginatedBookings) {
+            enrichedBookings.push(await enrichBookingObject(req, b));
+        }
+
         return res.json({
             success: true,
-            count: paginatedBookings.length,
-            bookings: paginatedBookings,
+            count: enrichedBookings.length,
+            bookings: enrichedBookings,
             pagination: {
                 total,
                 page: pg,
@@ -162,7 +253,8 @@ const getBookingById = async (req, res) => {
         if (!result.rows.length) {
             return res.status(404).json({ success: false, message: 'Booking not found.' });
         }
-        return res.json({ success: true, booking: result.rows[0] });
+        const enriched = await enrichBookingObject(req, result.rows[0]);
+        return res.json({ success: true, booking: enriched });
     } catch (err) {
         console.error('getBookingById error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
@@ -585,7 +677,8 @@ const updateBookingStatus = async (req, res) => {
             }).catch(e => console.error('[UserEmail] Error:', e));
         }
 
-        return res.json({ success: true, message: 'Booking status updated.', booking: updatedBooking });
+        const enriched = await enrichBookingObject(req, updatedBooking);
+        return res.json({ success: true, message: 'Booking status updated.', booking: enriched });
     } catch (err) {
         console.error('updateBookingStatus error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
@@ -705,7 +798,8 @@ const assignTherapist = async (req, res) => {
             }
         }
 
-        return res.json({ success: true, message: 'Therapist assigned.', booking: updatedBooking });
+        const enriched = await enrichBookingObject(req, updatedBooking);
+        return res.json({ success: true, message: 'Therapist assigned.', booking: enriched });
     } catch (err) {
         console.error('assignTherapist error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });

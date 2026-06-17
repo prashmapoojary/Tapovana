@@ -556,7 +556,7 @@ function AddService({ onBack }) {
                   📁 Upload Local Image
                 </button>
                 <button type="button" className="es-add-benefit-btn" style={{ margin: 0, padding: '8px 12px', fontSize: '12px', borderColor: '#CDA751', color: '#CDA751' }} onClick={() => setMediaModalOpen(true)}>
-                  📷 Choose from Unsplash
+                  📷 Choose from Pexels
                 </button>
               </div>
 
@@ -701,7 +701,10 @@ function AddService({ onBack }) {
           setMediaModalOpen(false);
         }}
         allowVideos={false}
-        title="Search Unsplash Images"
+        title="Search Pexels Images"
+        page_type="services"
+        category={category}
+        subcategory={subCategory}
         defaultQuery={(() => {
           if (subCategory && subCategory !== 'Select Sub Category') return subCategory;
           if (category && category !== 'Select category' && category !== 'Select Category') return category;

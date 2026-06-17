@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import "./Transactions.css";
 import { apiFetch } from "../api/http";
+import AnimatedNumber from "../utils/AnimatedNumber";
 import SearchIcon from "../assets/searchIcon.svg";
 import DropdownIcon from "../assets/dropdownIcon.svg";
 import { useAllocations } from "../utils/AllocationContext";
@@ -156,28 +157,28 @@ function Transactions() {
       {/* Financial metrics stats summary cards grid */}
       <section className="revenue-metrics-grid">
         <div className="revenue-metric-card collected">
-          <span className="revenue-card-value">₹{(summary.total_collected || 0).toLocaleString("en-IN")}</span>
           <span className="revenue-card-label">Total Revenue Collected</span>
+          <AnimatedNumber value={summary.total_collected || 0} prefix="₹" className="revenue-card-value" />
         </div>
 
         <div className="revenue-metric-card pending">
-          <span className="revenue-card-value">₹{(summary.pending_amount || 0).toLocaleString("en-IN")}</span>
           <span className="revenue-card-label">Pending Ledger Amount</span>
+          <AnimatedNumber value={summary.pending_amount || 0} prefix="₹" className="revenue-card-value" />
         </div>
 
         <div className="revenue-metric-card refunded">
-          <span className="revenue-card-value">₹{(summary.refunded_amount || 0).toLocaleString("en-IN")}</span>
           <span className="revenue-card-label">Total Refunds Processed</span>
+          <AnimatedNumber value={summary.refunded_amount || 0} prefix="₹" className="revenue-card-value" />
         </div>
 
         <div className="revenue-metric-card failed">
-          <span className="revenue-card-value">₹{(summary.failed_amount || 0).toLocaleString("en-IN")}</span>
           <span className="revenue-card-label">Failed Gateway Billing</span>
+          <AnimatedNumber value={summary.failed_amount || 0} prefix="₹" className="revenue-card-value" />
         </div>
 
         <div className="revenue-metric-card discount">
-          <span className="revenue-card-value">₹{(summary.discounts_applied || 0).toLocaleString("en-IN")}</span>
           <span className="revenue-card-label">Discounts Applied</span>
+          <AnimatedNumber value={summary.discounts_applied || 0} prefix="₹" className="revenue-card-value" />
         </div>
       </section>
 

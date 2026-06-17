@@ -1,0 +1,381 @@
+/* CategoryMediaGallery.css */
+
+.cmg-gallery-section {
+    margin: 20px 0;
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(205, 167, 81, 0.25);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(205, 167, 81, 0.05);
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cmg-gallery-section.collapsed {
+    border-color: rgba(205, 167, 81, 0.15);
+}
+
+/* Header styling */
+.cmg-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    background: rgba(255, 255, 255, 0.65);
+    border-bottom: 1px solid rgba(205, 167, 81, 0.15);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
+}
+
+.cmg-header:hover {
+    background: rgba(255, 255, 255, 0.85);
+}
+
+.cmg-header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cmg-glow-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #CDA751;
+    border-radius: 50%;
+    box-shadow: 0 0 10px #CDA751, 0 0 20px rgba(205, 167, 81, 0.5);
+    animation: cmg-pulse 1.8s infinite;
+}
+
+.cmg-header-title h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a202c;
+    letter-spacing: 0.3px;
+    font-family: 'Outfit', 'Manrope', sans-serif;
+}
+
+.cmg-badge {
+    background: rgba(205, 167, 81, 0.12);
+    color: #CDA751;
+    border: 1px solid rgba(205, 167, 81, 0.2);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.cmg-collapse-btn {
+    background: transparent;
+    border: none;
+    color: #CDA751;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Body content */
+.cmg-body {
+    padding: 16px 20px;
+    animation: cmg-slide-down 0.3s ease;
+}
+
+/* Toggles/Tabs */
+.cmg-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #edf2f7;
+    padding-bottom: 12px;
+}
+
+.cmg-tab-btn {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid #e2e8f0;
+    color: #4a5568;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.cmg-tab-btn:hover {
+    border-color: #CDA751;
+    color: #CDA751;
+}
+
+.cmg-tab-btn.active {
+    background: #CDA751;
+    border-color: #CDA751;
+    color: white;
+    box-shadow: 0 4px 12px rgba(205, 167, 81, 0.25);
+}
+
+/* Loading & States */
+.cmg-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 0;
+    gap: 12px;
+    color: #718096;
+}
+
+.cmg-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(205, 167, 81, 0.1);
+    border-top-color: #CDA751;
+    border-radius: 50%;
+    animation: cmg-spin 0.8s linear infinite;
+}
+
+.cmg-error, .cmg-empty {
+    text-align: center;
+    padding: 30px;
+    color: #718096;
+    font-size: 13px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    border: 1px dashed rgba(205, 167, 81, 0.15);
+}
+
+/* Grid Layout */
+.cmg-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+}
+
+/* Card design */
+.cmg-card {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    aspect-ratio: 1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.cmg-card:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 12px 24px rgba(205, 167, 81, 0.18);
+    border-color: rgba(205, 167, 81, 0.45);
+}
+
+.cmg-img-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.cmg-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.cmg-card:hover .cmg-img {
+    transform: scale(1.08);
+}
+
+.cmg-play-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 38px;
+    height: 38px;
+    background: rgba(205, 167, 81, 0.85);
+    backdrop-filter: blur(4px);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    z-index: 2;
+    transition: all 0.2s ease;
+}
+
+.cmg-card:hover .cmg-play-icon {
+    background: #CDA751;
+    transform: translate(-50%, -50%) scale(1.1);
+}
+
+.cmg-card-overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
+    padding: 12px 10px 8px 10px;
+    color: white;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.cmg-card:hover .cmg-card-overlay {
+    opacity: 1;
+}
+
+.cmg-desc {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cmg-author {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: 2px;
+}
+
+/* Lightbox Modal */
+.cmg-lightbox-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    animation: cmg-fade-in 0.25s ease;
+}
+
+.cmg-lightbox-card {
+    background: white;
+    border-radius: 12px;
+    max-width: 800px;
+    width: 100%;
+    max-height: calc(100vh - 80px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    border: 1px solid rgba(205, 167, 81, 0.2);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    animation: cmg-zoom-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.cmg-lightbox-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    border: none;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    transition: all 0.2s ease;
+}
+
+.cmg-lightbox-close:hover {
+    background: rgba(205, 167, 81, 0.9);
+}
+
+.cmg-lightbox-body {
+    flex: 1;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 250px;
+    overflow: hidden;
+}
+
+.cmg-lightbox-img, .cmg-lightbox-video {
+    max-width: 100%;
+    max-height: 55vh;
+    object-fit: contain;
+    display: block;
+}
+
+.cmg-lightbox-footer {
+    padding: 16px 24px;
+    background: #fafafa;
+    border-top: 1px solid #edf2f7;
+}
+
+.cmg-lightbox-footer h4 {
+    margin: 0 0 4px 0;
+    font-size: 15px;
+    color: #1a202c;
+    font-weight: 700;
+}
+
+.cmg-lightbox-footer p {
+    margin: 0;
+    font-size: 12px;
+    color: #718096;
+}
+
+/* Animations */
+@keyframes cmg-pulse {
+    0% { transform: scale(0.95); opacity: 0.8; }
+    50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 12px #CDA751, 0 0 24px rgba(205, 167, 81, 0.7); }
+    100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+@keyframes cmg-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes cmg-slide-down {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cmg-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes cmg-zoom-in {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+@media (max-width: 640px) {
+    .cmg-grid {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 8px;
+    }
+    
+    .cmg-lightbox-card {
+        max-height: calc(100vh - 40px);
+    }
+}

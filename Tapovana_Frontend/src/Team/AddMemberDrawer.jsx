@@ -26,6 +26,8 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [phoneTouched, setPhoneTouched] = useState(false);
 
   const fileInputRef = useRef(null);
 
@@ -59,6 +61,8 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
     setShowPresets(false);
     setFormData(initialForm);
     setError("");
+    setPhoneError("");
+    setPhoneTouched(false);
   };
 
   const handleClose = () => {
@@ -70,6 +74,22 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    if (name === "phone") {
+      setPhoneTouched(true);
+      const cleaned = value.replace(/\D/g, "");
+      setFormData((prev) => ({
+        ...prev,
+        [name]: cleaned
+      }));
+
+      if (cleaned.length !== 10) {
+        setPhoneError("Phone number must be exactly 10 digits");
+      } else {
+        setPhoneError("");
+      }
+      return;
+    }
 
     setFormData((prev) => ({
       ...prev,
@@ -343,9 +363,14 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                placeholder="+1 (555) 000-0000"
+                placeholder="10-digit number"
                 className="drawer-input"
               />
+              {phoneTouched && phoneError && (
+                <span className="phone-validation-error" style={{ color: "#e74c3c", fontSize: "12px", fontWeight: "600", marginTop: "4px", display: "block" }}>
+                  {phoneError}
+                </span>
+              )}
             </div>
           </div>
 

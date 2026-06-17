@@ -32,6 +32,8 @@ function Profile() {
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [specialization, setSpecialization] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [phoneTouched, setPhoneTouched] = useState(false);
 
   // Photo state
   const [photoPreview, setPhotoPreview] = useState(null);
@@ -136,8 +138,8 @@ function Profile() {
 
     if (phone && phone.trim()) {
       const phoneVal = phone.trim();
-      if (!/^\d{10,15}$/.test(phoneVal)) {
-        setError("Phone number must be digits only and between 10 to 15 characters long");
+      if (!/^\d{10}$/.test(phoneVal)) {
+        setError("Phone number must be exactly 10 digits");
         return;
       }
     }
@@ -195,6 +197,8 @@ function Profile() {
     setIsEditing(false);
     initForm();
     setError("");
+    setPhoneError("");
+    setPhoneTouched(false);
   };
 
   const fullName =
@@ -325,13 +329,29 @@ function Profile() {
               <div className="form-group-full">
                 <label>Phone Number</label>
                 {isEditing ? (
-                  <input
-                    type="text"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="profile-form-input"
-                    placeholder="Phone number"
-                  />
+                  <>
+                    <input
+                      type="text"
+                      value={phone}
+                      onChange={(e) => {
+                        setPhoneTouched(true);
+                        const cleaned = e.target.value.replace(/\D/g, "");
+                        setPhone(cleaned);
+                        if (cleaned.length > 0 && cleaned.length !== 10) {
+                          setPhoneError("Phone number must be exactly 10 digits");
+                        } else {
+                          setPhoneError("");
+                        }
+                      }}
+                      className="profile-form-input"
+                      placeholder="Phone number"
+                    />
+                    {phoneTouched && phoneError && (
+                      <span className="phone-validation-error" style={{ color: "#e74c3c", fontSize: "12px", fontWeight: "600", marginTop: "4px", display: "block" }}>
+                        {phoneError}
+                      </span>
+                    )}
+                  </>
                 ) : (
                   <div className="read-only-val">{phone || "-"}</div>
                 )}
@@ -367,7 +387,7 @@ function Profile() {
                   <button
                     type="submit"
                     className="profile-btn primary"
-                    disabled={saving}
+                    disabled={saving || !!phoneError}
                   >
                     {saving ? "Saving..." : "Save Changes"}
                   </button>

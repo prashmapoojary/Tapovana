@@ -121,19 +121,17 @@ export default function ForceChangePassword() {
       <div className="right-section">
         <h1 style={{ fontSize: "20px" }}>Reset Password</h1>
         
-        <div style={{ textAlign: "center", marginBottom: "15px" }}>
-          <img src={logoImg} alt="Tapovana" width="90" />
-        </div>
-
-        <h3 style={{ color: "#d97706", textAlign: "center", marginBottom: "10px", fontSize: "14px" }}>Change Password Required</h3>
-        <p className="note" style={{ color: "#d97706", marginBottom: "30px", fontWeight: "500", fontSize: "11px" }}>
+        <h3 style={{ color: "#caa24a", textAlign: "center", marginBottom: "10px", fontSize: "14px" }}>Change Password Required</h3>
+        <p className="note" style={{ marginBottom: "30px", fontWeight: "500", fontSize: "11px" }}>
           For security reasons, you must change your temporary password before continuing.
         </p>
         
         <div className="form-container">
-          <label>New Password</label>
+          <label htmlFor="force_new_password">New Password</label>
           <input
             type="password"
+            id="force_new_password"
+            name="force_new_password"
             className="input-field"
             value={newPassword}
             disabled={otpSent}
@@ -141,9 +139,11 @@ export default function ForceChangePassword() {
             placeholder="Min. 8 characters"
           />
 
-          <label>Confirm New Password</label>
+          <label htmlFor="force_confirm_password">Confirm New Password</label>
           <input
             type="password"
+            id="force_confirm_password"
+            name="force_confirm_password"
             className="input-field"
             value={confirmPassword}
             disabled={otpSent}
@@ -180,9 +180,11 @@ export default function ForceChangePassword() {
 
           {otpSent && (
             <>
-              <label>Enter OTP Code</label>
+              <label htmlFor="force_otp">Enter OTP Code</label>
               <input
                 type="text"
+                id="force_otp"
+                name="force_otp"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 className="input-field"
@@ -217,7 +219,7 @@ export default function ForceChangePassword() {
               {error && <p className="error-message" style={{ fontSize: "11px" }}>{error}</p>}
               {successMsg && <p className="success-message" style={{ color: "green", textAlign: "center", fontSize: "11px" }}>{successMsg}</p>}
               
-              <button className="btn" onClick={handleVerifyOtpAndSave} disabled={loading} style={{ marginTop: "10px" }}>
+              <button className="btn" onClick={handleVerifyOtpAndSave} disabled={loading}>
                 {loading ? "Verifying..." : "Verify and Save"}
               </button>
             </>

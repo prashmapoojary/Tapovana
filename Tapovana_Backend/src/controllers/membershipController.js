@@ -52,7 +52,50 @@ const getAllMemberships = async (req, res) => {
             [...values, parseInt(limit), offset]
         );
 
-        return res.json({ success: true, count: result.rows.length, memberships: result.rows, pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) } });
+        // Fetch remote memberships to get latest profile pictures
+        let remoteMembers = [];
+        try {
+            const response = await fetch('https://tapoclg.onrender.com/api/membership');
+            if (response.ok) {
+                const data = await response.json();
+                remoteMembers = data.success ? (data.memberships || []) : [];
+            }
+        } catch (fetchErr) {
+            console.error('Failed to fetch memberships from mobile backend:', fetchErr);
+        }
+
+        const remoteMembersMap = new Map();
+        for (const rm of remoteMembers) {
+            if (rm.customer_email) {
+                remoteMembersMap.set(rm.customer_email.toLowerCase(), rm.profile_pic);
+            }
+        }
+
+        const formattedMemberships = result.rows.map(row => {
+            let profilePhoto = null;
+            const emailKey = row.email ? row.email.toLowerCase() : '';
+            let pic = remoteMembersMap.get(emailKey) || row.profile_photo_url;
+            
+            if (pic) {
+                if (pic.startsWith('http')) {
+                    profilePhoto = pic;
+                } else if (pic.startsWith('/uploads/profile_photo-') || remoteMembersMap.has(emailKey)) {
+                    profilePhoto = `https://tapoclg.onrender.com${pic.startsWith('/') ? '' : '/'}${pic}`;
+                } else {
+                    // Local server upload
+                    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+                    const host = req.headers['x-forwarded-host'] || req.headers.host;
+                    profilePhoto = `${protocol}://${host}${pic.startsWith('/') ? '' : '/'}${pic}`;
+                }
+            }
+
+            return {
+                ...row,
+                profilePhoto
+            };
+        });
+
+        return res.json({ success: true, count: formattedMemberships.length, memberships: formattedMemberships, pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) } });
     } catch (err) {
         console.error('getAllMemberships error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
@@ -61,14 +104,73 @@ const getAllMemberships = async (req, res) => {
 
 // ─── GET single membership ────────────────────────────────────────────
 const getMembershipById = async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+        return res.status(400).json({ success: false, message: 'Invalid membership ID.' });
+    }
     try {
-        const result = await query('SELECT m.*, tm.first_name AS created_by_name FROM memberships m LEFT JOIN team_members tm ON tm.id = m.created_by WHERE m.id = $1', [req.params.id]);
+        const result = await query('SELECT m.*, tm.first_name AS created_by_name FROM memberships m LEFT JOIN team_members tm ON tm.id = m.created_by WHERE m.id = $1', [id]);
         if (!result.rows.length) return res.status(404).json({ success: false, message: 'Membership not found.' });
-        return res.json({ success: true, membership: result.rows[0] });
+        
+        const row = result.rows[0];
+        
+        // Fetch remote memberships to get latest profile picture for this member
+        let remotePic = null;
+        if (row.email) {
+            try {
+                const response = await fetch('https://tapoclg.onrender.com/api/membership');
+                if (response.ok) {
+                    const data = await response.json();
+                    const remoteMembers = data.success ? (data.memberships || []) : [];
+                    const match = remoteMembers.find(rm => rm.customer_email && rm.customer_email.toLowerCase() === row.email.toLowerCase());
+                    if (match) {
+                        remotePic = match.profile_pic;
+                    }
+                }
+            } catch (fetchErr) {
+                console.error('Failed to fetch membership from mobile backend:', fetchErr);
+            }
+        }
+        
+        let profilePhoto = null;
+        let pic = remotePic || row.profile_photo_url;
+        if (pic) {
+            if (pic.startsWith('http')) {
+                profilePhoto = pic;
+            } else if (pic.startsWith('/uploads/profile_photo-') || remotePic) {
+                profilePhoto = `https://tapoclg.onrender.com${pic.startsWith('/') ? '' : '/'}${pic}`;
+            } else {
+                // Local server upload
+                const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+                const host = req.headers['x-forwarded-host'] || req.headers.host;
+                profilePhoto = `${protocol}://${host}${pic.startsWith('/') ? '' : '/'}${pic}`;
+            }
+        }
+        
+        return res.json({ success: true, membership: { ...row, profilePhoto } });
     } catch (err) {
         console.error('getMembershipById error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
     }
+};
+
+const enrichMembership = (req, row) => {
+    if (!row) return null;
+    let profilePhoto = null;
+    let pic = row.profile_photo_url;
+    if (pic) {
+        if (pic.startsWith('http')) {
+            profilePhoto = pic;
+        } else if (pic.startsWith('/uploads/profile_photo-')) {
+            profilePhoto = `https://tapoclg.onrender.com${pic.startsWith('/') ? '' : '/'}${pic}`;
+        } else {
+            // Local server upload
+            const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+            const host = req.headers['x-forwarded-host'] || req.headers.host;
+            profilePhoto = `${protocol}://${host}${pic.startsWith('/') ? '' : '/'}${pic}`;
+        }
+    }
+    return { ...row, profilePhoto };
 };
 
 // ─── CREATE membership ────────────────────────────────────────────────
@@ -86,7 +188,7 @@ const createMembership = async (req, res) => {
             [name.trim(), email || null, phone || null, (tier || 'SILVER').toUpperCase(), new Date().toISOString().split('T')[0], expiryDate.toISOString().split('T')[0], sessions || 0, total_spent || 0, (status || 'active').toLowerCase(), savedImage, req.user?.id || null]
         );
 
-        return res.status(201).json({ success: true, message: 'Membership created.', membership: result.rows[0] });
+        return res.status(201).json({ success: true, message: 'Membership created.', membership: enrichMembership(req, result.rows[0]) });
     } catch (err) {
         console.error('createMembership error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
@@ -116,10 +218,12 @@ const updateMembership = async (req, res) => {
 
         if (!fields.length) return res.status(400).json({ success: false, message: 'No fields to update.' });
 
-        values.push(req.params.id);
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ success: false, message: 'Invalid membership ID.' });
+        values.push(id);
         const result = await query('UPDATE memberships SET ' + fields.join(', ') + ' WHERE id = $' + idx + ' RETURNING *', values);
         if (!result.rows.length) return res.status(404).json({ success: false, message: 'Membership not found.' });
-        return res.json({ success: true, message: 'Membership updated.', membership: result.rows[0] });
+        return res.json({ success: true, message: 'Membership updated.', membership: enrichMembership(req, result.rows[0]) });
     } catch (err) {
         console.error('updateMembership error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
@@ -129,7 +233,9 @@ const updateMembership = async (req, res) => {
 // ─── DELETE membership ────────────────────────────────────────────────
 const deleteMembership = async (req, res) => {
     try {
-        const result = await query('DELETE FROM memberships WHERE id = $1 RETURNING id', [req.params.id]);
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ success: false, message: 'Invalid membership ID.' });
+        const result = await query('DELETE FROM memberships WHERE id = $1 RETURNING id', [id]);
         if (!result.rows.length) return res.status(404).json({ success: false, message: 'Membership not found.' });
         return res.json({ success: true, message: 'Membership deleted.' });
     } catch (err) {

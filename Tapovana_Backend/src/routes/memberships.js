@@ -15,8 +15,8 @@ const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN')];
 
 // ─── Public routes (no auth needed — for mobile app) ─────────────────
 router.get('/', getAllMemberships);
-router.get('/:id', getMembershipById);
 router.get('/tiers', getAllTiers);
+router.get('/:id', getMembershipById);
 
 // ─── Admin-only routes ───────────────────────────────────────────────
 router.put('/tiers/:name', ...adminOnly, updateTier);
