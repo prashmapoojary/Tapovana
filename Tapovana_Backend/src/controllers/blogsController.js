@@ -466,6 +466,11 @@ const updateBlog = async (req, res) => {
             return res.status(403).json({ success: false, message: 'You can only edit your own blogs.' });
         }
 
+        // Check status: non-admins can only edit Draft or Rejected blogs
+        if (!isAdmin && !(blog.status === 'draft' || blog.status === 'rejected')) {
+            return res.status(403).json({ success: false, message: 'You can only edit Draft or Rejected blogs.' });
+        }
+
         const {
             title, category, summary, content_html, content_json,
             featured_image, tags, seo_title, seo_description, seo_keywords,

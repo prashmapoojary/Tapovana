@@ -662,26 +662,10 @@ export default function Blogs({ mode }) {
             </div>
           </div>
 
-          {/* Action Buttons for Admins & Authors */}
-          {(isAdmin || (isStaff && (detailBlog.status === "draft" || detailBlog.status === "rejected"))) && (
+          {/* Action Buttons for Admins only (no staff edit/delete here) */}
+          {isAdmin && (
             <div className="blog-admin-decision-actions" style={{ display: "flex", gap: "16px", marginTop: "8px", paddingTop: "16px", borderTop: "1px solid #edf2f7", flexWrap: "wrap" }}>
-              {isStaff && (detailBlog.status === "draft" || detailBlog.status === "rejected") && (
-                <>
-                  <button 
-                    className="blog-btn-accept" 
-                    onClick={() => navigate(`/dashboard/blogs/${detailBlog.id}/edit`)}
-                  >
-                    Edit
-                  </button>
-                  <button 
-                    className="blog-btn-reject" 
-                    onClick={() => handleDelete(detailBlog.id)}
-                  >
-                    Delete
-                  </button>
-                </>
-              )}
-              {isAdmin && detailBlog.status === "pending" && (
+              {detailBlog.status === "pending" && (
                 <>
                   <button 
                     className="blog-btn-accept" 
@@ -697,7 +681,7 @@ export default function Blogs({ mode }) {
                   </button>
                 </>
               )}
-              {isAdmin && detailBlog.status === "published" && (
+              {detailBlog.status === "published" && (
                 <button 
                   className="blog-btn-archive" 
                   onClick={() => handleArchive(detailBlog.id)}
@@ -705,7 +689,7 @@ export default function Blogs({ mode }) {
                   Archive Article
                 </button>
               )}
-              {isAdmin && detailBlog.status === "archived" && (
+              {detailBlog.status === "archived" && (
                 <button 
                   className="blog-btn-accept" 
                   onClick={() => handleRestore(detailBlog.id)}
