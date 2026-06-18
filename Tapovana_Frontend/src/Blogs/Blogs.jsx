@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { apiFetch, getUser } from "../utils/api";
+import { getImageUrl } from "../utils/image";
 import { useAllocations } from "../utils/AllocationContext";
 import MediaPickerModal from "../components/MediaPickerModal";
+import SearchIcon from "../assets/searchIcon.svg";
+import DropdownIcon from "../assets/dropdownIcon.svg";
 
 // --- Utility Functions ---
-const getImageUrl = (url) => {
-  if (!url) return "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800";
-  if (url.startsWith("http")) return url;
-  return `http://localhost:5000${url}`;
-};
 
 const formatDate = (dateStr) => {
   if (!dateStr) return "";
