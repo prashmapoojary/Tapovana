@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiFetch } from '../api/http';
-import { useAllocations } from '../utils/AllocationContext';
 import './MediaPickerModal.css';
 
 const placeholderImages = [
@@ -23,7 +22,6 @@ export default function MediaPickerModal({
     subcategory = "All",
     suggestions = ['Yoga', 'Meditation', 'Ayurveda', 'Massage', 'Nutrition', 'Wellness', 'Spa']
 }) {
-    const { triggerAlert } = useAllocations();
     const [searchType, setSearchType] = useState('image'); // 'image' or 'video'
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);

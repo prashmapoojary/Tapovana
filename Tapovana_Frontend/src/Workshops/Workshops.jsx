@@ -224,7 +224,7 @@ function WorkshopCard({ w, onClick }) {
 
 // ─── Main Component ─────────────────────────────────────────────────────
 export default function Workshops() {
-  const { allocateStaff, triggerAlert, triggerConfirm } = useAllocations();
+  const { allocateStaff } = useAllocations();
   const [workshops, setWorkshops] = useState([]);
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [mediaTarget, setMediaTarget] = useState(null); // 'add_image', 'add_video', 'edit_image', 'edit_video'
@@ -252,6 +252,9 @@ export default function Workshops() {
   };
   const [dataLoading, setDataLoading] = useState(true);
   const [instructors, setInstructors] = useState([]);
+  const [toast, setToast] = useState(null);
+  const [toastType, setToastType] = useState('success');
+  const toastTimerRef = useRef(null);
   const [videoProgress, setVideoProgress] = useState(null);
 
   // Filters
@@ -272,7 +275,8 @@ export default function Workshops() {
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState("");
 
-
+  // Delete confirm
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Video player
   const [videoPlaying, setVideoPlaying] = useState(false);
@@ -324,7 +328,7 @@ export default function Workshops() {
       const elapsed = getElapsedLiveSeconds(ws);
       if (video.currentTime > elapsed + 1.5) {
         video.currentTime = Math.min(elapsed, lastTimeRef.current);
-        triggerAlert("Forward seeking disabled during live session.");
+        alert("Forward seeking disabled during live session.");
       } else {
         lastTimeRef.current = video.currentTime;
       }
@@ -339,7 +343,7 @@ export default function Workshops() {
       const elapsed = getElapsedLiveSeconds(ws);
       if (video.currentTime > elapsed + 1.5) {
         video.currentTime = Math.min(elapsed, lastTimeRef.current);
-        triggerAlert("Forward seeking disabled during live session.");
+        alert("Forward seeking disabled during live session.");
       }
     }
   };
@@ -501,8 +505,7 @@ export default function Workshops() {
   };
 
   const handleDeleteAttendee = async (attendeeId) => {
-    const confirmed = await triggerConfirm("Are you sure you want to delete/remove this attendee?");
-    if (!confirmed) {
+    if (!window.confirm("Are you sure you want to delete/remove this attendee?")) {
       return;
     }
     try {
@@ -790,7 +793,7 @@ export default function Workshops() {
   };
 
   // ─── Delete Workshop ───────────────────────────────────────────────────
-  const handleDeleteWorkshop = async () => {
+  const handleDeleteWorkshop = () => {
     const liveStatus = selectedWs._liveStatus || getLiveStatus(selectedWs);
     if (liveStatus === "live" || liveStatus === "ongoing") {
       showToast("Cannot delete a live/ongoing workshop.", 'error');
@@ -800,13 +803,12 @@ export default function Workshops() {
       showToast("Cannot delete a completed workshop. Only upcoming workshops can be deleted.", 'error');
       return;
     }
-    const confirmed = await triggerConfirm(
-      "Are you sure you want to delete this workshop? This action cannot be undone.",
-      getImageUrl(selectedWs?.image_url || selectedWs?.image)
-    );
-    if (!confirmed) return;
+    setShowDeleteConfirm(true);
+  };
 
+  const confirmDeleteWorkshop = async () => {
     try {
+      setShowDeleteConfirm(false);
       setEditSaving(true);
       if (String(selectedWs.id).startsWith("WS-")) {
         // It's a dummy local workshop, just remove it locally
@@ -1003,7 +1005,10 @@ export default function Workshops() {
   };
 
   const showToast = (msg, type = 'success') => {
-    triggerAlert(msg, type === 'success');
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastType(type);
+    setToast(msg);
+    toastTimerRef.current = setTimeout(() => { setToast(null); toastTimerRef.current = null; }, 4000);
   };
 
   // ─── Render edit form ──────────────────────────────────────────────────
@@ -1539,7 +1544,26 @@ export default function Workshops() {
         </div>
       )}
 
-
+      {/* ── DELETE CONFIRM MODAL ── */}
+      {showDeleteConfirm && (
+        <div className="ws-modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="ws-modal" style={{ width: 400, textAlign: 'center', padding: '32px 24px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(205,167,81,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', overflow: 'hidden', border: '2px solid #CDA751' }}>
+              <img src={getImageUrl(selectedWs?.image_url || selectedWs?.image)} alt="Workshop Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/100x100?text=No+Image'; }} />
+            </div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: "#2d3748", margin: "0 0 8px 0" }}>Delete Workshop?</h2>
+            <p style={{ fontSize: 14, color: "#7b8a9a", margin: "0 0 24px 0", lineHeight: 1.5 }}>
+              Are you sure you want to delete this workshop? This action cannot be undone.
+            </p>
+            <div style={{ display: "flex", gap: 12 }}>
+              <button className="ws-modal-btn-secondary" style={{ flex: 1 }} onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
+              <button className="ws-modal-btn-primary" style={{ flex: 1, background: '#CDA751', borderColor: '#CDA751' }} onClick={confirmDeleteWorkshop}>
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── ADD MODAL ── */}
       {showAddModal && (
@@ -1665,7 +1689,20 @@ export default function Workshops() {
         </div>
       )}
 
-
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+          background: '#1A1A1A', border: '2px solid #CDA751', borderRadius: '12px',
+          padding: '18px 32px', zIndex: 2147483647, display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
+          boxShadow: '0 8px 32px rgba(205,167,81,0.25)',
+          color: toastType === 'error' ? '#EF4444' : (toastType === 'info' ? '#E2E8F0' : '#4ADE80'),
+          animation: 'wsFadeIn 0.3s ease-out', minWidth: 220, textAlign: 'center'
+        }}>
+          <span style={{ fontSize: 20 }}>{toastType === 'error' ? '⚠' : '✓'}</span>
+          <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.3px' }}>{toast}</span>
+        </div>
+      )}
 
       <MediaPickerModal 
         isOpen={mediaModalOpen}

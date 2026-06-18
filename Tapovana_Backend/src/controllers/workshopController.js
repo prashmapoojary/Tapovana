@@ -15,12 +15,6 @@ const ensureUploadsDir = () => {
     }
 };
 
-// Helper: Validate UUID
-const isValidUUID = (id) => {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(id);
-};
-
 // HELPERS: 24-hour Clock and Timezone Parsing
 const formatTime24 = (timeStr) => {
     if (!timeStr) return "00:00";
@@ -177,11 +171,6 @@ const handleWorkshopVideo = (videoData) => {
 
 // Helper: Allocate staff to workshop
 const allocateStaffToWorkshop = async (staffId, workshop) => {
-    if (!isValidUUID(staffId)) {
-        console.log(`Skipping allocate for invalid staff_id: ${staffId}`);
-        return;
-    }
-
     const allocationDetails = {
         id: workshop.id,
         type: 'workshop',
@@ -221,10 +210,6 @@ const allocateStaffToWorkshop = async (staffId, workshop) => {
 
 // Helper: Deallocate staff
 const deallocateStaffMember = async (staffId) => {
-    if (!isValidUUID(staffId)) {
-        console.log(`Skipping deallocate for invalid staff_id: ${staffId}`);
-        return;
-    }
     await query(
         'UPDATE team_members SET availability_status = $1, allocation_details = NULL WHERE id = $2 AND availability_status = $3',
         ['Available', staffId, 'Allocated']
@@ -247,9 +232,8 @@ const syncWorkshopAllocations = async (workshopId) => {
         if (!isCancelled) {
             const allocationStatus = workshop.status;
             const staffIds = workshop.assigned_staff_ids || [];
-            const validStaffIds = staffIds.filter(id => isValidUUID(id));
 
-            for (const staffId of validStaffIds) {
+            for (const staffId of staffIds) {
                 const allocationId = `ws-alloc-${workshop.id}-${staffId}`;
                 await query(
                     `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes, status)
@@ -281,7 +265,7 @@ const syncWorkshopAllocations = async (workshopId) => {
         }
 
         const newStaffIds = isCancelled ? [] : (workshop.assigned_staff_ids || []);
-        const allStaffIds = Array.from(new Set([...oldStaffIds, ...newStaffIds])).filter(id => isValidUUID(id));
+        const allStaffIds = Array.from(new Set([...oldStaffIds, ...newStaffIds]));
 
         for (const staffId of allStaffIds) {
             await syncStaffMemberStatus(staffId);
@@ -1057,13 +1041,7 @@ const completeWorkshopAllocation = async (req, res) => {
         staffIds = staffIds.filter(id => id !== staff_id);
 
         await query('UPDATE workshops SET assigned_staff_ids = $1 WHERE id = $2', [JSON.stringify(staffIds), req.params.id]);
-        
-        // Only try to deallocate if staff_id is valid UUID
-        if (isValidUUID(staff_id)) {
-            await deallocateStaffMember(staff_id);
-        } else {
-            console.log(`Skipping deallocate for invalid staff_id: ${staff_id}`);
-        }
+        await deallocateStaffMember(staff_id);
 
         // Sync workshop allocations
         await syncWorkshopAllocations(workshop.id);
@@ -1284,8 +1262,7 @@ const autoUpdateWorkshopStatuses = async () => {
 
                 // Send to staff
                 const staffIds = w.assigned_staff_ids || [];
-                const validStaffIds = staffIds.filter(id => isValidUUID(id));
-                for (const staffId of validStaffIds) {
+                for (const staffId of staffIds) {
                     const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
                     if (staffRes.rows.length) {
                         const s = staffRes.rows[0];
@@ -1313,8 +1290,7 @@ const autoUpdateWorkshopStatuses = async () => {
                 }
 
                 const staffIds = w.assigned_staff_ids || [];
-                const validStaffIds = staffIds.filter(id => isValidUUID(id));
-                for (const staffId of validStaffIds) {
+                for (const staffId of staffIds) {
                     const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
                     if (staffRes.rows.length) {
                         const s = staffRes.rows[0];
@@ -1347,7 +1323,7 @@ const autoUpdateWorkshopStatuses = async () => {
                     try {
                                                 const certCheck = await query('SELECT certificate_id, certificate_url FROM certificates WHERE participant_id = $1 AND workshop_id = $2', [att.id, w.id]);
                         let certId;
-                        let certUrl = `${backendUrl}/api/workshops/certificates/download/${att.id}.pdf`;
+                        let certUrl = `${backendUrl}/certificates/${att.id}.pdf`;
                         if (certCheck.rows.length > 0) {
                             certId = certCheck.rows[0].certificate_id;
                         } else {
@@ -1372,8 +1348,7 @@ const autoUpdateWorkshopStatuses = async () => {
                 }
 
                 const staffIds = w.assigned_staff_ids || [];
-                const validStaffIds = staffIds.filter(id => isValidUUID(id));
-                for (const staffId of validStaffIds) {
+                for (const staffId of staffIds) {
                     const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
                     if (staffRes.rows.length) {
                         const s = staffRes.rows[0];
@@ -1522,22 +1497,15 @@ const downloadCertificate = async (req, res) => {
         id = id.slice(0, -4);
     }
     try {
-        const queryBase = `
+        const certRes = await query(`
             SELECT c.certificate_id, c.issued_date, 
                    a.name AS participant_name, 
                    w.title AS workshop_title, w.date AS workshop_date
             FROM certificates c
             JOIN attendees a ON a.id = c.participant_id
             JOIN workshops w ON w.id = c.workshop_id
-        `;
-        let certRes;
-        if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)) {
-            certRes = await query(queryBase + ' WHERE c.certificate_id = $1', [id]);
-        } else if (/^\d+$/.test(id)) {
-            certRes = await query(queryBase + ' WHERE c.participant_id = $1', [parseInt(id, 10)]);
-        } else {
-            return res.status(404).json({ success: false, message: 'Invalid certificate identifier format.' });
-        }
+            WHERE c.certificate_id = $1 OR c.participant_id = $1
+        `, [id]);
 
         if (!certRes.rows.length) {
             return res.status(404).json({ success: false, message: 'Certificate not found.' });
@@ -1555,8 +1523,8 @@ const downloadCertificate = async (req, res) => {
 
         const pdfBuffer = await generateCertificatePDF(cert.participant_name, cert.workshop_title, formattedDate);
 
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", "attachment; filename=certificate.pdf");
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="certificate.pdf"');
         return res.send(pdfBuffer);
     } catch (err) {
         console.error('downloadCertificate error:', err);

@@ -670,56 +670,27 @@
 }
 
 .blog-editor-cancel {
-  padding: 12px 24px;
-  background: transparent;
-  border: 1px solid #cda751;
+  padding: 10px 16px;
+  background: white;
+  border: 1px solid #e2e8f0;
   border-radius: 6px;
-  color: #cda751;
+  color: #4a5568;
   cursor: pointer;
-  font-weight: 700;
-  transition: all 0.2s ease;
-}
-
-.blog-editor-cancel:hover {
-  background: #cda751;
-  color: white;
+  font-weight: 600;
 }
 
 .blog-editor-save {
-  padding: 12px 24px;
+  padding: 10px 16px;
+  background: #cda751;
   border: none;
   border-radius: 6px;
   color: white;
   cursor: pointer;
-  font-weight: 700;
-  transition: all 0.2s ease;
+  font-weight: 600;
 }
 
-.blog-editor-save-draft {
-  background: transparent;
-  border: 1px solid #cda751;
-  color: #cda751;
-}
-
-.blog-editor-save-draft:hover {
-  background: #cda751;
-  color: white;
-}
-
-.blog-editor-submit {
-  background: #cda751;
-  font-weight: 800;
-  box-shadow: 0 2px 10px rgba(205,167,81,0.2);
-}
-
-.blog-editor-submit:hover {
+.blog-editor-save:hover {
   background: #b59245;
-  box-shadow: 0 4px 14px rgba(205,167,81,0.3);
-}
-
-.blog-editor-save:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 /* ----------------------------------------------------- */
@@ -959,23 +930,13 @@
 }
 
 .blog-comment-mod-actions .approve-btn {
-  color: #cda751;
-  border-color: #cda751;
-}
-
-.blog-comment-mod-actions .approve-btn:hover {
-  background: #cda751;
-  color: white;
+  color: #2ecc71;
+  border-color: #2ecc71;
 }
 
 .blog-comment-mod-actions .reject-btn {
-  color: #cda751;
-  border-color: #cda751;
-}
-
-.blog-comment-mod-actions .reject-btn:hover {
-  background: #cda751;
-  color: white;
+  color: #e74c3c;
+  border-color: #e74c3c;
 }
 
 .blog-comment-status-badge {
@@ -1097,69 +1058,6 @@
 }
 
 /* ----------------------------------------------------- */
-/* Admin Detail View Buttons                             */
-/* ----------------------------------------------------- */
-.blog-admin-decision-actions {
-  display: flex;
-  gap: 16px;
-}
-
-.blog-btn-accept {
-  background: #cda751;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 800;
-  font-size: 16px;
-  padding: 12px 24px;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(205, 167, 81, 0.2);
-}
-
-.blog-btn-accept:hover {
-  background: #b89538;
-  box-shadow: 0 6px 18px rgba(205, 167, 81, 0.3);
-  transform: translateY(-1px);
-}
-
-.blog-btn-reject {
-  background: transparent;
-  color: #cda751;
-  border: 1px solid #cda751;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 800;
-  font-size: 16px;
-  padding: 12px 24px;
-  transition: all 0.2s ease;
-}
-
-.blog-btn-reject:hover {
-  background: #cda751;
-  color: white;
-}
-
-.blog-btn-archive {
-  background: #cda751;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 800;
-  font-size: 16px;
-  padding: 12px 24px;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(205, 167, 81, 0.2);
-}
-
-.blog-btn-archive:hover {
-  background: #b89538;
-  box-shadow: 0 6px 18px rgba(205, 167, 81, 0.3);
-  transform: translateY(-1px);
-}
-
-/* ----------------------------------------------------- */
 /* Loading spinner                                       */
 /* ----------------------------------------------------- */
 
@@ -1205,44 +1103,10 @@
   box-shadow: 0 4px 14px rgba(205, 167, 81, 0.2);
 }
 
-.blog-btn-reject {
-  background-color: transparent;
-  color: #cda751;
-  border: 2px solid #cda751;
-  box-shadow: none;
-}
-
-.blog-btn-accept:hover {
+.blog-btn-accept:hover,
+.blog-btn-reject:hover {
   background-color: #b89538;
   box-shadow: 0 6px 18px rgba(205, 167, 81, 0.35);
-  transform: translateY(-1px);
-}
-
-.blog-btn-reject:hover {
-  background-color: #cda751;
-  color: white;
-  box-shadow: 0 4px 14px rgba(205,167,81,0.2);
-}
-
-.blog-btn-archive {
-  background-color: #cda751;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 800;
-  font-size: 16px;
-  padding: 12px 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(205,167,81,0.2);
-}
-
-.blog-btn-archive:hover {
-  background-color: #b89538;
-  box-shadow: 0 6px 18px rgba(205,167,81,0.35);
   transform: translateY(-1px);
 }
 

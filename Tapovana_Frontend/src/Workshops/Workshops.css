@@ -663,16 +663,3 @@ select.ws-modal-input {
     font-size: 20px;
   }
 }
-
-/* Gold Alert Themes */
-.alert {
-  background-color: #FFD700;
-  color: #000;
-  border: 1px solid #FFD700;
-  border-radius: 8px;
-  padding: 10px 16px;
-  font-weight: 700;
-  margin-top: 10px;
-  font-size: 13px;
-  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.2);
-}

@@ -124,17 +124,15 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
 
         {/* Actions Footer */}
         <div className="blog-card-footer" onClick={(e) => e.stopPropagation()} style={{ marginTop: "auto", paddingTop: "6px", borderTop: "1px solid #edf2f7", display: "flex", gap: "4px", flexDirection: "column" }}>
-          {isStaff && (isDraft || isRejected) && (
+          {isStaff && (isDraft || isRejected) ? (
             <div className="blog-card-actions" style={{ display: "flex", gap: "6px", width: "100%", marginTop: "2px" }}>
               <button onClick={() => onEdit(blog)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Edit</button>
               <button onClick={() => onDelete(blog.id)} style={{ background: "transparent", color: "#cda751", border: "1px solid #cda751", padding: "5px 11px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Delete</button>
             </div>
-          )}
-          {isAdmin && isPending && (
-            <div className="blog-card-actions" style={{ display: "flex", gap: "6px", width: "100%", marginTop: "2px" }}>
-              <button onClick={() => onApprove(blog.id)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Approve</button>
-              <button onClick={() => onReject(blog.id)} style={{ background: "transparent", color: "#cda751", border: "1px solid #cda751", padding: "5px 11px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Reject</button>
-            </div>
+          ) : (
+            <button onClick={() => onClick(blog.id)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "7px 14px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "12px", width: "100%" }}>
+              Read Article
+            </button>
           )}
         </div>
       </div>
@@ -199,12 +197,21 @@ export default function Blogs({ mode }) {
     author_name: "", author_role: ""
   });
   const [rejectionModal, setRejectionModal] = useState({ isOpen: false, blogId: null, reason: "" });
+  const [toast, setToast] = useState(null);
+  const [toastType, setToastType] = useState('success');
+  const toastTimerRef = useRef(null);
   const [showSeo, setShowSeo] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [savingBlog, setSavingBlog] = useState(false);
   const fileInputRef = useRef(null);
 
+  const showToastMsg = (message, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastType(type);
+    setToast(message);
+    toastTimerRef.current = setTimeout(() => { setToast(null); toastTimerRef.current = null; }, 4000);
+  };
 
   // Handle initializing edit/create based on URL / mode prop
   useEffect(() => {
@@ -224,7 +231,7 @@ export default function Blogs({ mode }) {
   }, [mode, isStaff, navigate, currentUser]);
 
   useEffect(() => {
-    if (mode === "edit" && detailBlog) {
+    if (mode === "edit" && detailBlog && String(detailBlog.id) === String(id)) {
       setEditingBlogId(detailBlog.id);
       setEditBlogData({
         title: detailBlog.title || "",
@@ -311,17 +318,16 @@ export default function Blogs({ mode }) {
     navigate("/dashboard/blogs/" + blogId);
   };
 
-  const handleApprove = async (blogId) => {
-    const confirmed = await triggerConfirm("Are you sure you want to approve and publish this blog?");
-    if (!confirmed) return;
-    try {
-      await apiFetch(`/api/blogs/${blogId}/approve`, { method: "POST" });
-      await triggerAlert("Blog approved and published successfully.", true);
-      fetchBlogs();
-      if (id) fetchBlogDetail(id);
-    } catch (err) {
-      await triggerAlert(err.message || "Failed to approve blog.");
-    }
+  const handleApprove = (blogId) => {
+    triggerConfirm("Are you sure you want to approve and publish this blog?", async () => {
+      try {
+        await apiFetch(`/api/blogs/${blogId}/approve`, { method: "POST" });
+        showToastMsg("Blog approved and published successfully.");
+        fetchBlogs();
+      } catch (err) {
+        showToastMsg(err.message || "Failed to approve blog.", 'error');
+      }
+    });
   };
 
   const handleReject = (blogId) => {
@@ -330,7 +336,7 @@ export default function Blogs({ mode }) {
 
   const submitRejection = async () => {
     if (!rejectionModal.reason.trim()) {
-      await triggerAlert("Please provide a rejection reason.");
+      showToastMsg("Please provide a rejection reason.", 'error');
       return;
     }
     try {
@@ -338,40 +344,39 @@ export default function Blogs({ mode }) {
         method: "POST",
         body: JSON.stringify({ reason: rejectionModal.reason })
       });
+      showToastMsg("Article rejected and author notified.");
       setRejectionModal({ isOpen: false, blogId: null, reason: "" });
-      await triggerAlert("Blog rejected.");
       fetchBlogs();
-      if (id) fetchBlogDetail(id);
     } catch (err) {
-      await triggerAlert(err.message || "Failed to reject blog.");
+      showToastMsg(err.message || "Failed to reject blog.", 'error');
     }
   };
 
-  const handleArchive = async (blogId) => {
-    const confirmed = await triggerConfirm("Are you sure you want to archive this published article?");
-    if (!confirmed) return;
-    try {
-      await apiFetch(`/api/blogs/${blogId}/archive`, { method: "POST" });
-      await triggerAlert("Article archived successfully.", true);
-      fetchBlogs();
-      if (id) {
-        navigate("/dashboard/blogs");
+  const handleArchive = (blogId) => {
+    triggerConfirm("Are you sure you want to archive this published article?", async () => {
+      try {
+        await apiFetch(`/api/blogs/${blogId}/archive`, { method: "POST" });
+        showToastMsg("Article archived successfully.");
+        fetchBlogs();
+        if (id) {
+          navigate("/dashboard/blogs");
+        }
+      } catch (err) {
+        showToastMsg(err.message || "Failed to archive blog.", 'error');
       }
-    } catch (err) {
-      await triggerAlert(err.message || "Failed to archive blog.");
-    }
+    });
   };
 
-  const handleDelete = async (blogId) => {
-    const confirmed = await triggerConfirm("Are you sure you want to permanently delete this article?");
-    if (!confirmed) return;
-    try {
-      await apiFetch(`/api/blogs/${blogId}`, { method: "DELETE" });
-      await triggerAlert("Blog deleted successfully.", true);
-      fetchBlogs();
-    } catch (err) {
-      await triggerAlert(err.message || "Failed to delete blog.");
-    }
+  const handleDelete = (blogId) => {
+    triggerConfirm("Are you sure you want to permanently delete this article?", async () => {
+      try {
+        await apiFetch(`/api/blogs/${blogId}`, { method: "DELETE" });
+        showToastMsg("Article permanently deleted.");
+        fetchBlogs();
+      } catch (err) {
+        showToastMsg(err.message || "Failed to delete blog.", 'error');
+      }
+    });
   };
 
   // ─── Image upload ──────────────────────────────────────────────────
@@ -385,7 +390,7 @@ export default function Blogs({ mode }) {
           body: JSON.stringify({ image: reader.result })
         });
         setEditBlogData(prev => ({ ...prev, featured_image: data.url }));
-        triggerAlert("Image uploaded successfully.", true);
+        showToastMsg("Image uploaded successfully.");
       } catch {
         // Fallback: store base64 directly
         setEditBlogData(prev => ({ ...prev, featured_image: reader.result }));
@@ -410,34 +415,34 @@ export default function Blogs({ mode }) {
   const handleEditorSubmit = async (targetStatus) => {
     // 1. Title validation: Required, min length 3 chars.
     if (!editBlogData.title || editBlogData.title.trim().length < 3) {
-      await triggerAlert("Title is required (minimum 3 characters).");
+      showToastMsg("Title is required (minimum 3 characters).", 'error');
       return;
     }
     // 2. Category validation: Required.
     if (!editBlogData.category) {
-      await triggerAlert("Category is required.");
+      showToastMsg("Category is required.", 'error');
       return;
     }
     // 3. Author Name validation: Required, alphabets only.
     if (!editBlogData.author_name || !/^[A-Za-z\s]+$/.test(editBlogData.author_name.trim())) {
-      await triggerAlert("Author name must contain only alphabets.");
+      showToastMsg("Author name must contain only alphabets.", 'error');
       return;
     }
     // 4. Role validation: Required (Doctor/Therapist).
     const roleVal = editBlogData.author_role?.trim().toLowerCase();
     if (roleVal !== "doctor" && roleVal !== "therapist") {
-      await triggerAlert("Please select a valid role (Doctor/Therapist).");
+      showToastMsg("Please select a valid role (Doctor/Therapist).", 'error');
       return;
     }
     // 5. Image validation: Required for publishing (status = pending).
     if (targetStatus === "pending" && !editBlogData.featured_image) {
-      await triggerAlert("Featured image is required for publishing.");
+      showToastMsg("Featured image is required for publishing.", 'error');
       return;
     }
-    // 6. Description validation: Required, min length 500 chars only for pending
+    // 6. Description validation: Required, min length 500 chars.
     const textOnly = (editBlogData.content_html || "").replace(/<[^>]*>/g, '').trim();
-    if (targetStatus === "pending" && textOnly.length < 500) {
-      await triggerAlert("Content must be at least 500 characters.");
+    if (textOnly.length < 500) {
+      showToastMsg("Content must be at least 500 characters.", 'error');
       return;
     }
 
@@ -469,21 +474,19 @@ export default function Blogs({ mode }) {
           await apiFetch(`/api/blogs/${editingBlogId}/submit`, { method: "POST" });
         }
 
-        setEditingBlogId(null);
-        navigate("/dashboard/blogs");
-        await triggerAlert("Blog updated successfully.", true);
+        showToastMsg("Changes saved successfully.");
       } else {
         await apiFetch("/api/blogs", {
           method: "POST",
           body: JSON.stringify(payload)
         });
-        const msg = targetStatus === "draft" ? "Draft saved successfully." : "Blog created and submitted for review.";
-        setEditingBlogId(null);
-        navigate("/dashboard/blogs");
-        await triggerAlert(msg, true);
+        showToastMsg(targetStatus === "draft" ? "Draft saved successfully." : "Blog created and submitted for review.");
       }
+
+      setEditingBlogId(null);
+      navigate("/dashboard/blogs");
     } catch (err) {
-      await triggerAlert(err.message || "Failed to save blog.");
+      showToastMsg(err.message || "Failed to save blog.", 'error');
     } finally {
       setSavingBlog(false);
     }
@@ -527,10 +530,10 @@ export default function Blogs({ mode }) {
         body: JSON.stringify({ comment: commentText })
       });
       setCommentText("");
-      await triggerAlert("Comment added.", true);
+      showToastMsg("Comment added.");
       fetchBlogDetail(detailBlog.id);
     } catch (err) {
-      await triggerAlert(err.message || "Failed to add comment.");
+      showToastMsg(err.message || "Failed to add comment.", 'error');
     }
   };
 
@@ -540,10 +543,10 @@ export default function Blogs({ mode }) {
         method: "PATCH",
         body: JSON.stringify({ status })
       });
-      await triggerAlert(`Comment ${status}.`, true);
+      showToastMsg(`Comment ${status}.`);
       fetchBlogDetail(detailBlog.id);
     } catch (err) {
-      await triggerAlert(err.message || "Failed to moderate comment.");
+      showToastMsg(err.message || "Failed to moderate comment.", 'error');
     }
   };
 
@@ -561,7 +564,19 @@ export default function Blogs({ mode }) {
 
     return (
       <div className="blog-detail-container" style={{ background: "#fdfbf7", color: "#1a202c", padding: "24px" }}>
-
+        {toast && (
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            background: '#1A1A1A', border: '2px solid #CDA751', borderRadius: '12px',
+            padding: '18px 32px', zIndex: 2147483647, display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
+            boxShadow: '0 8px 32px rgba(205,167,81,0.25)',
+            color: toastType === 'error' ? '#EF4444' : (toastType === 'info' ? '#E2E8F0' : '#4ADE80'),
+            animation: 'blogToastFadeIn 0.3s ease-out', minWidth: 220, textAlign: 'center'
+          }}>
+            <span style={{ fontSize: 20 }}>{toastType === 'error' ? '⚠' : '✓'}</span>
+            <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.3px' }}>{toast}</span>
+          </div>
+        )}
 
         <div className="blog-detail-back" onClick={() => navigate("/dashboard/blogs")} style={{ color: "#cda751", cursor: "pointer", fontWeight: "bold", fontSize: "15px", marginBottom: "20px" }}>
           ← Back to Blogs
@@ -637,6 +652,7 @@ export default function Blogs({ mode }) {
                 <button 
                   className="blog-btn-archive" 
                   onClick={() => handleArchive(detailBlog.id)}
+                  style={{ background: "#718096", color: "#fff", border: "none", padding: "12px 24px", borderRadius: "8px", cursor: "pointer", fontWeight: "800", fontSize: "16px", boxShadow: "0 4px 14px rgba(113,128,150,0.3)" }}
                 >
                   Archive Article
                 </button>
@@ -658,7 +674,19 @@ export default function Blogs({ mode }) {
 
     return (
       <div className="blog-editor-page-container" style={{ background: "#fdfbf7", minHeight: "100vh", padding: "24px" }}>
-
+        {toast && (
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            background: '#1A1A1A', border: '2px solid #CDA751', borderRadius: '12px',
+            padding: '18px 32px', zIndex: 2147483647, display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
+            boxShadow: '0 8px 32px rgba(205,167,81,0.25)',
+            color: toastType === 'error' ? '#EF4444' : (toastType === 'info' ? '#E2E8F0' : '#4ADE80'),
+            animation: 'blogToastFadeIn 0.3s ease-out', minWidth: 220, textAlign: 'center'
+          }}>
+            <span style={{ fontSize: 20 }}>{toastType === 'error' ? '⚠' : '✓'}</span>
+            <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.3px' }}>{toast}</span>
+          </div>
+        )}
 
         <div className="blog-detail-back" onClick={handleCancel} style={{ marginBottom: "20px", color: "#cda751", cursor: "pointer", fontWeight: "bold" }}>
           ← Cancel and Go Back
@@ -674,7 +702,7 @@ export default function Blogs({ mode }) {
               <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Category/Discipline *</label>
               <select
                 value={editBlogData.category}
-                onChange={(e) => setEditBlogData(prev => ({ ...prev, category: e.target.value }))}
+                onChange={(e) => setEditBlogData({ ...editBlogData, category: e.target.value })}
                 style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", background: "#fff" }}
               >
                 <option value="AYURVEDA">Ayurveda</option>
@@ -691,7 +719,7 @@ export default function Blogs({ mode }) {
                 type="text"
                 placeholder="Enter blog title..."
                 value={editBlogData.title}
-                onChange={(e) => setEditBlogData(prev => ({ ...prev, title: e.target.value }))}
+                onChange={(e) => setEditBlogData({ ...editBlogData, title: e.target.value })}
                 style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px" }}
                 required
               />
@@ -703,7 +731,7 @@ export default function Blogs({ mode }) {
               <textarea
                 placeholder="Enter short summary or tagline..."
                 value={editBlogData.summary}
-                onChange={(e) => setEditBlogData(prev => ({ ...prev, summary: e.target.value }))}
+                onChange={(e) => setEditBlogData({ ...editBlogData, summary: e.target.value })}
                 rows={2}
                 style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", fontFamily: "inherit" }}
               />
@@ -716,7 +744,7 @@ export default function Blogs({ mode }) {
                 type="text"
                 placeholder="Enter author name..."
                 value={editBlogData.author_name}
-                onChange={(e) => setEditBlogData(prev => ({ ...prev, author_name: e.target.value }))}
+                onChange={(e) => setEditBlogData({ ...editBlogData, author_name: e.target.value })}
                 style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px" }}
                 required
               />
@@ -727,7 +755,7 @@ export default function Blogs({ mode }) {
               <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Role * (Doctor/Therapist)</label>
               <select
                 value={editBlogData.author_role}
-                onChange={(e) => setEditBlogData(prev => ({ ...prev, author_role: e.target.value }))}
+                onChange={(e) => setEditBlogData({ ...editBlogData, author_role: e.target.value })}
                 style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", background: "#fff" }}
               >
                 <option value="">Select Role</option>
@@ -799,18 +827,19 @@ export default function Blogs({ mode }) {
             </button>
             {showSeo && (
               <div className="blog-seo-fields" style={{ display: "flex", flexDirection: "column", gap: "12px", border: "1px solid #edf2f7", padding: "16px", borderRadius: "8px" }}>
-                <input type="text" placeholder="SEO Title" value={editBlogData.seo_title} onChange={(e) => setEditBlogData(prev => ({ ...prev, seo_title: e.target.value }))} style={{ padding: "10px", border: "1px solid #e2e8f0", borderRadius: "6px" }} />
-                <textarea placeholder="SEO Description" value={editBlogData.seo_description} onChange={(e) => setEditBlogData(prev => ({ ...prev, seo_description: e.target.value }))} rows={2} style={{ padding: "10px", border: "1px solid #e2e8f0", borderRadius: "6px", fontFamily: "inherit" }} />
-                <input type="text" placeholder="SEO Keywords (comma separated)" value={editBlogData.seo_keywords} onChange={(e) => setEditBlogData(prev => ({ ...prev, seo_keywords: e.target.value }))} style={{ padding: "10px", border: "1px solid #e2e8f0", borderRadius: "6px" }} />
+                <input type="text" placeholder="SEO Title" value={editBlogData.seo_title} onChange={(e) => setEditBlogData({ ...editBlogData, seo_title: e.target.value })} style={{ padding: "10px", border: "1px solid #e2e8f0", borderRadius: "6px" }} />
+                <textarea placeholder="SEO Description" value={editBlogData.seo_description} onChange={(e) => setEditBlogData({ ...editBlogData, seo_description: e.target.value })} rows={2} style={{ padding: "10px", border: "1px solid #e2e8f0", borderRadius: "6px", fontFamily: "inherit" }} />
+                <input type="text" placeholder="SEO Keywords (comma separated)" value={editBlogData.seo_keywords} onChange={(e) => setEditBlogData({ ...editBlogData, seo_keywords: e.target.value })} style={{ padding: "10px", border: "1px solid #e2e8f0", borderRadius: "6px" }} />
               </div>
             )}
 
             <div className="blog-editor-actions" style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "10px", borderTop: "1px solid #edf2f7", paddingTop: "20px" }}>
-              <button type="button" onClick={handleCancel} className="blog-editor-cancel">Cancel</button>
+              <button type="button" onClick={handleCancel} className="blog-editor-cancel" style={{ background: "#edf2f7", color: "#4a5568", border: "none", padding: "12px 24px", borderRadius: "6px", cursor: "pointer", fontWeight: "700" }}>Cancel</button>
               <button
                 type="button"
                 onClick={() => handleEditorSubmit("draft")}
-                className="blog-editor-save blog-editor-save-draft"
+                className="blog-editor-save"
+                style={{ background: "#718096", color: "white", border: "none", padding: "12px 24px", borderRadius: "6px", cursor: "pointer", fontWeight: "700" }}
                 disabled={savingBlog}
               >
                 Save Draft
@@ -818,7 +847,8 @@ export default function Blogs({ mode }) {
               <button
                 type="button"
                 onClick={() => handleEditorSubmit("pending")}
-                className="blog-editor-save blog-editor-submit"
+                className="blog-editor-save"
+                style={{ background: "#cda751", color: "#fff", border: "none", padding: "12px 24px", borderRadius: "6px", cursor: "pointer", fontWeight: "800", boxShadow: "0 2px 10px rgba(205,167,81,0.2)" }}
                 disabled={savingBlog}
               >
                 Submit for Review
@@ -826,29 +856,6 @@ export default function Blogs({ mode }) {
             </div>
           </div>
         </div>
-
-        <MediaPickerModal 
-          isOpen={mediaModalOpen}
-          onClose={() => setMediaModalOpen(false)}
-          onSelect={(url) => {
-            setEditBlogData(prev => ({ ...prev, featured_image: url }));
-            setMediaModalOpen(false);
-          }}
-          allowVideos={false}
-          title="Select Pexels Image"
-          page_type="blogs"
-          category={editBlogData?.category || 'Ayurveda'}
-          subcategory="All"
-          defaultQuery={(() => {
-            const cat = (editBlogData?.category || '').toUpperCase();
-            if (cat === 'AYURVEDA') return 'Ayurveda';
-            if (cat === 'YOGA') return 'Yoga';
-            if (cat === 'WELLNESS') return 'Wellness';
-            if (cat === 'NUTRITION') return 'Healthy Lifestyle';
-            return 'Wellness';
-          })()}
-          suggestions={['Ayurveda', 'Yoga', 'Wellness', 'Healthy Lifestyle']}
-        />
       </div>
     );
   }
@@ -858,7 +865,19 @@ export default function Blogs({ mode }) {
   // ═════════════════════════════════════════════════════════════════════
   return (
     <div className="blog-container">
-
+      {toast && (
+        <div style={{
+          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+          background: '#1A1A1A', border: '2px solid #CDA751', borderRadius: '12px',
+          padding: '18px 32px', zIndex: 2147483647, display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
+          boxShadow: '0 8px 32px rgba(205,167,81,0.25)',
+          color: toastType === 'error' ? '#EF4444' : (toastType === 'info' ? '#E2E8F0' : '#4ADE80'),
+          animation: 'blogToastFadeIn 0.3s ease-out', minWidth: 220, textAlign: 'center'
+        }}>
+          <span style={{ fontSize: 20 }}>{toastType === 'error' ? '⚠' : '✓'}</span>
+          <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.3px' }}>{toast}</span>
+        </div>
+      )}
 
       {/* Rejection Modal */}
       {rejectionModal.isOpen && (

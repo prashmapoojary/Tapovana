@@ -197,44 +197,9 @@ const createMembership = async (req, res) => {
 
 // ─── UPDATE membership ────────────────────────────────────────────────
 const updateMembership = async (req, res) => {
-    const { name, email, phone, tier, status, sessions, total_spent, profile_photo_url, profile_photo_base64, expiry_date } = req.body;
+    const { name, email, phone, tier, status, sessions, total_spent, profile_photo_url, profile_photo_base64 } = req.body;
 
     try {
-        const paramId = req.params.id;
-        let member = null;
-
-        if (/^\d+$/.test(paramId)) {
-            const id = parseInt(paramId, 10);
-            const result = await query('SELECT * FROM memberships WHERE id = $1', [id]);
-            if (result.rows.length) {
-                member = result.rows[0];
-            }
-        } else {
-            // Find by email (either passed in parameter or in req.body)
-            const emailKey = (paramId.includes('@') ? paramId : email)?.trim().toLowerCase();
-            if (emailKey) {
-                const result = await query('SELECT * FROM memberships WHERE email = $1', [emailKey]);
-                if (result.rows.length) {
-                    member = result.rows[0];
-                } else {
-                    // Create local record for mobile user if not found
-                    const savedImage = handleProfileImage(profile_photo_base64 || profile_photo_url);
-                    const defaultExpiry = new Date();
-                    defaultExpiry.setFullYear(defaultExpiry.getFullYear() + 1);
-                    const expStr = expiry_date || defaultExpiry.toISOString().split('T')[0];
-                    const insertResult = await query(
-                        'INSERT INTO memberships (name, email, phone, tier, join_date, expiry_date, sessions, total_spent, status, profile_photo_url, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
-                        [name || 'Mobile User', emailKey, phone || null, (tier || 'SILVER').toUpperCase(), new Date().toISOString().split('T')[0], expStr, sessions || 0, total_spent || 0, (status || 'active').toLowerCase(), savedImage, req.user?.id || null]
-                    );
-                    member = insertResult.rows[0];
-                }
-            }
-        }
-
-        if (!member) {
-            return res.status(404).json({ success: false, message: 'Membership not found.' });
-        }
-
         const fields = [];
         const values = [];
         let idx = 1;
@@ -246,7 +211,6 @@ const updateMembership = async (req, res) => {
         if (status !== undefined) { fields.push('status = $' + idx++); values.push(status.toLowerCase()); }
         if (sessions !== undefined) { fields.push('sessions = $' + idx++); values.push(sessions || 0); }
         if (total_spent !== undefined) { fields.push('total_spent = $' + idx++); values.push(total_spent || 0); }
-        if (expiry_date !== undefined) { fields.push('expiry_date = $' + idx++); values.push(expiry_date || null); }
         if (profile_photo_url !== undefined || profile_photo_base64 !== undefined) {
             const savedImage = handleProfileImage(profile_photo_base64 || profile_photo_url);
             if (savedImage !== undefined) { fields.push('profile_photo_url = $' + idx++); values.push(savedImage); }
@@ -254,8 +218,11 @@ const updateMembership = async (req, res) => {
 
         if (!fields.length) return res.status(400).json({ success: false, message: 'No fields to update.' });
 
-        values.push(member.id);
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ success: false, message: 'Invalid membership ID.' });
+        values.push(id);
         const result = await query('UPDATE memberships SET ' + fields.join(', ') + ' WHERE id = $' + idx + ' RETURNING *', values);
+        if (!result.rows.length) return res.status(404).json({ success: false, message: 'Membership not found.' });
         return res.json({ success: true, message: 'Membership updated.', membership: enrichMembership(req, result.rows[0]) });
     } catch (err) {
         console.error('updateMembership error:', err);
@@ -266,21 +233,10 @@ const updateMembership = async (req, res) => {
 // ─── DELETE membership ────────────────────────────────────────────────
 const deleteMembership = async (req, res) => {
     try {
-        const paramId = req.params.id;
-        let result;
-        if (/^\d+$/.test(paramId)) {
-            const id = parseInt(paramId, 10);
-            result = await query('DELETE FROM memberships WHERE id = $1 RETURNING id', [id]);
-        } else if (paramId.includes('@')) {
-            result = await query('DELETE FROM memberships WHERE email = $1 RETURNING id', [paramId.trim().toLowerCase()]);
-        } else {
-            return res.status(400).json({ success: false, message: 'Invalid membership identifier.' });
-        }
-        
-        if (!result || !result.rows.length) {
-            // Mobile member not yet in database
-            return res.json({ success: true, message: 'Membership record removed.' });
-        }
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ success: false, message: 'Invalid membership ID.' });
+        const result = await query('DELETE FROM memberships WHERE id = $1 RETURNING id', [id]);
+        if (!result.rows.length) return res.status(404).json({ success: false, message: 'Membership not found.' });
         return res.json({ success: true, message: 'Membership deleted.' });
     } catch (err) {
         console.error('deleteMembership error:', err);

@@ -689,7 +689,56 @@ function Home() {
         </div>
       )}
 
-
+      {/* Admin Action Alerts banner */}
+      {(() => {
+        if (role !== "SUPER_ADMIN" && role !== "CO_ADMIN") return null;
+        const savedBlogs = localStorage.getItem("tapovana_blogs");
+        const pendingBlogs = savedBlogs ? JSON.parse(savedBlogs).filter(b => b.status === "pending") : [];
+        if (pendingBlogs.length > 0) {
+          return (
+            <div style={{
+              background: "linear-gradient(135deg, rgba(205,167,81,0.06) 0%, rgba(24,138,148,0.06) 100%)",
+              border: "1px solid rgba(205,167,81,0.2)",
+              borderRadius: "14px",
+              padding: "16px 20px",
+              marginBottom: "24px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ fontSize: "24px" }}></span>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#2d3748" }}>
+                    Pending Blog Submissions Waiting Review
+                  </h4>
+                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#7b8a9a" }}>
+                    You have {pendingBlogs.length} new article submission{pendingBlogs.length > 1 ? "s" : ""} waiting for your moderation and format audit.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => navigate("/dashboard/blogs")}
+                style={{
+                  background: "#cda751",
+                  color: "white",
+                  border: "none",
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  boxShadow: "0 2px 8px rgba(205,167,81,0.3)",
+                  transition: "transform 0.2s"
+                }}
+              >
+                Review Articles →
+              </button>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
       {/* Grid section for Line & Bar Trends SVG charts */}
       <section className="charts-grid">

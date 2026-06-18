@@ -125,17 +125,17 @@ app.get("/api/analytics/dashboard", async (req, res) => {
         };
         try {
             const demandRes = await query(`
-                SELECT s.id, s.name, COUNT(*) as cnt 
+                SELECT s.customer_id as id, COUNT(*) as cnt 
                 FROM bookings b
                 JOIN services s ON LOWER(s.name) = LOWER(b.service_name)
-                GROUP BY s.id, s.name
+                GROUP BY s.customer_id
                 ORDER BY cnt DESC
                 LIMIT 5
             `);
             if (demandRes.rows.length > 0) {
                 const tempDemand = {};
                 demandRes.rows.forEach(r => {
-                    if (r.name) tempDemand[r.name] = parseInt(r.cnt || 0, 10);
+                    if (r.id) tempDemand[r.id] = parseInt(r.cnt || 0, 10);
                 });
                 service_demand = tempDemand;
             }

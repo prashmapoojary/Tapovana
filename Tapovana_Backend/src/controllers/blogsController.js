@@ -759,8 +759,7 @@ const trackBlogView = async (req, res) => {
     try {
         const { id } = req.params;
         const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.connection?.remoteAddress || 'unknown';
-        const userIdRaw = req.user?.id || null;
-        const userId = (userIdRaw && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userIdRaw)) ? userIdRaw : null;
+        const userId = req.user?.id || null;
 
         // Check for duplicate view in last 24 hours
         const duplicate = await query(`

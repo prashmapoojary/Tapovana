@@ -119,6 +119,7 @@ const EditMemberDrawer = ({ user, onClose }) => {
 function Team() {
   const { isStaffAllocated, triggerAlert, triggerConfirm } = useAllocations();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [toast, setToast] = useState({ visible: false, message: "", type: "" });
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -128,6 +129,7 @@ function Team() {
   const [page, setPage] = useState(1);
   const [editingUser, setEditingUser] = useState(null);
   const [openActionMenu, setOpenActionMenu] = useState(null);
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState(null);
 
   const ITEMS_PER_PAGE = 10;
 
@@ -183,24 +185,26 @@ function Team() {
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
-  const initiateDelete = async (u) => {
+  const initiateDelete = (user) => {
+    setDeleteConfirmUser(user);
     setOpenActionMenu(null);
-    const fullName = `${u.first_name || ""} ${u.last_name || ""}`.trim();
-    const confirmed = await triggerConfirm(
-      `Are you sure you want to delete ${fullName}?\n\nThis action cannot be undone.`,
-      getAvatarUrl(u)
-    );
-    if (!confirmed) return;
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmUser) return;
+    const u = deleteConfirmUser;
+    setDeleteConfirmUser(null);
     try {
-      setLoading(true);
       await apiFetch(`/api/teams/users/${u.user_id}`, { method: "DELETE" });
       await fetchUsers();
-      await triggerAlert("Team member deleted permanently.", true);
+      showToast("Team member deleted permanently.", "success");
     } catch (e) {
-      await triggerAlert("Failed to delete member: " + e.message);
-    } finally {
-      setLoading(false);
+      triggerAlert("Failed to delete member: " + e.message);
     }
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmUser(null);
   };
 
   const toggleStatus = async (userId, currentStatusBool) => {
@@ -242,12 +246,54 @@ function Team() {
   const handleStatusFilter = (val) => { setStatusFilter(val); setPage(1); };
 
   const showToast = (message, type) => {
-    triggerAlert(message, type === "success");
+    setToast({ visible: true, message, type });
+    setTimeout(() => setToast({ visible: false, message: "", type: "" }), 3000);
   };
 
   return (
     <div className="team-container">
+      {deleteConfirmUser && (
+        <div className="global-alert-overlay" style={{ zIndex: 10002 }}>
+          <div className="global-alert-modal">
+            <div className="global-alert-icon-container" style={{ background: "transparent", border: "none", marginBottom: "16px" }}>
+              <img 
+                src={getAvatarUrl(deleteConfirmUser)} 
+                alt="Profile" 
+                style={{ width: "64px", height: "64px", borderRadius: "50%", objectFit: "cover", border: "2px solid #e2e8f0" }}
+                onError={(e) => { e.target.onerror = null; e.target.src = DefaultAvatar; }}
+              />
+            </div>
+            <div className="global-alert-message">
+              <p style={{ margin: "0 0 16px 0", fontSize: "16px", color: "#2d3748" }}>
+                Are you sure you want to delete {`${deleteConfirmUser.first_name || ""} ${deleteConfirmUser.last_name || ""}`.trim()}?
+              </p>
+              <p style={{ margin: 0, fontSize: "14px", color: "#7b8a9a" }}>
+                This action cannot be undone.
+              </p>
+            </div>
+            <div className="global-confirm-actions">
+              <button className="global-confirm-cancel-btn" onClick={cancelDelete}>Cancel</button>
+              <button className="global-confirm-confirm-btn" onClick={confirmDelete}>Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
 
+      {toast.visible && (
+        <div style={{
+          position: "fixed", top: "20px", right: "20px", zIndex: 10001,
+          background: "#fff", border: "2px solid #cda751", borderRadius: "8px",
+          padding: "16px 24px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+          color: toast.type === "success" ? "#2e7559" : toast.type === "error" ? "#e53e3e" : "#4a5568",
+          fontWeight: 600, fontSize: "14px", display: "flex", alignItems: "center", gap: "8px",
+          animation: "slideInRight 0.3s ease-out"
+        }}>
+          {toast.type === "success" && "✓ "}
+          {toast.type === "error" && "⚠ "}
+          {toast.type === "info" && "ℹ "}
+          {toast.message}
+        </div>
+      )}
 
       <AddMemberDrawer 
         isOpen={drawerOpen} 
