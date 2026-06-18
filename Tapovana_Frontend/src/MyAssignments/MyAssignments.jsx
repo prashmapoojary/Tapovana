@@ -4,7 +4,6 @@ import '../Workshops/Workshops.css';
 import { useAllocations } from '../utils/AllocationContext';
 import { getUser } from '../utils/session';
 import { apiFetch } from '../api/http';
-import { getImageUrl } from '../utils/image';
 
 import AnimatedNumber from '../utils/AnimatedNumber';
 import DefaultAvatar from '../assets/profileIconDefault.png';
@@ -63,41 +62,17 @@ const STATUS_CONFIG = {
   cancelled: { label: "Cancelled", color: "#e74c3c", bg: "rgba(231,76,60,0.1)" },
 };
 
-function AssignmentCard({ a, services, workshops, vedicPrograms, onComplete, onDelete }) {
-  // Get cover image
-  let imageUrl = null;
+function AssignmentCard({ a, triggerAlert }) {
+  let categoryLabel = '';
   if (a.type === 'service') {
-    if (a.service_image_name) {
-      imageUrl = a.service_image_name;
-    } else {
-      const serviceName = a.sessionTitle.split(' - ')[0];
-      const service = services.find(s => (s.name || '').toLowerCase() === serviceName.toLowerCase());
-      if (service) {
-        imageUrl = service.image_url || service.image;
-      }
-    }
+    categoryLabel = 'Service';
   } else if (a.type === 'workshop') {
-    if (a.workshop_image_name) {
-      imageUrl = a.workshop_image_name;
-    } else {
-      const workshop = workshops.find(w => (w.title || '').toLowerCase() === a.sessionTitle.toLowerCase());
-      if (workshop) {
-        imageUrl = workshop.image_url || workshop.image || workshop.image_base64;
-      }
-    }
+    categoryLabel = 'Workshop';
   } else if (a.type === 'vedic_program') {
-    if (a.vediclife_image_name) {
-      imageUrl = a.vediclife_image_name;
-    } else {
-      const vedicProgram = vedicPrograms.find(p => (p.title || '').toLowerCase() === a.sessionTitle.toLowerCase());
-      if (vedicProgram) {
-        imageUrl = vedicProgram.image_url || vedicProgram.image || vedicProgram.image_base64;
-      }
-    }
+    categoryLabel = 'Vedic Program';
   }
-
-  const [imgFailed, setImgFailed] = useState(!imageUrl);
-  const displayImageUrl = getImageUrl(imageUrl, '');
+  const cat = CATEGORY_COLORS[categoryLabel] || CATEGORY_COLORS["Service"];
+  const st = STATUS_CONFIG[a.status] || STATUS_CONFIG.active;
 
   const getFormatDate = (dateStr) => {
     if (!dateStr) return '';
@@ -109,179 +84,76 @@ function AssignmentCard({ a, services, workshops, vedicPrograms, onComplete, onD
     }
   };
 
-  const getStaffLabel = () => {
-    if (a.type === 'service') return `${a.staffName} (${a.staffRole})`;
-    if (a.type === 'workshop') return a.staffName;
-    if (a.type === 'vedic_program') return a.staffName;
-    return a.staffName;
-  };
-
   // If status is removed, don't render the card at all!
   if (a.status === 'removed') return null;
+
+  const handleView = (e) => {
+    e.stopPropagation();
+    // Read-only view - we can implement a modal later, for now just a gold-themed alert
+    triggerAlert('View feature coming soon!');
+  };
 
   return (
     <div className="ws-card" style={{
       background: "#F9F9F9",
-      borderRadius: "12px",
-      padding: "0",
-      overflow: "hidden",
+      borderRadius: "8px",
+      padding: "16px",
       border: "1px solid #CDA751"
     }}>
-      {!imgFailed && displayImageUrl ? (
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "12px" }}>
+        <h3 style={{ margin: 0, color: "#1E1E1E", fontSize: "16px", fontWeight: 600 }}>{a.sessionTitle}</h3>
         <div style={{
-          width: "100%",
-          height: "140px",
-          overflow: "hidden"
+          background: "#CDA751",
+          color: "white",
+          fontWeight: 600,
+          padding: "4px 10px",
+          borderRadius: "4px",
+          fontSize: "11px"
         }}>
-          <img
-            src={displayImageUrl}
-            alt={a.sessionTitle}
-            onError={() => setImgFailed(true)}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover"
-            }}
-          />
+          {st.label}
         </div>
-      ) : (
-        <div style={{
-          width: "100%",
-          height: "140px",
-          background: "linear-gradient(135deg, rgba(205, 167, 81, 0.15), rgba(205, 167, 81, 0.05))"
-        }} />
-      )}
-      <div style={{ padding: "16px" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "12px" }}>
-          {a.type === 'service' && (
-            <div style={{
-              background: "#CDA751",
-              color: "white",
-              fontWeight: 700,
-              padding: "4px 12px",
-              borderRadius: "20px",
-              textTransform: "uppercase",
-              fontSize: "11px"
-            }}>
-              Service
-            </div>
-          )}
-          <div style={{
-            background: "#CDA751",
-            color: "white",
-            fontWeight: 600,
-            padding: "4px 10px",
-            borderRadius: "16px",
-            fontSize: "12px"
-          }}>
-            {(a.status === 'Live' || a.status === 'Upcoming') ? 'Pending' : (a.status === 'expired' ? 'Completed' : a.status}
-          </div>
-        </div>
-        <h3 style={{
-          margin: "0 0 8px 0",
-          color: "#1E1E1E",
-          fontSize: "18px",
-          fontWeight: "700"
-        }}>
-          {a.sessionTitle}
-        </h3>
-        <div style={{
-          color: "#555555",
-          fontSize: "13px",
-          marginBottom: "6px"
-        }}>
-          {a.type === 'service' ? 'Assigned Staff: ' : a.type === 'workshop' ? 'Instructor: ' : 'Lead Consultant: '}
-          {getStaffLabel()}
-        </div>
-        <div style={{
-          color: "#555555",
-          fontSize: "13px",
-          marginBottom: "4px",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px"
-        }}>
-          <div>
+      </div>
+      
+      <div style={{ marginBottom: "8px" }}>
+        <p style={{ margin: 0, color: "#555555", fontSize: "13px" }}>
+          {a.type === 'service' ? 'Assigned Staff' : a.type === 'workshop' ? 'Instructor' : 'Lead Consultant'}: {a.staffName} ({a.staffRole})
+        </p>
+      </div>
+      
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", marginBottom: "12px" }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <span style={{ color: "#555555", fontSize: "11px", marginBottom: "2px" }}>Date & Time</span>
+          <span style={{ color: "#1E1E1E", fontSize: "13px", fontWeight: 500 }}>
             {getFormatDate(a.startDate)} {a.bookingTime || a.time || ''}
-          </div>
-          <span>•</span>
-          <div>
+          </span>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <span style={{ color: "#555555", fontSize: "11px", marginBottom: "2px" }}>Duration</span>
+          <span style={{ color: "#1E1E1E", fontSize: "13px", fontWeight: 500 }}>
             {a.duration || a.duration_minutes || 30} mins
-          </div>
+          </span>
         </div>
-        <div style={{ marginTop: "16px", display: "flex", gap: "8px" }}>
-          <button
-            onClick={(e) => { e.stopPropagation(); }}
-            style={{
-              flex: 1,
-              padding: "8px 16px",
-              fontSize: "13px",
-              fontWeight: "600",
-              background: "white",
-              color: "#CDA751",
-              border: "1px solid #CDA751",
-              borderRadius: "8px",
-              cursor: "pointer",
-              transition: "all 0.2s ease-in-out"
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.background = "#FFF8E6";
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = "white";
-            }}
-          >
-            View
-          </button>
-          {(a.status === 'active' || a.status === 'Upcoming' || a.status === 'Live') && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onComplete(a); }}
-              style={{
-                flex: 1,
-                padding: "8px 16px",
-                fontSize: "13px",
-                fontWeight: "600",
-                background: "#CDA751",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
-                transition: "all 0.2s ease-in-out"
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = "#b59243";
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = "#CDA751";
-              }}
-            >
-              Mark Complete
-            </button>
-          )}
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(a); }}
-            style={{
-              flex: 1,
-              padding: "8px 16px",
-              fontSize: "13px",
-              fontWeight: "600",
-              background: "white",
-              color: "#e74c3c",
-              border: "1px solid #e74c3c",
-              borderRadius: "8px",
-              cursor: "pointer",
-              transition: "all 0.2s ease-in-out"
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.background = "#fdf2f2";
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = "white";
-            }}
-          >
-            Delete
-          </button>
-        </div>
+      </div>
+      
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button
+          onClick={handleView}
+          style={{
+            padding: '8px 16px',
+            fontSize: '13px',
+            fontWeight: 600,
+            background: "#CDA751",
+            color: 'white',
+            border: 'none',
+            borderRadius: "4px",
+            cursor: 'pointer',
+            transition: 'background-color 0.2s'
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#b59243'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#CDA751'; }}
+        >
+          View
+        </button>
       </div>
     </div>
   );
@@ -289,7 +161,7 @@ function AssignmentCard({ a, services, workshops, vedicPrograms, onComplete, onD
 
 function MyAssignments() {
   const loggedInUser = useMemo(() => getUser(), []);
-  const { allocations: contextAllocations, completeAllocation, triggerAlert, triggerConfirm } = useAllocations();
+  const { allocations: contextAllocations, triggerAlert } = useAllocations();
 
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [staffList, setStaffList] = useState([]);
@@ -300,9 +172,6 @@ function MyAssignments() {
   const [loading, setLoading] = useState(true);
   const [memberships, setMemberships] = useState([]);
   const [bookings, setBookings] = useState([]);
-  const [services, setServices] = useState([]);
-  const [workshops, setWorkshops] = useState([]);
-  const [vedicPrograms, setVedicPrograms] = useState([]);
 
   const isStaffUser = loggedInUser?.role === 'DOCTOR' || loggedInUser?.role === 'THERAPIST';
 
@@ -364,93 +233,6 @@ function MyAssignments() {
     fetchBookings();
   }, []);
 
-  // ─── Fetch services data for service images ───
-  useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        const res = await apiFetch("/api/services");
-        if (res.success) {
-          setServices(res.services || []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch services:", err);
-      }
-    };
-    fetchServices();
-  }, []);
-
-  // ─── Fetch workshops data for workshop images ───
-  useEffect(() => {
-    const fetchWorkshops = async () => {
-      try {
-        const res = await apiFetch("/api/workshops");
-        if (res.success) {
-          setWorkshops(res.workshops || []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch workshops:", err);
-      }
-    };
-    fetchWorkshops();
-  }, []);
-
-  // ─── Fetch vedic programs data for vedic program images ───
-  useEffect(() => {
-    const fetchVedicPrograms = async () => {
-      try {
-        const res = await apiFetch("/api/vedic-programs");
-        if (res.success) {
-          setVedicPrograms(res.programs || []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch vedic programs:", err);
-      }
-    };
-    fetchVedicPrograms();
-  }, []);
-
-  // ─── Refresh assignments after marking complete ───
-  const refreshAssignments = async () => {
-    try {
-      const data = await apiFetch('/api/services/my/assignments');
-      if (data.success && data.assignments) {
-        setBackendAssignments(data.assignments);
-      }
-    } catch (err) {
-      console.error("Failed to refresh assignments:", err);
-    }
-  };
-
-  // ─── Complete Assignment ───
-  const handleComplete = async (assignment) => {
-    const confirmed = await triggerConfirm(`Are you sure you want to mark "${assignment.sessionTitle}" as complete?`);
-    if (!confirmed) return;
-
-    try {
-      await completeAllocation(assignment.sessionId);
-      await refreshAssignments();
-      await triggerAlert("Assignment completed successfully!", true);
-    } catch (err) {
-      console.error("Failed to complete assignment:", err);
-      await triggerAlert("Failed to complete assignment.");
-    }
-  };
-
-  // ─── Delete Assignment ───
-  const handleDelete = async (assignment) => {
-    const confirmed = await triggerConfirm(`Are you sure you want to delete "${assignment.sessionTitle}"? This cannot be undone.`);
-    if (!confirmed) return;
-
-    try {
-      // TODO: Add backend delete endpoint if available
-      // await apiFetch(`/api/allocations/${assignment.id}`, { method: 'DELETE' });
-      await refreshAssignments();
-      await triggerAlert("Assignment deleted successfully!", true);
-    } catch (err) {
-      console.error("Failed to delete assignment:", err);
-      await triggerAlert("Failed to delete assignment.");
-    }
-  };
 
   // Determine active staff ID
   const activeStaffId = useMemo(() => {
@@ -741,11 +523,7 @@ function MyAssignments() {
                       <AssignmentCard
                         key={a.id}
                         a={a}
-                        services={services}
-                        workshops={workshops}
-                        vedicPrograms={vedicPrograms}
-                        onComplete={handleComplete}
-                        onDelete={handleDelete}
+                        triggerAlert={triggerAlert}
                       />
                     ))}
                   </div>
@@ -767,11 +545,7 @@ function MyAssignments() {
                       <AssignmentCard
                         key={a.id}
                         a={a}
-                        services={services}
-                        workshops={workshops}
-                        vedicPrograms={vedicPrograms}
-                        onComplete={handleComplete}
-                        onDelete={handleDelete}
+                        triggerAlert={triggerAlert}
                       />
                     ))}
                   </div>
@@ -793,11 +567,7 @@ function MyAssignments() {
                       <AssignmentCard
                         key={a.id}
                         a={a}
-                        services={services}
-                        workshops={workshops}
-                        vedicPrograms={vedicPrograms}
-                        onComplete={handleComplete}
-                        onDelete={handleDelete}
+                        triggerAlert={triggerAlert}
                       />
                     ))}
                   </div>
