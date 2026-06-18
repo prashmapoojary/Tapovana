@@ -4,6 +4,7 @@ import '../Workshops/Workshops.css';
 import { useAllocations } from '../utils/AllocationContext';
 import { getUser } from '../utils/session';
 import { apiFetch } from '../api/http';
+import { getImageUrl } from '../utils/image';
 
 import AnimatedNumber from '../utils/AnimatedNumber';
 import DefaultAvatar from '../assets/profileIconDefault.png';
@@ -62,17 +63,41 @@ const STATUS_CONFIG = {
   cancelled: { label: "Cancelled", color: "#e74c3c", bg: "rgba(231,76,60,0.1)" },
 };
 
-function AssignmentCard({ a, onComplete }) {
-  let categoryLabel = '';
+function AssignmentCard({ a, services, workshops, vedicPrograms, onComplete, onDelete }) {
+  // Get cover image
+  let imageUrl = null;
   if (a.type === 'service') {
-    categoryLabel = 'Service';
+    if (a.service_image_name) {
+      imageUrl = a.service_image_name;
+    } else {
+      const serviceName = a.sessionTitle.split(' - ')[0];
+      const service = services.find(s => (s.name || '').toLowerCase() === serviceName.toLowerCase());
+      if (service) {
+        imageUrl = service.image_url || service.image;
+      }
+    }
   } else if (a.type === 'workshop') {
-    categoryLabel = 'Workshop';
+    if (a.workshop_image_name) {
+      imageUrl = a.workshop_image_name;
+    } else {
+      const workshop = workshops.find(w => (w.title || '').toLowerCase() === a.sessionTitle.toLowerCase());
+      if (workshop) {
+        imageUrl = workshop.image_url || workshop.image || workshop.image_base64;
+      }
+    }
   } else if (a.type === 'vedic_program') {
-    categoryLabel = 'Vedic Program';
+    if (a.vediclife_image_name) {
+      imageUrl = a.vediclife_image_name;
+    } else {
+      const vedicProgram = vedicPrograms.find(p => (p.title || '').toLowerCase() === a.sessionTitle.toLowerCase());
+      if (vedicProgram) {
+        imageUrl = vedicProgram.image_url || vedicProgram.image || vedicProgram.image_base64;
+      }
+    }
   }
-  const cat = CATEGORY_COLORS[categoryLabel] || CATEGORY_COLORS["Service"];
-  const st = STATUS_CONFIG[a.status] || STATUS_CONFIG.active;
+
+  const [imgFailed, setImgFailed] = useState(!imageUrl);
+  const displayImageUrl = getImageUrl(imageUrl, '');
 
   const getFormatDate = (dateStr) => {
     if (!dateStr) return '';
@@ -84,78 +109,179 @@ function AssignmentCard({ a, onComplete }) {
     }
   };
 
+  const getStaffLabel = () => {
+    if (a.type === 'service') return `${a.staffName} (${a.staffRole})`;
+    if (a.type === 'workshop') return a.staffName;
+    if (a.type === 'vedic_program') return a.staffName;
+    return a.staffName;
+  };
+
   // If status is removed, don't render the card at all!
   if (a.status === 'removed') return null;
 
   return (
     <div className="ws-card" style={{
-      background: "#FAF6EB",
+      background: "#F9F9F9",
       borderRadius: "12px",
-      padding: "14px"
+      padding: "0",
+      overflow: "hidden",
+      border: "1px solid #CDA751"
     }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "10px" }}>
-        {a.type === 'service' && (
+      {!imgFailed && displayImageUrl ? (
+        <div style={{
+          width: "100%",
+          height: "140px",
+          overflow: "hidden"
+        }}>
+          <img
+            src={displayImageUrl}
+            alt={a.sessionTitle}
+            onError={() => setImgFailed(true)}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover"
+            }}
+          />
+        </div>
+      ) : (
+        <div style={{
+          width: "100%",
+          height: "140px",
+          background: "linear-gradient(135deg, rgba(205, 167, 81, 0.15), rgba(205, 167, 81, 0.05))"
+        }} />
+      )}
+      <div style={{ padding: "16px" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "12px" }}>
+          {a.type === 'service' && (
+            <div style={{
+              background: "#CDA751",
+              color: "white",
+              fontWeight: 700,
+              padding: "4px 12px",
+              borderRadius: "20px",
+              textTransform: "uppercase",
+              fontSize: "11px"
+            }}>
+              Service
+            </div>
+          )}
           <div style={{
             background: "#CDA751",
             color: "white",
-            fontWeight: 700,
-            padding: "6px 16px",
-            borderRadius: "20px",
-            textTransform: "uppercase"
+            fontWeight: 600,
+            padding: "4px 10px",
+            borderRadius: "16px",
+            fontSize: "12px"
           }}>
-            {categoryLabel}
+            {(a.status === 'Live' || a.status === 'Upcoming') ? 'Pending' : (a.status === 'expired' ? 'Completed' : a.status}
           </div>
-        )}
-        <div style={{
-          background: "#F0E9D6",
-          color: "#7C725E",
-          border: "1px solid #D8CFBB",
-          borderRadius: "16px",
-          padding: "3px 10px",
-          fontWeight: 600,
-          fontSize: "12px"
+        </div>
+        <h3 style={{
+          margin: "0 0 8px 0",
+          color: "#1E1E1E",
+          fontSize: "18px",
+          fontWeight: "700"
         }}>
-          {st.label}
+          {a.sessionTitle}
+        </h3>
+        <div style={{
+          color: "#555555",
+          fontSize: "13px",
+          marginBottom: "6px"
+        }}>
+          {a.type === 'service' ? 'Assigned Staff: ' : a.type === 'workshop' ? 'Instructor: ' : 'Lead Consultant: '}
+          {getStaffLabel()}
         </div>
-      </div>
-      <div style={{ marginBottom: "6px" }}>
-        <h3 style={{ margin: 0, color: "#0F172A", fontSize: "17px" }}>{a.sessionTitle}</h3>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#7b8a9a", marginBottom: "6px" }}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-        {a.staffName} ({a.staffRole})
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#7b8a9a", marginBottom: "10px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-          {getFormatDate(a.startDate)} {a.bookingTime || a.time || ''}
+        <div style={{
+          color: "#555555",
+          fontSize: "13px",
+          marginBottom: "4px",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px"
+        }}>
+          <div>
+            {getFormatDate(a.startDate)} {a.bookingTime || a.time || ''}
+          </div>
+          <span>•</span>
+          <div>
+            {a.duration || a.duration_minutes || 30} mins
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-          {a.duration || a.duration_minutes || 30} mins
-        </div>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: "13px", fontWeight: 700, color: "#2d3748" }}>
-          Assigned: {getFormatDate(a.createdAt)}
-        </span>
-        {(a.status === 'active' || a.status === 'Upcoming' || a.status === 'Live') && (
+        <div style={{ marginTop: "16px", display: "flex", gap: "8px" }}>
           <button
-            onClick={(e) => { e.stopPropagation(); onComplete(a); }}
+            onClick={(e) => { e.stopPropagation(); }}
             style={{
-              padding: '5px 14px',
-              fontSize: '12px',
-              fontWeight: '600',
-              background: "#CDA751",
-              color: 'white',
-              border: 'none',
+              flex: 1,
+              padding: "8px 16px",
+              fontSize: "13px",
+              fontWeight: "600",
+              background: "white",
+              color: "#CDA751",
+              border: "1px solid #CDA751",
               borderRadius: "8px",
-              cursor: 'pointer'
+              cursor: "pointer",
+              transition: "all 0.2s ease-in-out"
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = "#FFF8E6";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = "white";
             }}
           >
-            Mark Complete
+            View
           </button>
-        )}
+          {(a.status === 'active' || a.status === 'Upcoming' || a.status === 'Live') && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onComplete(a); }}
+              style={{
+                flex: 1,
+                padding: "8px 16px",
+                fontSize: "13px",
+                fontWeight: "600",
+                background: "#CDA751",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
+                transition: "all 0.2s ease-in-out"
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = "#b59243";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = "#CDA751";
+              }}
+            >
+              Mark Complete
+            </button>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(a); }}
+            style={{
+              flex: 1,
+              padding: "8px 16px",
+              fontSize: "13px",
+              fontWeight: "600",
+              background: "white",
+              color: "#e74c3c",
+              border: "1px solid #e74c3c",
+              borderRadius: "8px",
+              cursor: "pointer",
+              transition: "all 0.2s ease-in-out"
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = "#fdf2f2";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = "white";
+            }}
+          >
+            Delete
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -174,6 +300,9 @@ function MyAssignments() {
   const [loading, setLoading] = useState(true);
   const [memberships, setMemberships] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [services, setServices] = useState([]);
+  const [workshops, setWorkshops] = useState([]);
+  const [vedicPrograms, setVedicPrograms] = useState([]);
 
   const isStaffUser = loggedInUser?.role === 'DOCTOR' || loggedInUser?.role === 'THERAPIST';
 
@@ -235,7 +364,50 @@ function MyAssignments() {
     fetchBookings();
   }, []);
 
+  // ─── Fetch services data for service images ───
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const res = await apiFetch("/api/services");
+        if (res.success) {
+          setServices(res.services || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch services:", err);
+      }
+    };
+    fetchServices();
+  }, []);
 
+  // ─── Fetch workshops data for workshop images ───
+  useEffect(() => {
+    const fetchWorkshops = async () => {
+      try {
+        const res = await apiFetch("/api/workshops");
+        if (res.success) {
+          setWorkshops(res.workshops || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch workshops:", err);
+      }
+    };
+    fetchWorkshops();
+  }, []);
+
+  // ─── Fetch vedic programs data for vedic program images ───
+  useEffect(() => {
+    const fetchVedicPrograms = async () => {
+      try {
+        const res = await apiFetch("/api/vedic-programs");
+        if (res.success) {
+          setVedicPrograms(res.programs || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch vedic programs:", err);
+      }
+    };
+    fetchVedicPrograms();
+  }, []);
 
   // ─── Refresh assignments after marking complete ───
   const refreshAssignments = async () => {
@@ -569,7 +741,11 @@ function MyAssignments() {
                       <AssignmentCard
                         key={a.id}
                         a={a}
+                        services={services}
+                        workshops={workshops}
+                        vedicPrograms={vedicPrograms}
                         onComplete={handleComplete}
+                        onDelete={handleDelete}
                       />
                     ))}
                   </div>
@@ -591,7 +767,11 @@ function MyAssignments() {
                       <AssignmentCard
                         key={a.id}
                         a={a}
+                        services={services}
+                        workshops={workshops}
+                        vedicPrograms={vedicPrograms}
                         onComplete={handleComplete}
+                        onDelete={handleDelete}
                       />
                     ))}
                   </div>
@@ -613,7 +793,11 @@ function MyAssignments() {
                       <AssignmentCard
                         key={a.id}
                         a={a}
+                        services={services}
+                        workshops={workshops}
+                        vedicPrograms={vedicPrograms}
                         onComplete={handleComplete}
+                        onDelete={handleDelete}
                       />
                     ))}
                   </div>
