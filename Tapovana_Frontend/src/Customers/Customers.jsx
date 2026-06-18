@@ -500,22 +500,22 @@ function Customers() {
         </div>
 
         <div className="cust-table-pagination">
-          <div>
+          <div className="pagination-text">
             Showing {paginatedList.length > 0 ? (page - 1) * ITEMS_PER_PAGE + 1 : 0}
             {" – "}{Math.min(page * ITEMS_PER_PAGE, filteredAndSorted.length)}
             {" of "}{filteredAndSorted.length} customers
           </div>
           <div className="pagination-controls">
-            <button className="page-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>&lt;</button>
-            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-              let startPage = Math.max(1, page - 2);
-              let endPage = Math.min(totalPages, startPage + 4);
-              startPage = Math.max(1, endPage - 4);
+            <button className="page-btn-arrow" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>&lt;</button>
+            {Array.from({ length: Math.min(totalPages, 3) }, (_, i) => {
+              let startPage = Math.max(1, page - 1);
+              let endPage = Math.min(totalPages, startPage + 2);
+              startPage = Math.max(1, endPage - 2);
               return startPage + i;
             }).map((p) => (
               <button key={p} className={`page-btn ${page === p ? "active" : ""}`} onClick={() => setPage(p)}>{p}</button>
             ))}
-            <button className="page-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>&gt;</button>
+            <button className="page-btn-arrow" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>&gt;</button>
           </div>
         </div>
       </div>

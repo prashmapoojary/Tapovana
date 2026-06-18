@@ -33,11 +33,7 @@ const checkStaffAllocationConflict = async ({
     const proposedStartMins = getMinsFromTime(timeStr);
     const proposedEndMins = proposedStartMins + (durationMins || 60);
 
-
-
     // 1. Fetch all existing allocations for the staff member on that date
-    // We select active allocations that overlap with the proposed date.
-    // For Vedic Programs (which span multiple days), we check if the proposedDate falls within [start_date, end_date]
     const allocationsRes = await query(
         `SELECT id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes 
          FROM allocations 
@@ -56,75 +52,62 @@ const checkStaffAllocationConflict = async ({
     const serviceCount = existingAllocations.filter(a => a.type === 'service').length;
     const workshopCount = existingAllocations.filter(a => a.type === 'workshop').length;
     const vedicCount = existingAllocations.filter(a => a.type === 'vedic_program' || a.type === 'vedic_package').length;
+    const totalCount = existingAllocations.length;
 
-    // ── Rule: Vedic Life Package exclusivity ──
+    // ── Apply Allocation Rules ──
+    // Rule 1: Vedic Program already present → no other allocations
+    if (vedicCount > 0) {
+        return {
+            conflict: true,
+            message: 'Staff allocation limit reached for today.'
+        };
+    }
+
+    // Rule 2: Total allocations already 3 → no more
+    if (totalCount >= 3) {
+        return {
+            conflict: true,
+            message: 'Staff allocation limit reached for today.'
+        };
+    }
+
+    // Rule 3: Allocating vedic program → no other allocations allowed
     if (type === 'vedic_program' || type === 'vedic_package') {
         if (serviceCount > 0 || workshopCount > 0) {
             return {
                 conflict: true,
-                message: 'Staff allocation failed due to daily limit or package conflict.'
+                message: 'Staff allocation limit reached for today.'
             };
         }
-    }
-
-    if (type === 'service') {
-        if (vedicCount > 0) {
-            return {
-                conflict: true,
-                message: 'Staff allocation failed due to daily limit or package conflict.'
-            };
-        }
-        // Max 2 services
-        if (serviceCount >= 2) {
-            return {
-                conflict: true,
-                message: 'Staff allocation failed due to daily limit or package conflict.'
-            };
-        }
-        // If 2 services + 1 workshop are assigned, they must include a Vedic Life Package
-        if (serviceCount + 1 === 2 && workshopCount === 1 && vedicCount === 0) {
-            return {
-                conflict: true,
-                message: 'Staff allocation failed due to daily limit or package conflict.'
-            };
-        }
-    }
-
-    if (type === 'workshop') {
-        if (vedicCount > 0) {
-            return {
-                conflict: true,
-                message: 'Staff allocation failed due to daily limit or package conflict.'
-            };
-        }
-        // Max 1 workshop
+    } 
+    // Rule 4: Allocating workshop → max 1 workshop
+    else if (type === 'workshop') {
         if (workshopCount >= 1) {
             return {
                 conflict: true,
-                message: 'Staff allocation failed due to daily limit or package conflict.'
+                message: 'Staff allocation limit reached for today.'
             };
         }
-        // If 2 services + 1 workshop are assigned, they must include a Vedic Life Package
-        if (serviceCount === 2 && workshopCount + 1 === 1 && vedicCount === 0) {
+    }
+    // Rule 5: Allocating service → max 2 services
+    else if (type === 'service') {
+        if (serviceCount >= 2) {
             return {
                 conflict: true,
-                message: 'Staff allocation failed due to daily limit or package conflict.'
+                message: 'Staff allocation limit reached for today.'
             };
         }
     }
 
     // ── Rule: Time-Slot Overlap checking ──
     for (const a of existingAllocations) {
-        // Vedic program was already checked above and would have blocked the day.
-        // For services and workshops, we check exact time overlap.
         const existingStartMins = getMinsFromTime(a.booking_time);
         const existingEndMins = existingStartMins + (a.duration_minutes || 60);
-
         const overlap = (proposedStartMins < existingEndMins && proposedEndMins > existingStartMins);
         if (overlap) {
             return {
                 conflict: true,
-                message: `Staff allocation failed due to daily limit or package conflict.`
+                message: 'Staff allocation failed due to scheduling conflict.'
             };
         }
     }

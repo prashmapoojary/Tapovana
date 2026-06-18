@@ -344,19 +344,24 @@ function Transactions() {
 
         {/* Pagination controls */}
         <div className="ledger-pagination-footer">
-          <div>
+          <div className="pagination-text">
             Showing {filteredTransactions.length > 0 ? (page - 1) * 10 + 1 : 0} - {Math.min(page * 10, pagination.total)} of {pagination.total} transaction logs
           </div>
           <div className="pagination-controls">
             <button 
-              className="page-btn" 
+              className="page-btn-arrow" 
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
             >
               &lt;
             </button>
             
-            {Array.from({ length: pagination.pages }, (_, i) => i + 1).map(p => (
+            {Array.from({ length: Math.min(pagination.pages, 3) }, (_, i) => {
+              let startPage = Math.max(1, page - 1);
+              let endPage = Math.min(pagination.pages, startPage + 2);
+              startPage = Math.max(1, endPage - 2);
+              return startPage + i;
+            }).map(p => (
               <button 
                 key={p} 
                 className={`page-btn ${page === p ? "active" : ""}`}
@@ -367,7 +372,7 @@ function Transactions() {
             ))}
 
             <button 
-              className="page-btn" 
+              className="page-btn-arrow" 
               onClick={() => setPage(p => Math.min(pagination.pages, p + 1))}
               disabled={page === pagination.pages}
             >

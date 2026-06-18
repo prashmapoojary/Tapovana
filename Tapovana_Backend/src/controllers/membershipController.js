@@ -197,7 +197,7 @@ const createMembership = async (req, res) => {
 
 // ─── UPDATE membership ────────────────────────────────────────────────
 const updateMembership = async (req, res) => {
-    const { name, email, phone, tier, status, sessions, total_spent, profile_photo_url, profile_photo_base64 } = req.body;
+    const { name, email, phone, tier, status, sessions, total_spent, profile_photo_url, profile_photo_base64, join_date, expiry_date } = req.body;
 
     try {
         const fields = [];
@@ -211,6 +211,8 @@ const updateMembership = async (req, res) => {
         if (status !== undefined) { fields.push('status = $' + idx++); values.push(status.toLowerCase()); }
         if (sessions !== undefined) { fields.push('sessions = $' + idx++); values.push(sessions || 0); }
         if (total_spent !== undefined) { fields.push('total_spent = $' + idx++); values.push(total_spent || 0); }
+        if (join_date !== undefined) { fields.push('join_date = $' + idx++); values.push(join_date || null); }
+        if (expiry_date !== undefined) { fields.push('expiry_date = $' + idx++); values.push(expiry_date || null); }
         if (profile_photo_url !== undefined || profile_photo_base64 !== undefined) {
             const savedImage = handleProfileImage(profile_photo_base64 || profile_photo_url);
             if (savedImage !== undefined) { fields.push('profile_photo_url = $' + idx++); values.push(savedImage); }

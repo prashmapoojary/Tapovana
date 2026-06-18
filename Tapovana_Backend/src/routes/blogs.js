@@ -10,6 +10,7 @@ const {
     approveBlog,
     rejectBlog,
     archiveBlog,
+    restoreBlog,
     trackBlogView,
     toggleBlogLike,
     toggleBlogBookmark,
@@ -57,6 +58,7 @@ router.post('/:id/bookmark', authenticate, toggleBlogBookmark);
 router.post('/:id/approve', ...adminOnly, approveBlog);
 router.post('/:id/reject', ...adminOnly, rejectBlog);
 router.post('/:id/archive', ...adminOnly, archiveBlog);
+router.post('/:id/restore', ...adminOnly, restoreBlog);
 router.patch('/:id/comments/:commentId', ...adminOnly, moderateComment);
 
 module.exports = router;

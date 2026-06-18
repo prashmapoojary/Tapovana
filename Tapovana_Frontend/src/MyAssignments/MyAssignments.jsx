@@ -1,9 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import './MyAssignments.css';
+import '../Workshops/Workshops.css';
 import { useAllocations } from '../utils/AllocationContext';
 import { getUser } from '../utils/session';
 import { apiFetch } from '../api/http';
-import { getImageUrl } from '../utils/image';
+
 import AnimatedNumber from '../utils/AnimatedNumber';
 import DefaultAvatar from '../assets/profileIconDefault.png';
 
@@ -46,9 +47,81 @@ const InfoIcon = () => (
   </svg>
 );
 
+const CATEGORY_COLORS = {
+  "Service": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
+  "Workshop": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
+  "Vedic Program": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
+};
+
+const STATUS_CONFIG = {
+  Upcoming: { label: "Upcoming", color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
+  Live: { label: "🔴 LIVE", color: "#e74c3c", bg: "rgba(231,76,60,0.15)" },
+  active: { label: "Active", color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
+  pending: { label: "Pending", color: "#f39c12", bg: "rgba(243,156,18,0.1)" },
+  expired: { label: "Completed", color: "#a0aec0", bg: "rgba(160,174,192,0.1)" },
+  cancelled: { label: "Cancelled", color: "#e74c3c", bg: "rgba(231,76,60,0.1)" },
+};
+
+function AssignmentCard({ a, onComplete, onDelete }) {
+  let categoryLabel = '';
+  if (a.type === 'service') {
+    categoryLabel = 'Service';
+  } else if (a.type === 'workshop') {
+    categoryLabel = 'Workshop';
+  } else if (a.type === 'vedic_program') {
+    categoryLabel = 'Vedic Program';
+  }
+  const cat = CATEGORY_COLORS[categoryLabel] || CATEGORY_COLORS["Service"];
+  const st = STATUS_CONFIG[a.status] || STATUS_CONFIG.active;
+
+  const getFormatDate = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      const options = { year: 'numeric', month: 'short', day: 'numeric' };
+      return new Date(dateStr).toLocaleDateString(undefined, options);
+    } catch {
+      return dateStr;
+    }
+  };
+
+  // If status is removed, don't render the card at all!
+  if (a.status === 'removed') return null;
+
+  return (
+    <div className="ws-card" style={{
+      background: "#F8F3E6",
+      borderRadius: "12px",
+      padding: "16px"
+    }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <div style={{
+          background: "#CDA751",
+          color: "white",
+          fontWeight: 700,
+          padding: "6px 16px",
+          borderRadius: "20px",
+          textTransform: "uppercase"
+        }}>
+          {categoryLabel}
+        </div>
+        <div style={{
+          background: "#ffffff",
+          color: "#94A3B8",
+          border: "2px solid #94A3B8",
+          borderRadius: "20px",
+          padding: "4px 12px",
+          fontWeight: 600
+        }}>
+          {st.label}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MyAssignments() {
   const loggedInUser = useMemo(() => getUser(), []);
-  const { allocations: contextAllocations, completeAllocation } = useAllocations();
+  const { allocations: contextAllocations, completeAllocation, triggerAlert, triggerConfirm } = useAllocations();
 
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [staffList, setStaffList] = useState([]);
@@ -59,8 +132,6 @@ function MyAssignments() {
   const [loading, setLoading] = useState(true);
   const [memberships, setMemberships] = useState([]);
   const [bookings, setBookings] = useState([]);
-  const [services, setServices] = useState([]);
-  const [workshops, setWorkshops] = useState([]);
 
   const isStaffUser = loggedInUser?.role === 'DOCTOR' || loggedInUser?.role === 'THERAPIST';
 
@@ -122,35 +193,7 @@ function MyAssignments() {
     fetchBookings();
   }, []);
 
-  // ─── Fetch services data for service images ───
-  useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        const res = await apiFetch("/api/services");
-        if (res.success) {
-          setServices(res.services || []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch services:", err);
-      }
-    };
-    fetchServices();
-  }, []);
 
-  // ─── Fetch workshops data for workshop images ───
-  useEffect(() => {
-    const fetchWorkshops = async () => {
-      try {
-        const res = await apiFetch("/api/workshops");
-        if (res.success) {
-          setWorkshops(res.workshops || []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch workshops:", err);
-      }
-    };
-    fetchWorkshops();
-  }, []);
 
   // ─── Refresh assignments after marking complete ───
   const refreshAssignments = async () => {
@@ -161,6 +204,37 @@ function MyAssignments() {
       }
     } catch (err) {
       console.error("Failed to refresh assignments:", err);
+    }
+  };
+
+  // ─── Complete Assignment ───
+  const handleComplete = async (assignment) => {
+    const confirmed = await triggerConfirm(`Are you sure you want to mark "${assignment.sessionTitle}" as complete?`);
+    if (!confirmed) return;
+
+    try {
+      await completeAllocation(assignment.sessionId);
+      await refreshAssignments();
+      await triggerAlert("Assignment completed successfully!", true);
+    } catch (err) {
+      console.error("Failed to complete assignment:", err);
+      await triggerAlert("Failed to complete assignment.");
+    }
+  };
+
+  // ─── Delete Assignment ───
+  const handleDelete = async (assignment) => {
+    const confirmed = await triggerConfirm(`Are you sure you want to delete "${assignment.sessionTitle}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      // TODO: Add backend delete endpoint if available
+      // await apiFetch(`/api/allocations/${assignment.id}`, { method: 'DELETE' });
+      await refreshAssignments();
+      await triggerAlert("Assignment deleted successfully!", true);
+    } catch (err) {
+      console.error("Failed to delete assignment:", err);
+      await triggerAlert("Failed to delete assignment.");
     }
   };
 
@@ -350,107 +424,6 @@ function MyAssignments() {
     return currentStaffObj ? `${currentStaffObj.first_name || ''} ${currentStaffObj.last_name || ''}`.trim() : 'Specialist';
   }, [isStaffUser, loggedInUser, activeStaffId, staffList]);
 
-  // ─── Render Assignment Card (inside component scope) ───
-  const renderAssignmentCard = (a) => {
-    // Find image based on type
-    let imageUrl = DefaultAvatar;
-    if (a.type === 'service') {
-      const serviceName = a.sessionTitle.split(' - ')[0];
-      const service = services.find(s => (s.name || '').toLowerCase() === serviceName.toLowerCase());
-      if (service) {
-        imageUrl = getImageUrl(service.image_url, 'https://placehold.co/150?text=No+Image');
-      }
-    } else if (a.type === 'workshop' || a.type === 'vedic_program') {
-      const workshop = workshops.find(w => (w.title || '').toLowerCase() === a.sessionTitle.toLowerCase());
-      if (workshop) {
-        imageUrl = getImageUrl(workshop.image_url || workshop.image, 'https://placehold.co/150?text=No+Image');
-      }
-    }
-    
-    // Find staff profile photo (for non-service)
-    const staffMember = staffList.find(s => 
-      (s.user_id === a.staffId || s.id === a.staffId) || 
-      `${s.first_name || ''} ${s.last_name || ''}`.trim().toLowerCase() === a.staffName.toLowerCase()
-    ) || (isStaffUser ? loggedInUser : null);
-    const staffProfileUrl = staffMember?.profile_photo_url || staffMember?.profile_pic || null;
-    
-    const handleImageError = (e) => {
-      e.target.onerror = null;
-      e.target.src = DefaultAvatar;
-    };
-
-    // If status is removed, don't render the card at all!
-    if (a.status === 'removed') return null;
-
-    return (
-      <div key={a.id} className={`ma-card ${a.type}`}>
-        <div className="ma-card-header">
-          <span className={`ma-card-type-tag ${a.type}`}>
-            {a.type === 'vedic_program' ? 'Vedic Program' : a.type}
-          </span>
-          <span className={`ma-status-badge ${a.status}`}>
-            {a.status === 'active' ? 'Active / Scheduled'
-              : a.status === 'pending' ? 'Pending Confirmation'
-              : a.status === 'cancelled' ? 'Cancelled'
-              : a.status === 'removed' ? 'Deallocated'
-              : a.status === 'Upcoming' ? 'Upcoming'
-              : a.status === 'Live' ? '🔴 Live'
-              : 'Completed'}
-          </span>
-        </div>
-
-        <div className="ma-card-body">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-            {/* Cover image (for service/workshop/vedic program) */}
-            <img
-              src={imageUrl}
-              alt={a.type === 'service' ? 'Service' : 'Workshop'}
-              onError={handleImageError}
-              style={{ 
-                width: '48px', 
-                height: '48px', 
-                borderRadius: a.type === 'service' || a.type === 'workshop' || a.type === 'vedic_program' ? '8px' : '50%', 
-                objectFit: 'cover', 
-                border: '2px solid #e2e8f0' 
-              }}
-            />
-            <h3 className="ma-session-title" style={{ margin: 0 }}>{a.sessionTitle}</h3>
-          </div>
-          <div className="ma-details-list">
-            <div className="ma-detail-item">
-              <CalendarIcon />
-              <span className="ma-detail-label">Timeline:</span>
-              <span className="ma-detail-value">
-                {getFormatDate(a.startDate)}
-                {a.type === 'service' && a.bookingTime ? ` at ${a.bookingTime}` : ''}
-                {a.endDate && a.endDate !== a.startDate ? ` - ${getFormatDate(a.endDate)}` : ''}
-              </span>
-            </div>
-            <div className="ma-detail-item">
-              <UserIcon />
-              <span className="ma-detail-label">Staff:</span>
-              <span className="ma-detail-value">{a.staffName} ({a.staffRole})</span>
-            </div>
-            <div className="ma-detail-item">
-              <TagIcon />
-              <span className="ma-detail-label">Code:</span>
-              <span className="ma-detail-value">{a.sessionId || a.id}</span>
-            </div>
-          </div>
-          {a.status === 'cancelled' && (
-            <div className="ma-cancelled-message">
-              This service has been cancelled.
-            </div>
-          )}
-        </div>
-
-        <div className="ma-card-footer">
-          <span className="ma-assigned-date">Assigned: {getFormatDate(a.createdAt)}</span>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="my-assignments-container">
 
@@ -549,8 +522,15 @@ function MyAssignments() {
               return (
                 <div style={{ marginBottom: '32px' }}>
                   <h2 style={{ marginBottom: '16px', fontSize: '20px', fontWeight: '700', color: '#0F172A' }}>Services</h2>
-                  <div className="ma-grid">
-                    {servicesAssignments.map((a) => renderAssignmentCard(a)).filter(Boolean)}
+                  <div className="ws-grid">
+                    {servicesAssignments.map((a) => (
+                      <AssignmentCard
+                        key={a.id}
+                        a={a}
+                        onComplete={handleComplete}
+                        onDelete={handleDelete}
+                      />
+                    ))}
                   </div>
                 </div>
               );
@@ -565,8 +545,15 @@ function MyAssignments() {
               return (
                 <div style={{ marginBottom: '32px' }}>
                   <h2 style={{ marginBottom: '16px', fontSize: '20px', fontWeight: '700', color: '#0F172A' }}>Workshops</h2>
-                  <div className="ma-grid">
-                    {workshopsAssignments.map((a) => renderAssignmentCard(a)).filter(Boolean)}
+                  <div className="ws-grid">
+                    {workshopsAssignments.map((a) => (
+                      <AssignmentCard
+                        key={a.id}
+                        a={a}
+                        onComplete={handleComplete}
+                        onDelete={handleDelete}
+                      />
+                    ))}
                   </div>
                 </div>
               );
@@ -581,8 +568,15 @@ function MyAssignments() {
               return (
                 <div style={{ marginBottom: '32px' }}>
                   <h2 style={{ marginBottom: '16px', fontSize: '20px', fontWeight: '700', color: '#0F172A' }}>Vedic Life Package</h2>
-                  <div className="ma-grid">
-                    {vedicProgramsAssignments.map((a) => renderAssignmentCard(a)).filter(Boolean)}
+                  <div className="ws-grid">
+                    {vedicProgramsAssignments.map((a) => (
+                      <AssignmentCard
+                        key={a.id}
+                        a={a}
+                        onComplete={handleComplete}
+                        onDelete={handleDelete}
+                      />
+                    ))}
                   </div>
                 </div>
               );

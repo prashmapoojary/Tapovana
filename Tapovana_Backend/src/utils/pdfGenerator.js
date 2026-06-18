@@ -1,27 +1,23 @@
 const PDFDocument = require('pdfkit');
-const https = require('https');
+const fs = require('fs');
+const path = require('path');
 
 let cachedLogoBuffer = null;
 
 /**
- * Fetch remote logo image buffer. Caches buffer in memory to keep subsequent generation calls fast.
+ * Fetch local logo image buffer. Caches buffer in memory to keep subsequent generation calls fast.
  */
 function getLogoBuffer() {
     if (cachedLogoBuffer) return Promise.resolve(cachedLogoBuffer);
     return new Promise((resolve) => {
-        https.get('https://i.postimg.cc/5X7w5TCQ/logo.png', (res) => {
-            if (res.statusCode !== 200) {
-                return resolve(null);
-            }
-            const chunks = [];
-            res.on('data', (chunk) => chunks.push(chunk));
-            res.on('end', () => {
-                cachedLogoBuffer = Buffer.concat(chunks);
-                resolve(cachedLogoBuffer);
-            });
-        }).on('error', () => {
+        try {
+            const logoPath = path.join(__dirname, '../../Tapovana_Frontend/src/assets/logo.png');
+            cachedLogoBuffer = fs.readFileSync(logoPath);
+            resolve(cachedLogoBuffer);
+        } catch (err) {
+            console.warn('Failed to load local logo, falling back to text:', err);
             resolve(null);
-        });
+        }
     });
 }
 

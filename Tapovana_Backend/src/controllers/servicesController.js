@@ -122,8 +122,18 @@ const sendEmailForAllocation = async (staffId, service) => {
     }
 };
 
+// Helper: Validate UUID
+const isValidUUID = (id) => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(id);
+};
+
 // Helper: Allocate a single staff member
 const allocateStaffMember = async (staffId, service) => {
+    if (!isValidUUID(staffId)) {
+        console.warn('allocateStaffMember: skipping invalid UUID:', staffId);
+        return;
+    }
     const allocationDetails = {
         id: service.id,
         type: 'service',
@@ -133,23 +143,35 @@ const allocateStaffMember = async (staffId, service) => {
         endDate: null
     };
 
-    await query(
-        'UPDATE team_members SET availability_status = $1, allocation_details = $2::jsonb WHERE id = $3 AND status = $4',
-        ['Allocated', JSON.stringify(allocationDetails), staffId, 'active']
-    );
+    try {
+        await query(
+            'UPDATE team_members SET availability_status = $1, allocation_details = $2::jsonb WHERE id = $3 AND status = $4',
+            ['Allocated', JSON.stringify(allocationDetails), staffId, 'active']
+        );
 
-    // Send email notification (fire and forget - don't block)
-    if (service.status !== 'DRAFT') {
-        await sendEmailForAllocation(staffId, service);
+        // Send email notification (fire and forget - don't block)
+        if (service.status !== 'DRAFT') {
+            await sendEmailForAllocation(staffId, service);
+        }
+    } catch (err) {
+        console.error('allocateStaffMember error:', err);
     }
 };
 
 // Helper: Deallocate a single staff member
 const deallocateStaffMember = async (staffId) => {
-    await query(
-        'UPDATE team_members SET availability_status = $1, allocation_details = NULL WHERE id = $2 AND availability_status = $3',
-        ['Available', staffId, 'Allocated']
-    );
+    if (!isValidUUID(staffId)) {
+        console.warn('deallocateStaffMember: skipping invalid UUID:', staffId);
+        return;
+    }
+    try {
+        await query(
+            'UPDATE team_members SET availability_status = $1, allocation_details = NULL WHERE id = $2 AND availability_status = $3',
+            ['Available', staffId, 'Allocated']
+        );
+    } catch (err) {
+        console.error('deallocateStaffMember error:', err);
+    }
 };
 
 // GET ALL SERVICES
@@ -238,8 +260,9 @@ const createService = async (req, res) => {
         const staffIds = assigned_staff_ids || [];
 
         let staffDetails = [];
-        if (staffIds.length > 0) {
-            const staffResult = await query('SELECT id, first_name, last_name, email FROM team_members WHERE id = ANY($1::uuid[])', [staffIds]);
+        const validStaffIds = staffIds.filter(isValidUUID);
+        if (validStaffIds.length > 0) {
+            const staffResult = await query('SELECT id, first_name, last_name, email FROM team_members WHERE id = ANY($1::uuid[])', [validStaffIds]);
             staffDetails = staffResult.rows.map(r => ({
                 id: r.id,
                 name: `${r.first_name} ${r.last_name}`.trim(),
@@ -260,7 +283,7 @@ const createService = async (req, res) => {
 
         const service = result.rows[0];
 
-        for (const staffId of staffIds) {
+        for (const staffId of validStaffIds) {
             await allocateStaffMember(staffId, service);
         }
 
@@ -319,9 +342,10 @@ const updateService = async (req, res) => {
             fields.push('assigned_staff_ids = $' + idx++);
             values.push(JSON.stringify(assigned_staff_ids));
 
+            const validAssignedStaffIds = assigned_staff_ids.filter(isValidUUID);
             let staffDetails = [];
-            if (assigned_staff_ids.length > 0) {
-                const staffResult = await query('SELECT id, first_name, last_name, email FROM team_members WHERE id = ANY($1::uuid[])', [assigned_staff_ids]);
+            if (validAssignedStaffIds.length > 0) {
+                const staffResult = await query('SELECT id, first_name, last_name, email FROM team_members WHERE id = ANY($1::uuid[])', [validAssignedStaffIds]);
                 staffDetails = staffResult.rows.map(r => ({
                     id: r.id,
                     name: `${r.first_name} ${r.last_name}`.trim(),
@@ -331,8 +355,8 @@ const updateService = async (req, res) => {
             fields.push('assigned_staff_details = $' + idx++);
             values.push(JSON.stringify(staffDetails));
 
-            const removedStaff = oldStaffIds.filter(id => !assigned_staff_ids.includes(id));
-            const addedStaff = assigned_staff_ids.filter(id => !oldStaffIds.includes(id));
+            const removedStaff = oldStaffIds.filter(id => !validAssignedStaffIds.includes(id));
+            const addedStaff = validAssignedStaffIds.filter(id => !oldStaffIds.includes(id));
 
             for (const staffId of removedStaff) {
                 await deallocateStaffMember(staffId);
@@ -379,7 +403,8 @@ const deleteService = async (req, res) => {
         const service = await query('SELECT assigned_staff_ids FROM services WHERE id = $1', [req.params.id]);
         if (service.rows.length && service.rows[0].assigned_staff_ids) {
             const staffIds = service.rows[0].assigned_staff_ids;
-            for (const staffId of staffIds) {
+            const validStaffIds = staffIds.filter(isValidUUID);
+            for (const staffId of validStaffIds) {
                 await deallocateStaffMember(staffId);
             }
         }
@@ -411,12 +436,13 @@ const updateServiceStaff = async (req, res) => {
         const service = serviceResult.rows[0];
         const oldStaffIds = service.assigned_staff_ids || [];
 
-        const removedStaff = oldStaffIds.filter(id => !assigned_staff_ids.includes(id));
-        const addedStaff = assigned_staff_ids.filter(id => !oldStaffIds.includes(id));
+        const validAssignedStaffIds = assigned_staff_ids.filter(isValidUUID);
+        const removedStaff = oldStaffIds.filter(id => !validAssignedStaffIds.includes(id));
+        const addedStaff = validAssignedStaffIds.filter(id => !oldStaffIds.includes(id));
 
         let staffDetails = [];
-        if (assigned_staff_ids.length > 0) {
-            const staffResult = await query('SELECT id, first_name, last_name, email FROM team_members WHERE id = ANY($1::uuid[])', [assigned_staff_ids]);
+        if (validAssignedStaffIds.length > 0) {
+            const staffResult = await query('SELECT id, first_name, last_name, email FROM team_members WHERE id = ANY($1::uuid[])', [validAssignedStaffIds]);
             staffDetails = staffResult.rows.map(r => ({
                 id: r.id,
                 name: `${r.first_name} ${r.last_name}`.trim(),
@@ -454,20 +480,34 @@ const completeServiceAllocation = async (req, res) => {
     }
 
     try {
-        const serviceResult = await query('SELECT * FROM services WHERE id = $1', [req.params.id]);
-        if (!serviceResult.rows.length) {
-            return res.status(404).json({ success: false, message: 'Service not found.' });
+        // Only try to update service if id is a valid UUID
+        if (isValidUUID(req.params.id)) {
+            const serviceResult = await query('SELECT * FROM services WHERE id = $1', [req.params.id]);
+            if (!serviceResult.rows.length) {
+                return res.status(404).json({ success: false, message: 'Service not found.' });
+            }
+
+            const service = serviceResult.rows[0];
+            let staffIds = service.assigned_staff_ids || [];
+            staffIds = staffIds.filter(id => String(id) !== String(staff_id));
+
+            let staffDetails = service.assigned_staff_details || [];
+            staffDetails = staffDetails.filter(s => String(s.id) !== String(staff_id));
+
+            await query('UPDATE services SET assigned_staff_ids = $1, assigned_staff_details = $2 WHERE id = $3', [JSON.stringify(staffIds), JSON.stringify(staffDetails), req.params.id]);
         }
-
-        const service = serviceResult.rows[0];
-        let staffIds = service.assigned_staff_ids || [];
-        staffIds = staffIds.filter(id => id !== staff_id);
-
-        let staffDetails = service.assigned_staff_details || [];
-        staffDetails = staffDetails.filter(s => s.id !== staff_id);
-
-        await query('UPDATE services SET assigned_staff_ids = $1, assigned_staff_details = $2 WHERE id = $3', [JSON.stringify(staffIds), JSON.stringify(staffDetails), req.params.id]);
-        await deallocateStaffMember(staff_id);
+        
+        // Only call deallocateStaffMember if staff_id is a valid UUID
+        if (isValidUUID(staff_id)) {
+            try {
+                await deallocateStaffMember(staff_id);
+            } catch (deallocErr) {
+                // Ignore if staff_id isn't found
+                console.warn('completeServiceAllocation: deallocateStaffMember skipped (staff not found):', deallocErr.message);
+            }
+        } else {
+            console.warn('completeServiceAllocation: deallocateStaffMember skipped (invalid UUID):', staff_id);
+        }
 
         return res.json({ success: true, message: 'Staff allocation completed. Staff is now Available.' });
     } catch (err) {
@@ -480,7 +520,12 @@ const completeServiceAllocation = async (req, res) => {
 const getServiceAllocations = async (req, res) => {
     try {
         const result = await query(
-            'SELECT s.id AS service_id, s.name, s.assigned_staff_ids, tm.id AS staff_id, tm.first_name, tm.last_name, tm.email, tm.role_id, r.name AS role, tm.availability_status, tm.allocation_details FROM services s LEFT JOIN team_members tm ON tm.id = ANY(SELECT jsonb_array_elements_text(s.assigned_staff_ids)::uuid) LEFT JOIN roles r ON r.id = tm.role_id WHERE s.id = $1',
+            `SELECT s.id AS service_id, s.name, s.assigned_staff_ids, tm.id AS staff_id, tm.first_name, tm.last_name, tm.email, tm.role_id, r.name AS role, tm.availability_status, tm.allocation_details 
+             FROM services s 
+             LEFT JOIN LATERAL jsonb_array_elements_text(s.assigned_staff_ids) AS staff_id_text ON true
+             LEFT JOIN team_members tm ON tm.id::text = staff_id_text 
+             LEFT JOIN roles r ON r.id = tm.role_id 
+             WHERE s.id = $1`,
             [req.params.id]
         );
 
@@ -527,7 +572,7 @@ const getMyAssignments = async (req, res) => {
         );
 
         for (const alloc of allocationsResult.rows) {
-            assignments.push({
+            const assignment = {
                 id: alloc.id,
                 type: alloc.type,
                 staffId: userId,
@@ -540,7 +585,39 @@ const getMyAssignments = async (req, res) => {
                 endDate: alloc.end_date,
                 status: alloc.status,
                 createdAt: alloc.created_at
-            });
+            };
+
+            // Fetch image based on type
+            if (alloc.type === 'service' && isValidUUID(alloc.session_id)) {
+                try {
+                    const serviceResult = await query('SELECT image_url, image FROM services WHERE id = $1', [alloc.session_id]);
+                    if (serviceResult.rows.length) {
+                        assignment.service_image_name = serviceResult.rows[0].image_url || serviceResult.rows[0].image;
+                    }
+                } catch (e) {
+                    console.error('Error fetching service image:', e);
+                }
+            } else if (alloc.type === 'workshop' && isValidUUID(alloc.session_id)) {
+                try {
+                    const workshopResult = await query('SELECT image_url, image, image_base64 FROM workshops WHERE id = $1', [alloc.session_id]);
+                    if (workshopResult.rows.length) {
+                        assignment.workshop_image_name = workshopResult.rows[0].image_url || workshopResult.rows[0].image || workshopResult.rows[0].image_base64;
+                    }
+                } catch (e) {
+                    console.error('Error fetching workshop image:', e);
+                }
+            } else if (alloc.type === 'vedic_program' && isValidUUID(alloc.session_id)) {
+                try {
+                    const vedicResult = await query('SELECT image_url, image, image_base64 FROM vedic_programs WHERE id = $1', [alloc.session_id]);
+                    if (vedicResult.rows.length) {
+                        assignment.vediclife_image_name = vedicResult.rows[0].image_url || vedicResult.rows[0].image || vedicResult.rows[0].image_base64;
+                    }
+                } catch (e) {
+                    console.error('Error fetching vedic program image:', e);
+                }
+            }
+
+            assignments.push(assignment);
         }
 
         return res.json({ success: true, assignments });

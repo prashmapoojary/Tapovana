@@ -224,7 +224,7 @@ function WorkshopCard({ w, onClick }) {
 
 // ─── Main Component ─────────────────────────────────────────────────────
 export default function Workshops() {
-  const { allocateStaff } = useAllocations();
+  const { allocateStaff, triggerAlert } = useAllocations();
   const [workshops, setWorkshops] = useState([]);
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [mediaTarget, setMediaTarget] = useState(null); // 'add_image', 'add_video', 'edit_image', 'edit_video'
@@ -252,9 +252,6 @@ export default function Workshops() {
   };
   const [dataLoading, setDataLoading] = useState(true);
   const [instructors, setInstructors] = useState([]);
-  const [toast, setToast] = useState(null);
-  const [toastType, setToastType] = useState('success');
-  const toastTimerRef = useRef(null);
   const [videoProgress, setVideoProgress] = useState(null);
 
   // Filters
@@ -328,7 +325,7 @@ export default function Workshops() {
       const elapsed = getElapsedLiveSeconds(ws);
       if (video.currentTime > elapsed + 1.5) {
         video.currentTime = Math.min(elapsed, lastTimeRef.current);
-        alert("Forward seeking disabled during live session.");
+        triggerAlert("Forward seeking disabled during live session.", false);
       } else {
         lastTimeRef.current = video.currentTime;
       }
@@ -343,7 +340,7 @@ export default function Workshops() {
       const elapsed = getElapsedLiveSeconds(ws);
       if (video.currentTime > elapsed + 1.5) {
         video.currentTime = Math.min(elapsed, lastTimeRef.current);
-        alert("Forward seeking disabled during live session.");
+        triggerAlert("Forward seeking disabled during live session.", false);
       }
     }
   };
@@ -437,30 +434,30 @@ export default function Workshops() {
         errMsg = "This workshop is completed. Staff assignment and enrollment are disabled.";
       }
       setManualEnrollError(errMsg);
-      showToast(errMsg, 'error');
+      triggerAlert(errMsg, false);
       return;
     }
     if (!manualEnrollForm.name.trim() || !manualEnrollForm.email.trim()) {
       setManualEnrollError("Name and Email are required.");
-      showToast("Validation failed. Please check inputs.", 'error');
+      triggerAlert("Validation failed. Please check inputs.", false);
       return;
     }
     // Name: Alphabetic only
     if (!/^[A-Za-z\s]+$/.test(manualEnrollForm.name.trim())) {
       setManualEnrollError("Name must contain only alphabets.");
-      showToast("Validation failed. Please check inputs.", 'error');
+      triggerAlert("Validation failed. Please check inputs.", false);
       return;
     }
     // Email: Must end with .com
     if (!/^[^\s@]+@[^\s@]+\.com$/i.test(manualEnrollForm.email.trim())) {
       setManualEnrollError("Email must end with .com (e.g., @gmail.com).");
-      showToast("Validation failed. Please check inputs.", 'error');
+      triggerAlert("Validation failed. Please check inputs.", false);
       return;
     }
     // Phone: Must be exactly 10 digits (if provided)
     if (manualEnrollForm.phone && !/^\d{10}$/.test(manualEnrollForm.phone.trim())) {
       setManualEnrollError("Phone number must be exactly 10 digits.");
-      showToast("Validation failed. Please check inputs.", 'error');
+      triggerAlert("Validation failed. Please check inputs.", false);
       return;
     }
     try {
@@ -470,7 +467,7 @@ export default function Workshops() {
         body: JSON.stringify(manualEnrollForm)
       });
       if (res.success) {
-        showToast("User enrolled successfully!");
+        triggerAlert("User enrolled successfully!", true);
         setManualEnrollForm({ name: "", email: "", phone: "" });
         setPhoneError("");
         setShowManualEnroll(false);
@@ -494,13 +491,13 @@ export default function Workshops() {
         body: JSON.stringify({ status })
       });
       if (res.success) {
-        showToast(`Marked attendee as ${status}.`);
+        triggerAlert(`Marked attendee as ${status}.`, true);
         setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, status } : a));
       } else {
         throw new Error(res.message || "Failed to update attendance.");
       }
     } catch (err) {
-      showToast(err.message || "Failed to update attendance.", 'error');
+      triggerAlert(err.message || "Failed to update attendance.", false);
     }
   };
 
@@ -513,7 +510,7 @@ export default function Workshops() {
         method: "DELETE"
       });
       if (res.success) {
-        showToast("Attendee deleted successfully.");
+        triggerAlert("Attendee deleted successfully.", true);
         setAttendees(res.attendees || []);
         fetchWorkshops();
         setSelectedWs(prev => ({ ...prev, enrolled: Math.max(0, (prev.enrolled || 0) - 1) }));
@@ -521,7 +518,7 @@ export default function Workshops() {
         throw new Error(res.message || "Failed to delete attendee.");
       }
     } catch (err) {
-      showToast(err.message || "Failed to delete attendee.", 'error');
+      triggerAlert(err.message || "Failed to delete attendee.", false);
     }
   };
 
@@ -547,9 +544,9 @@ export default function Workshops() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-      showToast("CSV exported successfully.");
+      triggerAlert("CSV exported successfully.", true);
     } catch (err) {
-      showToast(err.message || "Failed to export CSV.", 'error');
+      triggerAlert(err.message || "Failed to export CSV.", false);
     }
   };
 
@@ -588,7 +585,7 @@ export default function Workshops() {
       else throw new Error("API returned failure");
     } catch (err) {
       console.error("fetchWorkshops error:", err);
-      showToast(err.message || "Failed to load workshops.", 'error');
+      triggerAlert(err.message || "Failed to load workshops.", false);
     } finally {
       setDataLoading(false);
     }
@@ -700,9 +697,9 @@ export default function Workshops() {
   // ─── Save edit ─────────────────────────────────────────────────────────
   const handleSaveEdit = async () => {
     setEditError("");
-    if (!editForm.title.trim()) { setEditError("Title is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (!editForm.instructor_id) { setEditError("Instructor selection is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (editForm.price === "" || Number(editForm.price) <= 0) { setEditError("Price must be greater than 0"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!editForm.title.trim()) { setEditError("Title is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (!editForm.instructor_id) { setEditError("Instructor selection is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (editForm.price === "" || Number(editForm.price) <= 0) { setEditError("Price must be greater than 0"); triggerAlert("Validation failed. Please check inputs.", false); return; }
 
     const parseDateInput = (dateStr) => {
       if (!dateStr) return null;
@@ -724,7 +721,7 @@ export default function Workshops() {
       
       if (selectedMidnight < today) {
         setEditError("Cannot schedule a workshop on a past date.");
-        showToast("Validation failed. Please check inputs.", 'error');
+        triggerAlert("Validation failed. Please check inputs.", false);
         return;
       }
     }
@@ -735,7 +732,7 @@ export default function Workshops() {
       if (isStaffChanged) {
         const errMsg = "This workshop is completed. Staff assignment and enrollment are disabled.";
         setEditError(errMsg);
-        showToast(errMsg, 'error');
+        triggerAlert(errMsg, false);
         return;
       }
     }
@@ -771,7 +768,7 @@ export default function Workshops() {
             setVideoProgress(percent);
           });
         } catch (uploadErr) {
-          showToast(`Changes saved but video upload failed: ${uploadErr.message}`, 'error');
+          triggerAlert(`Changes saved but video upload failed: ${uploadErr.message}`, false);
         } finally {
           setVideoProgress(null);
         }
@@ -784,7 +781,7 @@ export default function Workshops() {
         image_url: editForm.image_base64 || editForm.image_url
       }));
       setIsEditing(false);
-      showToast("Workshop updated!");
+      triggerAlert("Workshop updated!", true);
     } catch (err) {
       setEditError(err.message || "Failed to update workshop");
     } finally {
@@ -796,11 +793,11 @@ export default function Workshops() {
   const handleDeleteWorkshop = () => {
     const liveStatus = selectedWs._liveStatus || getLiveStatus(selectedWs);
     if (liveStatus === "live" || liveStatus === "ongoing") {
-      showToast("Cannot delete a live/ongoing workshop.", 'error');
+      triggerAlert("Cannot delete a live/ongoing workshop.", false);
       return;
     }
     if (liveStatus === "completed") {
-      showToast("Cannot delete a completed workshop. Only upcoming workshops can be deleted.", 'error');
+      triggerAlert("Cannot delete a completed workshop. Only upcoming workshops can be deleted.", false);
       return;
     }
     setShowDeleteConfirm(true);
@@ -814,15 +811,15 @@ export default function Workshops() {
         // It's a dummy local workshop, just remove it locally
         setWorkshops(prev => prev.filter(w => w.id !== selectedWs.id));
         setSelectedWs(null);
-        showToast("Workshop deleted successfully!");
+        triggerAlert("Workshop deleted successfully!", true);
         return;
       }
       await apiFetch("/api/workshops/" + selectedWs.id, { method: "DELETE" });
       await fetchWorkshops();
       setSelectedWs(null);
-      showToast("Workshop deleted successfully!");
+      triggerAlert("Workshop deleted successfully!", true);
     } catch (e) {
-      showToast("Failed to delete workshop: " + e.message, 'error');
+      triggerAlert("Failed to delete workshop: " + e.message, false);
     } finally {
       setEditSaving(false);
     }
@@ -846,11 +843,11 @@ export default function Workshops() {
   // ─── Create Workshop ───────────────────────────────────────────────────
   const handleCreateWorkshop = async () => {
     setAddError("");
-    if (!addForm.title.trim()) { setAddError("Title is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (!addForm.instructor_id) { setAddError("Instructor selection is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (!addForm.date) { setAddError("Date is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (!addForm.price) { setAddError("Price is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (Number(addForm.price) <= 0) { setAddError("Price must be greater than 0"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!addForm.title.trim()) { setAddError("Title is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (!addForm.instructor_id) { setAddError("Instructor selection is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (!addForm.date) { setAddError("Date is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (!addForm.price) { setAddError("Price is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (Number(addForm.price) <= 0) { setAddError("Price must be greater than 0"); triggerAlert("Validation failed. Please check inputs.", false); return; }
 
     const parseDateInput = (dateStr) => {
       if (!dateStr) return null;
@@ -872,7 +869,7 @@ export default function Workshops() {
       
       if (selectedMidnight < today) {
         setAddError("Cannot schedule a workshop on a past date.");
-        showToast("Validation failed. Please check inputs.", 'error');
+        triggerAlert("Validation failed. Please check inputs.", false);
         return;
       }
     }
@@ -880,7 +877,7 @@ export default function Workshops() {
     // Check staff allocation conflict attempts
     if (addForm.instructor_id && addForm.instructor_id === attemptedInstructorId && allocationAttempts >= 3) {
       setAddError("Allocation attempt 3 failed, please reassign staff.");
-      showToast("Validation failed. Please check inputs.", 'error');
+      triggerAlert("Validation failed. Please check inputs.", false);
       setAllocationAttempts(0);
       return;
     }
@@ -917,7 +914,7 @@ export default function Workshops() {
               setVideoProgress(percent);
             });
           } catch (uploadErr) {
-            showToast(`Workshop created but video upload failed: ${uploadErr.message}`, 'error');
+            triggerAlert(`Workshop created but video upload failed: ${uploadErr.message}`, false);
           } finally {
             setVideoProgress(null);
           }
@@ -932,7 +929,7 @@ export default function Workshops() {
         await fetchWorkshops();
         setShowAddModal(false);
         setAddForm(BLANK_FORM);
-        showToast("Workshop created successfully");
+        triggerAlert("Workshop created successfully", true);
       } else {
         throw new Error(res.message || "Failed to create workshop");
       }
@@ -952,7 +949,7 @@ export default function Workshops() {
       } else {
         setAddError(err.message || "Error creating workshop");
       }
-      showToast("Error creating workshop", 'error');
+      triggerAlert("Error creating workshop", false);
     } finally {
       setAddSaving(false);
     }
@@ -961,7 +958,7 @@ export default function Workshops() {
   // ─── Image file upload handler ──────────────────────────────────────────
   const handleImageFile = async (target, file) => {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { showToast("Image must be less than 5MB", 'error'); return; }
+    if (file.size > 5 * 1024 * 1024) { triggerAlert("Image must be less than 5MB", false); return; }
     const base64 = await fileToBase64(file);
     if (target === "add") {
       setAddForm(prev => ({ ...prev, image_base64: base64, image_url: "" }));
@@ -1002,13 +999,6 @@ export default function Workshops() {
     } else {
       setEditForm(prev => ({ ...prev, instructor_id: instructorId, instructor_name: name }));
     }
-  };
-
-  const showToast = (msg, type = 'success') => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToastType(type);
-    setToast(msg);
-    toastTimerRef.current = setTimeout(() => { setToast(null); toastTimerRef.current = null; }, 4000);
   };
 
   // ─── Render edit form ──────────────────────────────────────────────────
@@ -1686,21 +1676,6 @@ export default function Workshops() {
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-          background: '#1A1A1A', border: '2px solid #CDA751', borderRadius: '12px',
-          padding: '18px 32px', zIndex: 2147483647, display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
-          boxShadow: '0 8px 32px rgba(205,167,81,0.25)',
-          color: toastType === 'error' ? '#EF4444' : (toastType === 'info' ? '#E2E8F0' : '#4ADE80'),
-          animation: 'wsFadeIn 0.3s ease-out', minWidth: 220, textAlign: 'center'
-        }}>
-          <span style={{ fontSize: 20 }}>{toastType === 'error' ? '⚠' : '✓'}</span>
-          <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.3px' }}>{toast}</span>
         </div>
       )}
 

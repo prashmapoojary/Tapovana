@@ -5,6 +5,7 @@ import AnimatedNumber from "../utils/AnimatedNumber";
 import ActionIcon from "../assets/Button.svg";
 import DefaultAvatar from "../assets/profileIconDefault.png";
 import EnrollMemberDrawer from "./EnrollMemberDrawer";
+import { useAllocations } from "../utils/AllocationContext";
 
 // ── Tier Configuration ─────────────────────────────────────────────────
 const TIER_CONFIG = {
@@ -97,6 +98,7 @@ export default function Membership() {
   const [members, setMembers] = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [tierConfig, setTierConfig] = useState(TIER_CONFIG);
+  const { triggerAlert, triggerConfirm } = useAllocations();
 
   // Filters
   const [search, setSearch] = useState("");
@@ -121,10 +123,8 @@ export default function Membership() {
   const [enrollSaving, setEnrollSaving] = useState(false);
   const [enrollError, setEnrollError] = useState("");
 
-  // Action menu & toast
+  // Action menu
   const [openActionMenu, setOpenActionMenu] = useState(null);
-  const [toast, setToast] = useState({ visible: false, message: "", type: "" });
-  const [confirmModal, setConfirmModal] = useState({ visible: false, title: "", desc: "", onConfirm: null });
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -135,11 +135,6 @@ export default function Membership() {
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
-
-  const showToast = (message, type = "success") => {
-    setToast({ visible: true, message, type });
-    setTimeout(() => setToast({ visible: false, message: "", type: "" }), 3000);
-  };
 
   // ─── Fetch tiers from admin backend ─────────────────────────────────
   const fetchTiers = useCallback(async () => {
@@ -241,7 +236,7 @@ export default function Membership() {
       setMembers(merged);
     } catch {
       setMembers([]);
-      showToast("Failed to load members.", "error");
+      triggerAlert("Failed to load members.");
     } finally {
       setDataLoading(false);
     }
@@ -317,7 +312,7 @@ export default function Membership() {
   const handleUpgrade = async () => {
     if (!selectedMember || !newTier || newTier === selectedMember.tier) return;
     if (selectedMember.source !== "admin") {
-      showToast("Mobile members can only be managed via sync.", "info");
+      triggerAlert("Mobile members can only be managed via sync.");
       return;
     }
     try {
@@ -329,9 +324,9 @@ export default function Membership() {
       setMembers(prev => prev.map(m => m.id === selectedMember.id ? { ...m, tier: newTier } : m));
       setSelectedMember(prev => ({ ...prev, tier: newTier }));
       setUpgradeSuccess(true);
-      showToast("Tier updated successfully!");
+      triggerAlert("Tier updated successfully!", true);
     } catch {
-      showToast("Failed to update tier.", "error");
+      triggerAlert("Failed to update tier.");
     } finally {
       setUpgradeSaving(false);
       setTimeout(() => setUpgradeSuccess(false), 2500);
@@ -360,7 +355,7 @@ export default function Membership() {
     }));
     setTierSaving(false);
     setEditingTier(null);
-    showToast("Tier config updated!");
+    triggerAlert("Tier config updated!", true);
   };
 
   // ─── Enroll Member ───────────────────────────────────────────────────
@@ -393,7 +388,7 @@ export default function Membership() {
       });
       if (res.success) {
         await fetchMembers();
-        showToast("Member enrolled successfully.", "success");
+        triggerAlert("Member enrolled successfully.", true);
       } else throw new Error();
     } catch {
       setMembers(prev => [{
@@ -409,7 +404,7 @@ export default function Membership() {
         status: "pending",
         source: "admin"
       }, ...prev]);
-      showToast("Member enrolled successfully.", "success");
+      triggerAlert("Member enrolled successfully.", true);
     } finally {
       setEnrollSaving(false);
       setShowEnrollModal(false);
@@ -418,53 +413,141 @@ export default function Membership() {
   };
 
   // ─── Admin Actions ──────────────────────────────────────────────────
-  const triggerAction = (e, memberId, title, desc, onConfirmFn) => {
-    e.stopPropagation();
-    setOpenActionMenu(null);
-    setConfirmModal({ visible: true, title, desc, onConfirm: () => { onConfirmFn(); setConfirmModal({ visible: false, title: "", desc: "", onConfirm: null }); } });
-  };
-
-  const handleAccept = (e, memberId) => {
-    triggerAction(e, memberId, "Activate Membership", "Are you sure?", () => {
+  const handleAccept = async (e, memberId) => {
+    const member = members.find(m => m.id === memberId);
+    if (!member || member.source !== "admin") {
+      triggerAlert("Mobile members are managed via sync only.");
+      return;
+    }
+    
+    const confirmed = await triggerConfirm("Are you sure you want to activate this membership?");
+    if (!confirmed) return;
+    
+    try {
+      await apiFetch(`/api/memberships/${memberId.replace("admin-", "")}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "active" })
+      });
       setMembers(prev => prev.map(m => m.id === memberId ? { ...m, status: "active" } : m));
-      showToast("Membership activated.");
-    });
+      if (selectedMember?.id === memberId) {
+        setSelectedMember(prev => ({ ...prev, status: "active" }));
+      }
+      triggerAlert("Membership activated.", true);
+    } catch (err) {
+      triggerAlert("Failed to activate membership.");
+    }
   };
 
-  const handleReject = (e, memberId) => {
-    triggerAction(e, memberId, "Reject Membership", "Reject this membership?", () => {
+  const handleReject = async (e, memberId) => {
+    const member = members.find(m => m.id === memberId);
+    if (!member || member.source !== "admin") {
+      triggerAlert("Mobile members are managed via sync only.");
+      return;
+    }
+
+    const confirmed = await triggerConfirm("Reject this membership?");
+    if (!confirmed) return;
+
+    try {
+      await apiFetch(`/api/memberships/${memberId.replace("admin-", "")}`, {
+        method: "DELETE"
+      });
       setMembers(prev => prev.filter(m => m.id !== memberId));
-      showToast("Membership rejected.", "error");
-    });
+      if (selectedMember?.id === memberId) setSelectedMember(null);
+      triggerAlert("Membership rejected.");
+    } catch (err) {
+      triggerAlert("Failed to reject membership.");
+    }
   };
 
-  const handleDeactivate = (e, memberId) => {
-    triggerAction(e, memberId, "Deactivate Membership", "Deactivate this membership?", () => {
+  const handleDeactivate = async (e, memberId) => {
+    const member = members.find(m => m.id === memberId);
+    if (!member || member.source !== "admin") {
+      triggerAlert("Mobile members are managed via sync only.");
+      return;
+    }
+
+    const confirmed = await triggerConfirm("Deactivate this membership?");
+    if (!confirmed) return;
+
+    try {
+      await apiFetch(`/api/memberships/${memberId.replace("admin-", "")}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "inactive" })
+      });
       setMembers(prev => prev.map(m => m.id === memberId ? { ...m, status: "inactive" } : m));
-      showToast("Membership deactivated.", "info");
-    });
+      if (selectedMember?.id === memberId) {
+        setSelectedMember(prev => ({ ...prev, status: "inactive" }));
+      }
+      triggerAlert("Membership deactivated.");
+    } catch (err) {
+      triggerAlert("Failed to deactivate membership.");
+    }
   };
 
-  const handleRenew = (e, memberId) => {
-    triggerAction(e, memberId, "Renew Membership", "Renew for another year?", () => {
+  const handleRenew = async (e, memberId) => {
+    const member = members.find(m => m.id === memberId);
+    if (!member || member.source !== "admin") {
+      triggerAlert("Mobile members are managed via sync only.");
+      return;
+    }
+
+    const confirmed = await triggerConfirm("Renew this membership for another year?");
+    if (!confirmed) return;
+
+    try {
+      const newExpiry = new Date(member.expiryDate);
+      newExpiry.setFullYear(newExpiry.getFullYear() + 1);
+      
+      await apiFetch(`/api/memberships/${memberId.replace("admin-", "")}`, {
+        method: "PATCH",
+        body: JSON.stringify({ 
+          status: "active",
+          expiry_date: newExpiry.toISOString().split("T")[0] 
+        })
+      });
+      
       setMembers(prev => prev.map(m => {
         if (m.id === memberId) {
-          const newExpiry = new Date(m.expiryDate);
-          newExpiry.setFullYear(newExpiry.getFullYear() + 1);
           return { ...m, status: "active", expiryDate: newExpiry.toISOString().split("T")[0] };
         }
         return m;
       }));
-      showToast("Membership renewed.");
-    });
+      
+      if (selectedMember?.id === memberId) {
+        setSelectedMember(prev => ({ 
+          ...prev, 
+          status: "active", 
+          expiryDate: newExpiry.toISOString().split("T")[0] 
+        }));
+      }
+      
+      triggerAlert("Membership renewed.", true);
+    } catch (err) {
+      triggerAlert("Failed to renew membership.");
+    }
   };
 
-  const handleDelete = (e, memberId) => {
-    triggerAction(e, memberId, "Delete Record", "Permanently delete? This cannot be undone.", () => {
+  const handleDelete = async (e, memberId) => {
+    const member = members.find(m => m.id === memberId);
+    if (!member || member.source !== "admin") {
+      triggerAlert("Mobile members are managed via sync only.");
+      return;
+    }
+
+    const confirmed = await triggerConfirm("Permanently delete this record? This cannot be undone.");
+    if (!confirmed) return;
+
+    try {
+      await apiFetch(`/api/memberships/${memberId.replace("admin-", "")}`, {
+        method: "DELETE"
+      });
       setMembers(prev => prev.filter(m => m.id !== memberId));
       if (selectedMember?.id === memberId) setSelectedMember(null);
-      showToast("Record deleted.", "error");
-    });
+      triggerAlert("Record deleted.");
+    } catch (err) {
+      triggerAlert("Failed to delete record.");
+    }
   };
 
   const inputStyle = {
@@ -482,44 +565,12 @@ export default function Membership() {
   // ── RENDER ──────────────────────────────────────────────────────────
   return (
     <div className="mem-container">
-      {/* Toast */}
-      {toast.visible && (
-        <div style={{
-          position: "fixed", top: "20px", right: "20px", zIndex: 10001,
-          background: "#fff", border: "2px solid #cda751", borderRadius: "8px",
-          padding: "16px 24px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-          color: toast.type === "success" ? "#2e7559" : toast.type === "error" ? "#e53e3e" : "#4a5568",
-          fontWeight: 600, fontSize: "14px", display: "flex", alignItems: "center", gap: "8px",
-        }}>
-          {toast.type === "success" && "✓ "}
-          {toast.type === "error" && "⚠ "}
-          {toast.type === "info" && "ℹ "}
-          {toast.message}
-        </div>
-      )}
-
       <EnrollMemberDrawer
         isOpen={showEnrollModal}
         onClose={() => setShowEnrollModal(false)}
         onSaved={fetchMembers}
-        onShowToast={showToast}
+        onShowToast={triggerAlert}
       />
-
-      {/* Confirm Modal */}
-      {confirmModal.visible && (
-        <div className="global-alert-overlay" style={{ zIndex: 10002, position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div className="global-alert-modal" style={{ background: "white", padding: "24px", borderRadius: "12px", width: "400px", maxWidth: "90vw", boxShadow: "0 20px 40px rgba(0,0,0,0.2)" }}>
-            <h3 style={{ margin: "0 0 12px 0", fontSize: "18px", color: "#2d3748" }}>{confirmModal.title}</h3>
-            <p style={{ margin: "0 0 24px 0", fontSize: "14px", color: "#718096" }}>{confirmModal.desc}</p>
-            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-              <button onClick={() => setConfirmModal({ visible: false, title: "", desc: "", onConfirm: null })}
-                style={{ padding: "8px 16px", borderRadius: "6px", border: "1px solid #e2e8f0", background: "white", color: "#4a5568", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
-              <button onClick={confirmModal.onConfirm}
-                style={{ padding: "8px 16px", borderRadius: "6px", border: "none", background: "#cda751", color: "white", fontWeight: 600, cursor: "pointer" }}>Confirm</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Header */}
       <header className="mem-header">

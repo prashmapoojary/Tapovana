@@ -156,6 +156,52 @@ Tapovana Admin Team
     const sessionStart = new Date(session.startDate || session.date || session.start_date);
     const sessionEnd = sessionEndDate;
 
+    // ── Get date of this new allocation (normalized to just date, no time) ──
+    const allocDate = new Date(sessionStart);
+    allocDate.setHours(0, 0, 0, 0);
+
+    // ── Get staff's active allocations for this date ──
+    const staffAllocationsOnDate = allocations.filter(a => {
+      if (a.staffId !== staffId || a.status === "expired") return false;
+      const aStart = new Date(a.startDate);
+      aStart.setHours(0, 0, 0, 0);
+      return aStart.getTime() === allocDate.getTime();
+    });
+
+    // ── Count current allocations by type ──
+    const serviceCount = staffAllocationsOnDate.filter(a => a.type === "service").length;
+    const workshopCount = staffAllocationsOnDate.filter(a => a.type === "workshop").length;
+    const vedicCount = staffAllocationsOnDate.filter(a => a.type === "vedic_program").length;
+    const totalCount = staffAllocationsOnDate.length;
+
+    // ── Apply allocation rules ──
+    if (vedicCount > 0) {
+      triggerAlert("Staff allocation limit reached for today.", true);
+      return null;
+    }
+
+    if (totalCount >= 3) {
+      triggerAlert("Staff allocation limit reached for today.", true);
+      return null;
+    }
+
+    if (sessionType === "vedic_program") {
+      if (serviceCount > 0 || workshopCount > 0) {
+        triggerAlert("Staff allocation limit reached for today.", true);
+        return null;
+      }
+    } else if (sessionType === "workshop") {
+      if (workshopCount >= 1 || totalCount >= 3) {
+        triggerAlert("Staff allocation limit reached for today.", true);
+        return null;
+      }
+    } else if (sessionType === "service") {
+      if (serviceCount >= 2 || totalCount >= 3) {
+        triggerAlert("Staff allocation limit reached for today.", true);
+        return null;
+      }
+    }
+
     // ── Validation 2: Date-conflict check — same staff, overlapping dates ──
     const hasConflict = sessionType !== "service" && allocations.some((a) => {
       if (a.staffId !== staffId || a.status === "expired" || a.type === "service") return false;

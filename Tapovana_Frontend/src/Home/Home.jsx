@@ -262,6 +262,7 @@ function Home() {
   const fullName = (currentUser?.first_name || "") + (currentUser?.last_name ? ` ${currentUser.last_name}` : "");
 
   const myUserId = currentUser?.user_id || currentUser?.id || "";
+  const [pendingBlogsCount, setPendingBlogsCount] = useState(0);
 
   // Filter allocations for this logged-in therapist/doctor
   const myAllocations = useMemo(() => {
@@ -287,7 +288,7 @@ function Home() {
   }, [myUserId]);
 
   const publishedBlogsCount = myBlogs.filter(b => b.status === "published").length;
-  const pendingBlogsCount = myBlogs.filter(b => b.status === "pending").length;
+  const myPendingBlogsCount = myBlogs.filter(b => b.status === "pending").length;
   const draftBlogsCount = myBlogs.filter(b => b.status === "draft").length;
 
   const quotes = [
@@ -339,14 +340,20 @@ function Home() {
       else if (!data) setLoading(true);
       setError("");
       
-      const res = await apiFetch("/api/analytics/dashboard");
-      if (res.success) {
-        setData(res);
+      const params = new URLSearchParams({
+        filter: dateFilter,
+        ...(dateFilter === 'custom' && customFrom ? { from: customFrom } : {}),
+        ...(dateFilter === 'custom' && customTo ? { to: customTo } : {})
+      });
+      
+      const dashboardRes = await apiFetch(`/api/analytics/dashboard?${params.toString()}`);
+      if (dashboardRes.success) {
+        setData(dashboardRes);
       } else {
-        throw new Error(res.error || "Failed to load dashboard data");
+        throw new Error(dashboardRes.message || "Failed to load dashboard");
       }
     } catch (err) {
-      // Gracefully fall back to demo data when backend is unavailable
+      console.error(err);
       setData(DUMMY_DASHBOARD_DATA);
     } finally {
       setLoading(false);
@@ -354,12 +361,29 @@ function Home() {
     }
   };
 
+  // Fetch pending blogs count for admin
+  useEffect(() => {
+    if (role === "SUPER_ADMIN" || role === "CO_ADMIN") {
+      const fetchPendingBlogs = async () => {
+        try {
+          const res = await apiFetch("/api/blogs?status=pending");
+          if (res.success && res.blogs) {
+            setPendingBlogsCount(res.blogs.length);
+          }
+        } catch (err) {
+          console.error("Failed to fetch pending blogs count:", err);
+        }
+      };
+      fetchPendingBlogs();
+    }
+  }, [role]);
+
   useEffect(() => {
     fetchDashboardData();
     if (role === "SUPER_ADMIN" || role === "CO_ADMIN") {
       fetchConflicts();
     }
-  }, [role, fetchConflicts]);
+  }, [role, fetchConflicts, dateFilter, customFrom, customTo]);
 
   // Formatted date string for the subtitle
   const formattedDate = useMemo(() => {
@@ -371,12 +395,13 @@ function Home() {
     });
   }, []);
 
-  // Render stats cards — merge filter-specific data on top of API data
-  const filterData = FILTER_DATA[dateFilter] || FILTER_DATA.today;
-  const stats = {
-    ...(data?.stats || {}),
-    ...filterData.stats
-  };
+  // Stats from analytics endpoint
+  const stats = data?.stats || FILTER_DATA[dateFilter]?.stats || FILTER_DATA.today.stats;
+  
+  // Trends from analytics endpoint or fallback
+  const bookingTrend = data?.trends?.bookings_last_7_days || FILTER_DATA[dateFilter]?.trends?.bookings_last_7_days || FILTER_DATA.today.trends.bookings_last_7_days;
+  const revenueTrend = data?.trends?.revenue_last_7_days || FILTER_DATA[dateFilter]?.trends?.revenue_last_7_days || FILTER_DATA.today.trends.revenue_last_7_days;
+  const daysOfWeek = data?.trends?.daysOfWeek || ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   const STAT_LABELS = {
     today:  { bookings: "Today's Bookings",  revenue: "Today's Revenue" },
@@ -385,11 +410,6 @@ function Home() {
     custom: { bookings: "Period Bookings",    revenue: "Period Revenue" }
   };
   const statLabel = STAT_LABELS[dateFilter] || STAT_LABELS.today;
-
-  // Trends lists — use filter-specific data
-  const bookingTrend = filterData.trends.bookings_last_7_days;
-  const revenueTrend = filterData.trends.revenue_last_7_days;
-  const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   // Custom SVG line chart calculations (Bookings trend)
   const lineChartData = useMemo(() => {
@@ -689,7 +709,55 @@ function Home() {
         </div>
       )}
 
-
+      {/* Admin Action Alerts banner */}
+      {(() => {
+        if (role !== "SUPER_ADMIN" && role !== "CO_ADMIN") return null;
+        return (
+          <div style={{
+            background: "linear-gradient(135deg, rgba(205,167,81,0.06) 0%, rgba(24,138,148,0.06) 100%)",
+            border: "1px solid rgba(205,167,81,0.2)",
+            borderRadius: "14px",
+            padding: "16px 20px",
+            marginBottom: "24px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <span style={{ fontSize: "24px" }}></span>
+              <div>
+                <h4 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#2d3748" }}>
+                  {pendingBlogsCount > 0 ? "Pending Blog Submissions Waiting Review" : "No Pending Blog Submissions"}
+                </h4>
+                <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#7b8a9a" }}>
+                  {pendingBlogsCount > 0 
+                    ? `You have ${pendingBlogsCount} new article submission${pendingBlogsCount > 1 ? "s" : ""} waiting for your moderation and format audit.`
+                    : "No new article submissions waiting for review."}
+                </p>
+              </div>
+            </div>
+            {pendingBlogsCount > 0 && (
+              <button
+                onClick={() => navigate("/dashboard/blogs?status=pending")}
+                style={{
+                  background: "#cda751",
+                  color: "white",
+                  border: "none",
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  boxShadow: "0 2px 8px rgba(205,167,81,0.3)",
+                  transition: "transform 0.2s"
+                }}
+              >
+                Review Articles →
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Grid section for Line & Bar Trends SVG charts */}
       <section className="charts-grid">

@@ -112,28 +112,27 @@
 
 /* ── Status Badges (Gold Themed) ── */
 .status-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  display: inline-block;
+  text-align: center;
 }
 
 .status-badge.active {
-  color: #2ecc71; /* light green */
+  background: #D1FAE5;
+  color: #065F46;
 }
 
 .status-badge.inactive {
-  color: #ffb142; /* light orange */
-}
-
-.status-badge.blocked {
-  color: #ff7675; /* light red */
+  background: #FEF9C3;
+  color: #854D0E;
 }
 
 .status-badge.archived {
-  color: #a0aec0; /* light grey */
+  background: #FEE2E2;
+  color: #991B1B;
 }
 
 /* ── Membership Badges (Gold Themed) ── */
@@ -384,25 +383,38 @@
 }
 
 /* ── Pagination (Gold Themed) ── */
-.customers-pagination-footer {
+.cust-table-pagination {
+  background: #F8F7F6;
+  padding: 9.5px 20px;
   display: flex;
+  flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 20px;
-  border-top: 1px solid rgba(205, 167, 81, 0.15);
-  background: white;
-  font-size: 13px;
-  color: #8c9aa8;
-  border-radius: 0 0 14px 14px;
+  width: 100%;
+  box-sizing: border-box;
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  border-top: none;
+  box-shadow: none;
+}
+
+.pagination-text {
+  font-family: 'Manrope', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: #64748B;
+  white-space: nowrap;
 }
 
 .pagination-controls {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
+/* Number buttons: 1 2 3 */
 .page-btn {
   width: 34px;
   height: 34px;
@@ -425,15 +437,45 @@
   background: #CDA751;
   color: #FFFFFF;
   border: 1px solid #CDA751;
+  border-radius: 6px;
   font-weight: 700;
 }
 
 .page-btn:hover:not(:disabled):not(.active) {
-  background: #cda751;
-  color: white;
+  background: rgba(205, 167, 81, 0.08);
+  border-color: rgba(205, 167, 81, 0.35);
 }
 
 .page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Arrow buttons: < > */
+.page-btn-arrow {
+  width: 18px;
+  height: 17px;
+  border-radius: 4px;
+  border: 1px solid rgba(205, 167, 81, 0.20);
+  background: #FFFFFF;
+  color: #0F172A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-sizing: border-box;
+  font-size: 10px;
+  align-self: flex-start;
+  /* Aligns with the top of the 34px number buttons */
+}
+
+.page-btn-arrow:hover:not(:disabled) {
+  background: rgba(205, 167, 81, 0.08);
+  border-color: rgba(205, 167, 81, 0.35);
+}
+
+.page-btn-arrow:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }

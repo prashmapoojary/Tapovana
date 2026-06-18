@@ -310,7 +310,7 @@ function ProgramForm({ form, onChange, instructors, mode, onSearchPexels }) {
                       let list = [...(form.assigned_staff_ids || [])];
                       if (e.target.checked) {
                         if (list.length >= 9) {
-                          alert("Maximum 9 specialists can be assigned.");
+                          triggerAlert("Maximum 9 specialists can be assigned.", false);
                           return;
                         }
                         list.push(staffId);
@@ -375,7 +375,7 @@ function ProgramForm({ form, onChange, instructors, mode, onSearchPexels }) {
 
 // ─── Main Component ─────────────────────────────────────────────────────
 export default function VedicLifePrograms() {
-  const { allocateStaff, triggerAlert } = useAllocations();
+  const { allocateStaff, triggerAlert, triggerConfirm } = useAllocations();
   const [programs, setPrograms] = useState([]);
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [mediaTarget, setMediaTarget] = useState(null); // 'add' or 'edit'
@@ -394,9 +394,6 @@ export default function VedicLifePrograms() {
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [durationFilter, setDurationFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [toast, setToast] = useState(null);
-  const [toastType, setToastType] = useState('success');
-  const toastTimerRef = useRef(null);
 
   // Detail view
   const [selectedProgram, setSelectedProgram] = useState(null);
@@ -449,7 +446,7 @@ export default function VedicLifePrograms() {
       else throw new Error("API failed");
     } catch (err) {
       console.error("fetchPrograms error:", err);
-      showToast(err.message || "Failed to load programs.", 'error');
+      triggerAlert(err.message || "Failed to load programs.", false);
     } finally { setDataLoading(false); }
   };
 
@@ -557,7 +554,7 @@ export default function VedicLifePrograms() {
         body: JSON.stringify(manualEnrollForm)
       });
       if (res.success) {
-        showToast("User enrolled successfully!");
+        triggerAlert("User enrolled successfully!", true);
         setManualEnrollForm({ name: "", email: "", phone: "" });
         setPhoneError("");
         setShowManualEnroll(false);
@@ -575,13 +572,14 @@ export default function VedicLifePrograms() {
   };
 
   const handleDeleteAttendee = async (attendeeId) => {
-    if (!window.confirm("Are you sure you want to remove this attendee?")) return;
+    const confirmed = await triggerConfirm("Are you sure you want to remove this attendee?");
+    if (!confirmed) return;
     try {
       const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/attendees/${attendeeId}`, {
         method: "DELETE"
       });
       if (res.success) {
-        showToast("Attendee removed successfully!");
+        triggerAlert("Attendee removed successfully!", true);
         setAttendees(res.attendees || []);
         await fetchPrograms();
         setSelectedProgram(prev => ({ ...prev, enrolled: Math.max(0, (prev.enrolled || 0) - 1) }));
@@ -589,7 +587,7 @@ export default function VedicLifePrograms() {
         throw new Error(res.message || "Failed to delete attendee.");
       }
     } catch (err) {
-      showToast(err.message || "Error deleting attendee.", 'error');
+      triggerAlert(err.message || "Error deleting attendee.", false);
     }
   };
 
@@ -600,13 +598,13 @@ export default function VedicLifePrograms() {
         body: JSON.stringify({ status })
       });
       if (res.success) {
-        showToast("Attendance status updated.");
+        triggerAlert("Attendance status updated.", true);
         setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, status } : a));
       } else {
         throw new Error(res.message || "Failed to update status.");
       }
     } catch (err) {
-      showToast(err.message || "Error updating attendance.", 'error');
+      triggerAlert(err.message || "Error updating attendance.", false);
     }
   };
 
@@ -616,31 +614,32 @@ export default function VedicLifePrograms() {
         method: "PATCH"
       });
       if (res.success) {
-        showToast("Attendee checked in successfully!");
+        triggerAlert("Attendee checked in successfully!", true);
         setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, status: "checked_in", checked_in_at: new Date().toISOString() } : a));
       } else {
         throw new Error(res.message || "Failed to check in attendee.");
       }
     } catch (err) {
-      showToast(err.message || "Error checking in attendee.", 'error');
+      triggerAlert(err.message || "Error checking in attendee.", false);
     }
   };
 
   const handleCancelProgram = async () => {
-    if (!window.confirm("Are you sure you want to cancel this program? All attendees and staff will be notified via email.")) return;
+    const confirmed = await triggerConfirm("Are you sure you want to cancel this program? All attendees and staff will be notified via email.");
+    if (!confirmed) return;
     try {
       const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/cancel`, {
         method: "PATCH"
       });
       if (res.success) {
-        showToast("Program cancelled successfully.");
+        triggerAlert("Program cancelled successfully.", true);
         await fetchPrograms();
         setSelectedProgram(prev => ({ ...prev, status: "Cancelled", _status: "Cancelled" }));
       } else {
         throw new Error(res.message || "Failed to cancel program.");
       }
     } catch (err) {
-      showToast(err.message || "Error cancelling program.", 'error');
+      triggerAlert(err.message || "Error cancelling program.", false);
     }
   };
 
@@ -651,20 +650,21 @@ export default function VedicLifePrograms() {
   };
 
   const handleDeleteProgram = async () => {
-    if (!window.confirm("Are you sure you want to delete this program? This action cannot be undone.")) return;
+    const confirmed = await triggerConfirm("Are you sure you want to delete this program? This action cannot be undone.");
+    if (!confirmed) return;
     try {
       const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}`, {
         method: "DELETE"
       });
       if (res.success) {
-        showToast("Program deleted successfully!");
+        triggerAlert("Program deleted successfully!", true);
         setSelectedProgram(null);
         await fetchPrograms();
       } else {
         throw new Error(res.message || "Failed to delete program.");
       }
     } catch (err) {
-      showToast(err.message || "Error deleting program.", 'error');
+      triggerAlert(err.message || "Error deleting program.", false);
     }
   };
 
@@ -697,20 +697,20 @@ export default function VedicLifePrograms() {
     setEditError("");
     const todayStr = new Date().toISOString().split('T')[0];
 
-    if (!editForm.title.trim()) { setEditError("Title is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (!editForm.startDate) { setEditError("Start date is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (!editForm.endDate) { setEditError("End date is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (editForm.startDate < todayStr) { setEditError("Start date must be today or in the future"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (editForm.endDate < editForm.startDate) { setEditError("End date must be on or after start date"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (editForm.price === "" || Number(editForm.price) < 0) { setEditError("Price must be greater than or equal to 0"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (!editForm.capacity || Number(editForm.capacity) < 1) { setEditError("Capacity must be at least 1"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (Number(editForm.capacity) < (selectedProgram.enrolled || 0)) { setEditError(`Capacity cannot be less than the number of enrolled attendees (${selectedProgram.enrolled || 0})`); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (!editForm.consultant_id) { setEditError("Please select a lead consultant"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (editForm.assigned_staff_ids && editForm.assigned_staff_ids.length > 9) { setEditError("Maximum 9 specialists can be assigned."); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!editForm.title.trim()) { setEditError("Title is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (!editForm.startDate) { setEditError("Start date is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (!editForm.endDate) { setEditError("End date is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (editForm.startDate < todayStr) { setEditError("Start date must be today or in the future"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (editForm.endDate < editForm.startDate) { setEditError("End date must be on or after start date"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (editForm.price === "" || Number(editForm.price) < 0) { setEditError("Price must be greater than or equal to 0"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (!editForm.capacity || Number(editForm.capacity) < 1) { setEditError("Capacity must be at least 1"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (Number(editForm.capacity) < (selectedProgram.enrolled || 0)) { setEditError(`Capacity cannot be less than the number of enrolled attendees (${selectedProgram.enrolled || 0})`); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (!editForm.consultant_id) { setEditError("Please select a lead consultant"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (editForm.assigned_staff_ids && editForm.assigned_staff_ids.length > 9) { setEditError("Maximum 9 specialists can be assigned."); triggerAlert("Validation failed. Please check inputs.", false); return; }
 
     if (editForm.registrationDeadline) {
-      if (editForm.registrationDeadline < todayStr) { setEditError("Registration deadline must be today or in the future"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-      if (editForm.registrationDeadline > editForm.startDate) { setEditError("Registration deadline must be on or before start date"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+      if (editForm.registrationDeadline < todayStr) { setEditError("Registration deadline must be today or in the future"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+      if (editForm.registrationDeadline > editForm.startDate) { setEditError("Registration deadline must be on or before start date"); triggerAlert("Validation failed. Please check inputs.", false); return; }
     }
 
     try {
@@ -741,7 +741,7 @@ export default function VedicLifePrograms() {
         _status: getProgramStatus({ ...prev, ...editForm }) 
       }));
       setIsEditing(false);
-      showToast("Program updated successfully!");
+      triggerAlert("Program updated successfully!", true);
     } catch (err) {
       setEditError(err.message || "Failed to update program");
     } finally { setEditSaving(false); }
@@ -752,19 +752,19 @@ export default function VedicLifePrograms() {
     setAddError("");
     const todayStr = new Date().toISOString().split('T')[0];
 
-    if (!addForm.title.trim()) { setAddError("Title is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (!addForm.startDate) { setAddError("Start date is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (!addForm.endDate) { setAddError("End date is required"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (addForm.startDate < todayStr) { setAddError("Start date must be today or in the future"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (addForm.endDate < addForm.startDate) { setAddError("End date must be on or after start date"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (addForm.price === "" || Number(addForm.price) < 0) { setAddError("Price must be greater than or equal to 0"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (!addForm.capacity || Number(addForm.capacity) < 1) { setAddError("Capacity must be at least 1"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (!addForm.consultant_id) { setAddError("Please select a lead consultant"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-    if (addForm.assigned_staff_ids && addForm.assigned_staff_ids.length > 9) { setAddError("Maximum 9 specialists can be assigned."); showToast("Validation failed. Please check inputs.", 'error'); return; }
+    if (!addForm.title.trim()) { setAddError("Title is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (!addForm.startDate) { setAddError("Start date is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (!addForm.endDate) { setAddError("End date is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (addForm.startDate < todayStr) { setAddError("Start date must be today or in the future"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (addForm.endDate < addForm.startDate) { setAddError("End date must be on or after start date"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (addForm.price === "" || Number(addForm.price) < 0) { setAddError("Price must be greater than or equal to 0"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (!addForm.capacity || Number(addForm.capacity) < 1) { setAddError("Capacity must be at least 1"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (!addForm.consultant_id) { setAddError("Please select a lead consultant"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+    if (addForm.assigned_staff_ids && addForm.assigned_staff_ids.length > 9) { setAddError("Maximum 9 specialists can be assigned."); triggerAlert("Validation failed. Please check inputs.", false); return; }
 
     if (addForm.registrationDeadline) {
-      if (addForm.registrationDeadline < todayStr) { setAddError("Registration deadline must be today or in the future"); showToast("Validation failed. Please check inputs.", 'error'); return; }
-      if (addForm.registrationDeadline > addForm.startDate) { setAddError("Registration deadline must be on or before start date"); showToast("Validation failed. Please check inputs.", 'error'); return; }
+      if (addForm.registrationDeadline < todayStr) { setAddError("Registration deadline must be today or in the future"); triggerAlert("Validation failed. Please check inputs.", false); return; }
+      if (addForm.registrationDeadline > addForm.startDate) { setAddError("Registration deadline must be on or before start date"); triggerAlert("Validation failed. Please check inputs.", false); return; }
     }
 
     try {
@@ -796,7 +796,7 @@ export default function VedicLifePrograms() {
         await fetchPrograms();
         setShowCreateModal(false);
         setAddForm(BLANK_FORM);
-        showToast("Program created successfully!");
+        triggerAlert("Program created successfully!", true);
       }
     } catch (err) {
       setAddError(err.message || "Failed to create program");
@@ -806,7 +806,7 @@ export default function VedicLifePrograms() {
   // ─── Allocate staff (from detail tab) ───────────────────────────────────
   const handleAllocateInstructor = async () => {
     if (!selectedProgram) return;
-    if (!selectedProgram.consultant_id) { showToast("Please assign a consultant first", 'error'); return; }
+    if (!selectedProgram.consultant_id) { triggerAlert("Please assign a consultant first", false); return; }
 
     try {
       await apiFetch("/api/vedic-programs/" + selectedProgram.id + "/staff", {
@@ -817,17 +817,10 @@ export default function VedicLifePrograms() {
       if (inst) {
         allocateStaff(inst, { id: selectedProgram.id, title: selectedProgram.title, startDate: selectedProgram.startDate, date: selectedProgram.startDate, endDate: selectedProgram.endDate }, "vedic_program");
       }
-      showToast("Instructors allocated and notified via email!");
+      triggerAlert("Instructors allocated and notified via email!", true);
     } catch (err) {
-      showToast(err.message || "Failed to allocate instructors", 'error');
+      triggerAlert(err.message || "Failed to allocate instructors", false);
     }
-  };
-
-  const showToast = (msg, type = 'success') => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToastType(type);
-    setToast(msg);
-    toastTimerRef.current = setTimeout(() => { setToast(null); toastTimerRef.current = null; }, 4000);
   };
 
   // ─── Render detail view ─────────────────────────────────────────────────
@@ -1211,19 +1204,6 @@ export default function VedicLifePrograms() {
   // ─── RENDER ─────────────────────────────────────────────────────────────
   return (
     <div className="vedic-container">
-      {toast && (
-        <div style={{
-          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-          background: '#1A1A1A', border: '2px solid #CDA751', borderRadius: '12px',
-          padding: '18px 32px', zIndex: 2147483647, display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
-          boxShadow: '0 8px 32px rgba(205,167,81,0.25)',
-          color: toastType === 'error' ? '#EF4444' : (toastType === 'info' ? '#E2E8F0' : '#4ADE80'),
-          animation: 'wsFadeIn 0.3s ease-out', minWidth: 220, textAlign: 'center'
-        }}>
-          <span style={{ fontSize: 20 }}>{toastType === 'error' ? '⚠' : '✓'}</span>
-          <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.3px' }}>{toast}</span>
-        </div>
-      )}
 
       {/* ── HEADER (hide in detail view) ── */}
       {!selectedProgram && (

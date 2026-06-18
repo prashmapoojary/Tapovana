@@ -102,8 +102,14 @@ const getAllBlogs = async (req, res) => {
         // Role-based access
         if (isAdmin) {
             if (status) {
-                where.push(`b.status = $${paramIdx++}`);
-                params.push(status);
+                if (status === 'pending') {
+                    // For pending tab, only include pending blogs (not rejected)
+                    where.push(`b.status = $${paramIdx++}`);
+                    params.push('pending');
+                } else {
+                    where.push(`b.status = $${paramIdx++}`);
+                    params.push(status);
+                }
             }
         } else if (isStaff) {
             // Staff see their own blogs (all statuses) + published from others
@@ -753,13 +759,39 @@ const archiveBlog = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════
+// POST /api/blogs/:id/restore
+// ═══════════════════════════════════════════════════════════════════════
+const restoreBlog = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const existing = await query('SELECT status FROM blogs WHERE id = $1', [id]);
+        if (existing.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Blog not found.' });
+        }
+
+        if (existing.rows[0].status !== 'archived') {
+            return res.status(400).json({ success: false, message: 'Only archived blogs can be restored.' });
+        }
+
+        await query("UPDATE blogs SET status = 'published', updated_at = NOW() WHERE id = $1", [id]);
+        await query('INSERT INTO blog_audit_log (blog_id, status_change, changed_by) VALUES ($1, $2, $3)', [id, 'restored', req.user?.id || null]);
+        res.json({ success: true, message: 'Blog restored to published.' });
+    } catch (err) {
+        console.error('restoreBlog error:', err);
+        res.status(500).json({ success: false, message: 'Failed to restore blog.' });
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════
 // POST /api/blogs/:id/view
 // ═══════════════════════════════════════════════════════════════════════
 const trackBlogView = async (req, res) => {
     try {
         const { id } = req.params;
         const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.connection?.remoteAddress || 'unknown';
-        const userId = req.user?.id || null;
+        const userIdRaw = req.user?.id || null;
+        const userId = (userIdRaw && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userIdRaw)) ? userIdRaw : null;
 
         // Check for duplicate view in last 24 hours
         const duplicate = await query(`
@@ -957,6 +989,7 @@ module.exports = {
     approveBlog,
     rejectBlog,
     archiveBlog,
+    restoreBlog,
     trackBlogView,
     toggleBlogLike,
     toggleBlogBookmark,
