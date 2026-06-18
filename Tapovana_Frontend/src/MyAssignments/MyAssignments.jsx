@@ -118,18 +118,26 @@ function AssignmentCard({ a }) {
       </div>
       
       <div style={{ marginBottom: "12px" }}>
-        <p style={{ margin: 0, color: "#555555", fontSize: "14px", marginBottom: "4px" }}>
-          Date: {getFormatDate(a.startDate)}
-        </p>
-        <p style={{ margin: 0, color: "#1E1E1E", fontSize: "14px", fontWeight: 500, marginBottom: "12px" }}>
-          Time: {a.bookingTime || a.time || ''}
-        </p>
-        <p style={{ margin: 0, color: "#555555", fontSize: "14px", marginBottom: "4px" }}>
-          Duration:
-        </p>
-        <p style={{ margin: 0, color: "#1E1E1E", fontSize: "14px", fontWeight: 500 }}>
-          {a.duration || a.duration_minutes || 30} mins
-        </p>
+        <div style={{ display: "flex", gap: "24px", marginBottom: "12px" }}>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <p style={{ margin: 0, color: "#555555", fontSize: "14px", marginBottom: "4px" }}>Date</p>
+            <p style={{ margin: 0, color: "#1E1E1E", fontSize: "14px", fontWeight: 500 }}>
+              {getFormatDate(a.startDate)}
+            </p>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <p style={{ margin: 0, color: "#555555", fontSize: "14px", marginBottom: "4px" }}>Time</p>
+            <p style={{ margin: 0, color: "#1E1E1E", fontSize: "14px", fontWeight: 500 }}>
+              {a.bookingTime || a.time || ''}
+            </p>
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <p style={{ margin: 0, color: "#555555", fontSize: "14px", marginBottom: "4px" }}>Duration</p>
+          <p style={{ margin: 0, color: "#1E1E1E", fontSize: "14px", fontWeight: 500 }}>
+            {a.duration || a.duration_minutes || 30} mins
+          </p>
+        </div>
       </div>
     </div>
   );
