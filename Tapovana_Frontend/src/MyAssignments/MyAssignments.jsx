@@ -62,7 +62,7 @@ const STATUS_CONFIG = {
   cancelled: { label: "Cancelled", color: "#e74c3c", bg: "rgba(231,76,60,0.1)" },
 };
 
-function AssignmentCard({ a, onComplete, onDelete }) {
+function AssignmentCard({ a, onComplete }) {
   let categoryLabel = '';
   if (a.type === 'service') {
     categoryLabel = 'Service';
@@ -89,87 +89,61 @@ function AssignmentCard({ a, onComplete, onDelete }) {
 
   return (
     <div className="ws-card" style={{
-      background: "#F8F3E6",
+      background: "#FAF6EB",
       borderRadius: "12px",
-      padding: "16px"
+      padding: "14px"
     }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "12px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "flex-end", marginBottom: "10px" }}>
         <div style={{
-          background: "#CDA751",
-          color: "white",
-          fontWeight: 700,
-          padding: "6px 16px",
-          borderRadius: "20px",
-          textTransform: "uppercase"
-        }}>
-          {categoryLabel}
-        </div>
-        <div style={{
-          background: "#ffffff",
-          color: "#94A3B8",
-          border: "2px solid #94A3B8",
-          borderRadius: "20px",
-          padding: "4px 12px",
-          fontWeight: 600
+          background: "#F0E9D6",
+          color: "#7C725E",
+          border: "1px solid #D8CFBB",
+          borderRadius: "16px",
+          padding: "3px 10px",
+          fontWeight: 600,
+          fontSize: "12px"
         }}>
           {st.label}
         </div>
       </div>
-      <div style={{ marginBottom: "8px" }}>
-        <h3 style={{ margin: 0, color: "#0F172A", fontSize: "18px" }}>{a.sessionTitle}</h3>
+      <div style={{ marginBottom: "6px" }}>
+        <h3 style={{ margin: 0, color: "#0F172A", fontSize: "17px" }}>{a.sessionTitle}</h3>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#7b8a9a", marginBottom: "8px" }}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#7b8a9a", marginBottom: "6px" }}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
         {a.staffName} ({a.staffRole})
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "#7b8a9a", marginBottom: "12px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#7b8a9a", marginBottom: "10px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
           {getFormatDate(a.startDate)} {a.bookingTime || a.time || ''}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
           {a.duration || a.duration_minutes || 30} mins
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: "14px", fontWeight: 700, color: "#2d3748" }}>
+        <span style={{ fontSize: "13px", fontWeight: 700, color: "#2d3748" }}>
           Assigned: {getFormatDate(a.createdAt)}
         </span>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {(a.status === 'active' || a.status === 'Upcoming' || a.status === 'Live') && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onComplete(a); }}
-              style={{
-                padding: '6px 16px',
-                fontSize: '13px',
-                fontWeight: '600',
-                background: "#CDA751",
-                color: 'white',
-                border: 'none',
-                borderRadius: "8px",
-                cursor: 'pointer'
-              }}
-            >
-              Mark Complete
-            </button>
-          )}
+        {(a.status === 'active' || a.status === 'Upcoming' || a.status === 'Live') && (
           <button
-            onClick={(e) => { e.stopPropagation(); onDelete(a); }}
+            onClick={(e) => { e.stopPropagation(); onComplete(a); }}
             style={{
-              padding: '6px 16px',
-              fontSize: '13px',
+              padding: '5px 14px',
+              fontSize: '12px',
               fontWeight: '600',
-              background: 'transparent',
-              color: "#CDA751",
-              border: '2px solid #CDA751',
+              background: "#CDA751",
+              color: 'white',
+              border: 'none',
               borderRadius: "8px",
               cursor: 'pointer'
             }}
           >
-            Delete
+            Mark Complete
           </button>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -584,7 +558,6 @@ function MyAssignments() {
                         key={a.id}
                         a={a}
                         onComplete={handleComplete}
-                        onDelete={handleDelete}
                       />
                     ))}
                   </div>
@@ -607,7 +580,6 @@ function MyAssignments() {
                         key={a.id}
                         a={a}
                         onComplete={handleComplete}
-                        onDelete={handleDelete}
                       />
                     ))}
                   </div>
@@ -630,7 +602,6 @@ function MyAssignments() {
                         key={a.id}
                         a={a}
                         onComplete={handleComplete}
-                        onDelete={handleDelete}
                       />
                     ))}
                   </div>
