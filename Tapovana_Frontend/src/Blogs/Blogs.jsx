@@ -500,26 +500,33 @@ export default function Blogs({ mode }) {
         seo_title: editBlogData.seo_title,
         seo_description: editBlogData.seo_description,
         seo_keywords: editBlogData.seo_keywords,
-        status: targetStatus,
         author_name: editBlogData.author_name,
         author_role: editBlogData.author_role
       };
 
       if (editingBlogId) {
+        // First update the blog content (without changing status yet)
         await apiFetch(`/api/blogs/${editingBlogId}`, {
           method: "PATCH",
           body: JSON.stringify(payload)
         });
 
-        // If submitting for review after edit
+        // Then handle status change
         if (targetStatus === "pending") {
           await apiFetch(`/api/blogs/${editingBlogId}/submit`, { method: "POST" });
+        } else if (targetStatus === "draft") {
+          // If we just want to save as draft, update status separately
+          await apiFetch(`/api/blogs/${editingBlogId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: targetStatus })
+          });
         }
 
         setEditingBlogId(null);
         navigate("/dashboard/blogs");
         await triggerAlert("Blog updated successfully.", true);
       } else {
+        payload.status = targetStatus;
         await apiFetch("/api/blogs", {
           method: "POST",
           body: JSON.stringify(payload)
@@ -721,7 +728,22 @@ export default function Blogs({ mode }) {
         </div>
 
         <div className="blog-editor-card" style={{ background: "white", padding: "30px", borderRadius: "12px", border: "1px solid rgba(205,167,81,0.3)", boxShadow: "0 4px 20px rgba(205,167,81,0.05)" }}>
-          <h2 style={{ borderBottom: "2px solid #cda751", paddingBottom: "12px", color: "#1a202c", fontWeight: "800" }}>{mode === "edit" ? "Edit Blog Post" : "Create New Blog"}</h2>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "2px solid #cda751", paddingBottom: "12px", marginBottom: "20px" }}>
+            <h2 style={{ margin: 0, color: "#1a202c", fontWeight: "800" }}>{mode === "edit" ? "Edit Blog" : "Create New Blog"}</h2>
+            {mode === "edit" && detailBlog && (
+              <div style={{ 
+                background: "#cda751", 
+                color: "white", 
+                fontWeight: "600", 
+                padding: "6px 12px", 
+                borderRadius: "6px", 
+                fontSize: "13px", 
+                textTransform: "capitalize"
+              }}>
+                {detailBlog.status}
+              </div>
+            )}
+          </div>
           
           <div className="blog-editor-form" style={{ display: "flex", flexDirection: "column", gap: "20px", marginTop: "20px" }}>
             
@@ -767,29 +789,39 @@ export default function Blogs({ mode }) {
 
             {/* 4. Author Name */}
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Author Name * (Alphabets only)</label>
+              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Author Name</label>
               <input
                 type="text"
                 placeholder="Enter author name..."
                 value={editBlogData.author_name}
-                onChange={(e) => setEditBlogData(prev => ({ ...prev, author_name: e.target.value }))}
-                style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px" }}
-                required
+                onChange={mode === "create" ? (e) => setEditBlogData(prev => ({ ...prev, author_name: e.target.value })) : undefined}
+                disabled={mode === "edit"}
+                style={{ width: "100%", padding: "12px", border: `1px solid ${mode === "edit" ? "#cbd5e0" : "#e2e8f0"}`, borderRadius: "8px", fontSize: "14px", background: mode === "edit" ? "#edf2f7" : "#fff", cursor: mode === "edit" ? "not-allowed" : "text" }}
+                required={mode === "create"}
               />
             </div>
 
             {/* 5. Role */}
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Role * (Doctor/Therapist)</label>
-              <select
-                value={editBlogData.author_role}
-                onChange={(e) => setEditBlogData(prev => ({ ...prev, author_role: e.target.value }))}
-                style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", background: "#fff" }}
-              >
-                <option value="">Select Role</option>
-                <option value="Doctor">Doctor</option>
-                <option value="Therapist">Therapist</option>
-              </select>
+              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Role</label>
+              {mode === "create" ? (
+                <select
+                  value={editBlogData.author_role}
+                  onChange={(e) => setEditBlogData(prev => ({ ...prev, author_role: e.target.value }))}
+                  style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", background: "#fff" }}
+                >
+                  <option value="">Select Role</option>
+                  <option value="Doctor">Doctor</option>
+                  <option value="Therapist">Therapist</option>
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={editBlogData.author_role}
+                  disabled
+                  style={{ width: "100%", padding: "12px", border: "1px solid #cbd5e0", borderRadius: "8px", fontSize: "14px", background: "#edf2f7", cursor: "not-allowed" }}
+                />
+              )}
             </div>
 
             {/* 6. Date */}
