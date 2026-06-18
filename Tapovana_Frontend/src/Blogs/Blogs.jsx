@@ -405,6 +405,10 @@ export default function Blogs({ mode }) {
     }
   };
 
+  const handleEdit = (blog) => {
+    navigate(`/dashboard/blogs/${blog.id}/edit`);
+  };
+
   const handleDelete = async (blogId) => {
     const confirmed = await triggerConfirm("Are you sure you want to permanently delete this article?");
     if (!confirmed) return;
@@ -1037,7 +1041,7 @@ export default function Blogs({ mode }) {
               onClick={handleCardClick}
               isStaff={isStaff}
               isAdmin={isAdmin}
-              onEdit={(blog) => navigate(`/dashboard/blogs/${blog.id}/edit`)}
+              onEdit={handleEdit}
               onDelete={handleDelete}
               onApprove={handleApprove}
               onReject={handleReject}
