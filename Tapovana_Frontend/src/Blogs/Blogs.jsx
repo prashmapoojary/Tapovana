@@ -224,7 +224,7 @@ export default function Blogs({ mode }) {
   const [editBlogData, setEditBlogData] = useState({
     title: "", category: "AYURVEDA", summary: "", content_html: "",
     featured_image: "", tags: "", seo_title: "", seo_description: "", seo_keywords: "",
-    author_name: "", author_role: ""
+    author_name: "", author_role: "", read_time: ""
   });
   const [rejectionModal, setRejectionModal] = useState({ isOpen: false, blogId: null, reason: "" });
   const [showSeo, setShowSeo] = useState(false);
@@ -246,13 +246,19 @@ export default function Blogs({ mode }) {
         title: "", category: "AYURVEDA", summary: "", content_html: "",
         featured_image: "", tags: "", seo_title: "", seo_description: "", seo_keywords: "",
         author_name: `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim(),
-        author_role: currentUser?.role?.toUpperCase() === "DOCTOR" ? "Doctor" : currentUser?.role?.toUpperCase() === "THERAPIST" ? "Therapist" : ""
+        author_role: currentUser?.role?.toUpperCase() === "DOCTOR" ? "Doctor" : currentUser?.role?.toUpperCase() === "THERAPIST" ? "Therapist" : "",
+        read_time: "3 min read"
       });
     }
   }, [mode, isStaff, navigate, currentUser]);
 
   useEffect(() => {
     if (mode === "edit" && detailBlog) {
+      if (detailBlog.status !== "draft" && detailBlog.status !== "rejected") {
+        triggerAlert("You can only edit Draft or Rejected blogs.");
+        navigate("/dashboard/blogs");
+        return;
+      }
       setEditingBlogId(detailBlog.id);
       setEditBlogData({
         title: detailBlog.title || "",
@@ -260,15 +266,17 @@ export default function Blogs({ mode }) {
         summary: detailBlog.summary || "",
         content_html: detailBlog.content_html || "",
         featured_image: detailBlog.featured_image || "",
-        tags: detailBlog.tags?.join(", ") || "",
+        tags: Array.isArray(detailBlog.tags) ? detailBlog.tags.join(", ") : (detailBlog.tags || ""),
         seo_title: detailBlog.seo_title || "",
         seo_description: detailBlog.seo_description || "",
         seo_keywords: detailBlog.seo_keywords || "",
         author_name: detailBlog.author?.name || `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim(),
-        author_role: detailBlog.author?.role || (currentUser?.role?.toUpperCase() === "DOCTOR" ? "Doctor" : currentUser?.role?.toUpperCase() === "THERAPIST" ? "Therapist" : "")
+        author_role: detailBlog.author?.role || (currentUser?.role?.toUpperCase() === "DOCTOR" ? "Doctor" : currentUser?.role?.toUpperCase() === "THERAPIST" ? "Therapist" : ""),
+        read_time: detailBlog.read_time || "3 min read"
       });
     }
-  }, [mode, detailBlog, id, currentUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, detailBlog]);
 
   // ─── Fetch blogs list ──────────────────────────────────────────────
   const fetchBlogs = useCallback(async () => {
@@ -476,12 +484,17 @@ export default function Blogs({ mode }) {
       await triggerAlert("Please select a valid role (Doctor/Therapist).");
       return;
     }
-    // 5. Image validation: Required for publishing (status = pending).
+    // 5. Read Time validation: Required.
+    if (!editBlogData.read_time || !editBlogData.read_time.trim()) {
+      await triggerAlert("Read time is required.");
+      return;
+    }
+    // 6. Image validation: Required for publishing (status = pending).
     if (targetStatus === "pending" && !editBlogData.featured_image) {
       await triggerAlert("Featured image is required for publishing.");
       return;
     }
-    // 6. Description validation: Required, min length 500 chars only for pending
+    // 7. Description validation: Required, min length 500 chars only for pending
     const textOnly = (editBlogData.content_html || "").replace(/<[^>]*>/g, '').trim();
     if (targetStatus === "pending" && textOnly.length < 500) {
       await triggerAlert("Content must be at least 500 characters.");
@@ -501,7 +514,8 @@ export default function Blogs({ mode }) {
         seo_description: editBlogData.seo_description,
         seo_keywords: editBlogData.seo_keywords,
         author_name: editBlogData.author_name,
-        author_role: editBlogData.author_role
+        author_role: editBlogData.author_role,
+        read_time: editBlogData.read_time
       };
 
       if (editingBlogId) {
@@ -604,7 +618,7 @@ export default function Blogs({ mode }) {
   // ═════════════════════════════════════════════════════════════════════
   // DETAIL VIEW
   // ═════════════════════════════════════════════════════════════════════
-  if (id) {
+  if (id && mode !== "edit") {
     if (detailLoading) {
       return <div className="blog-loading"><div className="blog-spinner" /></div>;
     }
@@ -789,39 +803,42 @@ export default function Blogs({ mode }) {
 
             {/* 4. Author Name */}
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Author Name</label>
+              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Author Name *</label>
               <input
                 type="text"
                 placeholder="Enter author name..."
                 value={editBlogData.author_name}
-                onChange={mode === "create" ? (e) => setEditBlogData(prev => ({ ...prev, author_name: e.target.value })) : undefined}
-                disabled={mode === "edit"}
-                style={{ width: "100%", padding: "12px", border: `1px solid ${mode === "edit" ? "#cbd5e0" : "#e2e8f0"}`, borderRadius: "8px", fontSize: "14px", background: mode === "edit" ? "#edf2f7" : "#fff", cursor: mode === "edit" ? "not-allowed" : "text" }}
-                required={mode === "create"}
+                onChange={(e) => setEditBlogData(prev => ({ ...prev, author_name: e.target.value }))}
+                style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", background: "#fff" }}
+                required
               />
             </div>
 
             {/* 5. Role */}
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Role</label>
-              {mode === "create" ? (
-                <select
-                  value={editBlogData.author_role}
-                  onChange={(e) => setEditBlogData(prev => ({ ...prev, author_role: e.target.value }))}
-                  style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", background: "#fff" }}
-                >
-                  <option value="">Select Role</option>
-                  <option value="Doctor">Doctor</option>
-                  <option value="Therapist">Therapist</option>
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={editBlogData.author_role}
-                  disabled
-                  style={{ width: "100%", padding: "12px", border: "1px solid #cbd5e0", borderRadius: "8px", fontSize: "14px", background: "#edf2f7", cursor: "not-allowed" }}
-                />
-              )}
+              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Role *</label>
+              <select
+                value={editBlogData.author_role}
+                onChange={(e) => setEditBlogData(prev => ({ ...prev, author_role: e.target.value }))}
+                style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", background: "#fff" }}
+              >
+                <option value="">Select Role</option>
+                <option value="Doctor">Doctor</option>
+                <option value="Therapist">Therapist</option>
+              </select>
+            </div>
+
+            {/* Read Time */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Read Time *</label>
+              <input
+                type="text"
+                placeholder="e.g. 5 min read"
+                value={editBlogData.read_time}
+                onChange={(e) => setEditBlogData(prev => ({ ...prev, read_time: e.target.value }))}
+                style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", background: "#fff" }}
+                required
+              />
             </div>
 
             {/* 6. Date */}
@@ -909,7 +926,7 @@ export default function Blogs({ mode }) {
                 className="blog-editor-save blog-editor-submit"
                 disabled={savingBlog}
               >
-                Submit for Review
+                Send for Approval
               </button>
             </div>
           </div>
