@@ -99,76 +99,83 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate) 
                 renderTextLogo(doc);
             }
 
-            // 5. Title
+            // 5. Title – serif heading in gold
             doc.font('Times-Bold')
                .fontSize(34)
                .fillColor('#DAA520')
-               .text('CERTIFICATE OF COMPLETION', 0, 165, { align: 'center' });
+               .text('CERTIFICATE OF COMPLETION', 0, 170, { align: 'center' });
 
-            // Horizontal decorative divider line below title
+            // Horizontal decorative divider below title
             doc.lineWidth(1)
                .strokeColor('#DAA520')
-               .moveTo(841.89 / 2 - 180, 215)
-               .lineTo(841.89 / 2 + 180, 215)
+               .moveTo(841.89 / 2 - 180, 218)
+               .lineTo(841.89 / 2 + 180, 218)
                .stroke();
 
-            // 6. Presentation lines
+            // 6. Award line – serif italic body
             doc.font('Times-Italic')
                .fontSize(16)
-               .fillColor('#444444')
-               .text('This is proudly presented to', 0, 235, { align: 'center' });
+               .fillColor('#333333')
+               .text('This Certificate is Proudly Awarded to', 0, 240, { align: 'center' });
 
-            // 7. Participant Name
+            // 7. Participant Name – large bold, gold/black
             doc.font('Times-Bold')
-               .fontSize(36)
+               .fontSize(38)
                .fillColor('#1a1a1a')
-               .text(participantName, 0, 268, { align: 'center' });
+               .text(participantName, 0, 275, { align: 'center' });
 
-            // 8. Completion Statements
-            doc.font('Times-Roman')
-               .fontSize(16)
-               .fillColor('#444444')
-               .text('for successfully completing the workshop', 0, 322, { align: 'center' });
+            // Decorative underline beneath participant name
+            const nameWidth = doc.widthOfString(participantName);
+            const nameUnderlineHalf = Math.min(nameWidth / 2 + 30, 220);
+            doc.lineWidth(0.75)
+               .strokeColor('#DAA520')
+               .moveTo(841.89 / 2 - nameUnderlineHalf, 320)
+               .lineTo(841.89 / 2 + nameUnderlineHalf, 320)
+               .stroke();
 
-            // Workshop Title
+            // 8. Completion statement – sans-serif (Helvetica) body in black
+            doc.font('Helvetica')
+               .fontSize(15)
+               .fillColor('#333333')
+               .text('For successfully completing the workshop', 0, 340, { align: 'center' });
+
+            // Workshop Title – italic, gold-highlighted
             doc.font('Times-BoldItalic')
                .fontSize(24)
                .fillColor('#DAA520')
-               .text(workshopTitle, 0, 352, { align: 'center' });
+               .text(`"${workshopTitle}"`, 0, 372, { align: 'center' });
 
-            // Date of completion
-            doc.font('Times-Roman')
+            // Conducted on date
+            doc.font('Helvetica')
                .fontSize(14)
                .fillColor('#555555')
-               .text(`Completed on ${completionDate}`, 0, 395, { align: 'center' });
+               .text(`conducted on ${completionDate}`, 0, 412, { align: 'center' });
 
-            // 9. Signature lines
-            doc.lineWidth(1)
-               .strokeColor('#DAA520');
+            // ─── Footer ───
+            // Gold decorative line
+            doc.lineWidth(1.5)
+               .strokeColor('#DAA520')
+               .moveTo(841.89 / 2 - 200, 500)
+               .lineTo(841.89 / 2 + 200, 500)
+               .stroke();
 
-            // Left line
-            doc.moveTo(150, 495).lineTo(320, 495).stroke();
-            doc.font('Times-Italic')
-               .fontSize(18)
-               .fillColor('#2d3748')
-               .text('Tapovana Team', 150, 472, { width: 170, align: 'center' });
-            
-            doc.font('Times-Roman')
-               .fontSize(12)
-               .fillColor('#718096')
-               .text('Workshop Instructor', 150, 502, { width: 170, align: 'center' });
+            // Small decorative diamond in center of footer line
+            const cx = 841.89 / 2;
+            doc.save();
+            doc.fillColor('#DAA520');
+            doc.moveTo(cx, 500 - 4)
+               .lineTo(cx + 4, 500)
+               .lineTo(cx, 500 + 4)
+               .lineTo(cx - 4, 500)
+               .closePath()
+               .fill();
+            doc.restore();
 
-            // Right line
-            doc.moveTo(841.89 - 320, 495).lineTo(841.89 - 150, 495).stroke();
-            doc.font('Times-Italic')
-               .fontSize(18)
-               .fillColor('#2d3748')
-               .text('Prashma Poojary', 841.89 - 320, 472, { width: 170, align: 'center' });
-            
-            doc.font('Times-Roman')
-               .fontSize(12)
-               .fillColor('#718096')
-               .text('Authorized Representative', 841.89 - 320, 502, { width: 170, align: 'center' });
+            // Tagline & website
+            doc.font('Helvetica')
+               .fontSize(10)
+               .fillColor('#888888')
+               .text('Tapovana Life Space  •  www.tapovana.in', 0, 514, { align: 'center' });
 
             doc.end();
         } catch (err) {

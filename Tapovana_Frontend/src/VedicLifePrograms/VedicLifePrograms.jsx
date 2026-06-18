@@ -310,7 +310,7 @@ function ProgramForm({ form, onChange, instructors, mode, onSearchPexels }) {
                       let list = [...(form.assigned_staff_ids || [])];
                       if (e.target.checked) {
                         if (list.length >= 9) {
-                          alert("Maximum 9 specialists can be assigned.");
+                          triggerAlert("Maximum 9 specialists can be assigned.");
                           return;
                         }
                         list.push(staffId);
@@ -375,7 +375,7 @@ function ProgramForm({ form, onChange, instructors, mode, onSearchPexels }) {
 
 // ─── Main Component ─────────────────────────────────────────────────────
 export default function VedicLifePrograms() {
-  const { allocateStaff, triggerAlert } = useAllocations();
+  const { allocateStaff, triggerAlert, triggerConfirm } = useAllocations();
   const [programs, setPrograms] = useState([]);
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [mediaTarget, setMediaTarget] = useState(null); // 'add' or 'edit'
@@ -394,9 +394,7 @@ export default function VedicLifePrograms() {
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [durationFilter, setDurationFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [toast, setToast] = useState(null);
-  const [toastType, setToastType] = useState('success');
-  const toastTimerRef = useRef(null);
+
 
   // Detail view
   const [selectedProgram, setSelectedProgram] = useState(null);
@@ -575,7 +573,8 @@ export default function VedicLifePrograms() {
   };
 
   const handleDeleteAttendee = async (attendeeId) => {
-    if (!window.confirm("Are you sure you want to remove this attendee?")) return;
+    const confirmed = await triggerConfirm("Are you sure you want to remove this attendee?");
+    if (!confirmed) return;
     try {
       const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/attendees/${attendeeId}`, {
         method: "DELETE"
@@ -627,7 +626,8 @@ export default function VedicLifePrograms() {
   };
 
   const handleCancelProgram = async () => {
-    if (!window.confirm("Are you sure you want to cancel this program? All attendees and staff will be notified via email.")) return;
+    const confirmed = await triggerConfirm("Are you sure you want to cancel this program? All attendees and staff will be notified via email.");
+    if (!confirmed) return;
     try {
       const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/cancel`, {
         method: "PATCH"
@@ -651,7 +651,8 @@ export default function VedicLifePrograms() {
   };
 
   const handleDeleteProgram = async () => {
-    if (!window.confirm("Are you sure you want to delete this program? This action cannot be undone.")) return;
+    const confirmed = await triggerConfirm("Are you sure you want to delete this program? This action cannot be undone.");
+    if (!confirmed) return;
     try {
       const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}`, {
         method: "DELETE"
@@ -824,10 +825,7 @@ export default function VedicLifePrograms() {
   };
 
   const showToast = (msg, type = 'success') => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToastType(type);
-    setToast(msg);
-    toastTimerRef.current = setTimeout(() => { setToast(null); toastTimerRef.current = null; }, 4000);
+    triggerAlert(msg, type === 'success');
   };
 
   // ─── Render detail view ─────────────────────────────────────────────────
@@ -1211,19 +1209,7 @@ export default function VedicLifePrograms() {
   // ─── RENDER ─────────────────────────────────────────────────────────────
   return (
     <div className="vedic-container">
-      {toast && (
-        <div style={{
-          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-          background: '#1A1A1A', border: '2px solid #CDA751', borderRadius: '12px',
-          padding: '18px 32px', zIndex: 2147483647, display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
-          boxShadow: '0 8px 32px rgba(205,167,81,0.25)',
-          color: toastType === 'error' ? '#EF4444' : (toastType === 'info' ? '#E2E8F0' : '#4ADE80'),
-          animation: 'wsFadeIn 0.3s ease-out', minWidth: 220, textAlign: 'center'
-        }}>
-          <span style={{ fontSize: 20 }}>{toastType === 'error' ? '⚠' : '✓'}</span>
-          <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.3px' }}>{toast}</span>
-        </div>
-      )}
+
 
       {/* ── HEADER (hide in detail view) ── */}
       {!selectedProgram && (

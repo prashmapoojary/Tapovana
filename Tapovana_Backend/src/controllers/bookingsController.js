@@ -3,6 +3,12 @@ const { sendBookingStatusEmail, sendBookingAllocationEmail, sendBookingRemovalEm
 const { checkStaffAllocationConflict, syncStaffMemberStatus } = require('../utils/conflictChecker');
 const https = require('https');
 
+// Helper: Validate UUID
+const isValidUUID = (id) => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(id);
+};
+
 const pexelsCache = new Map();
 
 const getPexelsFallbackImage = async (queryStr) => {
@@ -498,9 +504,10 @@ const updateBookingStatus = async (req, res) => {
             }
 
             // Fetch all names for display
+            const validIncomingStaffIds = incomingStaffIds.filter(isValidUUID);
             const staffNamesRes = await query(
                 `SELECT id, first_name, last_name, email FROM team_members WHERE id = ANY($1::uuid[])`,
-                [incomingStaffIds]
+                [validIncomingStaffIds]
             );
             const staffMap = {};
             for (const row of staffNamesRes.rows) {
@@ -934,11 +941,12 @@ const sendBookingNotificationOnly = async (req, res) => {
 
         // Fetch staff info for notifications
         const staffIdsToFetch = [...new Set([...incomingStaffIds, ...removedIds, booking.therapist_id].filter(Boolean))];
+        const validStaffIdsToFetch = staffIdsToFetch.filter(isValidUUID);
         const staffMap = {};
-        if (staffIdsToFetch.length > 0) {
+        if (validStaffIdsToFetch.length > 0) {
             const staffNamesRes = await query(
                 `SELECT id, first_name, last_name, email FROM team_members WHERE id = ANY($1::uuid[])`,
-                [staffIdsToFetch]
+                [validStaffIdsToFetch]
             );
             for (const row of staffNamesRes.rows) {
                 staffMap[row.id] = { name: `${row.first_name} ${row.last_name}`.trim(), email: row.email };

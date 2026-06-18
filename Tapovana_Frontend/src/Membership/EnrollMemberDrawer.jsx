@@ -1,10 +1,8 @@
 
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import "./EnrollMemberDrawer.css";
 import DropdownIcon from "../assets/dropdownIcon.svg";
 import OverlayIcon from "../assets/Overlay.png";
-import ProfilePlaceholder from "../assets/profileIconDefault.png";
-import ProfileButtonIcon from "../assets/profileButton.png";
 import { apiFetch } from "../api/http";
 
 const initialForm = {
@@ -16,33 +14,11 @@ const initialForm = {
 };
 
 const EnrollMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
-  const [photoPreview, setPhotoPreview] = useState(null);
-  const [photoSource, setPhotoSource] = useState("default");
-  const [photoUrl, setPhotoUrl] = useState("");
-  const [photoBase64, setPhotoBase64] = useState("");
-  const [showPresets, setShowPresets] = useState(false);
   const [formData, setFormData] = useState(initialForm);
-
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const fileInputRef = useRef(null);
-
-  const presets = [
-    "avatar1.svg",
-    "avatar2.svg",
-    "avatar3.svg",
-    "avatar4.svg",
-    "avatar5.svg",
-    "avatar6.svg"
-  ];
-
   const resetForm = () => {
-    setPhotoPreview(null);
-    setPhotoSource("default");
-    setPhotoUrl("");
-    setPhotoBase64("");
-    setShowPresets(false);
     setFormData(initialForm);
     setError("");
   };
@@ -63,37 +39,12 @@ const EnrollMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
     }));
   };
 
-  const handlePhotoClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handlePhotoChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPhotoPreview(reader.result);
-      setPhotoSource("upload");
-      setPhotoBase64(reader.result);
-      setPhotoUrl("");
-      setShowPresets(false);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleSelectPreset = (presetName) => {
-    setPhotoSource("local");
-    setPhotoUrl(presetName);
-    setPhotoBase64("");
-    setPhotoPreview(`/avatars/${presetName}`);
-    setShowPresets(false);
-  };
-
   const validate = () => {
     if (!formData.name.trim()) return "Name is required";
     if (!formData.email.trim()) return "Email is required";
     if (!/\S+@\S+\.\S+/.test(formData.email.trim())) return "Enter a valid email address";
+    if (!formData.phone || !formData.phone.trim()) return "Phone number is required";
+    if (!/^\d{10}$/.test(formData.phone.trim())) return "Phone number must be exactly 10 digits";
     return "";
   };
 
@@ -109,12 +60,9 @@ const EnrollMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
     const payload = {
       name: formData.name.trim(),
       email: formData.email.trim().toLowerCase(),
-      phone: formData.phone?.trim() || null,
+      phone: formData.phone.trim(),
       tier: formData.tier,
-      status: formData.status,
-      profile_photo_source: photoSource,
-      profile_photo_url: photoUrl,
-      profile_photo_base64: photoBase64
+      status: formData.status
     };
 
     try {
@@ -173,97 +121,7 @@ const EnrollMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
             <div className="section-title">Basic Information</div>
           </div>
 
-          <div className="profile-upload-container">
-            <div className="profile-upload-box" onClick={handlePhotoClick}>
-              {photoPreview ? (
-                <img
-                  src={photoPreview}
-                  alt="Profile preview"
-                  className="profile-upload-preview"
-                />
-              ) : (
-                <img
-                  src={ProfilePlaceholder}
-                  alt="Profile placeholder"
-                  className="profile-upload-placeholder"
-                />
-              )}
-              <div className="camera-badge">
-                <img
-                  src={ProfileButtonIcon}
-                  alt="Upload"
-                  className="camera-badge-img"
-                />
-              </div>
-            </div>
-
-            <input
-              type="file"
-              accept="image/*"
-              className="profile-upload-input"
-              ref={fileInputRef}
-              onChange={handlePhotoChange}
-            />
-            <div className="profile-upload-label">Upload profile photo</div>
-
-            <button
-              type="button"
-              className="btn-select-preset"
-              onClick={() => setShowPresets(!showPresets)}
-              style={{
-                background: "transparent",
-                border: "1px solid #cda751",
-                borderRadius: "4px",
-                color: "#cda751",
-                fontSize: "12px",
-                padding: "4px 10px",
-                marginTop: "8px",
-                cursor: "pointer",
-                fontWeight: "600",
-                fontFamily: "inherit"
-              }}
-            >
-              Or Choose Preset Avatar
-            </button>
-
-            {showPresets && (
-              <div className="preset-avatar-grid" style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(6, 1fr)",
-                gap: "8px",
-                marginTop: "12px",
-                width: "100%",
-                maxWidth: "280px"
-              }}>
-                {presets.map((preset) => (
-                  <div
-                    key={preset}
-                    onClick={() => handleSelectPreset(preset)}
-                    style={{
-                      cursor: "pointer",
-                      border: photoUrl === preset ? "2px solid #cda751" : "2px solid transparent",
-                      borderRadius: "6px",
-                      padding: "2px",
-                      transition: "all 0.2s"
-                    }}
-                  >
-                    <img
-                      src={`/avatars/${preset}`}
-                      alt={preset}
-                      style={{
-                        width: "100%",
-                        aspectRatio: "1/1",
-                        display: "block",
-                        borderRadius: "4px"
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="form-group">
+          <div className="form-group" style={{ marginTop: "16px" }}>
             <label className="input-label">Full Name</label>
             <input
               type="text"
@@ -297,7 +155,7 @@ const EnrollMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                placeholder="+91 XXXXXXXXXX"
+                placeholder="Enter 10-digit phone number"
                 className="drawer-input"
               />
             </div>
