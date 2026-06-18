@@ -121,6 +121,7 @@ function App() {
               <Route path="my-assignments" element={<SafePage><MyAssignments /></SafePage>} />
               <Route path="bookings" element={<SafePage><Bookings /></SafePage>} />
               <Route path="services" element={<SafePage><Services /></SafePage>} />
+              <Route path="feedbacks" element={<SafePage><Feedbacks /></SafePage>} />
 
               {/* Admin-only routes — redirects staff to Home */}
               <Route path="customers" element={<RoleProtectedRoute><SafePage><Customers /></SafePage></RoleProtectedRoute>} />
@@ -129,7 +130,6 @@ function App() {
               <Route path="membership" element={<RoleProtectedRoute><SafePage><Membership /></SafePage></RoleProtectedRoute>} />
               <Route path="workshops" element={<RoleProtectedRoute><SafePage><Workshops /></SafePage></RoleProtectedRoute>} />
               <Route path="vedic-programs" element={<RoleProtectedRoute><SafePage><VedicLifePrograms /></SafePage></RoleProtectedRoute>} />
-              <Route path="feedbacks" element={<RoleProtectedRoute><SafePage><Feedbacks /></SafePage></RoleProtectedRoute>} />
             </Route>
 
           </Routes>
