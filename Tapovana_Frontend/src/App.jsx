@@ -21,6 +21,8 @@ const Membership = lazy(() => import("./Membership/Membership"));
 const Workshops = lazy(() => import("./Workshops/Workshops"));
 const VedicLifePrograms = lazy(() => import("./VedicLifePrograms/VedicLifePrograms"));
 const Blogs = lazy(() => import("./Blogs/Blogs"));
+const BlogCreate = lazy(() => import("./Blogs/BlogCreate"));
+const BlogEdit = lazy(() => import("./Blogs/BlogEdit"));
 const MyAssignments = lazy(() => import("./MyAssignments/MyAssignments"));
 
 // Guard 1: Checks for a valid session token and handles forced password change
@@ -114,9 +116,9 @@ function App() {
               <Route index element={<SafePage><Home /></SafePage>} />
               <Route path="profile" element={<SafePage><Profile /></SafePage>} />
               <Route path="blogs" element={<SafePage><Blogs /></SafePage>} />
-              <Route path="blogs/create" element={<SafePage><Blogs mode="create" /></SafePage>} />
+              <Route path="blogs/create" element={<SafePage><BlogCreate /></SafePage>} />
               <Route path="blogs/:id" element={<SafePage><Blogs /></SafePage>} />
-              <Route path="blogs/:id/edit" element={<SafePage><Blogs mode="edit" /></SafePage>} />
+              <Route path="blogs/:id/edit" element={<SafePage><BlogEdit /></SafePage>} />
               <Route path="my-assignments" element={<SafePage><MyAssignments /></SafePage>} />
               <Route path="bookings" element={<SafePage><Bookings /></SafePage>} />
               <Route path="services" element={<SafePage><Services /></SafePage>} />

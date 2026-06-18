@@ -1,152 +1,322 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import Quill from "quill";
-import "quill/dist/quill.snow.css";
-import "./Blogs.css";
-import SearchIcon from "../assets/searchIcon.svg";
-import DropdownIcon from "../assets/dropdownIcon.svg";
-import { getUser } from "../utils/session";
-import { getImageUrl } from "../utils/image";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { apiFetch, getUser } from "../utils/api";
 import { useAllocations } from "../utils/AllocationContext";
-import { apiFetch } from "../api/http";
 import MediaPickerModal from "../components/MediaPickerModal";
+
+// --- Utility Functions ---
+const getImageUrl = (url) => {
+  if (!url) return "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800";
+  if (url.startsWith("http")) return url;
+  return `http://localhost:5000${url}`;
+};
 
 const formatDate = (dateStr) => {
   if (!dateStr) return "";
-  return new Date(dateStr).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  try {
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric"
+    });
+  } catch {
+    return "";
+  }
 };
 
-// ─── Quill Editor Component ──────────────────────────────────────────────
-function QuillEditor({ value, onChange }) {
-  const containerRef = useRef(null);
-  const quillRef = useRef(null);
-  const isInternalChange = useRef(false);
-
-  useEffect(() => {
-    if (containerRef.current && !quillRef.current) {
-      quillRef.current = new Quill(containerRef.current, {
-        theme: "snow",
-        modules: {
-          toolbar: [
-            [{ header: [1, 2, 3, false] }],
-            ["bold", "italic", "underline", "strike"],
-            [{ list: "ordered" }, { list: "bullet" }],
-            ["blockquote", "link", "image"],
-            ["clean"],
-          ],
-        },
-        placeholder: "Write your blog content here...",
-      });
-
-      quillRef.current.on("text-change", () => {
-        isInternalChange.current = true;
-        const html = quillRef.current.root.innerHTML;
-        onChange(html === "<p><br></p>" ? "" : html);
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    if (quillRef.current && !isInternalChange.current) {
-      const currentHtml = quillRef.current.root.innerHTML;
-      if (value !== currentHtml && value !== undefined) {
-        quillRef.current.root.innerHTML = value || "";
-      }
-    }
-    isInternalChange.current = false;
-  }, [value]);
-
-  return (
-    <div className="blog-quill-container">
-      <div ref={containerRef} />
-    </div>
-  );
-}
-
-// ─── Blog Card ───────────────────────────────────────────────────────────
-function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove, onReject, onArchive, onRestore }) {
+// --- Components ---
+function BlogCard({ blog, onClick, onEdit, onDelete, onApprove, onReject, onArchive, onRestore, isStaff, isAdmin }) {
   const isDraft = blog.status === "draft";
   const isPending = blog.status === "pending";
-  const isPublished = blog.status === "published";
   const isRejected = blog.status === "rejected";
   const isArchived = blog.status === "archived";
 
   return (
-    <div className="blog-card" onClick={() => onClick(blog.id)} style={{ display: "flex", flexDirection: "column", background: "white", borderRadius: "12px", border: "1px solid rgba(205,167,81,0.2)", overflow: "hidden", transition: "all 0.2s" }}>
-      <div className="blog-card-content" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
-        
-        {/* 1. Category/Discipline */}
-        <span className="blog-card-category" style={{ fontSize: "11px", fontWeight: "700", color: "#cda751", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+    <div className="blog-card" onClick={() => onClick(blog.id)} style={{
+      background: "#fff",
+      borderRadius: "12px",
+      overflow: "hidden",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+      border: "1px solid #edf2f7",
+      cursor: "pointer",
+      display: "flex",
+      flexDirection: "column"
+    }}>
+      <div style={{ position: "relative" }}>
+        <img
+          src={getImageUrl(blog.featured_image)}
+          alt={blog.title}
+          style={{
+            width: "100%",
+            height: "200px",
+            objectFit: "cover"
+          }}
+          onError={(e) => {
+            e.target.src = "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800";
+          }}
+        />
+        <div style={{
+          position: "absolute",
+          top: "12px",
+          left: "12px",
+          background: isDraft ? "#e2e8f0" : isPending ? "#fef3c7" : isRejected ? "#fee2e2" : isArchived ? "#e2e8f0" : "#cda751",
+          color: isDraft ? "#4a5568" : isPending ? "#78350f" : isRejected ? "#7f1d1d" : isArchived ? "#4a5568" : "#fff",
+          padding: "4px 10px",
+          borderRadius: "6px",
+          fontSize: "11px",
+          fontWeight: "600",
+          textTransform: "uppercase",
+          letterSpacing: "0.5px"
+        }}>
+          {blog.status}
+        </div>
+        <div style={{
+          position: "absolute",
+          top: "12px",
+          right: "12px",
+          background: "#cda751",
+          color: "white",
+          padding: "4px 10px",
+          borderRadius: "6px",
+          fontSize: "11px",
+          fontWeight: "600",
+          textTransform: "uppercase"
+        }}>
           {blog.category}
-        </span>
+        </div>
+      </div>
 
-        {/* 2. Title */}
-        <h3 className="blog-card-title" style={{ margin: "0", fontSize: "15px", fontWeight: "700", color: "#1a202c", lineClamp: 2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: "1.3" }}>
+      <div style={{ padding: "16px", flex: 1, display: "flex", flexDirection: "column" }}>
+        <h3 style={{
+          margin: "0 0 8px 0",
+          color: "#1a202c",
+          fontSize: "18px",
+          fontWeight: "700",
+          lineHeight: "1.3"
+        }}>
           {blog.title}
         </h3>
 
-        {/* 3. Image */}
-        <div className="blog-card-image-wrapper" style={{ position: "relative", borderRadius: "8px", overflow: "hidden", border: "1px solid #edf2f7", height: "135px" }}>
-          <img
-            src={getImageUrl(blog.featured_image)}
-            alt={blog.title}
-            className="blog-card-image"
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            onError={(e) => {
-              e.target.src = "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800";
-            }}
-          />
-          {(isStaff || isAdmin) && (
-            <div className={"blog-status-badge " + blog.status} style={{ fontSize: "9px", padding: "2px 6px" }}>
-              {isPublished ? "Published" : isPending ? "Pending" : isDraft ? "Draft" : isRejected ? "Rejected" : "Archived"}
+        {blog.summary && (
+          <p style={{
+            margin: "0 0 12px 0",
+            color: "#4a5568",
+            fontSize: "13px",
+            lineHeight: "1.5",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden"
+          }}>
+            {blog.summary}
+          </p>
+        )}
+
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "8px",
+          marginTop: "auto"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{
+              width: "28px",
+              height: "28px",
+              borderRadius: "50%",
+              background: "#cda751",
+              color: "white",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "12px",
+              fontWeight: "700"
+            }}>
+              {blog.author?.name ? blog.author.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : "?"}
             </div>
-          )}
-        </div>
-
-        {/* 4. Author Name & Role */}
-        <div style={{ fontSize: "11px", fontWeight: "600", color: "#4a5568", marginTop: "1px" }}>
-          By {blog.author?.name || "Anonymous"} <span style={{ color: "#cbd5e0", margin: "0 4px" }}>|</span> <span style={{ textTransform: "uppercase", color: "#cda751", fontWeight: "700" }}>{blog.author?.role || "Specialist"}</span>
-        </div>
-
-        {/* 5. Date & Read Time */}
-        <div style={{ fontSize: "11px", color: "#718096", marginBottom: "2px" }}>
-          {formatDate(blog.published_at || blog.created_at)} · {blog.read_time}
+            <div>
+              <p style={{
+                margin: 0,
+                color: "#1a202c",
+                fontSize: "12px",
+                fontWeight: "600"
+              }}>
+                {blog.author?.name || "Anonymous"}
+              </p>
+              <p style={{
+                margin: 0,
+                color: "#718096",
+                fontSize: "11px"
+              }}>
+                {blog.author?.role || "Specialist"}
+              </p>
+            </div>
+          </div>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            color: "#718096",
+            fontSize: "11px"
+          }}>
+            <span>📅 {formatDate(blog.published_at || blog.created_at)}</span>
+            <span>⏱️ {blog.read_time || "3 min read"}</span>
+          </div>
         </div>
 
         {isRejected && blog.rejection_reason && (
-          <div style={{ marginTop: "4px", padding: "4px 8px", backgroundColor: "#fff5f5", border: "1px solid #feb2b2", borderRadius: "6px", fontSize: "11px", color: "#c53030" }}>
+          <div style={{
+            marginTop: "4px",
+            padding: "4px 8px",
+            backgroundColor: "#fff5f5",
+            border: "1px solid #feb2b2",
+            borderRadius: "6px",
+            fontSize: "11px",
+            color: "#c53030"
+          }}>
             <strong>Reason:</strong> {blog.rejection_reason}
           </div>
         )}
 
         {/* Actions Footer */}
-        <div className="blog-card-footer" onClick={(e) => e.stopPropagation()} style={{ marginTop: "auto", paddingTop: "6px", borderTop: "1px solid #edf2f7", display: "flex", gap: "4px", flexDirection: "column" }}>
+        <div className="blog-card-footer" onClick={(e) => e.stopPropagation()} style={{
+          marginTop: "auto",
+          paddingTop: "6px",
+          borderTop: "1px solid #edf2f7",
+          display: "flex",
+          gap: "4px",
+          flexDirection: "column"
+        }}>
           {isStaff && (isDraft || isRejected) && (
-            <div className="blog-card-actions" style={{ display: "flex", gap: "6px", width: "100%", marginTop: "2px" }}>
-              <button onClick={() => onEdit(blog)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Edit</button>
-              <button onClick={() => onDelete(blog.id)} style={{ background: "transparent", color: "#cda751", border: "1px solid #cda751", padding: "5px 11px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Delete</button>
+            <div className="blog-card-actions" style={{
+              display: "flex",
+              gap: "6px",
+              width: "100%",
+              marginTop: "2px"
+            }}>
+              <button onClick={() => onEdit(blog)} style={{
+                background: "#cda751",
+                color: "#fff",
+                border: "none",
+                padding: "6px 12px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "700",
+                fontSize: "11px",
+                flex: 1,
+                textAlign: "center"
+              }}>Edit</button>
+              <button onClick={() => onDelete(blog.id)} style={{
+                background: "transparent",
+                color: "#cda751",
+                border: "1px solid #cda751",
+                padding: "5px 11px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "700",
+                fontSize: "11px",
+                flex: 1,
+                textAlign: "center"
+              }}>Delete</button>
             </div>
           )}
           {isAdmin && isPending && (
-            <div className="blog-card-actions" style={{ display: "flex", gap: "6px", width: "100%", marginTop: "2px" }}>
-              <button onClick={() => onApprove(blog.id)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Approve</button>
-              <button onClick={() => onReject(blog.id)} style={{ background: "transparent", color: "#cda751", border: "1px solid #cda751", padding: "5px 11px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Reject</button>
+            <div className="blog-card-actions" style={{
+              display: "flex",
+              gap: "6px",
+              width: "100%",
+              marginTop: "2px"
+            }}>
+              <button onClick={() => onApprove(blog.id)} style={{
+                background: "#cda751",
+                color: "#fff",
+                border: "none",
+                padding: "6px 12px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "700",
+                fontSize: "11px",
+                flex: 1,
+                textAlign: "center"
+              }}>Approve</button>
+              <button onClick={() => onReject(blog.id)} style={{
+                background: "transparent",
+                color: "#cda751",
+                border: "1px solid #cda751",
+                padding: "5px 11px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "700",
+                fontSize: "11px",
+                flex: 1,
+                textAlign: "center"
+              }}>Reject</button>
             </div>
           )}
           {isAdmin && isArchived && (
-            <div className="blog-card-actions" style={{ display: "flex", gap: "6px", width: "100%", marginTop: "2px" }}>
-              <button onClick={() => onRestore(blog.id)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Restore</button>
-              <button onClick={() => onDelete(blog.id)} style={{ background: "transparent", color: "#cda751", border: "1px solid #cda751", padding: "5px 11px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Delete</button>
+            <div className="blog-card-actions" style={{
+              display: "flex",
+              gap: "6px",
+              width: "100%",
+              marginTop: "2px"
+            }}>
+              <button onClick={() => onRestore(blog.id)} style={{
+                background: "#cda751",
+                color: "#fff",
+                border: "none",
+                padding: "6px 12px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "700",
+                fontSize: "11px",
+                flex: 1,
+                textAlign: "center"
+              }}>Restore</button>
+              <button onClick={() => onDelete(blog.id)} style={{
+                background: "transparent",
+                color: "#cda751",
+                border: "1px solid #cda751",
+                padding: "5px 11px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "700",
+                fontSize: "11px",
+                flex: 1,
+                textAlign: "center"
+              }}>Delete</button>
             </div>
           )}
-          {isAdmin && isPublished && (
-            <div className="blog-card-actions" style={{ display: "flex", gap: "6px", width: "100%", marginTop: "2px" }}>
-              <button onClick={() => onArchive(blog.id)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Archive</button>
-              <button onClick={() => onDelete(blog.id)} style={{ background: "transparent", color: "#cda751", border: "1px solid #cda751", padding: "5px 11px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Delete</button>
+          {isAdmin && blog.status === "published" && (
+            <div className="blog-card-actions" style={{
+              display: "flex",
+              gap: "6px",
+              width: "100%",
+              marginTop: "2px"
+            }}>
+              <button onClick={() => onArchive(blog.id)} style={{
+                background: "#cda751",
+                color: "#fff",
+                border: "none",
+                padding: "6px 12px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "700",
+                fontSize: "11px",
+                flex: 1,
+                textAlign: "center"
+              }}>Archive</button>
+              <button onClick={() => onDelete(blog.id)} style={{
+                background: "transparent",
+                color: "#cda751",
+                border: "1px solid #cda751",
+                padding: "5px 11px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "700",
+                fontSize: "11px",
+                flex: 1,
+                textAlign: "center"
+              }}>Delete</button>
             </div>
           )}
         </div>
@@ -155,7 +325,6 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
   );
 }
 
-// ─── Related Blogs ───────────────────────────────────────────────────────
 function RelatedBlogs({ currentBlogId, blogs, onClick }) {
   const relatedBlogs = useMemo(() => {
     return blogs
@@ -183,10 +352,8 @@ function RelatedBlogs({ currentBlogId, blogs, onClick }) {
   );
 }
 
-// ═════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ═════════════════════════════════════════════════════════════════════════
-export default function Blogs({ mode }) {
+// --- Main Component ---
+export default function Blogs() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -220,57 +387,9 @@ export default function Blogs({ mode }) {
     else if (status === "published") setActiveTab("published");
     else if (status === "archived") setActiveTab("archived");
   }, [searchParams, isAdmin]);
-  const [editingBlogId, setEditingBlogId] = useState(null);
-  const [editBlogData, setEditBlogData] = useState({
-    title: "", category: "AYURVEDA", summary: "", content_html: "",
-    featured_image: "", tags: "", seo_title: "", seo_description: "", seo_keywords: "",
-    author_name: "", author_role: ""
-  });
   const [rejectionModal, setRejectionModal] = useState({ isOpen: false, blogId: null, reason: "" });
-  const [showSeo, setShowSeo] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const [commentText, setCommentText] = useState("");
-  const [savingBlog, setSavingBlog] = useState(false);
-  const fileInputRef = useRef(null);
 
-
-  // Handle initializing edit/create based on URL / mode prop
-  useEffect(() => {
-    if (mode === "create") {
-      if (!isStaff) {
-        navigate("/dashboard/blogs");
-        return;
-      }
-      setEditingBlogId(null);
-      setEditBlogData({
-        title: "", category: "AYURVEDA", summary: "", content_html: "",
-        featured_image: "", tags: "", seo_title: "", seo_description: "", seo_keywords: "",
-        author_name: `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim(),
-        author_role: currentUser?.role?.toUpperCase() === "DOCTOR" ? "Doctor" : currentUser?.role?.toUpperCase() === "THERAPIST" ? "Therapist" : ""
-      });
-    }
-  }, [mode, isStaff, navigate, currentUser]);
-
-  useEffect(() => {
-    if (mode === "edit" && detailBlog) {
-      setEditingBlogId(detailBlog.id);
-      setEditBlogData({
-        title: detailBlog.title || "",
-        category: detailBlog.category || "AYURVEDA",
-        summary: detailBlog.summary || "",
-        content_html: detailBlog.content_html || "",
-        featured_image: detailBlog.featured_image || "",
-        tags: detailBlog.tags?.join(", ") || "",
-        seo_title: detailBlog.seo_title || "",
-        seo_description: detailBlog.seo_description || "",
-        seo_keywords: detailBlog.seo_keywords || "",
-        author_name: detailBlog.author?.name || `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim(),
-        author_role: detailBlog.author?.role || (currentUser?.role?.toUpperCase() === "DOCTOR" ? "Doctor" : currentUser?.role?.toUpperCase() === "THERAPIST" ? "Therapist" : "")
-      });
-    }
-  }, [mode, detailBlog, id, currentUser]);
-
-  // ─── Fetch blogs list ──────────────────────────────────────────────
+  // Fetch blogs list
   const fetchBlogs = useCallback(async () => {
     try {
       setLoading(true);
@@ -297,10 +416,10 @@ export default function Blogs({ mode }) {
   }, [categoryFilter, search, activeTab, isAdmin, isStaff]);
 
   useEffect(() => {
-    if (!id && !mode) fetchBlogs();
-  }, [fetchBlogs, id, mode]);
+    if (!id) fetchBlogs();
+  }, [fetchBlogs, id]);
 
-  // ─── Fetch single blog detail ──────────────────────────────────────
+  // Fetch single blog detail
   const fetchBlogDetail = useCallback(async (blogId) => {
     try {
       setDetailLoading(true);
@@ -322,7 +441,7 @@ export default function Blogs({ mode }) {
     else setDetailBlog(null);
   }, [id, fetchBlogDetail]);
 
-  // ─── Filtered blogs for display ────────────────────────────────────
+  // Filtered blogs for display
   const filteredBlogs = useMemo(() => {
     return blogs.filter((blog) => {
       if (isStaff && activeTab === "other_blogs") {
@@ -334,9 +453,25 @@ export default function Blogs({ mode }) {
     });
   }, [blogs, activeTab, currentUser, isStaff]);
 
-  // ─── Handlers ──────────────────────────────────────────────────────
+  // --- Handlers ---
   const handleCardClick = (blogId) => {
     navigate("/dashboard/blogs/" + blogId);
+  };
+
+  const handleEdit = (blog) => {
+    navigate(`/dashboard/blogs/${blog.id}/edit`);
+  };
+
+  const handleDelete = async (blogId) => {
+    const confirmed = await triggerConfirm("Are you sure you want to permanently delete this article?");
+    if (!confirmed) return;
+    try {
+      await apiFetch(`/api/blogs/${blogId}`, { method: "DELETE" });
+      await triggerAlert("Blog deleted successfully.", true);
+      fetchBlogs();
+    } catch (err) {
+      await triggerAlert(err.message || "Failed to delete blog.");
+    }
   };
 
   const handleApprove = async (blogId) => {
@@ -380,170 +515,28 @@ export default function Blogs({ mode }) {
     if (!confirmed) return;
     try {
       await apiFetch(`/api/blogs/${blogId}/archive`, { method: "POST" });
-      await triggerAlert("Article archived successfully.", true);
+      await triggerAlert("Blog archived successfully.", true);
       fetchBlogs();
-      if (id) {
-        navigate("/dashboard/blogs");
-      }
+      if (id) fetchBlogDetail(id);
     } catch (err) {
       await triggerAlert(err.message || "Failed to archive blog.");
     }
   };
 
   const handleRestore = async (blogId) => {
-    const confirmed = await triggerConfirm("Are you sure you want to restore this archived article to published status?");
+    const confirmed = await triggerConfirm("Are you sure you want to restore this archived article?");
     if (!confirmed) return;
     try {
       await apiFetch(`/api/blogs/${blogId}/restore`, { method: "POST" });
-      await triggerAlert("Article restored successfully.", true);
+      await triggerAlert("Blog restored successfully.", true);
       fetchBlogs();
-      if (id) {
-        navigate("/dashboard/blogs");
-      }
+      if (id) fetchBlogDetail(id);
     } catch (err) {
       await triggerAlert(err.message || "Failed to restore blog.");
     }
   };
 
-  const handleEdit = (blog) => {
-    navigate(`/dashboard/blogs/${blog.id}/edit`);
-  };
-
-  const handleDelete = async (blogId) => {
-    const confirmed = await triggerConfirm("Are you sure you want to permanently delete this article?");
-    if (!confirmed) return;
-    try {
-      await apiFetch(`/api/blogs/${blogId}`, { method: "DELETE" });
-      await triggerAlert("Blog deleted successfully.", true);
-      fetchBlogs();
-    } catch (err) {
-      await triggerAlert(err.message || "Failed to delete blog.");
-    }
-  };
-
-  // ─── Image upload ──────────────────────────────────────────────────
-  const handleImageFile = (file) => {
-    if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const data = await apiFetch("/api/uploads/blog-image", {
-          method: "POST",
-          body: JSON.stringify({ image: reader.result })
-        });
-        setEditBlogData(prev => ({ ...prev, featured_image: data.url }));
-        triggerAlert("Image uploaded successfully.", true);
-      } catch {
-        // Fallback: store base64 directly
-        setEditBlogData(prev => ({ ...prev, featured_image: reader.result }));
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer?.files?.[0];
-    handleImageFile(file);
-  };
-
-  const handleCancel = () => {
-    setEditingBlogId(null);
-    navigate("/dashboard/blogs");
-  };
-
-  // ─── Editor submit ─────────────────────────────────────────────────
-  const handleEditorSubmit = async (targetStatus) => {
-    // 1. Title validation: Required, min length 3 chars.
-    if (!editBlogData.title || editBlogData.title.trim().length < 3) {
-      await triggerAlert("Title is required (minimum 3 characters).");
-      return;
-    }
-    // 2. Category validation: Required.
-    if (!editBlogData.category) {
-      await triggerAlert("Category is required.");
-      return;
-    }
-    // 3. Author Name validation: Required, alphabets only.
-    if (!editBlogData.author_name || !/^[A-Za-z\s]+$/.test(editBlogData.author_name.trim())) {
-      await triggerAlert("Author name must contain only alphabets.");
-      return;
-    }
-    // 4. Role validation: Required (Doctor/Therapist).
-    const roleVal = editBlogData.author_role?.trim().toLowerCase();
-    if (roleVal !== "doctor" && roleVal !== "therapist") {
-      await triggerAlert("Please select a valid role (Doctor/Therapist).");
-      return;
-    }
-    // 5. Image validation: Required for publishing (status = pending).
-    if (targetStatus === "pending" && !editBlogData.featured_image) {
-      await triggerAlert("Featured image is required for publishing.");
-      return;
-    }
-    // 6. Description validation: Required, min length 500 chars only for pending
-    const textOnly = (editBlogData.content_html || "").replace(/<[^>]*>/g, '').trim();
-    if (targetStatus === "pending" && textOnly.length < 500) {
-      await triggerAlert("Content must be at least 500 characters.");
-      return;
-    }
-
-    setSavingBlog(true);
-    try {
-      const payload = {
-        title: editBlogData.title,
-        category: editBlogData.category,
-        summary: editBlogData.summary,
-        content_html: editBlogData.content_html,
-        featured_image: editBlogData.featured_image,
-        tags: editBlogData.tags ? editBlogData.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-        seo_title: editBlogData.seo_title,
-        seo_description: editBlogData.seo_description,
-        seo_keywords: editBlogData.seo_keywords,
-        author_name: editBlogData.author_name,
-        author_role: editBlogData.author_role
-      };
-
-      if (editingBlogId) {
-        // First update the blog content (without changing status yet)
-        await apiFetch(`/api/blogs/${editingBlogId}`, {
-          method: "PATCH",
-          body: JSON.stringify(payload)
-        });
-
-        // Then handle status change
-        if (targetStatus === "pending") {
-          await apiFetch(`/api/blogs/${editingBlogId}/submit`, { method: "POST" });
-        } else if (targetStatus === "draft") {
-          // If we just want to save as draft, update status separately
-          await apiFetch(`/api/blogs/${editingBlogId}`, {
-            method: "PATCH",
-            body: JSON.stringify({ status: targetStatus })
-          });
-        }
-
-        setEditingBlogId(null);
-        navigate("/dashboard/blogs");
-        await triggerAlert("Blog updated successfully.", true);
-      } else {
-        payload.status = targetStatus;
-        await apiFetch("/api/blogs", {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
-        const msg = targetStatus === "draft" ? "Draft saved successfully." : "Blog created and submitted for review.";
-        setEditingBlogId(null);
-        navigate("/dashboard/blogs");
-        await triggerAlert(msg, true);
-      }
-    } catch (err) {
-      await triggerAlert(err.message || "Failed to save blog.");
-    } finally {
-      setSavingBlog(false);
-    }
-  };
-
-  // ─── Like / Bookmark ───────────────────────────────────────────────
+  // --- Like / Bookmark ---
   const handleToggleLike = async () => {
     if (!currentUser) return;
     try {
@@ -572,7 +565,9 @@ export default function Blogs({ mode }) {
     }
   };
 
-  // ─── Comments ──────────────────────────────────────────────────────
+  // --- Comments ---
+  const [commentText, setCommentText] = useState("");
+
   const handleSubmitComment = async () => {
     if (!commentText.trim()) return;
     try {
@@ -601,9 +596,7 @@ export default function Blogs({ mode }) {
     }
   };
 
-  // ═════════════════════════════════════════════════════════════════════
-  // DETAIL VIEW
-  // ═════════════════════════════════════════════════════════════════════
+  // --- Detail View ---
   if (id) {
     if (detailLoading) {
       return <div className="blog-loading"><div className="blog-spinner" /></div>;
@@ -615,31 +608,59 @@ export default function Blogs({ mode }) {
 
     return (
       <div className="blog-detail-container" style={{ background: "#fdfbf7", color: "#1a202c", padding: "24px" }}>
-
-
-        <div className="blog-detail-back" onClick={() => navigate("/dashboard/blogs")} style={{ color: "#cda751", cursor: "pointer", fontWeight: "bold", fontSize: "15px", marginBottom: "20px" }}>
+        <div className="blog-detail-back" onClick={() => navigate("/dashboard/blogs")} style={{
+          color: "#cda751",
+          cursor: "pointer",
+          fontWeight: "bold",
+          fontSize: "15px",
+          marginBottom: "20px"
+        }}>
           ← Back to Blogs
         </div>
 
         {/* Single card wrapping the entire blog */}
-        <article className="blog-detail-main" style={{ display: "flex", flexDirection: "column", gap: "16px", background: "#fff", borderRadius: "12px", border: "1px solid rgba(205,167,81,0.25)", padding: "28px", boxShadow: "0 4px 20px rgba(205,167,81,0.08)" }}>
-          
+        <article className="blog-detail-main" style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "16px",
+          background: "#fff",
+          borderRadius: "12px",
+          border: "1px solid rgba(205,167,81,0.25)",
+          padding: "28px",
+          boxShadow: "0 4px 20px rgba(205,167,81,0.08)"
+        }}>
           {/* Category/Discipline */}
-          <div className="blog-detail-category" style={{ fontSize: "14px", fontWeight: "700", color: "#cda751", textTransform: "uppercase", letterSpacing: "1px" }}>
+          <div className="blog-detail-category" style={{
+            fontSize: "14px",
+            fontWeight: "700",
+            color: "#cda751",
+            textTransform: "uppercase",
+            letterSpacing: "1px"
+          }}>
             {detailBlog.category}
           </div>
 
           {/* Title */}
-          <h1 className="blog-detail-title" style={{ fontSize: "32px", fontWeight: "800", color: "#1a202c", margin: "0" }}>
+          <h1 className="blog-detail-title" style={{
+            fontSize: "32px",
+            fontWeight: "800",
+            color: "#1a202c",
+            margin: "0"
+          }}>
             {detailBlog.title}
           </h1>
 
           {/* Image */}
           <div className="blog-detail-image-wrapper" style={{ borderRadius: "10px", overflow: "hidden" }}>
-            <img 
-              src={getImageUrl(detailBlog.featured_image)} 
-              alt={detailBlog.title} 
-              style={{ width: "100%", maxHeight: "450px", objectFit: "cover", display: "block" }}
+            <img
+              src={getImageUrl(detailBlog.featured_image)}
+              alt={detailBlog.title}
+              style={{
+                width: "100%",
+                maxHeight: "450px",
+                objectFit: "cover",
+                display: "block"
+              }}
               onError={(e) => {
                 e.target.src = "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800";
               }}
@@ -647,14 +668,23 @@ export default function Blogs({ mode }) {
           </div>
 
           {/* Description/Content */}
-          <section 
-            className="blog-detail-body" 
-            style={{ fontSize: "17px", lineHeight: "1.8", color: "#2d3748" }} 
-            dangerouslySetInnerHTML={{ __html: detailBlog.content_html }} 
+          <section
+            className="blog-detail-body"
+            style={{ fontSize: "17px", lineHeight: "1.8", color: "#2d3748" }}
+            dangerouslySetInnerHTML={{ __html: detailBlog.content_html }}
           />
 
           {/* Meta Details: 2 rows, 2 columns — no separate box */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 16px", marginTop: "8px", paddingTop: "16px", borderTop: "1px solid #edf2f7", fontSize: "14px", color: "#4a5568" }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "10px 16px",
+            marginTop: "8px",
+            paddingTop: "16px",
+            borderTop: "1px solid #edf2f7",
+            fontSize: "14px",
+            color: "#4a5568"
+          }}>
             <div>
               <strong style={{ color: "#1a202c" }}>Author:</strong> {detailBlog.author?.name || "Anonymous"}
             </div>
@@ -671,17 +701,24 @@ export default function Blogs({ mode }) {
 
           {/* Action Buttons for Admins only (no staff edit/delete here) */}
           {isAdmin && (
-            <div className="blog-admin-decision-actions" style={{ display: "flex", gap: "16px", marginTop: "8px", paddingTop: "16px", borderTop: "1px solid #edf2f7", flexWrap: "wrap" }}>
+            <div className="blog-admin-decision-actions" style={{
+              display: "flex",
+              gap: "16px",
+              marginTop: "8px",
+              paddingTop: "16px",
+              borderTop: "1px solid #edf2f7",
+              flexWrap: "wrap"
+            }}>
               {detailBlog.status === "pending" && (
                 <>
-                  <button 
-                    className="blog-btn-accept" 
+                  <button
+                    className="blog-btn-accept"
                     onClick={() => handleApprove(detailBlog.id)}
                   >
                     Accept
                   </button>
-                  <button 
-                    className="blog-btn-reject" 
+                  <button
+                    className="blog-btn-reject"
                     onClick={() => handleReject(detailBlog.id)}
                   >
                     Reject
@@ -689,16 +726,16 @@ export default function Blogs({ mode }) {
                 </>
               )}
               {detailBlog.status === "published" && (
-                <button 
-                  className="blog-btn-archive" 
+                <button
+                  className="blog-btn-archive"
                   onClick={() => handleArchive(detailBlog.id)}
                 >
                   Archive Article
                 </button>
               )}
               {detailBlog.status === "archived" && (
-                <button 
-                  className="blog-btn-accept" 
+                <button
+                  className="blog-btn-accept"
                   onClick={() => handleRestore(detailBlog.id)}
                 >
                   Restore Article
@@ -711,249 +748,19 @@ export default function Blogs({ mode }) {
     );
   }
 
-  // ═════════════════════════════════════════════════════════════════════
-  // EDITOR VIEW (Full Page)
-  // ═════════════════════════════════════════════════════════════════════
-  if (mode === "create" || mode === "edit") {
-    if (mode === "edit" && detailLoading) {
-      return <div className="blog-loading"><div className="blog-spinner" /></div>;
-    }
-
-    return (
-      <div className="blog-editor-page-container" style={{ background: "#fdfbf7", minHeight: "100vh", padding: "24px" }}>
-
-
-        <div className="blog-detail-back" onClick={handleCancel} style={{ marginBottom: "20px", color: "#cda751", cursor: "pointer", fontWeight: "bold" }}>
-          ← Cancel and Go Back
-        </div>
-
-        <div className="blog-editor-card" style={{ background: "white", padding: "30px", borderRadius: "12px", border: "1px solid rgba(205,167,81,0.3)", boxShadow: "0 4px 20px rgba(205,167,81,0.05)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "2px solid #cda751", paddingBottom: "12px", marginBottom: "20px" }}>
-            <h2 style={{ margin: 0, color: "#1a202c", fontWeight: "800" }}>{mode === "edit" ? "Edit Blog" : "Create New Blog"}</h2>
-            {mode === "edit" && detailBlog && (
-              <div style={{ 
-                background: "#cda751", 
-                color: "white", 
-                fontWeight: "600", 
-                padding: "6px 12px", 
-                borderRadius: "6px", 
-                fontSize: "13px", 
-                textTransform: "capitalize"
-              }}>
-                {detailBlog.status}
-              </div>
-            )}
-          </div>
-          
-          <div className="blog-editor-form" style={{ display: "flex", flexDirection: "column", gap: "20px", marginTop: "20px" }}>
-            
-            {/* 1. Category/Discipline */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Category/Discipline *</label>
-              <select
-                value={editBlogData.category}
-                onChange={(e) => setEditBlogData(prev => ({ ...prev, category: e.target.value }))}
-                style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", background: "#fff" }}
-              >
-                <option value="AYURVEDA">Ayurveda</option>
-                <option value="YOGA">Yoga</option>
-                <option value="NUTRITION">Nutrition</option>
-                <option value="WELLNESS">Wellness</option>
-              </select>
-            </div>
-
-            {/* 2. Title */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Blog Title * (Min 3 chars)</label>
-              <input
-                type="text"
-                placeholder="Enter blog title..."
-                value={editBlogData.title}
-                onChange={(e) => setEditBlogData(prev => ({ ...prev, title: e.target.value }))}
-                style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px" }}
-                required
-              />
-            </div>
-
-            {/* 3. Short Subtitle/Tagline */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Short Subtitle/Tagline</label>
-              <textarea
-                placeholder="Enter short summary or tagline..."
-                value={editBlogData.summary}
-                onChange={(e) => setEditBlogData(prev => ({ ...prev, summary: e.target.value }))}
-                rows={2}
-                style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", fontFamily: "inherit" }}
-              />
-            </div>
-
-            {/* 4. Author Name */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Author Name</label>
-              <input
-                type="text"
-                placeholder="Enter author name..."
-                value={editBlogData.author_name}
-                onChange={mode === "create" ? (e) => setEditBlogData(prev => ({ ...prev, author_name: e.target.value })) : undefined}
-                disabled={mode === "edit"}
-                style={{ width: "100%", padding: "12px", border: `1px solid ${mode === "edit" ? "#cbd5e0" : "#e2e8f0"}`, borderRadius: "8px", fontSize: "14px", background: mode === "edit" ? "#edf2f7" : "#fff", cursor: mode === "edit" ? "not-allowed" : "text" }}
-                required={mode === "create"}
-              />
-            </div>
-
-            {/* 5. Role */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Role</label>
-              {mode === "create" ? (
-                <select
-                  value={editBlogData.author_role}
-                  onChange={(e) => setEditBlogData(prev => ({ ...prev, author_role: e.target.value }))}
-                  style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", background: "#fff" }}
-                >
-                  <option value="">Select Role</option>
-                  <option value="Doctor">Doctor</option>
-                  <option value="Therapist">Therapist</option>
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={editBlogData.author_role}
-                  disabled
-                  style={{ width: "100%", padding: "12px", border: "1px solid #cbd5e0", borderRadius: "8px", fontSize: "14px", background: "#edf2f7", cursor: "not-allowed" }}
-                />
-              )}
-            </div>
-
-            {/* 6. Date */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "14px", fontWeight: "700", color: "#718096" }}>Date (Auto-generated, not editable)</label>
-              <input
-                type="text"
-                value={mode === "edit" && detailBlog ? formatDate(detailBlog.created_at) : formatDate(new Date())}
-                disabled
-                style={{ width: "100%", padding: "12px", border: "1px solid #cbd5e0", borderRadius: "8px", fontSize: "14px", background: "#edf2f7", cursor: "not-allowed", color: "#4a5568" }}
-              />
-            </div>
-
-            {/* 7. Image */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "4px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c", margin: 0 }}>Featured Image Thumbnail * (Required for publishing)</label>
-                <button type="button" className="blog-seo-toggle" style={{ margin: 0, fontSize: "12px", border: "1px solid #cda751", padding: "4px 10px", borderRadius: "6px" }}
-                  onClick={(e) => { e.stopPropagation(); setMediaModalOpen(true); }}>
-                  📷 Choose from Pexels
-                </button>
-              </div>
-              <div
-                className={`blog-image-upload-zone ${dragOver ? "drag-over" : ""}`}
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                style={{ border: "2px dashed #cbd5e0", borderRadius: "8px", padding: "20px", textAlign: "center", cursor: "pointer", background: "#fafafa" }}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={(e) => handleImageFile(e.target.files?.[0])}
-                />
-                {editBlogData.featured_image ? (
-                  <img
-                    src={getImageUrl(editBlogData.featured_image)}
-                    alt="Preview"
-                    className="blog-image-preview"
-                    style={{ maxHeight: "200px", maxWidth: "100%", objectFit: "contain", borderRadius: "6px" }}
-                  />
-                ) : (
-                  <p style={{ color: "#718096", margin: 0 }}>📷 Click or drag an image here for featured image</p>
-                )}
-              </div>
-            </div>
-
-            {/* 8. Description/Content */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c" }}>Description/Content * (Min 50 chars)</label>
-              <QuillEditor
-                value={editBlogData.content_html}
-                onChange={(html) => setEditBlogData(prev => ({ ...prev, content_html: html }))}
-              />
-            </div>
-
-            {/* SEO Fields */}
-            <button type="button" className="blog-seo-toggle" onClick={() => setShowSeo(!showSeo)} style={{ alignSelf: "flex-start", background: "transparent", border: "none", color: "#cda751", cursor: "pointer", fontWeight: "bold" }}>
-              {showSeo ? "▾" : "▸"} SEO Settings
-            </button>
-            {showSeo && (
-              <div className="blog-seo-fields" style={{ display: "flex", flexDirection: "column", gap: "12px", border: "1px solid #edf2f7", padding: "16px", borderRadius: "8px" }}>
-                <input type="text" placeholder="SEO Title" value={editBlogData.seo_title} onChange={(e) => setEditBlogData(prev => ({ ...prev, seo_title: e.target.value }))} style={{ padding: "10px", border: "1px solid #e2e8f0", borderRadius: "6px" }} />
-                <textarea placeholder="SEO Description" value={editBlogData.seo_description} onChange={(e) => setEditBlogData(prev => ({ ...prev, seo_description: e.target.value }))} rows={2} style={{ padding: "10px", border: "1px solid #e2e8f0", borderRadius: "6px", fontFamily: "inherit" }} />
-                <input type="text" placeholder="SEO Keywords (comma separated)" value={editBlogData.seo_keywords} onChange={(e) => setEditBlogData(prev => ({ ...prev, seo_keywords: e.target.value }))} style={{ padding: "10px", border: "1px solid #e2e8f0", borderRadius: "6px" }} />
-              </div>
-            )}
-
-            <div className="blog-editor-actions" style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "10px", borderTop: "1px solid #edf2f7", paddingTop: "20px" }}>
-              <button type="button" onClick={handleCancel} className="blog-editor-cancel">Cancel</button>
-              <button
-                type="button"
-                onClick={() => handleEditorSubmit("draft")}
-                className="blog-editor-save blog-editor-save-draft"
-                disabled={savingBlog}
-              >
-                Save Draft
-              </button>
-              <button
-                type="button"
-                onClick={() => handleEditorSubmit("pending")}
-                className="blog-editor-save blog-editor-submit"
-                disabled={savingBlog}
-              >
-                Submit for Review
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <MediaPickerModal 
-          isOpen={mediaModalOpen}
-          onClose={() => setMediaModalOpen(false)}
-          onSelect={(url) => {
-            setEditBlogData(prev => ({ ...prev, featured_image: url }));
-            setMediaModalOpen(false);
-          }}
-          allowVideos={false}
-          title="Select Pexels Image"
-          page_type="blogs"
-          category={editBlogData?.category || 'Ayurveda'}
-          subcategory="All"
-          defaultQuery={(() => {
-            const cat = (editBlogData?.category || '').toUpperCase();
-            if (cat === 'AYURVEDA') return 'Ayurveda';
-            if (cat === 'YOGA') return 'Yoga';
-            if (cat === 'WELLNESS') return 'Wellness';
-            if (cat === 'NUTRITION') return 'Healthy Lifestyle';
-            return 'Wellness';
-          })()}
-          suggestions={['Ayurveda', 'Yoga', 'Wellness', 'Healthy Lifestyle']}
-        />
-      </div>
-    );
-  }
-
-  // ═════════════════════════════════════════════════════════════════════
-  // LIST VIEW
-  // ═════════════════════════════════════════════════════════════════════
+  // --- List View ---
   return (
     <div className="blog-container">
-
-
       {/* Rejection Modal */}
       {rejectionModal.isOpen && (
         <div className="blog-editor-modal-overlay">
           <div className="blog-editor-modal" style={{ maxWidth: "400px" }}>
             <h2>Reject Blog</h2>
-            <p style={{ color: "#718096", marginBottom: "16px", fontSize: "14px" }}>
+            <p style={{
+              color: "#718096",
+              marginBottom: "16px",
+              fontSize: "14px"
+            }}>
               Please provide a reason for rejecting this article. This will be sent to the author.
             </p>
             <textarea
@@ -961,7 +768,15 @@ export default function Blogs({ mode }) {
               value={rejectionModal.reason}
               onChange={(e) => setRejectionModal({ ...rejectionModal, reason: e.target.value })}
               className="blog-editor-form-textarea"
-              style={{ width: "100%", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", marginBottom: "16px", fontFamily: "inherit", resize: "vertical" }}
+              style={{
+                width: "100%",
+                padding: "12px",
+                border: "1px solid #e2e8f0",
+                borderRadius: "8px",
+                marginBottom: "16px",
+                fontFamily: "inherit",
+                resize: "vertical"
+              }}
               rows={4}
               required
             />
@@ -981,15 +796,21 @@ export default function Blogs({ mode }) {
         </div>
         {isStaff && (
           <button
-            style={{ background: "#cda751", color: "white", border: "none", padding: "10px 20px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}
+            style={{
+              background: "#cda751",
+              color: "white",
+              border: "none",
+              padding: "10px 20px",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontWeight: "bold"
+            }}
             onClick={() => navigate("/dashboard/blogs/create")}
           >
             + Create Blog
           </button>
         )}
       </div>
-
-
 
       {/* Tabs */}
       {isAdmin && (
@@ -1026,7 +847,7 @@ export default function Blogs({ mode }) {
       {/* Search & Filter Controls */}
       <div className="blog-controls">
         <div className="blog-search-box">
-          <img src={SearchIcon} alt="search" />
+          <img src="https://cdn-icons-png.flaticon.com/512/64/64673.png" alt="search" style={{ width: "16px", height: "16px", opacity: "0.5" }} />
           <input type="text" placeholder="Search blogs..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <div className="blog-filter-dropdown">
@@ -1037,7 +858,7 @@ export default function Blogs({ mode }) {
             <option value="NUTRITION">Nutrition</option>
             <option value="WELLNESS">Wellness</option>
           </select>
-          <img src={DropdownIcon} alt="dropdown" />
+          <img src="https://cdn-icons-png.flaticon.com/512/25/25243.png" alt="dropdown" style={{ width: "12px", height: "12px" }} />
         </div>
       </div>
 
@@ -1068,26 +889,18 @@ export default function Blogs({ mode }) {
         </div>
       )}
 
-      <MediaPickerModal 
+      <MediaPickerModal
         isOpen={mediaModalOpen}
         onClose={() => setMediaModalOpen(false)}
         onSelect={(url) => {
-          setEditBlogData(prev => ({ ...prev, featured_image: url }));
           setMediaModalOpen(false);
         }}
         allowVideos={false}
         title="Select Pexels Image"
         page_type="blogs"
-        category={editBlogData?.category || 'Ayurveda'}
+        category="Ayurveda"
         subcategory="All"
-        defaultQuery={(() => {
-          const cat = (editBlogData?.category || '').toUpperCase();
-          if (cat === 'AYURVEDA') return 'Ayurveda';
-          if (cat === 'YOGA') return 'Yoga';
-          if (cat === 'WELLNESS') return 'Wellness';
-          if (cat === 'NUTRITION') return 'Healthy Lifestyle';
-          return 'Wellness';
-        })()}
+        defaultQuery="Wellness"
         suggestions={['Ayurveda', 'Yoga', 'Wellness', 'Healthy Lifestyle']}
       />
     </div>
