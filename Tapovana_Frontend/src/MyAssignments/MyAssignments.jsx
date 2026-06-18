@@ -108,25 +108,28 @@ function AssignmentCard({ a }) {
         </div>
       </div>
       
-      <div style={{ marginBottom: "12px" }}>
-        <p style={{ margin: 0, color: "#555555", fontSize: "14px" }}>
-          {a.type === 'service' ? 'Assigned Staff' : a.type === 'workshop' ? 'Instructor' : 'Lead Consultant'}: {a.staffName} ({a.staffRole})
+      <div style={{ marginBottom: "16px" }}>
+        <p style={{ margin: 0, color: "#555555", fontSize: "14px", marginBottom: "4px" }}>
+          {a.type === 'service' ? 'Assigned Staff' : a.type === 'workshop' ? 'Instructor' : 'Lead Consultant'}: {a.staffName}
+        </p>
+        <p style={{ margin: 0, color: "#1E1E1E", fontSize: "14px", fontWeight: 500 }}>
+          Role: {a.staffRole}
         </p>
       </div>
       
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "24px" }}>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ color: "#555555", fontSize: "12px", marginBottom: "4px" }}>Date & Time</span>
-          <span style={{ color: "#1E1E1E", fontSize: "14px", fontWeight: 500 }}>
-            {getFormatDate(a.startDate)} {a.bookingTime || a.time || ''}
-          </span>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ color: "#555555", fontSize: "12px", marginBottom: "4px" }}>Duration</span>
-          <span style={{ color: "#1E1E1E", fontSize: "14px", fontWeight: 500 }}>
-            {a.duration || a.duration_minutes || 30} mins
-          </span>
-        </div>
+      <div style={{ marginBottom: "12px" }}>
+        <p style={{ margin: 0, color: "#555555", fontSize: "14px", marginBottom: "4px" }}>
+          Date: {getFormatDate(a.startDate)}
+        </p>
+        <p style={{ margin: 0, color: "#1E1E1E", fontSize: "14px", fontWeight: 500, marginBottom: "12px" }}>
+          Time: {a.bookingTime || a.time || ''}
+        </p>
+        <p style={{ margin: 0, color: "#555555", fontSize: "14px", marginBottom: "4px" }}>
+          Duration:
+        </p>
+        <p style={{ margin: 0, color: "#1E1E1E", fontSize: "14px", fontWeight: 500 }}>
+          {a.duration || a.duration_minutes || 30} mins
+        </p>
       </div>
     </div>
   );
