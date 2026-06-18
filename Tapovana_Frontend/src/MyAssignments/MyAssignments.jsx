@@ -93,7 +93,7 @@ function AssignmentCard({ a, onComplete, onDelete }) {
       borderRadius: "12px",
       padding: "16px"
     }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "12px" }}>
         <div style={{
           background: "#CDA751",
           color: "white",
@@ -113,6 +113,62 @@ function AssignmentCard({ a, onComplete, onDelete }) {
           fontWeight: 600
         }}>
           {st.label}
+        </div>
+      </div>
+      <div style={{ marginBottom: "8px" }}>
+        <h3 style={{ margin: 0, color: "#0F172A", fontSize: "18px" }}>{a.sessionTitle}</h3>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#7b8a9a", marginBottom: "8px" }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+        {a.staffName} ({a.staffRole})
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "#7b8a9a", marginBottom: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+          {getFormatDate(a.startDate)} {a.bookingTime || a.time || ''}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+          {a.duration || a.duration_minutes || 30} mins
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: "14px", fontWeight: 700, color: "#2d3748" }}>
+          Assigned: {getFormatDate(a.createdAt)}
+        </span>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {(a.status === 'active' || a.status === 'Upcoming' || a.status === 'Live') && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onComplete(a); }}
+              style={{
+                padding: '6px 16px',
+                fontSize: '13px',
+                fontWeight: '600',
+                background: "#CDA751",
+                color: 'white',
+                border: 'none',
+                borderRadius: "8px",
+                cursor: 'pointer'
+              }}
+            >
+              Mark Complete
+            </button>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(a); }}
+            style={{
+              padding: '6px 16px',
+              fontSize: '13px',
+              fontWeight: '600',
+              background: 'transparent',
+              color: "#CDA751",
+              border: '2px solid #CDA751',
+              borderRadius: "8px",
+              cursor: 'pointer'
+            }}
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>
