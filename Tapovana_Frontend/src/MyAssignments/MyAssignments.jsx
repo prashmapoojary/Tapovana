@@ -93,7 +93,19 @@ function AssignmentCard({ a, onComplete }) {
       borderRadius: "12px",
       padding: "14px"
     }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "flex-end", marginBottom: "10px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "10px" }}>
+        {a.type === 'service' && (
+          <div style={{
+            background: "#CDA751",
+            color: "white",
+            fontWeight: 700,
+            padding: "6px 16px",
+            borderRadius: "20px",
+            textTransform: "uppercase"
+          }}>
+            {categoryLabel}
+          </div>
+        )}
         <div style={{
           background: "#F0E9D6",
           color: "#7C725E",
