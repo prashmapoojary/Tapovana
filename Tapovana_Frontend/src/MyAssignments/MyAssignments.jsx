@@ -62,7 +62,7 @@ const STATUS_CONFIG = {
   cancelled: { label: "Cancelled", color: "#e74c3c", bg: "rgba(231,76,60,0.1)" },
 };
 
-function AssignmentCard({ a, triggerAlert }) {
+function AssignmentCard({ a }) {
   let categoryLabel = '';
   if (a.type === 'service') {
     categoryLabel = 'Service';
@@ -87,73 +87,46 @@ function AssignmentCard({ a, triggerAlert }) {
   // If status is removed, don't render the card at all!
   if (a.status === 'removed') return null;
 
-  const handleView = (e) => {
-    e.stopPropagation();
-    // Read-only view - we can implement a modal later, for now just a gold-themed alert
-    triggerAlert('View feature coming soon!');
-  };
-
   return (
     <div className="ws-card" style={{
       background: "#F9F9F9",
       borderRadius: "8px",
-      padding: "16px",
+      padding: "20px",
       border: "1px solid #CDA751"
     }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "12px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "16px" }}>
         <h3 style={{ margin: 0, color: "#1E1E1E", fontSize: "16px", fontWeight: 600 }}>{a.sessionTitle}</h3>
         <div style={{
           background: "#CDA751",
           color: "white",
           fontWeight: 600,
-          padding: "4px 10px",
+          padding: "4px 12px",
           borderRadius: "4px",
-          fontSize: "11px"
+          fontSize: "12px"
         }}>
           {st.label}
         </div>
       </div>
       
-      <div style={{ marginBottom: "8px" }}>
-        <p style={{ margin: 0, color: "#555555", fontSize: "13px" }}>
+      <div style={{ marginBottom: "12px" }}>
+        <p style={{ margin: 0, color: "#555555", fontSize: "14px" }}>
           {a.type === 'service' ? 'Assigned Staff' : a.type === 'workshop' ? 'Instructor' : 'Lead Consultant'}: {a.staffName} ({a.staffRole})
         </p>
       </div>
       
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", marginBottom: "12px" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "24px" }}>
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ color: "#555555", fontSize: "11px", marginBottom: "2px" }}>Date & Time</span>
-          <span style={{ color: "#1E1E1E", fontSize: "13px", fontWeight: 500 }}>
+          <span style={{ color: "#555555", fontSize: "12px", marginBottom: "4px" }}>Date & Time</span>
+          <span style={{ color: "#1E1E1E", fontSize: "14px", fontWeight: 500 }}>
             {getFormatDate(a.startDate)} {a.bookingTime || a.time || ''}
           </span>
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ color: "#555555", fontSize: "11px", marginBottom: "2px" }}>Duration</span>
-          <span style={{ color: "#1E1E1E", fontSize: "13px", fontWeight: 500 }}>
+          <span style={{ color: "#555555", fontSize: "12px", marginBottom: "4px" }}>Duration</span>
+          <span style={{ color: "#1E1E1E", fontSize: "14px", fontWeight: 500 }}>
             {a.duration || a.duration_minutes || 30} mins
           </span>
         </div>
-      </div>
-      
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button
-          onClick={handleView}
-          style={{
-            padding: '8px 16px',
-            fontSize: '13px',
-            fontWeight: 600,
-            background: "#CDA751",
-            color: 'white',
-            border: 'none',
-            borderRadius: "4px",
-            cursor: 'pointer',
-            transition: 'background-color 0.2s'
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#b59243'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#CDA751'; }}
-        >
-          View
-        </button>
       </div>
     </div>
   );
@@ -161,7 +134,7 @@ function AssignmentCard({ a, triggerAlert }) {
 
 function MyAssignments() {
   const loggedInUser = useMemo(() => getUser(), []);
-  const { allocations: contextAllocations, triggerAlert } = useAllocations();
+  const { allocations: contextAllocations } = useAllocations();
 
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [staffList, setStaffList] = useState([]);
@@ -523,7 +496,6 @@ function MyAssignments() {
                       <AssignmentCard
                         key={a.id}
                         a={a}
-                        triggerAlert={triggerAlert}
                       />
                     ))}
                   </div>
@@ -545,7 +517,6 @@ function MyAssignments() {
                       <AssignmentCard
                         key={a.id}
                         a={a}
-                        triggerAlert={triggerAlert}
                       />
                     ))}
                   </div>
@@ -567,7 +538,6 @@ function MyAssignments() {
                       <AssignmentCard
                         key={a.id}
                         a={a}
-                        triggerAlert={triggerAlert}
                       />
                     ))}
                   </div>
