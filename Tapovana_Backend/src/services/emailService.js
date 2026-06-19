@@ -881,13 +881,14 @@ const sendBlogRejectedEmail = async ({ to, authorName, blogTitle, reason }) => {
   });
 };
 
-const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, workshopTitle, completionDate, downloadUrl }) => {
+const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, workshopTitle, completionDate, downloadUrl, certId }) => {
+  const linkUrl = certId ? `https://tapovana.onrender.com/api/certificates/download/${certId}` : downloadUrl;
   const html = emailWrapper(`
     <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 20px 0 10px;">
-      Click below to download your certificate.
+      Click below to download your certificate:
     </p>
     <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 25px 0;">
-      <a href="${downloadUrl}" style="color:#cda751;font-weight:bold;text-decoration:underline;">${downloadUrl}</a>
+      <a href="${linkUrl}" style="color:#cda751;font-weight:bold;text-decoration:underline;">Download Certificate</a>
     </p>
   `);
 

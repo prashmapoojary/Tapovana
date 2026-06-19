@@ -1416,7 +1416,8 @@ const autoUpdateWorkshopStatuses = async () => {
                                 participantName: att.name,
                                 workshopTitle: w.title,
                                 completionDate: completionDateStr,
-                                downloadUrl: certUrl
+                                downloadUrl: certUrl,
+                                certId: certId
                             });
                             console.log(`Certificate email sent to attendee: ${att.email} for workshop: ${w.title}`);
                         }
