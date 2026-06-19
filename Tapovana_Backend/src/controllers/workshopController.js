@@ -1661,14 +1661,17 @@ const downloadCertificate = async (req, res) => {
             }
         }
 
-        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Type", "application/octet-stream");
         res.setHeader("Content-Disposition", "attachment; filename=certificate.pdf");
 
-        return res.download(filePath, 'certificate.pdf', (err) => {
-            if (err) {
-                console.error('downloadCertificate res.download error:', err);
+        const stream = fs.createReadStream(filePath);
+        stream.on('error', (streamErr) => {
+            console.error('downloadCertificate stream error:', streamErr);
+            if (!res.headersSent) {
+                res.status(500).json({ success: false, message: 'Server error downloading certificate.' });
             }
         });
+        return stream.pipe(res);
     } catch (err) {
         console.error('downloadCertificate error:', err);
         return res.status(500).json({ success: false, message: 'Server error downloading certificate.' });
