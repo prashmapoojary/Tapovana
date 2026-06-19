@@ -9,7 +9,7 @@ const pool = new Pool({
   },
   max: 10,                             // max connections (Neon free tier allows ~100 pooled)
   idleTimeoutMillis: 20000,            // close idle clients after 20 seconds (Neon may kill them at ~30s)
-  connectionTimeoutMillis: 10000,      // wait up to 10 seconds — fail fast to avoid endpoint hangs on Neon cold start
+  connectionTimeoutMillis: 20000,      // wait up to 20 seconds — allows Neon cold starts to wake up cleanly
   keepAlive: true,                     // send TCP keep-alive packets
   keepAliveInitialDelayMillis: 10000,  // delay before first keep-alive packet
   allowExitOnIdle: false,              // keep pool alive for background jobs
@@ -23,18 +23,17 @@ pool.on('error', (err) => {
 
 // ── Helper: determine if an error is transient (retryable) ────────────────
 const isTransientError = (err) => {
+  if (!err) return false;
+  
   const transientCodes = [
     'ENOTFOUND', 'ECONNREFUSED', 'ETIMEDOUT', 'ECONNRESET',
-    'EPIPE', 'EAI_AGAIN', 'EHOSTUNREACH'
+    'EPIPE', 'EAI_AGAIN', 'EHOSTUNREACH', '57P01', '57P02', '57P03'
   ];
 
-  // pg error codes / Node system error codes
-  if (err.code && transientCodes.includes(err.code)) return true;
-
-  // pg-pool / pg connection error message checks
-  if (err.message) {
-    const msgLower = err.message.toLowerCase();
-    if (
+  const checkMessage = (msg) => {
+    if (!msg) return false;
+    const msgLower = msg.toLowerCase();
+    return (
       msgLower.includes('connection terminated') ||
       msgLower.includes('connection error') ||
       msgLower.includes('econnreset') ||
@@ -45,9 +44,19 @@ const isTransientError = (err) => {
       msgLower.includes('timeout') ||
       msgLower.includes('terminated due to connection timeout') ||
       msgLower.includes('unexpectedly')
-    ) {
-      return true;
-    }
+    );
+  };
+
+  // pg error codes / Node system error codes
+  if (err.code && transientCodes.includes(err.code)) return true;
+
+  // pg-pool / pg connection error message checks
+  if (err.message && checkMessage(err.message)) return true;
+
+  // Check the error cause message (e.g. wrapper errors from pg-pool)
+  if (err.cause) {
+    if (err.cause.code && transientCodes.includes(err.cause.code)) return true;
+    if (err.cause.message && checkMessage(err.cause.message)) return true;
   }
 
   return false;
