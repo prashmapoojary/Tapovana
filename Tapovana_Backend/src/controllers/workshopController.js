@@ -1378,7 +1378,9 @@ const autoUpdateWorkshopStatuses = async () => {
                 }
 
                 // Process attendees: generate certificate and send emails for anyone who doesn't have a certificate yet
-                const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || 'https://tapovana.onrender.com';
+                const port = process.env.PORT || 5000;
+                const defaultUrl = process.env.NODE_ENV === 'production' ? 'https://tapovana.onrender.com' : `http://localhost:${port}`;
+                const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
                 for (const att of attendeesRes.rows) {
                     try {
                         const certCheck = await query('SELECT certificate_id, certificate_url FROM certificates WHERE participant_id = $1 AND workshop_id = $2', [att.id, w.id]);
@@ -1573,6 +1575,57 @@ const downloadCertificate = async (req, res) => {
             certRes = await query(queryBase + ' WHERE c.participant_id = $1', [parseInt(id, 10)]);
         } else {
             return res.status(404).json({ success: false, message: 'Invalid certificate identifier format.' });
+        }
+
+        if (!certRes.rows.length) {
+            if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)) {
+                // Check if the id is actually an attendee ID of a completed workshop
+                const attendeeRes = await query(`
+                    SELECT a.id, a.name, a.email, w.id AS workshop_id, w.title AS workshop_title, w.date AS workshop_date, w.status AS workshop_status
+                    FROM attendees a
+                    JOIN workshops w ON w.id = a.workshop_id
+                    WHERE a.id = $1 AND (w.status = 'Completed' OR w.status = 'completed')
+                `, [id]);
+                
+                if (attendeeRes.rows.length) {
+                    const att = attendeeRes.rows[0];
+                    const certId = uuidv4();
+                    const port = process.env.PORT || 5000;
+                    const defaultUrl = process.env.NODE_ENV === 'production' ? 'https://tapovana.onrender.com' : `http://localhost:${port}`;
+                    const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
+                    const certUrl = `${backendUrl}/api/certificates/download/${certId}`;
+                    
+                    let dateStr = att.workshop_date;
+                    if (att.workshop_date instanceof Date) {
+                        const year = att.workshop_date.getFullYear();
+                        const month = String(att.workshop_date.getMonth() + 1).padStart(2, '0');
+                        const day = String(att.workshop_date.getDate()).padStart(2, '0');
+                        dateStr = `${year}-${month}-${day}`;
+                    }
+                    const compDateObj = new Date(dateStr);
+                    const completionDateStr = compDateObj.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+
+                    const pdfBuffer = await generateCertificatePDF(att.name, att.workshop_title, completionDateStr);
+                    const certsDir = path.join(__dirname, '../../uploads/certificates');
+                    if (!fs.existsSync(certsDir)) {
+                        fs.mkdirSync(certsDir, { recursive: true });
+                    }
+                    const filePath = path.join(certsDir, `${certId}.pdf`);
+                    fs.writeFileSync(filePath, pdfBuffer);
+                    
+                    await query(
+                        `INSERT INTO certificates (certificate_id, participant_id, workshop_id, certificate_url, issued_date)
+                         VALUES ($1, $2, $3, $4, NOW())`,
+                        [certId, att.id, att.workshop_id, certUrl]
+                    );
+                    
+                    certRes = await query(queryBase + ' WHERE c.certificate_id = $1', [certId]);
+                }
+            }
         }
 
         if (!certRes.rows.length) {
