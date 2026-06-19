@@ -17,9 +17,13 @@ const {
     deleteTeamMemberFrontend,
     updateSelfProfile,
     updateAllocationStatus,
+    getPublicSpecialists,
 } = require('../controllers/teamController');
 
 const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN')];
+
+// ── Public route for listing therapists and doctors ──────────────────────
+router.get('/public/specialists', getPublicSpecialists);
 
 // ── Frontend routes MUST come before /:id routes ──────────────────────────────
 router.patch('/profile', authenticate, updateSelfProfile);

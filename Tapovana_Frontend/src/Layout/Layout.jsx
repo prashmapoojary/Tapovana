@@ -291,14 +291,14 @@ const Layout = () => {
       return ["doctor", "therapist"].includes(role);
     }
 
-    // Doctor sees only Services, Bookings, Blogs, and My Assignments
+    // Doctor sees only Services, Bookings, Blogs, My Assignments, and Feedbacks
     if (role === "doctor") {
-      return ["Services", "Bookings", "Blogs", "My Assignments"].includes(item.name);
+      return ["Services", "Bookings", "Blogs", "My Assignments", "Feedbacks"].includes(item.name);
     }
     
-    // Therapist sees only Bookings, Blogs, and My Assignments
+    // Therapist sees only Bookings, Blogs, My Assignments, and Feedbacks
     if (role === "therapist") {
-      return ["Bookings", "Blogs", "My Assignments"].includes(item.name);
+      return ["Bookings", "Blogs", "My Assignments", "Feedbacks"].includes(item.name);
     }
 
     // Admin / Manager / others see everything

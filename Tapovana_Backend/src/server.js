@@ -63,6 +63,7 @@ app.post("/api/uploads/blog-image", require("./middleware/auth").authenticate, r
 app.post("/api/vedicpackages", require("./controllers/vedicProgramsController").registerAttendeeFromMobile);
 app.get("/certificates/:id", require("./controllers/workshopController").downloadCertificate);
 app.get("/api/download/certificate/:id", require("./controllers/workshopController").downloadCertificate);
+app.get("/api/certificates/download/:id", require("./controllers/workshopController").downloadCertificate);
 app.get("/api/analytics/dashboard", require("./middleware/auth").authenticate, require("./controllers/homeController").getAnalyticsDashboard);
 
 app.use("/api/customer", customerRoutes);

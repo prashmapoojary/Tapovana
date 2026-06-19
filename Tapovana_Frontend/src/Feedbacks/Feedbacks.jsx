@@ -51,7 +51,7 @@ const INITIAL_FEEDBACKS = [
 ];
 
 export default function Feedbacks() {
-  const [feedbacks, setFeedbacks] = useState(INITIAL_FEEDBACKS);
+  const [feedbacks, setFeedbacks] = useState([]);
   const [openActionMenu, setOpenActionMenu] = useState(null);
   
   // Filter states
@@ -67,6 +67,42 @@ export default function Feedbacks() {
   // Notification toast state
   const [toast, setToast] = useState({ visible: false, message: '' });
   const [toastTimeoutId, setToastTimeoutId] = useState(null);
+
+  useEffect(() => {
+    const fetchFeedbacks = async () => {
+      try {
+        const response = await fetch('https://tapoclg.onrender.com/api/reviews');
+        const data = await response.json();
+        if (data.success && Array.isArray(data.reviews)) {
+          const mappedFeedbacks = data.reviews.map(item => {
+            // Normalize moduleType capitalization
+            let modType = item.module_type || 'Blog';
+            if (modType.toLowerCase() === 'vedic life' || modType.toLowerCase() === 'vediclife') {
+              modType = 'Vedic Life';
+            } else {
+              modType = modType.charAt(0).toUpperCase() + modType.slice(1).toLowerCase();
+            }
+
+            return {
+              id: item.id,
+              userName: item.username || 'Anonymous',
+              email: item.email || 'N/A',
+              moduleType: modType,
+              title: item.title || 'N/A',
+              feedbackContent: item.feedback || '',
+              rating: item.rating || 5,
+              dateSubmitted: item.date ? item.date.substring(0, 10) : new Date().toISOString().substring(0, 10),
+              status: item.status || 'Pending'
+            };
+          });
+          setFeedbacks(mappedFeedbacks);
+        }
+      } catch (err) {
+        console.error('Error fetching feedbacks:', err);
+      }
+    };
+    fetchFeedbacks();
+  }, []);
 
   useEffect(() => {
     // Override page-content overflow-y so layout fits page height and scrolls inside table
@@ -310,14 +346,14 @@ export default function Feedbacks() {
                 <th>Feedback</th>
                 <th>Rating</th>
                 <th>Date</th>
-                <th>Status</th>
+
                 <th className="th-actions">Action</th>
               </tr>
             </thead>
             <tbody>
               {filteredFeedbacks.length === 0 ? (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '32px', color: '#64748B' }}>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '32px', color: '#64748B' }}>
                     No feedbacks found matching the filter criteria.
                   </td>
                 </tr>
@@ -339,9 +375,7 @@ export default function Feedbacks() {
                       <span className="fb-rating-stars">{renderStars(item.rating)}</span>
                     </td>
                     <td>{item.dateSubmitted}</td>
-                    <td>
-                      <span className={getStatusClass(item.status)}>{item.status}</span>
-                    </td>
+
                     <td className="td-actions" style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
                       <div style={{ position: "relative", display: "inline-block" }}>
                         <img

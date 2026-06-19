@@ -1385,22 +1385,13 @@ const autoUpdateWorkshopStatuses = async () => {
                         
                         if (certCheck.rows.length === 0) {
                             const certId = uuidv4();
-                            const certUrl = `${backendUrl}/api/download/certificate/${certId}`;
+                            const certUrl = `${backendUrl}/api/certificates/download/${certId}`;
                             
                             await query(
                                 `INSERT INTO certificates (certificate_id, participant_id, workshop_id, certificate_url, issued_date)
                                  VALUES ($1, $2, $3, $4, NOW())`,
                                 [certId, att.id, w.id, certUrl]
                             );
-
-                            // Send both completion email and certificate link to the participant
-                            await sendWorkshopCompletedEmail({
-                                to: att.email,
-                                staffOrParticipantName: att.name,
-                                workshopTitle: w.title,
-                                date: dateStr,
-                                time: w.time
-                            });
 
                             const compDateObj = new Date(dateStr);
                             const completionDateStr = compDateObj.toLocaleDateString('en-US', {
@@ -1591,9 +1582,27 @@ const downloadCertificate = async (req, res) => {
 
         const pdfBuffer = await generateCertificatePDF(cert.participant_name, cert.workshop_title, formattedDate);
 
+        // Generate temporary file to serve via res.download
+        const os = require('os');
+        const tempDir = os.tmpdir();
+        const tempFilename = `certificate_${id}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}.pdf`;
+        const filePath = path.join(tempDir, tempFilename);
+        fs.writeFileSync(filePath, pdfBuffer);
+
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", "attachment; filename=\"certificate.pdf\"");
-        return res.send(pdfBuffer);
+        res.setHeader("Content-Disposition", "attachment; filename=certificate.pdf");
+        
+        return res.download(filePath, 'certificate.pdf', (err) => {
+            // Clean up the temp file after download completes or error occurs
+            fs.unlink(filePath, (unlinkErr) => {
+                if (unlinkErr && unlinkErr.code !== 'ENOENT') {
+                    console.error('Error deleting temp certificate file:', unlinkErr);
+                }
+            });
+            if (err) {
+                console.error('downloadCertificate res.download error:', err);
+            }
+        });
     } catch (err) {
         console.error('downloadCertificate error:', err);
         return res.status(500).json({ success: false, message: 'Server error downloading certificate.' });

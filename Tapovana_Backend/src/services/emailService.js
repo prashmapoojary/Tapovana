@@ -891,29 +891,18 @@ const sendBlogRejectedEmail = async ({ to, authorName, blogTitle, reason }) => {
 
 const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, workshopTitle, completionDate, downloadUrl }) => {
   const html = emailWrapper(`
-    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 20px 0 10px;">Dear ${participantName},</p>
-    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 15px 0;">
-      Congratulations on successfully completing the workshop: ${workshopTitle} on ${completionDate}.
-    </p>
-    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 15px 0;">
-      Your certificate of completion is now available.
+    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 20px 0 10px;">
+      Congratulations! You have successfully completed the workshop.
     </p>
     <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 25px 0;">
-      👉 <a href="${downloadUrl}" style="color:#cda751;font-weight:bold;text-decoration:underline;">Download Certificate</a>
-    </p>
-    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 15px 0;">
-      Thank you for your participation.
-    </p>
-    <p style="color:#888;font-size:14px;line-height:1.5;margin:30px 0 0 0;">
-      Regards,<br/>
-      Tapovana Team
+      <a href="${downloadUrl}" style="color:#cda751;font-weight:bold;text-decoration:underline;">Click here to download your certificate</a>
     </p>
   `);
 
   return transporter.sendMail({
     from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
     to,
-    subject: `Workshop Completion Certificate – ${workshopTitle}`,
+    subject: "Workshop Completed – Download Your Certificate",
     html,
   });
 };

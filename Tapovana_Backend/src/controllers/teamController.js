@@ -937,6 +937,24 @@ const updateAllocationStatus = async (req, res) => {
     }
 };
 
+const getPublicSpecialists = async (req, res) => {
+    try {
+        const result = await query(
+            `SELECT tm.id AS user_id, tm.first_name, tm.last_name, tm.email, tm.phone,
+                    tm.avatar_url, tm.specialization,
+                    r.name AS role, r.label AS role_label
+             FROM team_members tm
+             JOIN roles r ON r.id = tm.role_id
+             WHERE tm.status = 'active' AND LOWER(r.name) IN ('doctor', 'therapist')
+             ORDER BY tm.first_name ASC`
+        );
+        return res.json({ success: true, specialists: result.rows });
+    } catch (err) {
+        console.error('getPublicSpecialists error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
 module.exports = {
     getTeam,
     getTeamMember,
@@ -954,4 +972,5 @@ module.exports = {
     deleteTeamMemberFrontend,
     updateSelfProfile,
     updateAllocationStatus,
+    getPublicSpecialists,
 };
