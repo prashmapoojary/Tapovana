@@ -1398,7 +1398,7 @@ const autoUpdateWorkshopStatuses = async () => {
 
                             // Generate and save certificate PDF persistently to disk
                             const pdfBuffer = await generateCertificatePDF(att.name, w.title, completionDateStr);
-                            const certsDir = path.join(__dirname, '../../uploads/certificates');
+                            const certsDir = path.join(process.cwd(), 'certificates');
                             if (!fs.existsSync(certsDir)) {
                                 fs.mkdirSync(certsDir, { recursive: true });
                             }
@@ -1610,7 +1610,7 @@ const downloadCertificate = async (req, res) => {
                     });
 
                     const pdfBuffer = await generateCertificatePDF(att.name, att.workshop_title, completionDateStr);
-                    const certsDir = path.join(__dirname, '../../uploads/certificates');
+                    const certsDir = path.join(process.cwd(), 'certificates');
                     if (!fs.existsSync(certsDir)) {
                         fs.mkdirSync(certsDir, { recursive: true });
                     }
@@ -1635,24 +1635,29 @@ const downloadCertificate = async (req, res) => {
         const cert = certRes.rows[0];
         const certId = cert.certificate_id;
 
-        const certsDir = path.join(__dirname, '../../uploads/certificates');
-        const filePath = path.join(certsDir, `${certId}.pdf`);
+        const certsDir = path.join(process.cwd(), 'certificates');
+        let filePath = path.join(certsDir, `${certId}.pdf`);
 
         if (!fs.existsSync(filePath)) {
-            // Fallback for older records: generate and save it
-            let dateStr = cert.workshop_date;
-            const completionDate = dateStr ? new Date(dateStr) : new Date(cert.issued_date);
-            const formattedDate = completionDate.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-            const pdfBuffer = await generateCertificatePDF(cert.participant_name, cert.workshop_title, formattedDate);
+            const oldFilePath = path.join(__dirname, '../../uploads/certificates', `${certId}.pdf`);
+            if (fs.existsSync(oldFilePath)) {
+                filePath = oldFilePath;
+            } else {
+                // Fallback for older records: generate and save it
+                let dateStr = cert.workshop_date;
+                const completionDate = dateStr ? new Date(dateStr) : new Date(cert.issued_date);
+                const formattedDate = completionDate.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                const pdfBuffer = await generateCertificatePDF(cert.participant_name, cert.workshop_title, formattedDate);
 
-            if (!fs.existsSync(certsDir)) {
-                fs.mkdirSync(certsDir, { recursive: true });
+                if (!fs.existsSync(certsDir)) {
+                    fs.mkdirSync(certsDir, { recursive: true });
+                }
+                fs.writeFileSync(filePath, pdfBuffer);
             }
-            fs.writeFileSync(filePath, pdfBuffer);
         }
 
         res.setHeader("Content-Type", "application/pdf");
