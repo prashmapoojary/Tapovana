@@ -11,7 +11,7 @@ function getLogoBuffer() {
     if (cachedLogoBuffer) return Promise.resolve(cachedLogoBuffer);
     return new Promise((resolve) => {
         try {
-            const logoPath = path.join(__dirname, '../../Tapovana_Frontend/src/assets/logo.png');
+            const logoPath = path.join(__dirname, '../../../Tapovana_Frontend/src/assets/logo.png');
             cachedLogoBuffer = fs.readFileSync(logoPath);
             resolve(cachedLogoBuffer);
         } catch (err) {
