@@ -514,23 +514,15 @@ const sendWorkshopScheduledEmail = async ({ to, staffOrParticipantName, workshop
 
 const sendWorkshopOngoingEmail = async ({ to, staffOrParticipantName, workshopTitle }) => {
   const html = emailWrapper(`
-    <h1 style="color:#2ecc71;text-align:center;">Workshop is LIVE</h1>
-    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 20px 0;">
-      Hello ${staffOrParticipantName || 'Valued Guest'},
-    </p>
-    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
-      Workshop <strong>${workshopTitle}</strong> is live, please join.
-    </p>
-    <p style="color:#888;font-size:13px;line-height:1.5;margin:24px 0 0 0;">
-      Best regards,<br/>
-      <strong>Workshop Admin Team</strong>
+    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 20px 0 20px;">
+      Join the session now.
     </p>
   `);
 
   return transporter.sendMail({
     from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
     to,
-    subject: `Workshop is LIVE, please join! – ${workshopTitle}`,
+    subject: "Workshop is Live Now",
     html,
   });
 };
@@ -892,10 +884,10 @@ const sendBlogRejectedEmail = async ({ to, authorName, blogTitle, reason }) => {
 const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, workshopTitle, completionDate, downloadUrl }) => {
   const html = emailWrapper(`
     <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 20px 0 10px;">
-      Congratulations! You have successfully completed the workshop.
+      Click below to download your certificate.
     </p>
     <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 25px 0;">
-      <a href="${downloadUrl}" style="color:#cda751;font-weight:bold;text-decoration:underline;">Click here to download your certificate</a>
+      <a href="${downloadUrl}" style="color:#cda751;font-weight:bold;text-decoration:underline;">${downloadUrl}</a>
     </p>
   `);
 

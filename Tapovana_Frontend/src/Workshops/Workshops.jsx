@@ -319,11 +319,7 @@ export default function Workshops() {
     const ws = workshops.find(w => w.id === selectedWs?.id) || selectedWs;
     const liveStatus = getLiveStatus(ws);
     if (liveStatus === "live") {
-      const elapsed = getElapsedLiveSeconds(ws);
-      if (video.currentTime > elapsed + 1.5) {
-        video.currentTime = Math.min(elapsed, lastTimeRef.current);
-        triggerAlert("Forward seeking disabled during live session.", false);
-      } else {
+      if (video.currentTime > lastTimeRef.current) {
         lastTimeRef.current = video.currentTime;
       }
     }
@@ -334,9 +330,8 @@ export default function Workshops() {
     const ws = workshops.find(w => w.id === selectedWs?.id) || selectedWs;
     const liveStatus = getLiveStatus(ws);
     if (liveStatus === "live") {
-      const elapsed = getElapsedLiveSeconds(ws);
-      if (video.currentTime > elapsed + 1.5) {
-        video.currentTime = Math.min(elapsed, lastTimeRef.current);
+      if (video.currentTime > lastTimeRef.current) {
+        video.currentTime = lastTimeRef.current; // block forward seek
         triggerAlert("Forward seeking disabled during live session.", false);
       }
     }
@@ -349,7 +344,9 @@ export default function Workshops() {
     if (liveStatus === "live" && !video.hasSyncedLiveTime) {
       const elapsed = getElapsedLiveSeconds(ws);
       if (elapsed > 0) {
-        video.currentTime = Math.min(elapsed, video.duration || elapsed);
+        const targetTime = Math.min(elapsed, video.duration || elapsed);
+        lastTimeRef.current = targetTime;
+        video.currentTime = targetTime;
       }
       video.hasSyncedLiveTime = true;
     }
@@ -362,7 +359,9 @@ export default function Workshops() {
     if (liveStatus === "live" && !video.hasSyncedLiveTime) {
       const elapsed = getElapsedLiveSeconds(ws);
       if (elapsed > 0) {
-        video.currentTime = Math.min(elapsed, video.duration || elapsed);
+        const targetTime = Math.min(elapsed, video.duration || elapsed);
+        lastTimeRef.current = targetTime;
+        video.currentTime = targetTime;
       }
       video.hasSyncedLiveTime = true;
     }
@@ -1196,6 +1195,7 @@ export default function Workshops() {
                     </div>
                   ) : (
                     <video 
+                      key={displayVideo}
                       ref={videoRef} 
                       controls 
                       poster={getImageUrl(displayImage)}
@@ -1205,7 +1205,7 @@ export default function Workshops() {
                       onLoadedMetadata={handleLoadedMetadata}
                       style={{ width: "100%", maxHeight: 400, borderRadius: 8, display: "block" }}
                     >
-                      <source src={displayVideo.startsWith("http") || displayVideo.startsWith("blob:") ? displayVideo : `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}${displayVideo}`} />
+                      <source src={displayVideo.startsWith("http") || displayVideo.startsWith("blob:") ? displayVideo : `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}${displayVideo}`} type="video/mp4" />
                     </video>
                   )}
                 </div>
