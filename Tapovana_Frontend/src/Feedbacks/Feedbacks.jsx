@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import './Feedbacks.css';
+import ActionIcon from '../assets/Button.svg';
 
 // Initial dummy feedbacks
 const INITIAL_FEEDBACKS = [
@@ -51,6 +52,7 @@ const INITIAL_FEEDBACKS = [
 
 export default function Feedbacks() {
   const [feedbacks, setFeedbacks] = useState(INITIAL_FEEDBACKS);
+  const [openActionMenu, setOpenActionMenu] = useState(null);
   
   // Filter states
   const [moduleFilter, setModuleFilter] = useState('All');
@@ -65,6 +67,30 @@ export default function Feedbacks() {
   // Notification toast state
   const [toast, setToast] = useState({ visible: false, message: '' });
   const [toastTimeoutId, setToastTimeoutId] = useState(null);
+
+  useEffect(() => {
+    // Override page-content overflow-y so layout fits page height and scrolls inside table
+    const parentPageContent = document.querySelector('.page-content');
+    if (parentPageContent) {
+      parentPageContent.style.overflowY = 'hidden';
+      parentPageContent.style.height = '100%';
+      parentPageContent.style.display = 'flex';
+      parentPageContent.style.flexDirection = 'column';
+    }
+
+    const handleCloseActionMenu = () => setOpenActionMenu(null);
+    document.addEventListener('click', handleCloseActionMenu);
+
+    return () => {
+      if (parentPageContent) {
+        parentPageContent.style.overflowY = '';
+        parentPageContent.style.height = '';
+        parentPageContent.style.display = '';
+        parentPageContent.style.flexDirection = '';
+      }
+      document.removeEventListener('click', handleCloseActionMenu);
+    };
+  }, []);
 
   // Helper to trigger plain-text gold notifications
   const showToast = (message) => {
@@ -186,7 +212,6 @@ export default function Feedbacks() {
       {/* Toast Notification */}
       {toast.visible && (
         <div className="fb-notification-toast">
-          <span>🔔</span>
           <span>{toast.message}</span>
         </div>
       )}
@@ -286,7 +311,7 @@ export default function Feedbacks() {
                 <th>Rating</th>
                 <th>Date</th>
                 <th>Status</th>
-                <th className="fb-th-actions">Action</th>
+                <th className="th-actions">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -317,25 +342,96 @@ export default function Feedbacks() {
                     <td>
                       <span className={getStatusClass(item.status)}>{item.status}</span>
                     </td>
-                    <td className="fb-td-actions">
-                      <div className="fb-actions-cell">
-                        <button className="fb-action-btn" title="View" onClick={() => handleView(item)}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-                          </svg>
-                        </button>
-                        {item.status !== 'Archived' && (
-                          <button className="fb-action-btn" title="Archive" onClick={() => handleArchive(item.id)}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="21 8 21 21 3 21 3 8" /><rect x="1" y="3" width="22" height="5" /><line x1="10" y1="12" x2="14" y2="12" />
-                            </svg>
-                          </button>
+                    <td className="td-actions" style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
+                      <div style={{ position: "relative", display: "inline-block" }}>
+                        <img
+                          src={ActionIcon}
+                          className="action-icon"
+                          alt="Actions"
+                          style={{ cursor: "pointer" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenActionMenu(openActionMenu === item.id ? null : item.id);
+                          }}
+                        />
+                        {openActionMenu === item.id && (
+                          <div style={{
+                            position: "absolute",
+                            right: 0,
+                            top: "100%",
+                            zIndex: 1000,
+                            background: "#fff",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: "8px",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                            minWidth: "140px",
+                            overflow: "hidden",
+                            textAlign: "left"
+                          }}>
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleView(item);
+                                setOpenActionMenu(null);
+                              }}
+                              style={{
+                                padding: "10px 16px",
+                                cursor: "pointer",
+                                fontSize: "14px",
+                                color: "#2d3748",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px"
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = "#f7fafc"}
+                              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                            >
+                              View
+                            </div>
+                            {item.status !== 'Archived' && (
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleArchive(item.id);
+                                  setOpenActionMenu(null);
+                                }}
+                                style={{
+                                  padding: "10px 16px",
+                                  cursor: "pointer",
+                                  fontSize: "14px",
+                                  color: "#2d3748",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px"
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = "#f7fafc"}
+                                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                              >
+                                Archive
+                              </div>
+                            )}
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenActionMenu(null);
+                                handleDelete(item.id, item.userName);
+                              }}
+                              style={{
+                                padding: "10px 16px",
+                                cursor: "pointer",
+                                fontSize: "14px",
+                                color: "#dc2626",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px"
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = "#fef2f2"}
+                              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                            >
+                              Delete
+                            </div>
+                          </div>
                         )}
-                        <button className="fb-action-btn fb-action-delete" title="Delete" onClick={() => handleDelete(item.id, item.userName)}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                          </svg>
-                        </button>
                       </div>
                     </td>
                   </tr>

@@ -29,7 +29,8 @@ export default function MediaPickerModal({
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
-    
+    const [backendDown, setBackendDown] = useState(false);
+
     // File upload state for fallback
     const fileInputRef = useRef(null);
     const [uploading, setUploading] = useState(false);
@@ -45,6 +46,7 @@ export default function MediaPickerModal({
             setSelectedItem(null);
             setError('');
             setUploadError('');
+            setBackendDown(false);
             setQuery(defaultQuery || 'wellness');
             setSearchType('image');
             handleSearch(defaultQuery || 'wellness', 'image');
@@ -56,6 +58,7 @@ export default function MediaPickerModal({
         const q = searchQuery.trim() || 'wellness';
         setLoading(true);
         setError('');
+        setBackendDown(false);
         setSelectedItem(null);
         setSearchType(type);
 
@@ -70,7 +73,17 @@ export default function MediaPickerModal({
             }
         } catch (err) {
             console.error("[Media Search Error]", err.message);
-            setError(err.message || "Error searching media.");
+            // Detect network / connection-refused errors → show upload fallback immediately
+            const isNetworkError = err.message === 'Failed to fetch' ||
+                err.message?.includes('ERR_CONNECTION_REFUSED') ||
+                err.message?.includes('NetworkError') ||
+                err.name === 'TypeError';
+            if (isNetworkError) {
+                setBackendDown(true);
+                setError('');
+            } else {
+                setError(err.message || "Error searching media.");
+            }
             setResults([]);
         } finally {
             setLoading(false);
@@ -229,6 +242,30 @@ export default function MediaPickerModal({
                         </div>
                     )}
 
+                    {/* Backend offline banner */}
+                    {!loading && backendDown && (
+                        <div className="mp-error-state" style={{ marginBottom: '12px' }}>
+                            <p style={{ fontWeight: '700', fontSize: '15px', marginBottom: '6px' }}>⚠️ Cannot reach the server</p>
+                            <p style={{ fontSize: '13px', color: '#718096', margin: '0 0 14px' }}>The backend is offline or unreachable. You can still upload a local file below.</p>
+                            <button
+                                type="button"
+                                className="mp-retry-btn"
+                                onClick={() => handleSearch(query, searchType)}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: '#CDA751',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    fontWeight: '700',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Retry Connection
+                            </button>
+                        </div>
+                    )}
+
                     {!loading && error && (
                         <div className="mp-error-state">
                             <p>⚠️ {error}</p>
@@ -313,8 +350,8 @@ export default function MediaPickerModal({
                         </div>
                     )}
 
-                    {/* Local Fallback Upload when 0 search results */}
-                    {!loading && !error && results.length === 0 && (
+                    {/* Local Fallback Upload when 0 search results OR backend down */}
+                    {!loading && (backendDown || (!error && results.length === 0)) && (
                         <div className="mp-empty-state" style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>
                             <div style={{ color: '#718096' }}>
                                 <p style={{ fontSize: '16px', fontWeight: 'bold', margin: '0 0 4px' }}>No stock media found on Pexels.</p>

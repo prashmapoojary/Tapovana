@@ -79,12 +79,9 @@ function getStatus(wsDate, wsTime, wsDuration, start_time, end_time) {
         endTime = new Date(startTime.getTime() + durationMins * 60000);
     }
 
-    // 5-minute buffer before marking as completed
-    const completionTime = new Date(endTime.getTime() + 5 * 60000);
-
     if (now < startTime) {
         return 'Upcoming';
-    } else if (now >= startTime && now < completionTime) {
+    } else if (now >= startTime && now < endTime) {
         return 'Live';
     } else {
         return 'Completed';
@@ -695,12 +692,10 @@ const updateWorkshop = async (req, res) => {
                 }
             }
             if (targetStatus === 'Completed') {
-                // Allow manual completion only after the 5-minute buffer has passed
                 const endTime = existing.end_time ? new Date(existing.end_time) : null;
                 if (endTime) {
-                    const completionTime = new Date(endTime.getTime() + 5 * 60000);
-                    if (now < completionTime) {
-                        return res.status(400).json({ success: false, message: "Cannot mark a workshop as Completed until 5 minutes after its end time has passed." });
+                    if (now < endTime) {
+                        return res.status(400).json({ success: false, message: "Cannot mark a workshop as Completed until after its end time has passed." });
                     }
                 }
             }
@@ -1138,6 +1133,11 @@ const enrollUserInWorkshop = async (req, res) => {
         // Update enrolled count
         await query('UPDATE workshops SET enrolled = enrolled + 1 WHERE id = $1', [id]);
 
+        // If workshop is already completed, reset completed_notified to false so the background scheduler generates certificate for the new attendee
+        if (workshop.status === 'Completed' || workshop.status === 'completed') {
+            await query('UPDATE workshops SET completed_notified = FALSE WHERE id = $1', [id]);
+        }
+
         return res.status(201).json({
             success: true,
             message: 'Successfully enrolled in workshop.',
@@ -1178,6 +1178,14 @@ const updateAttendeeAttendance = async (req, res) => {
 
         if (!result.rows.length) {
             return res.status(404).json({ success: false, message: 'Attendee record not found.' });
+        }
+
+        // If attendance status changes to 'attended' and the workshop is already Completed, reset completed_notified to false so they get their certificate
+        if (status === 'attended') {
+            const wsRes = await query('SELECT status FROM workshops WHERE id = $1', [id]);
+            if (wsRes.rows.length && (wsRes.rows[0].status === 'Completed' || wsRes.rows[0].status === 'completed')) {
+                await query('UPDATE workshops SET completed_notified = FALSE WHERE id = $1', [id]);
+            }
         }
 
         return res.json({ success: true, message: 'Attendance status updated.', attendee: result.rows[0] });
@@ -1267,7 +1275,17 @@ const autoUpdateWorkshopStatuses = async () => {
                 dateStr = `${year}-${month}-${day}`;
             }
 
-            const newStatus = getStatus(dateStr, w.time, w.duration, w.start_time, w.end_time);
+            let newStatus = getStatus(dateStr, w.time, w.duration, w.start_time, w.end_time);
+
+            // Respect manual overrides or terminal statuses
+            if (w.status === 'Completed' || w.status === 'completed') {
+                newStatus = 'Completed';
+            } else if (w.status === 'Cancelled' || w.status === 'cancelled') {
+                newStatus = 'Cancelled';
+            } else if (w.status === 'Live' && newStatus === 'Upcoming') {
+                // If already marked live manually, do not downgrade to upcoming
+                newStatus = 'Live';
+            }
 
             let upNotified = w.upcoming_notified;
             let onNotified = w.ongoing_notified;
@@ -1333,62 +1351,75 @@ const autoUpdateWorkshopStatuses = async () => {
                 onNotified = true;
             }
 
-            // 3. Send completed notifications if newly Completed and not yet notified
-            if (newStatus === 'Completed' && !compNotified) {
+            // 3. Send completed notifications if Newly/Already Completed
+            if (newStatus === 'Completed') {
                 const attendeesRes = await query("SELECT id, email, name FROM attendees WHERE workshop_id = $1 AND status != 'absent'", [w.id]);
-                for (const att of attendeesRes.rows) {
-                    sendWorkshopCompletedEmail({
-                        to: att.email,
-                        staffOrParticipantName: att.name,
-                        workshopTitle: w.title,
-                        date: dateStr,
-                        time: w.time
-                    }).catch(e => console.error('Completed email (attendee) failed:', e.message));
+                
+                // Determine if this is the initial transition to Completed status
+                const isInitialCompletion = (w.status !== 'Completed' && w.status !== 'completed');
+
+                // Send general completion email to staff only during the initial transition
+                if (isInitialCompletion) {
+                    const staffIds = w.assigned_staff_ids || [];
+                    const validStaffIds = staffIds.filter(id => isValidUUID(id));
+                    for (const staffId of validStaffIds) {
+                        const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
+                        if (staffRes.rows.length) {
+                            const s = staffRes.rows[0];
+                            sendWorkshopCompletedEmail({
+                                to: s.email,
+                                staffOrParticipantName: `${s.first_name} ${s.last_name}`.trim(),
+                                workshopTitle: w.title,
+                                date: dateStr,
+                                time: w.time
+                            }).catch(e => console.error('Completed email (staff) failed:', e.message));
+                        }
+                    }
                 }
 
-                // Auto-generate certificates and send completion certificate email
-                const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+                // Process attendees: generate certificate and send emails for anyone who doesn't have a certificate yet
+                const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || 'https://tapovana.onrender.com';
                 for (const att of attendeesRes.rows) {
                     try {
-                                                const certCheck = await query('SELECT certificate_id, certificate_url FROM certificates WHERE participant_id = $1 AND workshop_id = $2', [att.id, w.id]);
-                        let certId;
-                        let certUrl = `${backendUrl}/api/workshops/certificates/download/${att.id}.pdf`;
-                        if (certCheck.rows.length > 0) {
-                            certId = certCheck.rows[0].certificate_id;
-                        } else {
-                            certId = uuidv4();
+                        const certCheck = await query('SELECT certificate_id, certificate_url FROM certificates WHERE participant_id = $1 AND workshop_id = $2', [att.id, w.id]);
+                        
+                        if (certCheck.rows.length === 0) {
+                            const certId = uuidv4();
+                            const certUrl = `${backendUrl}/api/download/certificate/${certId}`;
+                            
                             await query(
                                 `INSERT INTO certificates (certificate_id, participant_id, workshop_id, certificate_url, issued_date)
                                  VALUES ($1, $2, $3, $4, NOW())`,
                                 [certId, att.id, w.id, certUrl]
                             );
-                        }
 
-                        sendWorkshopCompletionCertificateEmail({
-                            to: att.email,
-                            participantName: att.name,
-                            workshopTitle: w.title,
-                            downloadUrl: certUrl
-                        }).catch(certErr => console.error(`Error sending certificate for attendee ${att.email}:`, certErr.message));
-                        console.log(`Certificate email sent to attendee: ${att.email} for workshop: ${w.title}`);
+                            // Send both completion email and certificate link to the participant
+                            await sendWorkshopCompletedEmail({
+                                to: att.email,
+                                staffOrParticipantName: att.name,
+                                workshopTitle: w.title,
+                                date: dateStr,
+                                time: w.time
+                            });
+
+                            const compDateObj = new Date(dateStr);
+                            const completionDateStr = compDateObj.toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                            });
+
+                            await sendWorkshopCompletionCertificateEmail({
+                                to: att.email,
+                                participantName: att.name,
+                                workshopTitle: w.title,
+                                completionDate: completionDateStr,
+                                downloadUrl: certUrl
+                            });
+                            console.log(`Certificate email sent to attendee: ${att.email} for workshop: ${w.title}`);
+                        }
                     } catch (certErr) {
                         console.error(`Error generating/sending certificate for attendee ${att.email}:`, certErr.message);
-                    }
-                }
-
-                const staffIds = w.assigned_staff_ids || [];
-                const validStaffIds = staffIds.filter(id => isValidUUID(id));
-                for (const staffId of validStaffIds) {
-                    const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
-                    if (staffRes.rows.length) {
-                        const s = staffRes.rows[0];
-                        sendWorkshopCompletedEmail({
-                            to: s.email,
-                            staffOrParticipantName: `${s.first_name} ${s.last_name}`.trim(),
-                            workshopTitle: w.title,
-                            date: dateStr,
-                            time: w.time
-                        }).catch(e => console.error('Completed email (staff) failed:', e.message));
                     }
                 }
                 compNotified = true;
@@ -1537,7 +1568,7 @@ const downloadCertificate = async (req, res) => {
         `;
         let certRes;
         if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)) {
-            certRes = await query(queryBase + ' WHERE c.certificate_id = $1', [id]);
+            certRes = await query(queryBase + ' WHERE c.certificate_id = $1 OR c.participant_id = $1', [id]);
         } else if (/^\d+$/.test(id)) {
             certRes = await query(queryBase + ' WHERE c.participant_id = $1', [parseInt(id, 10)]);
         } else {
@@ -1561,7 +1592,7 @@ const downloadCertificate = async (req, res) => {
         const pdfBuffer = await generateCertificatePDF(cert.participant_name, cert.workshop_title, formattedDate);
 
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", "attachment; filename=certificate.pdf");
+        res.setHeader("Content-Disposition", "attachment; filename=\"certificate.pdf\"");
         return res.send(pdfBuffer);
     } catch (err) {
         console.error('downloadCertificate error:', err);

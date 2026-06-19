@@ -55,47 +55,60 @@ const checkStaffAllocationConflict = async ({
     const totalCount = existingAllocations.length;
 
     // ── Apply Allocation Rules ──
-    // Rule 1: Vedic Program already present → no other allocations
+
+    // Rule 1: A Vedic Program is already active on this date (multi-day) → block ALL other allocations
     if (vedicCount > 0) {
         return {
             conflict: true,
-            message: 'Staff allocation limit reached for today.'
+            message: 'Staff is fully committed to a Vedic Life Program on this date. No other allocations are allowed during the program duration.'
         };
     }
 
-    // Rule 2: Total allocations already 3 → no more
-    if (totalCount >= 3) {
-        return {
-            conflict: true,
-            message: 'Staff allocation limit reached for today.'
-        };
-    }
-
-    // Rule 3: Allocating vedic program → no other allocations allowed
+    // Rule 2: Allocating a Vedic Program → no other services or workshops must be present
     if (type === 'vedic_program' || type === 'vedic_package') {
         if (serviceCount > 0 || workshopCount > 0) {
             return {
                 conflict: true,
-                message: 'Staff allocation limit reached for today.'
+                message: 'Cannot allocate a Vedic Life Program when the staff already has services or workshops assigned on overlapping dates.'
             };
         }
-    } 
-    // Rule 4: Allocating workshop → max 1 workshop
+        // Vedic program itself is allowed (will cover 7-8 days, blocking all else)
+    }
+    // Rule 3: Allocating a Workshop
     else if (type === 'workshop') {
+        // Only 1 workshop allowed per day
         if (workshopCount >= 1) {
             return {
                 conflict: true,
-                message: 'Staff allocation limit reached for today.'
+                message: 'Staff can only be allocated to 1 workshop per day.'
             };
         }
-    }
-    // Rule 5: Allocating service → max 2 services
-    else if (type === 'service') {
+        // With a workshop, services are capped at 2 (total max 3: 2 services + 1 workshop)
         if (serviceCount >= 2) {
             return {
                 conflict: true,
-                message: 'Staff allocation limit reached for today.'
+                message: 'Staff already has 2 services on this day. Cannot add more when a workshop is also assigned (max: 2 services + 1 workshop per day).'
             };
+        }
+    }
+    // Rule 4: Allocating a Service
+    else if (type === 'service') {
+        if (workshopCount > 0) {
+            // Workshop is present → max 2 services allowed
+            if (serviceCount >= 2) {
+                return {
+                    conflict: true,
+                    message: 'Staff can handle a maximum of 2 services when a workshop is also scheduled (max: 2 services + 1 workshop per day).'
+                };
+            }
+        } else {
+            // No workshop → allow up to 3 services
+            if (serviceCount >= 3) {
+                return {
+                    conflict: true,
+                    message: 'Staff can handle a maximum of 3 services per day (when no workshop or Vedic program is scheduled).'
+                };
+            }
         }
     }
 

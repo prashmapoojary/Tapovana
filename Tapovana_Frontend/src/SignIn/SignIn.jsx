@@ -51,6 +51,7 @@ function SignIn() {
       }
 
       setShowOtpSection(true);
+      setErrorMessage("OTP sent to your registered email.");
     } catch (err) {
       setErrorMessage("Network error. Please try again.");
     } finally {

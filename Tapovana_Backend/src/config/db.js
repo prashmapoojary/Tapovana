@@ -9,7 +9,7 @@ const pool = new Pool({
   },
   max: 10,                             // max connections (Neon free tier allows ~100 pooled)
   idleTimeoutMillis: 20000,            // close idle clients after 20 seconds (Neon may kill them at ~30s)
-  connectionTimeoutMillis: 30000,      // wait up to 30 seconds for connection establishment (prevents Neon cold start timeouts)
+  connectionTimeoutMillis: 10000,      // wait up to 10 seconds — fail fast to avoid endpoint hangs on Neon cold start
   keepAlive: true,                     // send TCP keep-alive packets
   keepAliveInitialDelayMillis: 10000,  // delay before first keep-alive packet
   allowExitOnIdle: false,              // keep pool alive for background jobs
@@ -54,14 +54,14 @@ const isTransientError = (err) => {
 };
 
 // ── Query wrapper with exponential backoff retry for Neon cold starts ─────
-const query = async (text, params, retries = 6) => {
+const query = async (text, params, retries = 3) => {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       return await pool.query(text, params);
     } catch (err) {
       if (isTransientError(err) && attempt < retries - 1) {
-        // Exponential backoff: 1s, 2s, 4s, 8s, 16s
-        const delay = Math.min(1000 * Math.pow(2, attempt), 16000);
+        // Exponential backoff: 1s, 2s, 4s (capped)
+        const delay = Math.min(1000 * Math.pow(2, attempt), 4000);
         console.warn(`[DB] Query failed (attempt ${attempt + 1}/${retries}): ${err.message} — retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
@@ -72,7 +72,7 @@ const query = async (text, params, retries = 6) => {
 };
 
 // ── getClient wrapper with transient error retry and safe release ──────────
-const getClient = async (retries = 6) => {
+const getClient = async (retries = 3) => {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const client = await pool.connect();
@@ -92,7 +92,7 @@ const getClient = async (retries = 6) => {
       return client;
     } catch (err) {
       if (isTransientError(err) && attempt < retries - 1) {
-        const delay = Math.min(1000 * Math.pow(2, attempt), 16000);
+        const delay = Math.min(1000 * Math.pow(2, attempt), 4000);
         console.warn(`[DB Pool] Connect failed (attempt ${attempt + 1}/${retries}): ${err.message} — retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {

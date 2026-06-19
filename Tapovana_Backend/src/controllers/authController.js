@@ -1,10 +1,11 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const { query, getClient } = require("../config/db");
 const { sendOtpEmail } = require("../services/emailService");
 require("dotenv").config();
 
-const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
+const generateOtp = () => String(crypto.randomInt(100000, 1000000));
 
 const buildAccessMap = (accessArray = []) =>
     accessArray.reduce((acc, key) => ({ ...acc, [key]: true }), {});
@@ -56,7 +57,7 @@ const loginPassword = async (req, res) => {
         );
 
         const otp = generateOtp();
-        const expiresAt = new Date(Date.now() + parseInt(process.env.OTP_EXPIRES_MINUTES || "10", 10) * 60000);
+        const expiresAt = new Date(Date.now() + 5 * 60000); // 5 minutes expiry
 
         // FIX: Insert plaintext OTP to fit in VARCHAR(6) column, avoiding the 500 error
         await query(
@@ -141,7 +142,7 @@ const verifyOtp = async (req, res) => {
             return res.status(401).json({ success: false, message: "Invalid OTP." });
         }
 
-        await client.query("UPDATE otp_verification SET used = TRUE WHERE id = $1", [otpRow.id]);
+        await client.query("DELETE FROM otp_verification WHERE id = $1", [otpRow.id]);
         await client.query("UPDATE login_credentials SET last_login = NOW() WHERE member_id = $1", [member.id]);
 
         const accessMap = buildAccessMap(member.access || []);

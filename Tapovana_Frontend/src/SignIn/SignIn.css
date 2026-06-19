@@ -103,10 +103,12 @@ label{
 
 
 .error-message {
-    color: red;
+    color: #caa24a;
     font-size: 14px;
-    text-shadow: 1px 1px 3px rgba(255, 0, 0, 0.5);
     text-align: center;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    font-weight: 600;
 }
 
 .btn{

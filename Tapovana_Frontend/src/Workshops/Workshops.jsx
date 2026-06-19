@@ -16,10 +16,9 @@ const getLiveStatus = (ws) => {
   if (ws.start_time && ws.end_time) {
     const startTime = new Date(ws.start_time);
     const endTime = new Date(ws.end_time);
-    const completionTime = new Date(endTime.getTime() + 5 * 60 * 1000);
     
     if (now < startTime) return "upcoming";
-    if (now >= startTime && now < completionTime) return "live";
+    if (now >= startTime && now < endTime) return "live";
     return "completed";
   }
 
@@ -61,16 +60,14 @@ const getLiveStatus = (ws) => {
     }
   }
 
-  // Build Date objects for start, end, and completion (end + 5 min buffer)
+  // Build Date objects for start and end
   const wsStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), wsHour, wsMinute, 0, 0);
   const wsEndMins = wsHour * 60 + wsMinute + (ws.duration || 60);
   const wsEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
     Math.floor(wsEndMins / 60), wsEndMins % 60, 0, 0);
-  // 5-minute completion buffer (mirrors backend logic)
-  const wsCompletion = new Date(wsEnd.getTime() + 5 * 60 * 1000);
 
   if (now < wsStart) return "upcoming";
-  if (now >= wsStart && now < wsCompletion) return "live";
+  if (now >= wsStart && now < wsEnd) return "live";
   return "completed";
 };
 

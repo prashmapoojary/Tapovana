@@ -231,10 +231,19 @@
   flex-shrink: 0;
 }
 
+/* Hack to override .page-content styles only when Feedbacks page is active */
+.page-content:has(.fb-catalog) {
+  overflow-y: hidden !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 24px 32px 0 32px !important;
+}
+
 /* ─── Scrollable table area ──────────────────────────────────────────── */
 .fb-table-scroll-area {
   flex: 1;
-  overflow-y: auto;
+  overflow: auto; /* vertical and horizontal scroll */
   min-height: 0;
 }
 
@@ -244,11 +253,12 @@
   border: 1px solid rgba(205, 167, 81, 0.1);
   box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .fb-table {
   width: 100%;
+  min-width: 1200px; /* Force horizontal scrollbar if screen is less than 1200px wide */
   border-collapse: collapse;
   text-align: left;
 }
@@ -266,7 +276,15 @@
   vertical-align: middle;
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 10;
+}
+
+.fb-table th:first-child {
+  border-top-left-radius: 8px;
+}
+
+.fb-table th:last-child {
+  border-top-right-radius: 8px;
 }
 
 .fb-table td {
@@ -327,13 +345,13 @@
 }
 
 /* ─── Actions Cell ───────────────────────────────────────────────────── */
-.fb-th-actions,
-.fb-td-actions {
+.th-actions,
+.td-actions {
   vertical-align: middle;
   padding-top: 12px;
   padding-bottom: 12px;
   text-align: center;
-  width: 110px;
+  width: 90px;
 }
 
 .fb-actions-cell {
@@ -573,4 +591,17 @@
     transform: translateX(0);
     opacity: 1;
   }
+}
+
+/* ─── Action Icon ─── */
+.action-icon {
+  width: 12px;
+  height: 12px;
+  cursor: pointer;
+  transition: filter 0.2s ease, opacity 0.2s ease;
+  filter: none;
+}
+
+.action-icon:hover {
+  filter: brightness(0);
 }
