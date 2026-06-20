@@ -1381,12 +1381,32 @@ const autoUpdateWorkshopStatuses = async () => {
                 const port = process.env.PORT || 5000;
                 const defaultUrl = process.env.NODE_ENV === 'production' ? 'https://tapovana.onrender.com' : `http://localhost:${port}`;
                 const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
+                
+                // Fetch instructor details
+                let signatureImage = null;
+                let instructorName = w.instructor || 'Workshop Instructor';
+                if (w.instructor_id && isValidUUID(w.instructor_id)) {
+                    const instRes = await query('SELECT first_name, last_name, signature_image FROM team_members WHERE id = $1', [w.instructor_id]);
+                    if (instRes.rows.length) {
+                        const inst = instRes.rows[0];
+                        instructorName = `${inst.first_name} ${inst.last_name}`.trim();
+                        signatureImage = inst.signature_image;
+                    }
+                }
+
                 for (const att of attendeesRes.rows) {
                     try {
-                        const certCheck = await query('SELECT certificate_id, certificate_url FROM certificates WHERE participant_id = $1 AND workshop_id = $2', [att.id, w.id]);
+                        const certCheck = await query('SELECT certificate_id FROM certificates WHERE participant_id = $1 AND workshop_id = $2', [att.id, w.id]);
                         
                         if (certCheck.rows.length === 0) {
-                            const certId = uuidv4();
+                            // Generate unique certificate ID CERT-YYYY-RANDOM6
+                            const year = new Date().getFullYear();
+                            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                            let rand = '';
+                            for (let i = 0; i < 6; i++) {
+                                rand += chars.charAt(Math.floor(Math.random() * chars.length));
+                            }
+                            const certId = `CERT-${year}-${rand}`;
                             const certUrl = `${backendUrl}/api/certificates/download/${certId}`;
 
                             const compDateObj = new Date(dateStr);
@@ -1397,7 +1417,15 @@ const autoUpdateWorkshopStatuses = async () => {
                             });
 
                             // Generate and save certificate PDF persistently to disk
-                            const pdfBuffer = await generateCertificatePDF(att.name, w.title, completionDateStr, w.instructor);
+                            const pdfBuffer = await generateCertificatePDF(
+                                att.name,
+                                w.title,
+                                completionDateStr,
+                                instructorName,
+                                signatureImage,
+                                certId
+                            );
+                            
                             const certsDir = path.join(process.cwd(), 'certificates');
                             if (!fs.existsSync(certsDir)) {
                                 fs.mkdirSync(certsDir, { recursive: true });
@@ -1406,9 +1434,18 @@ const autoUpdateWorkshopStatuses = async () => {
                             fs.writeFileSync(filePath, pdfBuffer);
                             
                             await query(
-                                `INSERT INTO certificates (certificate_id, participant_id, workshop_id, certificate_url, issued_date)
-                                 VALUES ($1, $2, $3, $4, NOW())`,
-                                [certId, att.id, w.id, certUrl]
+                                `INSERT INTO certificates (certificate_id, participant_id, participant_name, workshop_id, workshop_name, instructor_id, pdf_url, completion_date)
+                                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                                [
+                                    certId,
+                                    att.id,
+                                    att.name,
+                                    w.id,
+                                    w.title,
+                                    w.instructor_id,
+                                    certUrl,
+                                    dateStr
+                                ]
                             );
 
                             await sendWorkshopCompletionCertificateEmail({
@@ -1554,128 +1591,10 @@ const streamWorkshopVideo = async (req, res) => {
     }
 };
 
-// DOWNLOAD CERTIFICATE PDF
+// DOWNLOAD CERTIFICATE PDF (Delegated to certificatesController)
 const downloadCertificate = async (req, res) => {
-    let id = req.params.id;
-    if (id && id.endsWith('.pdf')) {
-        id = id.slice(0, -4);
-    }
-    try {
-        const queryBase = `
-            SELECT c.certificate_id, c.issued_date, 
-                   a.name AS participant_name, 
-                   w.title AS workshop_title, w.date AS workshop_date, w.instructor
-            FROM certificates c
-            JOIN attendees a ON a.id = c.participant_id
-            JOIN workshops w ON w.id = c.workshop_id
-        `;
-        let certRes;
-        if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)) {
-            certRes = await query(queryBase + ' WHERE c.certificate_id = $1 OR c.participant_id = $1', [id]);
-        } else if (/^\d+$/.test(id)) {
-            certRes = await query(queryBase + ' WHERE c.participant_id = $1', [parseInt(id, 10)]);
-        } else {
-            return res.status(404).json({ success: false, message: 'Invalid certificate identifier format.' });
-        }
-
-        if (!certRes.rows.length) {
-            if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)) {
-                // Check if the id is actually an attendee ID of a completed workshop
-                const attendeeRes = await query(`
-                    SELECT a.id, a.name, a.email, w.id AS workshop_id, w.title AS workshop_title, w.date AS workshop_date, w.status AS workshop_status, w.instructor
-                    FROM attendees a
-                    JOIN workshops w ON w.id = a.workshop_id
-                    WHERE a.id = $1 AND (w.status = 'Completed' OR w.status = 'completed')
-                `, [id]);
-                
-                if (attendeeRes.rows.length) {
-                    const att = attendeeRes.rows[0];
-                    const certId = uuidv4();
-                    const port = process.env.PORT || 5000;
-                    const defaultUrl = process.env.NODE_ENV === 'production' ? 'https://tapovana.onrender.com' : `http://localhost:${port}`;
-                    const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
-                    const certUrl = `${backendUrl}/api/certificates/download/${certId}`;
-                    
-                    let dateStr = att.workshop_date;
-                    if (att.workshop_date instanceof Date) {
-                        const year = att.workshop_date.getFullYear();
-                        const month = String(att.workshop_date.getMonth() + 1).padStart(2, '0');
-                        const day = String(att.workshop_date.getDate()).padStart(2, '0');
-                        dateStr = `${year}-${month}-${day}`;
-                    }
-                    const compDateObj = new Date(dateStr);
-                    const completionDateStr = compDateObj.toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                    });
-
-                    const pdfBuffer = await generateCertificatePDF(att.name, att.workshop_title, completionDateStr, att.instructor);
-                    const certsDir = path.join(process.cwd(), 'certificates');
-                    if (!fs.existsSync(certsDir)) {
-                        fs.mkdirSync(certsDir, { recursive: true });
-                    }
-                    const filePath = path.join(certsDir, `${certId}.pdf`);
-                    fs.writeFileSync(filePath, pdfBuffer);
-                    
-                    await query(
-                        `INSERT INTO certificates (certificate_id, participant_id, workshop_id, certificate_url, issued_date)
-                         VALUES ($1, $2, $3, $4, NOW())`,
-                        [certId, att.id, att.workshop_id, certUrl]
-                    );
-                    
-                    certRes = await query(queryBase + ' WHERE c.certificate_id = $1', [certId]);
-                }
-            }
-        }
-
-        if (!certRes.rows.length) {
-            return res.status(404).json({ success: false, message: 'Certificate not found.' });
-        }
-
-        const cert = certRes.rows[0];
-        const certId = cert.certificate_id;
-
-        const certsDir = path.join(process.cwd(), 'certificates');
-        let filePath = path.join(certsDir, `${certId}.pdf`);
-
-        if (!fs.existsSync(filePath)) {
-            const oldFilePath = path.join(__dirname, '../../uploads/certificates', `${certId}.pdf`);
-            if (fs.existsSync(oldFilePath)) {
-                filePath = oldFilePath;
-            } else {
-                // Fallback for older records: generate and save it
-                let dateStr = cert.workshop_date;
-                const completionDate = dateStr ? new Date(dateStr) : new Date(cert.issued_date);
-                const formattedDate = completionDate.toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                });
-                const pdfBuffer = await generateCertificatePDF(cert.participant_name, cert.workshop_title, formattedDate, cert.instructor);
-
-                if (!fs.existsSync(certsDir)) {
-                    fs.mkdirSync(certsDir, { recursive: true });
-                }
-                fs.writeFileSync(filePath, pdfBuffer);
-            }
-        }
-
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", "attachment; filename=certificate.pdf");
-
-        const stream = fs.createReadStream(filePath);
-        stream.on('error', (streamErr) => {
-            console.error('downloadCertificate stream error:', streamErr);
-            if (!res.headersSent) {
-                res.status(500).json({ success: false, message: 'Server error downloading certificate.' });
-            }
-        });
-        return stream.pipe(res);
-    } catch (err) {
-        console.error('downloadCertificate error:', err);
-        return res.status(500).json({ success: false, message: 'Server error downloading certificate.' });
-    }
+    const { downloadCertificatePdf } = require('./certificatesController');
+    return downloadCertificatePdf(req, res);
 };
 
 module.exports = {

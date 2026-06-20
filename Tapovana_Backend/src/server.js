@@ -61,9 +61,10 @@ app.use("/api/blogs", blogsRoutes);
 app.use("/api/media", mediaRoutes);
 app.post("/api/uploads/blog-image", require("./middleware/auth").authenticate, require("./middleware/auth").requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR', 'THERAPIST'), require("./controllers/blogsController").uploadBlogImage);
 app.post("/api/vedicpackages", require("./controllers/vedicProgramsController").registerAttendeeFromMobile);
-app.get("/certificates/:id", require("./controllers/workshopController").downloadCertificate);
-app.get("/api/download/certificate/:id", require("./controllers/workshopController").downloadCertificate);
-app.get("/api/certificates/download/:id", require("./controllers/workshopController").downloadCertificate);
+app.use("/api/certificates", require("./routes/certificates"));
+app.get("/certificates/:id", require("./controllers/certificatesController").downloadCertificatePdf);
+app.get("/api/download/certificate/:id", require("./controllers/certificatesController").downloadCertificatePdf);
+app.get("/api/certificates/download/:id", require("./controllers/certificatesController").downloadCertificatePdf);
 app.get("/api/analytics/dashboard", require("./middleware/auth").authenticate, require("./controllers/homeController").getAnalyticsDashboard);
 
 app.use("/api/customer", customerRoutes);
