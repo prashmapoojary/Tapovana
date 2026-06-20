@@ -1397,7 +1397,7 @@ const autoUpdateWorkshopStatuses = async () => {
                             });
 
                             // Generate and save certificate PDF persistently to disk
-                            const pdfBuffer = await generateCertificatePDF(att.name, w.title, completionDateStr);
+                            const pdfBuffer = await generateCertificatePDF(att.name, w.title, completionDateStr, w.instructor);
                             const certsDir = path.join(process.cwd(), 'certificates');
                             if (!fs.existsSync(certsDir)) {
                                 fs.mkdirSync(certsDir, { recursive: true });
@@ -1564,7 +1564,7 @@ const downloadCertificate = async (req, res) => {
         const queryBase = `
             SELECT c.certificate_id, c.issued_date, 
                    a.name AS participant_name, 
-                   w.title AS workshop_title, w.date AS workshop_date
+                   w.title AS workshop_title, w.date AS workshop_date, w.instructor
             FROM certificates c
             JOIN attendees a ON a.id = c.participant_id
             JOIN workshops w ON w.id = c.workshop_id
@@ -1582,7 +1582,7 @@ const downloadCertificate = async (req, res) => {
             if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)) {
                 // Check if the id is actually an attendee ID of a completed workshop
                 const attendeeRes = await query(`
-                    SELECT a.id, a.name, a.email, w.id AS workshop_id, w.title AS workshop_title, w.date AS workshop_date, w.status AS workshop_status
+                    SELECT a.id, a.name, a.email, w.id AS workshop_id, w.title AS workshop_title, w.date AS workshop_date, w.status AS workshop_status, w.instructor
                     FROM attendees a
                     JOIN workshops w ON w.id = a.workshop_id
                     WHERE a.id = $1 AND (w.status = 'Completed' OR w.status = 'completed')
@@ -1610,7 +1610,7 @@ const downloadCertificate = async (req, res) => {
                         day: 'numeric'
                     });
 
-                    const pdfBuffer = await generateCertificatePDF(att.name, att.workshop_title, completionDateStr);
+                    const pdfBuffer = await generateCertificatePDF(att.name, att.workshop_title, completionDateStr, att.instructor);
                     const certsDir = path.join(process.cwd(), 'certificates');
                     if (!fs.existsSync(certsDir)) {
                         fs.mkdirSync(certsDir, { recursive: true });
@@ -1652,7 +1652,7 @@ const downloadCertificate = async (req, res) => {
                     month: 'long',
                     day: 'numeric'
                 });
-                const pdfBuffer = await generateCertificatePDF(cert.participant_name, cert.workshop_title, formattedDate);
+                const pdfBuffer = await generateCertificatePDF(cert.participant_name, cert.workshop_title, formattedDate, cert.instructor);
 
                 if (!fs.existsSync(certsDir)) {
                     fs.mkdirSync(certsDir, { recursive: true });
@@ -1661,7 +1661,7 @@ const downloadCertificate = async (req, res) => {
             }
         }
 
-        res.setHeader("Content-Type", "application/octet-stream");
+        res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", "attachment; filename=certificate.pdf");
 
         const stream = fs.createReadStream(filePath);

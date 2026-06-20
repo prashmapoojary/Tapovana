@@ -884,18 +884,19 @@ const sendBlogRejectedEmail = async ({ to, authorName, blogTitle, reason }) => {
 const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, workshopTitle, completionDate, downloadUrl, certId }) => {
   const linkUrl = certId ? `https://tapovana.onrender.com/api/certificates/download/${certId}` : downloadUrl;
   const html = emailWrapper(`
+    <h1 style="color:#cda751;text-align:center;">Workshop Completed</h1>
     <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 20px 0 10px;">
-      Click below to download your certificate:
+      Congratulations on completing <strong>${workshopTitle}</strong>! Click below to download your certificate.
     </p>
-    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 25px 0;">
-      <a href="${linkUrl}" style="color:#cda751;font-weight:bold;text-decoration:underline;">Download Certificate</a>
+    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 25px 0;text-align:center;">
+      <a href="${linkUrl}" style="display:inline-block;background:#cda751;color:#111;font-weight:bold;padding:12px 24px;border-radius:6px;text-decoration:none;">Download Certificate</a>
     </p>
   `);
 
   return transporter.sendMail({
     from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
     to,
-    subject: "Workshop Completed – Download Your Certificate",
+    subject: `Your Tapovana Workshop Certificate – ${workshopTitle}`,
     html,
   });
 };
