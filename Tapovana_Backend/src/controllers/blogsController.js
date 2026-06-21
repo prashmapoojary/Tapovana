@@ -980,7 +980,12 @@ const publishScheduledBlogs = async () => {
             }
         }
     } catch (err) {
-        console.error('[Blog Scheduler] Error publishing scheduled blogs:', err);
+        const { isTransientError } = require('../config/db');
+        if (isTransientError(err)) {
+            console.warn('[Blog Scheduler] Transient database connection timeout/termination (Neon cold-start). Retrying next cycle...');
+        } else {
+            console.error('[Blog Scheduler] Error publishing scheduled blogs:', err);
+        }
     }
 };
 

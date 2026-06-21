@@ -111,4 +111,4 @@ const getClient = async (retries = 3) => {
   }
 };
 
-module.exports = { query, getClient, pool };
+module.exports = { query, getClient, pool, isTransientError };

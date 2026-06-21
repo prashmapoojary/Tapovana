@@ -176,7 +176,7 @@ const syncIncomingBookings = async () => {
                 if (existing.rows.length === 0) {
                     const paymentStatus = 'PAID';
                     await query(
-                        'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)',
+                        'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (id) DO NOTHING',
                         [
                             rb.id, rb.user_name, rb.service_name,
                             rb.booking_date, rb.booking_time, null,
@@ -491,7 +491,7 @@ const ensureBookingExistsLocally = async (bookingId) => {
                 const remoteBooking = data.booking;
                 const paymentStatus = 'PAID';
                 const insertResult = await query(
-                    'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *',
+                    'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (id) DO NOTHING RETURNING *',
                     [
                         remoteBooking.id, remoteBooking.user_name, remoteBooking.service_name,
                         remoteBooking.booking_date, remoteBooking.booking_time, null,
@@ -500,7 +500,11 @@ const ensureBookingExistsLocally = async (bookingId) => {
                         remoteBooking.profile_pic || null
                     ]
                 );
-                return insertResult.rows[0];
+                if (insertResult.rows.length) {
+                    return insertResult.rows[0];
+                }
+                const fetchAgain = await query('SELECT * FROM bookings WHERE id = $1', [remoteBooking.id]);
+                return fetchAgain.rows[0];
             }
         }
     } catch (err) {
@@ -516,7 +520,7 @@ const ensureBookingExistsLocally = async (bookingId) => {
             if (remoteBooking) {
                 const paymentStatus = 'PAID';
                 const insertResult = await query(
-                    'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *',
+                    'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (id) DO NOTHING RETURNING *',
                     [
                         remoteBooking.id, remoteBooking.user_name, remoteBooking.service_name,
                         remoteBooking.booking_date, remoteBooking.booking_time, null,
@@ -525,7 +529,11 @@ const ensureBookingExistsLocally = async (bookingId) => {
                         remoteBooking.profile_pic || null
                     ]
                 );
-                return insertResult.rows[0];
+                if (insertResult.rows.length) {
+                    return insertResult.rows[0];
+                }
+                const fetchAgain = await query('SELECT * FROM bookings WHERE id = $1', [remoteBooking.id]);
+                return fetchAgain.rows[0];
             }
         }
     } catch (err) {

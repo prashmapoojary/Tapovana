@@ -205,7 +205,12 @@ app.listen(PORT, () => {
         try {
             await autoUpdateWorkshopStatuses();
         } catch (err) {
-            console.error("Error in background workshop status update:", err);
+            const { isTransientError } = require("./config/db");
+            if (isTransientError(err)) {
+                console.warn("[Workshop Scheduler] Transient database connection timeout/termination (Neon cold-start). Retrying next cycle...");
+            } else {
+                console.error("Error in background workshop status update:", err);
+            }
         } finally {
             workshopUpdateRunning = false;
         }
@@ -233,7 +238,12 @@ app.listen(PORT, () => {
         try {
             await autoUpdateVedicProgramStatuses();
         } catch (err) {
-            console.error("Error in background Vedic Program status update:", err);
+            const { isTransientError } = require("./config/db");
+            if (isTransientError(err)) {
+                console.warn("[Vedic Program Scheduler] Transient database connection timeout/termination (Neon cold-start). Retrying next cycle...");
+            } else {
+                console.error("Error in background Vedic Program status update:", err);
+            }
         } finally {
             vedicUpdateRunning = false;
         }
