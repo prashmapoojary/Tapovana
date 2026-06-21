@@ -190,14 +190,28 @@ const generateCertificatesForWorkshop = async (req, res) => {
                 ]);
 
                 // Send email notification
-                await sendWorkshopCompletionCertificateEmail({
-                    to: att.email,
-                    participantName: att.name,
-                    workshopTitle: workshop.title,
-                    completionDate: completionDateStr,
-                    downloadUrl: certUrl,
-                    certId: certificateId
-                });
+                try {
+                    await sendWorkshopCompletionCertificateEmail({
+                        to: att.email,
+                        participantName: att.name,
+                        workshopTitle: workshop.title,
+                        completionDate: completionDateStr,
+                        downloadUrl: certUrl,
+                        certId: certificateId
+                    });
+                    await query(
+                        `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)
+                         VALUES ($1, $2, 'sent', NOW())`,
+                        [att.id, workshop.id]
+                    );
+                } catch (emailErr) {
+                    console.error(`Failed to send manual certificate email to ${att.email}:`, emailErr.message);
+                    await query(
+                        `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)
+                         VALUES ($1, $2, 'failed', NOW())`,
+                        [att.id, workshop.id]
+                    );
+                }
 
                 generatedCount++;
             }
@@ -347,14 +361,28 @@ const resendCertificateEmail = async (req, res) => {
         });
 
         // Resend email
-        await sendWorkshopCompletionCertificateEmail({
-            to: cert.participant_email,
-            participantName: cert.participant_name,
-            workshopTitle: cert.workshop_name,
-            completionDate: completionDateStr,
-            downloadUrl: cert.pdf_url,
-            certId: cert.certificate_id
-        });
+        try {
+            await sendWorkshopCompletionCertificateEmail({
+                to: cert.participant_email,
+                participantName: cert.participant_name,
+                workshopTitle: cert.workshop_name,
+                completionDate: completionDateStr,
+                downloadUrl: cert.pdf_url,
+                certId: cert.certificate_id
+            });
+            await query(
+                `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)
+                 VALUES ($1, $2, 'sent', NOW())`,
+                [cert.participant_id, cert.workshop_id]
+            );
+        } catch (emailErr) {
+            console.error(`Failed to resend certificate email to ${cert.participant_email}:`, emailErr.message);
+            await query(
+                `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)
+                 VALUES ($1, $2, 'failed', NOW())`,
+                [cert.participant_id, cert.workshop_id]
+            );
+        }
 
         return res.json({ success: true, message: 'Certificate email resent successfully.' });
     } catch (err) {

@@ -1259,8 +1259,26 @@ const exportWorkshopAttendees = async (req, res) => {
 
 
 
+// Ensure email_logs table exists
+const ensureEmailLogsTableExists = async () => {
+    try {
+        await query(`
+            CREATE TABLE IF NOT EXISTS email_logs (
+                id SERIAL PRIMARY KEY,
+                participant_id UUID REFERENCES attendees(id) ON DELETE CASCADE,
+                workshop_id UUID REFERENCES workshops(id) ON DELETE CASCADE,
+                sent_at TIMESTAMPTZ DEFAULT NOW(),
+                status VARCHAR(50) DEFAULT 'sent'
+            );
+        `);
+    } catch (err) {
+        console.error('Error creating email_logs table:', err.message);
+    }
+};
+
 const autoUpdateWorkshopStatuses = async () => {
     try {
+        await ensureEmailLogsTableExists();
         const res = await query(`
             SELECT id, title, date, time, duration, status, assigned_staff_ids, start_time, end_time, upcoming_notified, ongoing_notified, completed_notified 
             FROM workshops 
@@ -1448,15 +1466,29 @@ const autoUpdateWorkshopStatuses = async () => {
                                 ]
                             );
 
-                            await sendWorkshopCompletionCertificateEmail({
-                                to: att.email,
-                                participantName: att.name,
-                                workshopTitle: w.title,
-                                completionDate: completionDateStr,
-                                downloadUrl: certUrl,
-                                certId: certId
-                            });
-                            console.log(`Certificate email sent to attendee: ${att.email} for workshop: ${w.title}`);
+                            try {
+                                await sendWorkshopCompletionCertificateEmail({
+                                    to: att.email,
+                                    participantName: att.name,
+                                    workshopTitle: w.title,
+                                    completionDate: completionDateStr,
+                                    downloadUrl: certUrl,
+                                    certId: certId
+                                });
+                                await query(
+                                    `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)
+                                     VALUES ($1, $2, 'sent', NOW())`,
+                                    [att.id, w.id]
+                                );
+                                console.log(`Certificate email sent to attendee: ${att.email} for workshop: ${w.title}`);
+                            } catch (emailErr) {
+                                console.error(`Failed to send certificate email to ${att.email}:`, emailErr.message);
+                                await query(
+                                    `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)
+                                     VALUES ($1, $2, 'failed', NOW())`,
+                                    [att.id, w.id]
+                                );
+                            }
                         }
                     } catch (certErr) {
                         console.error(`Error generating/sending certificate for attendee ${att.email}:`, certErr.message);
