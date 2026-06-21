@@ -83,32 +83,30 @@ const checkStaffAllocationConflict = async ({
                 message: 'Staff can only be allocated to 1 workshop per day.'
             };
         }
-        // With a workshop, services are capped at 2 (total max 3: 2 services + 1 workshop)
-        if (serviceCount >= 2) {
+        // If staff has 3 services on a given day → no workshop allowed
+        if (serviceCount >= 3) {
             return {
                 conflict: true,
-                message: 'Staff already has 2 services on this day. Cannot add more when a workshop is also assigned (max: 2 services + 1 workshop per day).'
+                message: 'Staff already has 3 services allocated today. No workshop allowed.'
             };
         }
+        // If staff has 2 services → one workshop is possible, but timings must not overlap (timings check is done below)
     }
     // Rule 4: Allocating a Service
     else if (type === 'service') {
-        if (workshopCount > 0) {
-            // Workshop is present → max 2 services allowed
-            if (serviceCount >= 2) {
-                return {
-                    conflict: true,
-                    message: 'Staff can handle a maximum of 2 services when a workshop is also scheduled (max: 2 services + 1 workshop per day).'
-                };
-            }
-        } else {
-            // No workshop → allow up to 3 services
-            if (serviceCount >= 3) {
-                return {
-                    conflict: true,
-                    message: 'Staff can handle a maximum of 3 services per day (when no workshop or Vedic program is scheduled).'
-                };
-            }
+        // For one staff → maximum 3 services per day. If a 4th service is attempted -> block it.
+        if (serviceCount >= 3) {
+            return {
+                conflict: true,
+                message: 'Staff already allocated to 3 services today.'
+            };
+        }
+        // If staff has a workshop, they can have at most 2 services (since 3 services + workshop is not allowed)
+        if (workshopCount > 0 && serviceCount >= 2) {
+            return {
+                conflict: true,
+                message: 'Staff already has a workshop and 2 services allocated. Cannot allocate a 3rd service.'
+            };
         }
     }
 

@@ -1,5 +1,11 @@
 const { query } = require('../config/db');
-const { sendBookingStatusEmail, sendBookingAllocationEmail, sendBookingRemovalEmail } = require('../services/emailService');
+const { 
+    sendBookingStatusEmail, 
+    sendBookingAllocationEmail, 
+    sendBookingRemovalEmail,
+    sendStaffCancellationEmail,
+    sendStaffCompletionEmail 
+} = require('../services/emailService');
 const { checkStaffAllocationConflict, syncStaffMemberStatus } = require('../utils/conflictChecker');
 const https = require('https');
 
@@ -137,93 +143,289 @@ const ensureDeletedBookingsTableExists = async () => {
 };
 ensureDeletedBookingsTableExists();
 
+// Helper: Log audit trail entry
+const logBookingAudit = async (bookingId, status, therapistId, therapistName, note) => {
+    try {
+        await query(
+            `INSERT INTO booking_status_updates (booking_id, status, therapist_id, therapist_name, note, updated_at)
+             VALUES ($1, $2, $3, $4, $5, NOW())`,
+            [bookingId ? parseInt(bookingId) : null, status, therapistId || null, therapistName || null, note || null]
+        );
+    } catch (err) {
+        console.error('Failed to log booking audit:', err);
+    }
+};
+
+// Helper: Ingest/Sync bookings from the mobile app endpoint into the local DB
+const syncIncomingBookings = async () => {
+    try {
+        const response = await fetch('https://tapoclg.onrender.com/api/bookings?limit=100');
+        if (response.ok) {
+            const data = await response.json();
+            const remoteBookings = data.success ? (data.bookings || []) : [];
+            
+            // Get all deleted booking IDs
+            const deletedRes = await query("SELECT booking_id FROM deleted_booking_ids");
+            const deletedIds = new Set(deletedRes.rows.map(r => String(r.booking_id)));
+            
+            for (const rb of remoteBookings) {
+                const bookingId = String(rb.id);
+                if (deletedIds.has(bookingId)) continue;
+                
+                const existing = await query("SELECT id FROM bookings WHERE id = $1", [rb.id]);
+                if (existing.rows.length === 0) {
+                    const paymentStatus = 'PAID';
+                    await query(
+                        'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)',
+                        [
+                            rb.id, rb.user_name, rb.service_name,
+                            rb.booking_date, rb.booking_time, null,
+                            rb.note, rb.total_amount, rb.pass_details,
+                            paymentStatus, 'PENDING', rb.created_at, rb.user_email || rb.email || null,
+                            rb.profile_pic || null
+                        ]
+                    );
+                    
+                    // Trigger pending email notification if email exists
+                    let userEmail = rb.user_email || rb.email || null;
+                    if (userEmail) {
+                        await sendBookingStatusEmail({
+                            to: userEmail,
+                            firstName: rb.user_name || 'Customer',
+                            status: 'PENDING',
+                            details: {
+                                service: rb.service_name,
+                                date: rb.booking_date,
+                                time: rb.booking_time
+                            }
+                        }).catch(e => console.error("Error sending pending email during auto-sync:", e));
+                    }
+                } else {
+                    // Dynamically backfill profile_pic if present in remote but missing locally
+                    if (rb.profile_pic && !existing.rows[0].profile_pic) {
+                        await query(
+                            "UPDATE bookings SET profile_pic = $1 WHERE id = $2 AND profile_pic IS NULL",
+                            [rb.profile_pic, rb.id]
+                        );
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error('syncIncomingBookings background sync error:', err);
+    }
+};
+
+// Helper: Common booking transition & allocation rules validation
+const validateBookingTransitionAndAllocations = async (booking, newStatus, incomingStaffIds) => {
+    // 1. Terminal state locks
+    if (booking.status === 'COMPLETED') {
+        if (newStatus === 'CANCELLED') {
+            return { valid: false, message: 'Completed bookings cannot be cancelled.' };
+        }
+        return { valid: false, message: 'Completed bookings cannot be modified.' };
+    }
+    if (booking.status === 'CANCELLED') {
+        if (newStatus === 'COMPLETED') {
+            return { valid: false, message: 'Cancelled bookings cannot be marked as completed.' };
+        }
+        return { valid: false, message: 'Cancelled bookings cannot be modified.' };
+    }
+
+    // 2. Direct Pending → Completed not allowed
+    if (newStatus === 'COMPLETED' && booking.status === 'PENDING') {
+        return { valid: false, message: 'You cannot mark a pending booking as completed.' };
+    }
+
+    // 3. Reverting to Pending from Confirmed not allowed
+    if (booking.status === 'CONFIRMED' && newStatus === 'PENDING') {
+        return { valid: false, message: 'Confirmed bookings cannot revert to pending.' };
+    }
+
+    // 4. Fetch service duration
+    const serviceRes = await query('SELECT duration_minutes FROM services WHERE name = $1', [booking.service_name]);
+    let duration = 60;
+    if (serviceRes.rows.length && serviceRes.rows[0].duration_minutes) {
+        duration = serviceRes.rows[0].duration_minutes;
+    }
+
+    // 5. Completion buffer constraint (service end time + 30 minutes)
+    if (newStatus === 'COMPLETED') {
+        if (booking.status !== 'CONFIRMED') {
+            return { valid: false, message: 'Error: Booking must be in Confirmed state to be completed.' };
+        }
+        const baseDate = new Date(booking.booking_date);
+        const timeStr = booking.booking_time || '00:00';
+        const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+        if (match) {
+            let hours = parseInt(match[1], 10);
+            const mins = parseInt(match[2], 10);
+            const ampm = match[3] ? match[3].toUpperCase() : null;
+            if (ampm === 'PM' && hours < 12) hours += 12;
+            if (ampm === 'AM' && hours === 12) hours = 0;
+            baseDate.setHours(hours, mins, 0, 0);
+        }
+        const endTime = new Date(baseDate.getTime() + (duration + 30) * 60000);
+        if (new Date() < endTime) {
+            const diffMins = Math.ceil((endTime - new Date()) / 60000);
+            return {
+                valid: false,
+                message: `Cannot complete yet. Available after end time + 30 min buffer (${diffMins} min remaining).`
+            };
+        }
+    }
+
+    // 6. Cannot cancel once service started
+    if (newStatus === 'CANCELLED' && booking.status === 'CONFIRMED') {
+        const baseDate = new Date(booking.booking_date);
+        const timeStr = booking.booking_time || '00:00';
+        const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+        if (match) {
+            let hours = parseInt(match[1], 10);
+            const mins = parseInt(match[2], 10);
+            const ampm = match[3] ? match[3].toUpperCase() : null;
+            if (ampm === 'PM' && hours < 12) hours += 12;
+            if (ampm === 'AM' && hours === 12) hours = 0;
+            baseDate.setHours(hours, mins, 0, 0);
+        }
+        if (new Date() >= baseDate) {
+            return { valid: false, message: 'Cannot cancel booking once the service has started.' };
+        }
+    }
+
+    // 7. Allocation Rules (CONFIRMED status)
+    if (newStatus === 'CONFIRMED') {
+        if (incomingStaffIds === null) {
+            const existingAllocs = await query(
+                `SELECT staff_id FROM allocations WHERE session_id = $1 AND type = 'service'`,
+                [String(booking.id)]
+            );
+            if (existingAllocs.rows.length === 0) {
+                return { valid: false, message: 'Please select a staff member to confirm the booking.' };
+            }
+        } else {
+            if (incomingStaffIds.length === 0) {
+                return { valid: false, message: 'Please select a staff member to confirm the booking.' };
+            }
+            if (incomingStaffIds.length > 3) {
+                return { valid: false, message: 'Maximum of 3 staff allocations possible per service.' };
+            }
+
+            for (const staffId of incomingStaffIds) {
+                const conflictCheck = await checkStaffAllocationConflict({
+                    staffId: staffId,
+                    date: booking.booking_date,
+                    timeStr: booking.booking_time,
+                    durationMins: duration,
+                    type: 'service',
+                    sessionId: booking.id
+                });
+                if (conflictCheck.conflict) {
+                    return { valid: false, message: conflictCheck.message || 'Staff allocation failed due to daily limit or package conflict.' };
+                }
+            }
+        }
+    }
+
+    return { valid: true, duration };
+};
+
+// CREATE BOOKING (New booking from mobile client)
+const createBooking = async (req, res) => {
+    try {
+        const { id, user_name, service_name, booking_date, booking_time, note, total_amount, pass_details, user_email, email, profile_pic } = req.body;
+        if (!user_name || !service_name) {
+            return res.status(400).json({ success: false, message: 'user_name and service_name are required.' });
+        }
+        
+        // Check if deleted
+        const bookingId = id ? parseInt(id) : null;
+        if (bookingId) {
+            const deletedCheck = await query('SELECT 1 FROM deleted_booking_ids WHERE booking_id = $1', [bookingId]);
+            if (deletedCheck.rows.length) {
+                return res.status(400).json({ success: false, message: 'This booking has been deleted.' });
+            }
+            const existing = await query("SELECT id FROM bookings WHERE id = $1", [bookingId]);
+            if (existing.rows.length) {
+                return res.status(400).json({ success: false, message: 'Booking already exists.' });
+            }
+        }
+
+        const paymentStatus = 'PAID';
+        const status = 'PENDING';
+        
+        const insertRes = await query(
+            'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES (COALESCE($1, nextval(\'bookings_id_seq\')), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, $13) RETURNING *',
+            [
+                bookingId, user_name, service_name,
+                booking_date, booking_time, null,
+                note || null, total_amount || null, pass_details || null,
+                paymentStatus, status, user_email || email || null,
+                profile_pic || null
+            ]
+        );
+        
+        const newBooking = insertRes.rows[0];
+        
+        // Trigger audit trail log
+        await logBookingAudit(newBooking.id, newBooking.status, null, null, 'New booking created from mobile endpoint.');
+
+        // Trigger email
+        let emailAddress = user_email || email || null;
+        if (emailAddress) {
+            await sendBookingStatusEmail({
+                to: emailAddress,
+                firstName: user_name || 'Customer',
+                status: 'PENDING',
+                details: {
+                    service: service_name,
+                    date: booking_date,
+                    time: booking_time
+                }
+            }).catch(e => console.error("Error sending pending email during POST booking:", e));
+        }
+
+        return res.status(201).json({ success: true, booking: newBooking });
+    } catch (err) {
+        console.error('POST booking error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
 // GET ALL BOOKINGS
 const getAllBookings = async (req, res) => {
     try {
         const { status, date_from, date_to, page = 1, limit = 10 } = req.query;
-        const isTherapist = req.user?.role === 'THERAPIST';
 
-        let allBookings = [];
+        // 1. Ingest any new bookings from Render to local database
+        await syncIncomingBookings();
 
-        if (isTherapist) {
-            // For therapist view, only show bookings from our database (no mobile backend fetch)
-            const localDbRes = await query("SELECT * FROM bookings");
-            allBookings = localDbRes.rows;
-        } else {
-            // 1. Fetch previously updated bookings from the local database
-            const localDbRes = await query(
-                "SELECT * FROM bookings WHERE status IN ('CONFIRMED', 'COMPLETED', 'CANCELLED')"
-            );
-            const localUpdatedBookings = localDbRes.rows;
+        // 2. Query bookings from local database ONLY
+        let dbQuery = "SELECT * FROM bookings WHERE 1=1";
+        const queryParams = [];
 
-            // 2. Fetch pending and new bookings from the mobile backend
-            let remoteBookings = [];
-            try {
-                const response = await fetch('https://tapoclg.onrender.com/api/bookings?limit=100');
-                if (response.ok) {
-                    const data = await response.json();
-                    remoteBookings = data.success ? (data.bookings || []) : [];
-
-                    // Dynamically backfill missing profile_pic for existing local bookings
-                    for (const rb of remoteBookings) {
-                        if (rb.profile_pic) {
-                            await query(
-                                "UPDATE bookings SET profile_pic = $1 WHERE id = $2 AND profile_pic IS NULL",
-                                [rb.profile_pic, rb.id]
-                            );
-                        }
-                    }
-                }
-            } catch (fetchErr) {
-                console.error('Failed to fetch from mobile backend, falling back to local only:', fetchErr);
-                // Fallback: load pending from local DB if any exist there
-                const localPendingRes = await query("SELECT * FROM bookings WHERE status = 'PENDING'");
-                remoteBookings = localPendingRes.rows;
-            }
-
-            // Get all deleted booking IDs
-            const deletedRes = await query("SELECT booking_id FROM deleted_booking_ids");
-            const deletedIds = new Set(deletedRes.rows.map(r => String(r.booking_id)));
-
-            // Filter remote bookings: keep only the ones that are not in localUpdatedBookings and NOT deleted
-            const localUpdatedIds = new Set(localUpdatedBookings.map(b => String(b.id)));
-            
-            // Remote bookings should have PENDING status (all new/incoming entries start as Pending)
-            const pendingAndNewBookings = remoteBookings
-                .filter(b => !localUpdatedIds.has(String(b.id)) && !deletedIds.has(String(b.id)))
-                .map(b => ({
-                    ...b,
-                    user_email: b.user_email || b.email || null,
-                    status: 'PENDING',
-                    therapist_id: null,
-                    therapist_name: null
-                }));
-
-            // 3. Merge: Database updated bookings + Remote pending/new bookings
-            allBookings = [...localUpdatedBookings, ...pendingAndNewBookings];
+        if (status) {
+            queryParams.push(status.toUpperCase());
+            dbQuery += ` AND status = $${queryParams.length}`;
         }
+        if (date_from) {
+            queryParams.push(new Date(date_from));
+            dbQuery += ` AND booking_date >= $${queryParams.length}`;
+        }
+        if (date_to) {
+            const toDate = new Date(date_to);
+            toDate.setHours(23, 59, 59, 999);
+            queryParams.push(toDate);
+            dbQuery += ` AND booking_date <= $${queryParams.length}`;
+        }
+
+        const dbRes = await query(dbQuery, queryParams);
+        let allBookings = dbRes.rows;
 
         // Sort by created_at DESC, fallback to booking_date
         allBookings.sort((a, b) => new Date(b.created_at || b.booking_date) - new Date(a.created_at || a.booking_date));
 
-        // 4. Apply Filters
-        if (status) {
-            allBookings = allBookings.filter(b => (b.status || '').toUpperCase() === status.toUpperCase());
-        }
-
-        if (date_from) {
-            const fromDate = new Date(date_from);
-            fromDate.setHours(0, 0, 0, 0);
-            allBookings = allBookings.filter(b => b.booking_date && new Date(b.booking_date) >= fromDate);
-        }
-
-        if (date_to) {
-            const toDate = new Date(date_to);
-            toDate.setHours(23, 59, 59, 999);
-            allBookings = allBookings.filter(b => b.booking_date && new Date(b.booking_date) <= toDate);
-        }
-
-        // 5. Paginate
+        // Paginate
         const total = allBookings.length;
         const pg = parseInt(page) || 1;
         const lim = parseInt(limit) || 10;
@@ -403,6 +605,7 @@ const updateBookingStatus = async (req, res) => {
     const newStatus = status ? status.toUpperCase() : null;
 
     if (!newStatus || !['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(newStatus)) {
+        await logBookingAudit(req.params.id, 'ERROR', null, null, 'Valid status is required.');
         return res.status(400).json({ success: false, message: 'Valid status is required.' });
     }
 
@@ -419,60 +622,18 @@ const updateBookingStatus = async (req, res) => {
     try {
         const booking = await ensureBookingExistsLocally(req.params.id);
         if (!booking) {
+            await logBookingAudit(req.params.id, 'ERROR', null, null, 'Booking not found.');
             return res.status(404).json({ success: false, message: 'Booking not found.' });
         }
 
-        // Terminal state locks
-        if (booking.status === 'COMPLETED') {
-            if (newStatus === 'CANCELLED') {
-                return res.status(400).json({ success: false, message: 'Completed bookings cannot be cancelled.' });
-            }
-            return res.status(400).json({ success: false, message: 'Completed bookings cannot be modified.' });
-        }
-        if (booking.status === 'CANCELLED') {
-            if (newStatus === 'COMPLETED') {
-                return res.status(400).json({ success: false, message: 'Cancelled bookings cannot be marked as completed.' });
-            }
-            return res.status(400).json({ success: false, message: 'Cancelled bookings cannot be modified.' });
+        // Run validation helper
+        const validation = await validateBookingTransitionAndAllocations(booking, newStatus, incomingStaffIds);
+        if (!validation.valid) {
+            await logBookingAudit(booking.id, 'ERROR', incomingStaffIds && incomingStaffIds.length ? incomingStaffIds[0] : null, null, validation.message);
+            return res.status(400).json({ success: false, message: validation.message });
         }
 
-        // Direct Pending → Completed not allowed
-        if (newStatus === 'COMPLETED' && booking.status === 'PENDING') {
-            return res.status(400).json({ success: false, message: 'You cannot mark a pending booking as completed.' });
-        }
-
-        // Fetch service duration
-        const serviceRes = await query('SELECT duration_minutes FROM services WHERE name = $1', [booking.service_name]);
-        let duration = 60;
-        if (serviceRes.rows.length && serviceRes.rows[0].duration_minutes) {
-            duration = serviceRes.rows[0].duration_minutes;
-        }
-
-        // Completion constraints — only from CONFIRMED, only after end time + 10 min buffer
-        if (newStatus === 'COMPLETED') {
-            if (booking.status !== 'CONFIRMED') {
-                return res.status(400).json({ success: false, message: 'Error: Booking must be in Confirmed state to be completed.' });
-            }
-            const baseDate = new Date(booking.booking_date);
-            const timeStr = booking.booking_time || '00:00';
-            const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
-            if (match) {
-                let hours = parseInt(match[1], 10);
-                const mins = parseInt(match[2], 10);
-                const ampm = match[3] ? match[3].toUpperCase() : null;
-                if (ampm === 'PM' && hours < 12) hours += 12;
-                if (ampm === 'AM' && hours === 12) hours = 0;
-                baseDate.setHours(hours, mins, 0, 0);
-            }
-            const endTime = new Date(baseDate.getTime() + (duration + 10) * 60000);
-            if (new Date() < endTime) {
-                const diffMins = Math.ceil((endTime - new Date()) / 60000);
-                return res.status(400).json({
-                    success: false,
-                    message: `Cannot complete yet. Available after end time + 10 min buffer (${diffMins} min remaining).`
-                });
-            }
-        }
+        const duration = validation.duration;
 
         // ─── Multi-Staff Allocation Logic (CONFIRMED only) ───────────────────────
         let finalStaffName = booking.therapist_name;
@@ -480,29 +641,6 @@ const updateBookingStatus = async (req, res) => {
         let allocDiff = { addedIds: [], removedIds: [] };
 
         if (newStatus === 'CONFIRMED' && incomingStaffIds !== null) {
-            if (incomingStaffIds.length === 0) {
-                return res.status(400).json({ success: false, message: 'Please select a staff member to confirm the booking.' });
-            }
-
-            // ── Enforce max 2 allocations per booking ──
-            const oldTherapistId = booking.therapist_id;
-            const newTherapistId = incomingStaffIds[0];
-            const isReallocating = (booking.status !== 'CONFIRMED') || (newTherapistId !== oldTherapistId);
-
-            if (isReallocating) {
-                const allocCountRes = await query(
-                    `SELECT COUNT(*) as cnt FROM booking_status_updates WHERE booking_id = $1 AND status = 'CONFIRMED'`,
-                    [parseInt(booking.id)]
-                );
-                const allocCount = parseInt(allocCountRes.rows[0]?.cnt || 0);
-                if (allocCount >= 2) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'Staff allocation limit reached. You cannot allocate more than twice for this booking.'
-                    });
-                }
-            }
-
             // Fetch all names for display
             const validIncomingStaffIds = incomingStaffIds.filter(isValidUUID);
             const staffNamesRes = await query(
@@ -529,7 +667,6 @@ const updateBookingStatus = async (req, res) => {
                 for (const removedId of allocDiff.removedIds) {
                     const staffInfo = staffMap[removedId];
                     if (!staffInfo) {
-                        // fetch from DB if not in the incoming list
                         const removedRes = await query(
                             'SELECT first_name, last_name, email FROM team_members WHERE id = $1', [removedId]
                         );
@@ -637,7 +774,6 @@ const updateBookingStatus = async (req, res) => {
 
             // Send completion email to staff
             if (!req.body.skip_notify) {
-                const { sendStaffCompletionEmail } = require('../services/emailService');
                 for (const staffId of uniqueStaffIds) {
                     const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
                     if (staffRes.rows.length) {
@@ -661,11 +797,7 @@ const updateBookingStatus = async (req, res) => {
         const updatedBooking = result.rows[0];
 
         // Store audit record
-        await query(
-            `INSERT INTO booking_status_updates (booking_id, status, therapist_id, therapist_name, note, updated_at)
-             VALUES ($1, $2, $3, $4, $5, NOW())`,
-            [parseInt(updatedBooking.id), updatedBooking.status, updatedBooking.therapist_id, updatedBooking.therapist_name, updatedBooking.note]
-        );
+        await logBookingAudit(updatedBooking.id, updatedBooking.status, updatedBooking.therapist_id, updatedBooking.therapist_name, updatedBooking.note);
 
         // ─── Customer email notification ──────────────────────────────────────────
         const userEmail = updatedBooking.user_email || null;
@@ -699,39 +831,28 @@ const assignTherapist = async (req, res) => {
     try {
         const bookingRes = await query('SELECT * FROM bookings WHERE id = $1', [req.params.id]);
         if (!bookingRes.rows.length) {
+            await logBookingAudit(req.params.id, 'ERROR', therapist_id, therapist_name, 'Booking not found.');
             return res.status(404).json({ success: false, message: 'Booking not found.' });
         }
         const booking = bookingRes.rows[0];
         if (booking.status !== 'CONFIRMED') {
+            await logBookingAudit(booking.id, 'ERROR', therapist_id, therapist_name, 'Staff allocation is only available for confirmed bookings.');
             return res.status(400).json({ success: false, message: 'Staff allocation is only available for confirmed bookings.' });
         }
         const oldTherapistId = booking.therapist_id;
-        const isReallocating = therapist_id && (therapist_id !== oldTherapistId);
-
-        if (isReallocating) {
-            const allocCountRes = await query(
-                `SELECT COUNT(*) as cnt FROM booking_status_updates WHERE booking_id = $1 AND status = 'CONFIRMED'`,
-                [parseInt(booking.id)]
-            );
-            const allocCount = parseInt(allocCountRes.rows[0]?.cnt || 0);
-            if (allocCount >= 2) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Staff allocation limit reached. You cannot allocate more than twice for this booking.'
-                });
-            }
-        }
 
         let name = therapist_name;
+        let staffEmail = null;
         if (therapist_id) {
-            const staffRes = await query('SELECT id, first_name, last_name FROM team_members WHERE id = $1', [therapist_id]);
+            const staffRes = await query('SELECT id, first_name, last_name, email FROM team_members WHERE id = $1', [therapist_id]);
             if (staffRes.rows.length) {
                 name = (staffRes.rows[0].first_name + ' ' + staffRes.rows[0].last_name).trim();
+                staffEmail = staffRes.rows[0].email;
             }
         }
 
         // Check scheduling conflict if booking is confirmed
-        if (booking.status === 'CONFIRMED' && therapist_id) {
+        if (therapist_id) {
             const serviceRes = await query('SELECT duration_minutes FROM services WHERE name = $1', [booking.service_name]);
             const duration = serviceRes.rows.length && serviceRes.rows[0].duration_minutes ? serviceRes.rows[0].duration_minutes : 60;
 
@@ -745,14 +866,13 @@ const assignTherapist = async (req, res) => {
             });
 
             if (conflictCheck.conflict) {
+                await logBookingAudit(booking.id, 'ERROR', therapist_id, name, conflictCheck.message || 'Staff allocation failed due to daily limit or package conflict.');
                 return res.status(400).json({
                     success: false,
-                    message: `Staff allocation failed due to daily limit or package conflict.`
+                    message: conflictCheck.message || `Staff allocation failed due to daily limit or package conflict.`
                 });
             }
         }
-
-        let wasInConflict = false;
 
         const result = await query(
             'UPDATE bookings SET therapist_id = $1, therapist_name = $2 WHERE id = $3 RETURNING *',
@@ -760,12 +880,8 @@ const assignTherapist = async (req, res) => {
         );
         const updatedBooking = result.rows[0];
 
-        // Store in the separate booking_status_updates table
-        await query(
-            `INSERT INTO booking_status_updates (booking_id, status, therapist_id, therapist_name, note, updated_at)
-             VALUES ($1, $2, $3, $4, $5, NOW())`,
-            [parseInt(updatedBooking.id), updatedBooking.status, updatedBooking.therapist_id, updatedBooking.therapist_name, updatedBooking.note]
-        );
+        // Store in the separate booking_status_updates table (Audit log)
+        await logBookingAudit(updatedBooking.id, updatedBooking.status, updatedBooking.therapist_id, updatedBooking.therapist_name, 'Therapist assigned.');
 
         // Sync to allocations table using the multi-staff helper to keep formats consistent
         const serviceRes = await query('SELECT duration_minutes FROM services WHERE name = $1', [updatedBooking.service_name]);
@@ -782,27 +898,48 @@ const assignTherapist = async (req, res) => {
         if (oldTherapistId) {
             await syncStaffMemberStatus(oldTherapistId);
         }
-        if (updatedBooking.therapist_id && updatedBooking.therapist_id !== oldTherapistId) {
+        if (updatedBooking.therapist_id) {
             await syncStaffMemberStatus(updatedBooking.therapist_id);
         }
 
-        if (wasInConflict && updatedBooking.therapist_id && updatedBooking.therapist_id !== oldTherapistId && !req.body.skip_notify) {
-            const userEmail = updatedBooking.user_email || req.body.user_email || null;
-            if (userEmail) {
-                const { sendUserReassignmentEmail } = require('../services/emailService');
-                await sendUserReassignmentEmail({
-                    to: userEmail,
-                    userName: updatedBooking.user_name || 'Customer',
-                    details: {
-                        service: updatedBooking.service_name,
-                        date: updatedBooking.booking_date,
-                        time: updatedBooking.booking_time,
-                        staff: updatedBooking.therapist_name
-                    }
-                }).catch(e => console.error("Error sending user reassignment email:", e));
-            } else {
-                console.log(`[Reassignment] Notification skipped: No user email available for booking #${updatedBooking.id}`);
+        // Notify removed staff (Reallocation Notice)
+        if (oldTherapistId && oldTherapistId !== therapist_id && !req.body.skip_notify) {
+            const oldStaffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [oldTherapistId]);
+            if (oldStaffRes.rows.length && oldStaffRes.rows[0].email) {
+                const s = oldStaffRes.rows[0];
+                await sendBookingRemovalEmail({
+                    to: s.email,
+                    staffName: `${s.first_name} ${s.last_name}`.trim(),
+                    bookingId: booking.id,
+                    details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time, customer: booking.user_name }
+                }).catch(e => console.error('[RemovalEmail] Error:', e));
             }
+        }
+
+        // Notify newly added staff (Allocation Email)
+        if (therapist_id && therapist_id !== oldTherapistId && staffEmail && !req.body.skip_notify) {
+            await sendBookingAllocationEmail({
+                to: staffEmail,
+                staffName: name,
+                bookingId: booking.id,
+                details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time, customer: booking.user_name }
+            }).catch(e => console.error('[AllocationEmail] Error:', e));
+        }
+
+        // Send reassignment notice to customer
+        const userEmail = updatedBooking.user_email || req.body.user_email || null;
+        if (userEmail && !req.body.skip_notify) {
+            const { sendUserReassignmentEmail } = require('../services/emailService');
+            await sendUserReassignmentEmail({
+                to: userEmail,
+                userName: updatedBooking.user_name || 'Customer',
+                details: {
+                    service: updatedBooking.service_name,
+                    date: updatedBooking.booking_date,
+                    time: updatedBooking.booking_time,
+                    staff: updatedBooking.therapist_name
+                }
+            }).catch(e => console.error("Error sending user reassignment email:", e));
         }
 
         const enriched = await enrichBookingObject(req, updatedBooking);
@@ -914,18 +1051,33 @@ const sendBookingNotificationOnly = async (req, res) => {
     const { status, staff_ids, staff_id, note } = req.body;
     const newStatus = status ? status.toUpperCase() : null;
 
+    if (!newStatus || !['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(newStatus)) {
+        await logBookingAudit(req.params.id, 'ERROR', null, null, 'Valid status is required.');
+        return res.status(400).json({ success: false, message: 'Valid status is required.' });
+    }
+
+    // Normalize to array: prefer staff_ids, fall back to staff_id
+    let incomingStaffIds = null;
+    if (Array.isArray(staff_ids)) {
+        incomingStaffIds = staff_ids.filter(Boolean);
+    } else if (staff_id !== undefined && staff_id !== null) {
+        incomingStaffIds = [staff_id];
+    } else if (staff_ids === null || staff_id === null) {
+        incomingStaffIds = [];
+    }
+
     try {
         const booking = await ensureBookingExistsLocally(req.params.id);
         if (!booking) {
+            await logBookingAudit(req.params.id, 'ERROR', null, null, 'Booking not found.');
             return res.status(404).json({ success: false, message: 'Booking not found.' });
         }
 
-        // Normalize to array: prefer staff_ids, fall back to staff_id
-        let incomingStaffIds = [];
-        if (Array.isArray(staff_ids)) {
-            incomingStaffIds = staff_ids.filter(Boolean);
-        } else if (staff_id !== undefined && staff_id !== null) {
-            incomingStaffIds = [staff_id];
+        // Run validation helper
+        const validation = await validateBookingTransitionAndAllocations(booking, newStatus, incomingStaffIds);
+        if (!validation.valid) {
+            await logBookingAudit(booking.id, 'ERROR', incomingStaffIds && incomingStaffIds.length ? incomingStaffIds[0] : null, null, validation.message);
+            return res.status(400).json({ success: false, message: validation.message });
         }
 
         // Fetch existing allocations for comparison
@@ -934,7 +1086,7 @@ const sendBookingNotificationOnly = async (req, res) => {
             [String(booking.id), `bk-alloc-${booking.id}-%`]
         );
         const existingStaffIds = new Set(existingRows.rows.map(r => String(r.staff_id)));
-        const newStaffIdSet = new Set(incomingStaffIds.map(id => String(id)));
+        const newStaffIdSet = new Set((incomingStaffIds || []).map(id => String(id)));
 
         const addedIds = [...newStaffIdSet].filter(id => !existingStaffIds.has(id));
         const removedIds = [...existingStaffIds].filter(id => !newStaffIdSet.has(id));
@@ -1039,4 +1191,4 @@ const sendBookingNotificationOnly = async (req, res) => {
     }
 };
 
-module.exports = { getAllBookings, getBookingById, updateBookingStatus, assignTherapist, syncFromRender, deleteBooking, sendBookingNotificationOnly };
+module.exports = { getAllBookings, getBookingById, updateBookingStatus, assignTherapist, syncFromRender, deleteBooking, sendBookingNotificationOnly, createBooking };

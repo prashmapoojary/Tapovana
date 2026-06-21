@@ -7,7 +7,8 @@ const {
     assignTherapist,
     syncFromRender,
     deleteBooking,
-    sendBookingNotificationOnly
+    sendBookingNotificationOnly,
+    createBooking
 } = require('../controllers/bookingsController');
 
 const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR')];
@@ -16,6 +17,7 @@ const staffOrAdmin = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCT
 // Read routes — public, no auth required
 router.get('/', getAllBookings);
 router.get('/:id', getBookingById);
+router.post('/', createBooking);
 
 // Admin-only actions
 router.post('/:id/notify', ...adminOnly, sendBookingNotificationOnly);

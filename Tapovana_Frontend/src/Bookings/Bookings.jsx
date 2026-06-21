@@ -379,6 +379,18 @@ function Bookings() {
     }
   };
 
+  const handleToggleStaff = (staffId) => {
+    if (assignedStaffIds.includes(staffId)) {
+      setAssignedStaffIds(prev => prev.filter(id => id !== staffId));
+    } else {
+      if (assignedStaffIds.length >= 3) {
+        triggerAlert("Maximum of 3 staff allocations possible per service.");
+        return;
+      }
+      setAssignedStaffIds(prev => [...prev, staffId]);
+    }
+  };
+
   const handleDeleteBooking = async (booking) => {
     const contextName = booking.user_name || booking.service_name || "Guest";
     const dummyImage = "https://ui-avatars.com/api/?name=" + encodeURIComponent(contextName) + "&background=dc2626&color=fff";
@@ -608,7 +620,7 @@ function Bookings() {
                               if (ampm === 'AM' && h === 12) h = 0;
                               base.setHours(h, min, 0, 0);
                             }
-                            const unlockAt = new Date(base.getTime() + (durationMins + 10) * 60000);
+                            const unlockAt = new Date(base.getTime() + (durationMins + 30) * 60000);
                             const now = new Date();
                             if (now >= unlockAt) {
                               completionAllowed = true;
@@ -617,8 +629,8 @@ function Bookings() {
                               const hrs = Math.floor(diffMins / 60);
                               const mins = diffMins % 60;
                               bufferLabel = hrs > 0
-                                ? `Available in ${hrs}h ${mins}m (end time + 10 min buffer)`
-                                : `Available in ${mins} min (end time + 10 min buffer)`;
+                                ? `Available in ${hrs}h ${mins}m (end time + 30 min buffer)`
+                                : `Available in ${mins} min (end time + 30 min buffer)`;
                             }
                           }
                         }
