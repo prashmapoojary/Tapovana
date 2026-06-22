@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import "./VedicLifePrograms.css";
+import "../Team/AddMemberDrawer.css";
+import DropdownIcon from "../assets/dropdownIcon.svg";
 import { apiFetch } from "../api/http";
 import { useAllocations } from "../utils/AllocationContext";
 import { getUser } from "../utils/session";
@@ -408,6 +410,17 @@ export default function VedicLifePrograms() {
   const [addForm, setAddForm] = useState(BLANK_FORM);
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState("");
+
+  useEffect(() => {
+    if (showCreateModal) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showCreateModal]);
 
   // Attendee list state
   const [attendees, setAttendees] = useState([]);
@@ -1293,27 +1306,27 @@ export default function VedicLifePrograms() {
         </div>
       )}
 
-      {/* ── CREATE MODAL ── */}
-      {showCreateModal && (
-        <div className="vedic-modal-overlay" onClick={() => setShowCreateModal(false)}>
-          <div className="vedic-modal" style={{ maxWidth: 700 }} onClick={e => e.stopPropagation()}>
-            <div className="vedic-modal-header">
-              <h2 className="vedic-modal-title">Create New Vedic Program</h2>
-              <button className="vedic-modal-close" onClick={() => setShowCreateModal(false)}>✕</button>
-            </div>
-            <div className="vedic-modal-body" style={{ maxHeight: "65vh", overflowY: "auto" }}>
-              <ProgramForm form={addForm} onChange={(e) => setAddForm(p => ({ ...p, [e.target.name]: e.target.value }))} instructors={instructors} mode="add" onSearchPexels={() => { setMediaTarget('add'); setMediaModalOpen(true); }} />
-              {addError && <div style={{ color: "#e74c3c", fontSize: 13, fontWeight: 600, marginTop: 8 }}>{addError}</div>}
-              <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-                <button className="vedic-btn-cancel" style={{ flex: 1 }} onClick={() => setShowCreateModal(false)}>Cancel</button>
-                <button className="vedic-btn-allocate" style={{ flex: 2 }} onClick={handleCreateProgram} disabled={addSaving}>
-                  {addSaving ? "Creating..." : "Create Program"}
-                </button>
-              </div>
-            </div>
+      {/* ── CREATE DRAWER ── */}
+      <div className={`drawer-overlay ${showCreateModal ? "open" : ""}`} onClick={() => setShowCreateModal(false)} style={{ zIndex: 1000 }} />
+      <div className={`drawer-panel ${showCreateModal ? "open" : ""}`} style={{ zIndex: 1001, width: "450px", right: showCreateModal ? 0 : "-490px" }}>
+        <div className="drawer-header">
+          <div className="drawer-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 8, color: "#CDA751" }}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            Create New Vedic Program
           </div>
+          <button className="drawer-close-btn" onClick={() => setShowCreateModal(false)}>✕</button>
         </div>
-      )}
+        <div className="drawer-body">
+          <ProgramForm form={addForm} onChange={(e) => setAddForm(p => ({ ...p, [e.target.name]: e.target.value }))} instructors={instructors} mode="add" onSearchPexels={() => { setMediaTarget('add'); setMediaModalOpen(true); }} />
+          {addError && <div style={{ color: "#e74c3c", fontSize: 13, fontWeight: 600, marginTop: 12 }}>{addError}</div>}
+        </div>
+        <div className="drawer-footer">
+          <button className="btn-cancel" onClick={() => setShowCreateModal(false)}>Cancel</button>
+          <button className="btn-save" onClick={handleCreateProgram} disabled={addSaving} style={{ opacity: addSaving ? 0.6 : 1 }}>
+            {addSaving ? "Creating..." : "Create Program"}
+          </button>
+        </div>
+      </div>
 
       <MediaPickerModal 
         isOpen={mediaModalOpen}

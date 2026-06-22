@@ -197,7 +197,8 @@ const generateCertificatesForWorkshop = async (req, res) => {
                         workshopTitle: workshop.title,
                         completionDate: completionDateStr,
                         downloadUrl: certUrl,
-                        certId: certificateId
+                        certId: certificateId,
+                        participantId: att.id
                     });
                     await query(
                         `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)
@@ -321,6 +322,11 @@ const downloadCertificatePdf = async (req, res) => {
         // Return headers for immediate browser download
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", `attachment; filename="Certificate-${cert.certificate_id}.pdf"`);
+        res.setHeader("Content-Description", "File Transfer");
+        res.setHeader("Content-Transfer-Encoding", "binary");
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
 
         const stream = fs.createReadStream(filePath);
         stream.on('error', (streamErr) => {
@@ -368,7 +374,8 @@ const resendCertificateEmail = async (req, res) => {
                 workshopTitle: cert.workshop_name,
                 completionDate: completionDateStr,
                 downloadUrl: cert.pdf_url,
-                certId: cert.certificate_id
+                certId: cert.certificate_id,
+                participantId: cert.participant_id
             });
             await query(
                 `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)

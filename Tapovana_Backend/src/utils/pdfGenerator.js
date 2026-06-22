@@ -1,8 +1,10 @@
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 
 let cachedLogoBuffer = null;
+let cachedFontPath = null;
 
 /**
  * Fetch local logo image buffer. Caches buffer in memory to keep subsequent generation calls fast.
@@ -12,12 +14,82 @@ function getLogoBuffer() {
     return new Promise((resolve) => {
         try {
             const logoPath = path.join(__dirname, '../../../Tapovana_Frontend/src/assets/logo.png');
-            cachedLogoBuffer = fs.readFileSync(logoPath);
-            resolve(cachedLogoBuffer);
+            if (fs.existsSync(logoPath)) {
+                cachedLogoBuffer = fs.readFileSync(logoPath);
+                resolve(cachedLogoBuffer);
+            } else {
+                resolve(null);
+            }
         } catch (err) {
-            console.warn('Failed to load local logo, falling back to text:', err);
+            console.warn('Failed to load local logo:', err);
             resolve(null);
         }
+    });
+}
+
+/**
+ * Automatically downloads and caches the cursive signature font from Google Fonts GitHub repo.
+ * Handles HTTP redirects gracefully.
+ */
+function downloadFontIfNotExist() {
+    if (cachedFontPath && fs.existsSync(cachedFontPath)) {
+        return Promise.resolve(cachedFontPath);
+    }
+
+    const fontDir = path.join(__dirname, '../assets');
+    if (!fs.existsSync(fontDir)) {
+        fs.mkdirSync(fontDir, { recursive: true });
+    }
+
+    const fontPath = path.join(fontDir, 'AlexBrush-Regular.ttf');
+    if (fs.existsSync(fontPath)) {
+        // Simple sanity check of the file format
+        try {
+            const stat = fs.statSync(fontPath);
+            if (stat.size > 1000) {
+                cachedFontPath = fontPath;
+                return Promise.resolve(fontPath);
+            } else {
+                fs.unlinkSync(fontPath);
+            }
+        } catch (e) {
+            fs.unlinkSync(fontPath);
+        }
+    }
+
+    return new Promise((resolve) => {
+        console.log('Tapovana Certificate: Downloading signature font from Google Fonts GitHub repository...');
+        const url = 'https://github.com/google/fonts/raw/main/ofl/alexbrush/AlexBrush-Regular.ttf';
+        const file = fs.createWriteStream(fontPath);
+        
+        const download = (targetUrl) => {
+            https.get(targetUrl, (response) => {
+                if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                    // Follow redirection (e.g. raw.githubusercontent.com)
+                    download(response.headers.location);
+                } else if (response.statusCode === 200) {
+                    response.pipe(file);
+                    file.on('finish', () => {
+                        file.close();
+                        console.log('Tapovana Certificate: Signature font cached successfully at:', fontPath);
+                        cachedFontPath = fontPath;
+                        resolve(fontPath);
+                    });
+                } else {
+                    file.close();
+                    fs.unlink(fontPath, () => {});
+                    console.warn(`Failed to download font: HTTP Status ${response.statusCode}`);
+                    resolve(null);
+                }
+            }).on('error', (err) => {
+                file.close();
+                fs.unlink(fontPath, () => {});
+                console.warn('Failed to download cursive signature font:', err.message);
+                resolve(null);
+            });
+        };
+
+        download(url);
     });
 }
 
@@ -27,65 +99,6 @@ function renderTextLogo(doc, x, y, width) {
        .fontSize(16)
        .fillColor('#1b4d3e')
        .text('T A P O V A N A', x, y, { width: width, align: 'center' });
-    doc.restore();
-}
-
-/**
- * Draw a beautiful gold radial mandala in the background with low opacity
- */
-function drawWatermarkMandala(doc, cx, cy) {
-    doc.save();
-    const goldColor = '#DAA520';
-    doc.strokeColor(goldColor);
-    doc.opacity(0.07); // Subtle watermark opacity
-    
-    // Draw concentric circles
-    const radii = [60, 120, 180, 240, 300];
-    radii.forEach((r, idx) => {
-        doc.lineWidth(idx % 2 === 0 ? 1 : 0.5);
-        doc.circle(cx, cy, r).stroke();
-    });
-
-    // Petal patterns
-    const layers = [
-        { count: 12, r: 120, petalH: 20 },
-        { count: 24, r: 240, petalH: 40 }
-    ];
-
-    layers.forEach((layer) => {
-        doc.lineWidth(0.8);
-        for (let i = 0; i < layer.count; i++) {
-            const angle = (i * 2 * Math.PI) / layer.count;
-            const nextAngle = ((i + 1) * 2 * Math.PI) / layer.count;
-            const midAngle = (angle + nextAngle) / 2;
-
-            const x1 = cx + Math.cos(angle) * layer.r;
-            const y1 = cy + Math.sin(angle) * layer.r;
-            const x2 = cx + Math.cos(nextAngle) * layer.r;
-            const y2 = cy + Math.sin(nextAngle) * layer.r;
-
-            const peakR = layer.r + layer.petalH;
-            const mx = cx + Math.cos(midAngle) * peakR;
-            const my = cy + Math.sin(midAngle) * peakR;
-
-            doc.moveTo(x1, y1)
-               .quadraticCurveTo(mx, my, x2, y2)
-               .stroke();
-        }
-    });
-
-    // Draw lines radiating from the inner core
-    doc.lineWidth(0.5);
-    const coreCount = 16;
-    for (let i = 0; i < coreCount; i++) {
-        const angle = (i * 2 * Math.PI) / coreCount;
-        const x1 = cx + Math.cos(angle) * 15;
-        const y1 = cy + Math.sin(angle) * 15;
-        const x2 = cx + Math.cos(angle) * 60;
-        const y2 = cy + Math.sin(angle) * 60;
-        doc.moveTo(x1, y1).lineTo(x2, y2).stroke();
-    }
-
     doc.restore();
 }
 
@@ -102,6 +115,10 @@ function drawWatermarkMandala(doc, cx, cy) {
 function generateCertificatePDF(participantName, workshopTitle, completionDate, conductorName, signatureImage, certificateId) {
     return new Promise(async (resolve, reject) => {
         try {
+            // A4 page dimensions in points (landscape)
+            const width = 841.89;
+            const height = 595.28;
+
             const doc = new PDFDocument({
                 layout: 'landscape',
                 size: 'A4',
@@ -113,179 +130,164 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             doc.on('end', () => resolve(Buffer.concat(chunks)));
             doc.on('error', (err) => reject(err));
 
-            const width = 841.89;
-            const height = 595.28;
+            // Ensure signature font is downloaded and ready
+            let signatureFontPath = null;
+            try {
+                signatureFontPath = await downloadFontIfNotExist();
+            } catch (err) {
+                console.warn('Failed to check or download cursive font:', err);
+            }
 
-            // 1. Premium soft off-white background
-            doc.rect(0, 0, width, height).fill('#FAF9F6');
+            // 1. Load background image (certificate_template.png) if it exists
+            const templatePath = path.join(__dirname, '../assets/certificate_template.png');
+            if (fs.existsSync(templatePath)) {
+                doc.image(templatePath, 0, 0, { width: width, height: height });
+            } else {
+                // Safe vector fallback if background image is missing
+                doc.rect(0, 0, width, height).fill('#FAF9F6');
+                doc.rect(25, 25, width - 50, height - 50)
+                   .lineWidth(12)
+                   .strokeColor('#d4af37')
+                   .stroke();
+            }
 
-            // 2. Draw watermark mandala centered
-            drawWatermarkMandala(doc, width / 2, height / 2);
-
-            // 3. Gold and Green double borders
-            // Outer green border
-            doc.rect(25, 25, width - 50, height - 50)
-               .lineWidth(5)
-               .strokeColor('#1b4d3e')
-               .stroke();
-
-            // Inner gold border
-            doc.rect(34, 34, width - 68, height - 68)
-               .lineWidth(1.5)
-               .strokeColor('#DAA520')
-               .stroke();
-
-            // Corner border accents (gold leaf curves)
-            const drawCornerAccent = (x, y, rotation) => {
-                doc.save();
-                doc.translate(x, y);
-                doc.rotate(rotation);
-                doc.lineWidth(1.5);
-                doc.strokeColor('#DAA520');
-                doc.moveTo(0, 0).quadraticCurveTo(20, 0, 20, 20).stroke();
-                doc.moveTo(0, 0).quadraticCurveTo(0, 20, 20, 20).stroke();
-                doc.restore();
-            };
-            drawCornerAccent(40, 40, 0);
-            drawCornerAccent(width - 40, 40, 90);
-            drawCornerAccent(width - 40, height - 40, 180);
-            drawCornerAccent(40, height - 40, 270);
-
-            // 4. Header: TAPOVANA LIFE SPACE (centered)
-            doc.font('Times-Bold')
-               .fontSize(16)
-               .fillColor('#1b4d3e')
-               .text('TAPOVANA LIFE SPACE', 0, 52, { width: width, align: 'center', characterSpacing: 2 });
-
-            // 5. Logo directly below the title
+            // 2. Render logo
             const logo = await getLogoBuffer();
-            const logoWidth = 60;
+            const logoWidth = 65;
             const logoX = (width - logoWidth) / 2;
-            const logoY = 78;
+            const logoY = 60;
             if (logo) {
                 try {
                     doc.image(logo, logoX, logoY, { width: logoWidth });
                 } catch (imgErr) {
-                    console.warn('Failed to draw logo, rendering backup text:', imgErr);
-                    renderTextLogo(doc, 0, logoY, width);
+                    console.warn('Failed to draw logo:', imgErr);
+                    renderTextLogo(doc, 0, logoY + 10, width);
                 }
             } else {
-                renderTextLogo(doc, 0, logoY, width);
+                renderTextLogo(doc, 0, logoY + 10, width);
             }
 
-            // 6. Title: CERTIFICATE OF COMPLETION
+            // 3. Render title: CERTIFICATE OF COMPLETION
             doc.font('Times-Bold')
                .fontSize(28)
-               .fillColor('#DAA520')
-               .text('CERTIFICATE OF COMPLETION', 0, 150, { width: width, align: 'center', characterSpacing: 1 });
+               .fillColor('#d4af37')
+               .text('CERTIFICATE OF COMPLETION', 0, 140, { width: width, align: 'center', characterSpacing: 1 });
 
-            // Thin gold line under title
-            doc.lineWidth(1)
-               .strokeColor('#DAA520')
-               .moveTo(width / 2 - 150, 188)
-               .lineTo(width / 2 + 150, 188)
-               .stroke();
-
-            // 7. Presentation text
+            // 4. Body presented text
             doc.font('Times-Italic')
                .fontSize(15)
                .fillColor('#555555')
-               .text('This is proudly presented to', 0, 208, { width: width, align: 'center' });
+               .text('This is proudly presented to', 0, 200, { width: width, align: 'center' });
 
-            // 8. Participant Name (gold/green accent)
-            doc.font('Times-BoldItalic')
+            // 5. Participant Name (large bold)
+            doc.font('Times-Bold')
                .fontSize(36)
-               .fillColor('#1b4d3e')
-               .text(participantName, 0, 238, { width: width, align: 'center' });
+               .fillColor('#000000')
+               .text(participantName, 0, 230, { width: width, align: 'center' });
 
-            // Completion description
+            // 6. Completion subtitle
             doc.font('Times-Italic')
                .fontSize(14)
                .fillColor('#555555')
-               .text('for successfully completing the workshop', 0, 292, { width: width, align: 'center' });
+               .text('for successfully completing the workshop', 0, 285, { width: width, align: 'center' });
 
-            // 9. Workshop Title (bold, gold)
+            // 7. Workshop Title
             doc.font('Times-Bold')
-               .fontSize(22)
-               .fillColor('#DAA520')
-               .text(workshopTitle, 0, 318, { width: width, align: 'center' });
+               .fontSize(24)
+               .fillColor('#d4af37')
+               .text(workshopTitle, 0, 312, { width: width, align: 'center' });
 
-            // 10. Date of completion
+            // 8. Footer Section (Left, Center, Right aligned)
+            const footerY = 415;
+
+            // Left: Completed Date
             doc.font('Times-Roman')
-               .fontSize(13)
-               .fillColor('#555555')
-               .text(`Completed on ${completionDate}`, 0, 356, { width: width, align: 'center' });
+               .fontSize(12)
+               .fillColor('#000000')
+               .text(`Completed on ${completionDate}`, 55, footerY + 45, { width: 240, align: 'left' });
 
-            // 11. Certificate ID (Optional, bottom right or bottom center)
+            // Center: Certificate ID
             if (certificateId) {
                 doc.font('Times-Roman')
-                   .fontSize(9)
-                   .fillColor('#888888')
-                   .text(`Certificate ID: ${certificateId}`, 0, 376, { width: width, align: 'center' });
+                   .fontSize(11)
+                   .fillColor('#000000')
+                   .text(`Certificate ID: ${certificateId}`, (width - 240) / 2, footerY + 45, { width: 240, align: 'center' });
             }
 
-            // 12. Instructor Signature Section (Centered at the bottom of the certificate)
-            const sigY = 412;
-            const sigLineY = 475;
-            const sigWidth = 180;
-            const sigX = (width - sigWidth) / 2;
+            // Right: Signature block
+            const rightColX = width - 295;
+            const sigWidth = 150;
+            const sigX = rightColX + (240 - sigWidth) / 2;
+            const sigY = footerY - 10;
 
-            // Draw signature image if provided
             let signatureDrawn = false;
+
+            // Check signature image
             if (signatureImage && typeof signatureImage === 'string') {
                 try {
-                    // signatureImage could be base64, file path, or URL.
-                    // If it is a base64 string
                     if (signatureImage.startsWith('data:image/')) {
                         const matches = signatureImage.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
                         if (matches && matches.length === 3) {
                             const buffer = Buffer.from(matches[2], 'base64');
-                            doc.image(buffer, sigX + 15, sigY, { width: sigWidth - 30, height: 50 });
+                            doc.image(buffer, sigX, sigY, { width: sigWidth, height: 45 });
                             signatureDrawn = true;
                         }
                     } else if (signatureImage.startsWith('/') || /^[a-zA-Z]:[\\/]/i.test(signatureImage)) {
-                        // Check if absolute or relative file path
                         const resolvedPath = path.isAbsolute(signatureImage) 
                             ? signatureImage 
                             : path.join(__dirname, '../../', signatureImage);
                         if (fs.existsSync(resolvedPath)) {
-                            doc.image(resolvedPath, sigX + 15, sigY, { width: sigWidth - 30, height: 50 });
+                            doc.image(resolvedPath, sigX, sigY, { width: sigWidth, height: 45 });
                             signatureDrawn = true;
                         }
-                    } else if (/^https?:\/\//i.test(signatureImage)) {
-                        // If it's a URL, we might need sync fetching, which is tricky in a sync loop.
-                        // We will fall back to cursive rendering but if the file exists locally, we render it.
                     }
                 } catch (sigErr) {
-                    console.warn('Failed to draw signature image, falling back to cursive:', sigErr);
+                    console.warn('Failed to draw signature image, falling back to cursive text:', sigErr);
                 }
             }
 
-            // Fallback: Display instructor name in cursive if signature image is not drawn
+            // Cursive name signature generator (styled like handwritten cursive in 3rd screenshot)
             if (!signatureDrawn) {
-                doc.font('Times-Italic')
-                   .fontSize(20)
-                   .fillColor('#1b4d3e')
-                   .text(conductorName || 'Tapovana Specialist', 0, sigY + 12, { width: width, align: 'center' });
+                const signatureText = conductorName || 'Prashmana Poojary';
+                if (signatureFontPath) {
+                    try {
+                        doc.font(signatureFontPath)
+                           .fontSize(28)
+                           .fillColor('#000000')
+                           .text(signatureText, rightColX, sigY + 5, { width: 240, align: 'center' });
+                        signatureDrawn = true;
+                    } catch (fontErr) {
+                        console.warn('Failed to render loaded cursive font:', fontErr);
+                    }
+                }
+                
+                // Absolute fallback to Times-Italic
+                if (!signatureDrawn) {
+                    doc.font('Times-Italic')
+                       .fontSize(22)
+                       .fillColor('#1b4d3e')
+                       .text(signatureText, rightColX, sigY + 10, { width: 240, align: 'center' });
+                }
             }
 
-            // Thin gold signature line
+            // Signature divider line
             doc.lineWidth(1)
-               .strokeColor('#DAA520')
-               .moveTo(sigX, sigLineY)
-               .lineTo(sigX + sigWidth, sigLineY)
+               .strokeColor('#d4af37')
+               .moveTo(rightColX + 30, footerY + 40)
+               .lineTo(rightColX + 210, footerY + 40)
                .stroke();
 
-            // Instructor details
-            doc.font('Times-Bold')
+            // Instructor details below line
+            const instructorPrintName = conductorName || 'Prashmana Poojary';
+            doc.font('Times-Roman')
                .fontSize(11)
-               .fillColor('#1a1a1a')
-               .text(conductorName || 'Tapovana Instructor', 0, sigLineY + 6, { width: width, align: 'center' });
+               .fillColor('#000000')
+               .text(instructorPrintName, rightColX, footerY + 46, { width: 240, align: 'center' });
 
             doc.font('Times-Roman')
                .fontSize(9)
                .fillColor('#777777')
-               .text('Workshop Instructor', 0, sigLineY + 20, { width: width, align: 'center' });
+               .text('Workshop Instructor', rightColX, footerY + 59, { width: 240, align: 'center' });
 
             doc.end();
         } catch (err) {

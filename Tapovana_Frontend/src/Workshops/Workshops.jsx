@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import "./Workshops.css";
+import "../Team/AddMemberDrawer.css";
+import DropdownIcon from "../assets/dropdownIcon.svg";
 import { apiFetch } from "../api/http";
 import { getImageUrl } from "../utils/image";
 import { useAllocations } from "../utils/AllocationContext";
@@ -268,6 +270,17 @@ export default function Workshops() {
   const [addForm, setAddForm] = useState(BLANK_FORM);
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState("");
+
+  useEffect(() => {
+    if (showAddModal) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showAddModal]);
 
   // Delete confirm
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -1552,129 +1565,133 @@ export default function Workshops() {
         </div>
       )}
 
-      {/* ── ADD MODAL ── */}
-      {showAddModal && (
-        <div className="ws-modal-overlay" onClick={handleCloseAddModal}>
-          <div className="ws-modal" style={{ width: 620 }} onClick={e => e.stopPropagation()}>
-            <div className="ws-modal-header" style={{ paddingBottom: 16, borderBottom: "1px solid #E8E2D9" }}>
-              <h2 className="ws-modal-title" style={{ margin: 0 }}>Create New Workshop</h2>
-              <button className="ws-modal-close" onClick={handleCloseAddModal}>X</button>
+      {/* ── ADD DRAWER ── */}
+      <div className={`drawer-overlay ${showAddModal ? "open" : ""}`} onClick={handleCloseAddModal} style={{ zIndex: 1000 }} />
+      <div className={`drawer-panel ${showAddModal ? "open" : ""}`} style={{ zIndex: 1001, width: "420px", right: showAddModal ? 0 : "-460px" }}>
+        <div className="drawer-header">
+          <div className="drawer-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 8, color: "#CDA751" }}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            Create New Workshop
+          </div>
+          <button className="drawer-close-btn" onClick={handleCloseAddModal}>✕</button>
+        </div>
+        <div className="drawer-body">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label className="input-label">Program Title</label>
+              <input value={addForm.title} onChange={e => handleAddFormChange("title", e.target.value)} className="drawer-input" placeholder="e.g. Sunset Yoga Flow" />
             </div>
-            <div className="ws-modal-body" style={{ maxHeight: "60vh", overflowY: "auto" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Program Title</label>
-                  <input value={addForm.title} onChange={e => handleAddFormChange("title", e.target.value)} className="ws-modal-input" placeholder="e.g. Sunset Yoga Flow" />
-                </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Category</label>
-                    <select value={addForm.category} onChange={e => handleAddFormChange("category", e.target.value)} className="ws-modal-input">
-                      {Object.keys(CATEGORY_COLORS).map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Instructor</label>
-                    <select value={addForm.instructor_id} onChange={e => handleInstructorChange("add", e)} className="ws-modal-input">
-                      <option value="">Select Instructor</option>
-                      {instructors.map(i => (
-                        <option key={i.user_id || i.id} value={i.user_id || i.id}>
-                          {i.first_name} {i.last_name} ({String(i.role || "").toUpperCase() === 'DOCTOR' ? 'Dr.' : 'Therapist'})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Date</label>
-                    <input type="date" value={addForm.date} onChange={e => handleAddFormChange("date", e.target.value)} className="ws-modal-input" min={new Date().toISOString().split("T")[0]} />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Start Time</label>
-                    <input type="time" value={addForm.time} onChange={e => handleAddFormChange("time", e.target.value)} className="ws-modal-input" />
-                  </div>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Duration (mins)</label>
-                    <input type="number" value={addForm.duration} onChange={e => handleAddFormChange("duration", e.target.value)} className="ws-modal-input" min={15} step={15} />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Price (Rs)</label>
-                    <input type="number" value={addForm.price} onChange={e => handleAddFormChange("price", e.target.value)} className="ws-modal-input" placeholder="1500" min={0} />
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Workshop Image</label>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: "none" }}
-                      onChange={e => { if (e.target.files[0]) handleImageFile("add", e.target.files[0]); e.target.value = ''; }} id="addImageInput" />
-                    <button type="button" className="ws-modal-btn-secondary" style={{ padding: "6px 14px", fontSize: 12 }}
-                      onClick={() => document.getElementById("addImageInput")?.click()}>
-                      Browse Image
-                    </button>
-                    <button type="button" className="ws-modal-btn-secondary" style={{ padding: "6px 14px", fontSize: 12, borderColor: '#CDA751', color: '#CDA751' }}
-                      onClick={() => { setMediaTarget('add_image'); setMediaPickerType('image'); setMediaModalOpen(true); }}>
-                      Stock Image
-                    </button>
-                    <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
-                    <input value={addForm.image_url} onChange={e => handleAddFormChange("image_url", e.target.value)}
-                      className="ws-modal-input" style={{ flex: 1 }} placeholder="https://..." />
-                  </div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    {(addForm.image_base64 || addForm.image_url) && (
-                      <div style={{ position: "relative", width: 100, height: 70, borderRadius: 6, overflow: "hidden" }}>
-                        <img src={getImageUrl(addForm.image_base64 || addForm.image_url)} alt="preview"
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          onError={(e) => { e.target.style.display = "none"; }} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Workshop Video (Optional)</label>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <input type="file" accept="video/*" style={{ display: "none" }}
-                      onChange={e => { if (e.target.files[0]) handleVideoFile("add", e.target.files[0]); e.target.value = ''; }} id="addVideoInput" />
-                    <button type="button" className="ws-modal-btn-secondary" style={{ padding: "6px 14px", fontSize: 12 }}
-                      onClick={() => document.getElementById("addVideoInput")?.click()}>
-                      Browse Video
-                    </button>
-                    <button type="button" className="ws-modal-btn-secondary" style={{ padding: "6px 14px", fontSize: 12, borderColor: '#CDA751', color: '#CDA751' }}
-                      onClick={() => { setMediaTarget('add_video'); setMediaPickerType('video'); setMediaModalOpen(true); }}>
-                      Stock Video
-                    </button>
-                    <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
-                    <input value={addForm.video_url} onChange={e => handleAddFormChange("video_url", e.target.value)} className="ws-modal-input" placeholder="https://youtube.com/..." style={{ flex: 1 }} />
-                  </div>
-                  {addForm.video_url && <span style={{ fontSize: 11, color: "#4a5568", marginTop: 4 }}>Video attached</span>}
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#404854" }}>Description</label>
-                  <textarea value={addForm.description} onChange={e => handleAddFormChange("description", e.target.value)}
-                    rows={3} className="ws-modal-input" style={{ resize: "vertical" }} placeholder="Brief description..." />
-                </div>
-
-                {addError && <div style={{ color: "#e74c3c", fontSize: 13, fontWeight: 600 }}>{addError}</div>}
-
-                <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
-                  <button className="ws-modal-btn-secondary" style={{ flex: 1 }} onClick={handleCloseAddModal}>Cancel</button>
-                  <button className="ws-modal-btn-primary" style={{ flex: 2 }} onClick={handleCreateWorkshop} disabled={addSaving}>
-                    {addSaving ? (videoProgress !== null ? `Uploading Video ${videoProgress}%` : "Creating...") : "Create Workshop"}
-                  </button>
-                </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label className="input-label">Category</label>
+              <div className="select-wrapper">
+                <select value={addForm.category} onChange={e => handleAddFormChange("category", e.target.value)} className="drawer-select">
+                  {Object.keys(CATEGORY_COLORS).map(c => <option key={c}>{c}</option>)}
+                </select>
+                <img src={DropdownIcon} alt="dropdown" className="select-icon" />
               </div>
             </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label className="input-label">Instructor</label>
+              <div className="select-wrapper">
+                <select value={addForm.instructor_id} onChange={e => handleInstructorChange("add", e)} className="drawer-select">
+                  <option value="">Select Instructor</option>
+                  {instructors.map(i => (
+                    <option key={i.user_id || i.id} value={i.user_id || i.id}>
+                      {i.first_name} {i.last_name} ({String(i.role || "").toUpperCase() === 'DOCTOR' ? 'Dr.' : 'Therapist'})
+                    </option>
+                  ))}
+                </select>
+                <img src={DropdownIcon} alt="dropdown" className="select-icon" />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label className="input-label">Date</label>
+                <input type="date" value={addForm.date} onChange={e => handleAddFormChange("date", e.target.value)} className="drawer-input" min={new Date().toISOString().split("T")[0]} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label className="input-label">Start Time</label>
+                <input type="time" value={addForm.time} onChange={e => handleAddFormChange("time", e.target.value)} className="drawer-input" />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label className="input-label">Duration (mins)</label>
+                <input type="number" value={addForm.duration} onChange={e => handleAddFormChange("duration", e.target.value)} className="drawer-input" min={15} step={15} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label className="input-label">Price (Rs)</label>
+                <input type="number" value={addForm.price} onChange={e => handleAddFormChange("price", e.target.value)} className="drawer-input" placeholder="1500" min={0} />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label className="input-label">Workshop Image</label>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: "none" }}
+                  onChange={e => { if (e.target.files[0]) handleImageFile("add", e.target.files[0]); e.target.value = ''; }} id="addImageInput" />
+                <button type="button" className="ws-modal-btn-secondary" style={{ padding: "6px 14px", fontSize: 12 }}
+                  onClick={() => document.getElementById("addImageInput")?.click()}>
+                  Browse Image
+                </button>
+                <button type="button" className="ws-modal-btn-secondary" style={{ padding: "6px 14px", fontSize: 12, borderColor: '#CDA751', color: '#CDA751' }}
+                  onClick={() => { setMediaTarget('add_image'); setMediaPickerType('image'); setMediaModalOpen(true); }}>
+                  Stock Image
+                </button>
+                <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
+                <input value={addForm.image_url} onChange={e => handleAddFormChange("image_url", e.target.value)}
+                  className="drawer-input" style={{ flex: 1 }} placeholder="https://..." />
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                {(addForm.image_base64 || addForm.image_url) && (
+                  <div style={{ position: "relative", width: 100, height: 70, borderRadius: 6, overflow: "hidden" }}>
+                    <img src={getImageUrl(addForm.image_base64 || addForm.image_url)} alt="preview"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={(e) => { e.target.style.display = "none"; }} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label className="input-label">Workshop Video (Optional)</label>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <input type="file" accept="video/*" style={{ display: "none" }}
+                  onChange={e => { if (e.target.files[0]) handleVideoFile("add", e.target.files[0]); e.target.value = ''; }} id="addVideoInput" />
+                <button type="button" className="ws-modal-btn-secondary" style={{ padding: "6px 14px", fontSize: 12 }}
+                  onClick={() => document.getElementById("addVideoInput")?.click()}>
+                  Browse Video
+                </button>
+                <button type="button" className="ws-modal-btn-secondary" style={{ padding: "6px 14px", fontSize: 12, borderColor: '#CDA751', color: '#CDA751' }}
+                  onClick={() => { setMediaTarget('add_video'); setMediaPickerType('video'); setMediaModalOpen(true); }}>
+                  Stock Video
+                </button>
+                <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
+                <input value={addForm.video_url} onChange={e => handleAddFormChange("video_url", e.target.value)} className="drawer-input" placeholder="https://youtube.com/..." style={{ flex: 1 }} />
+              </div>
+              {addForm.video_url && <span style={{ fontSize: 11, color: "#4a5568", marginTop: 4 }}>Video attached</span>}
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label className="input-label">Description</label>
+              <textarea value={addForm.description} onChange={e => handleAddFormChange("description", e.target.value)}
+                rows={3} className="drawer-input" style={{ resize: "vertical" }} placeholder="Brief description..." />
+            </div>
+
+            {addError && <div style={{ color: "#e74c3c", fontSize: 13, fontWeight: 600 }}>{addError}</div>}
           </div>
         </div>
-      )}
+        <div className="drawer-footer">
+          <button className="btn-cancel" onClick={handleCloseAddModal}>Cancel</button>
+          <button className="btn-save" onClick={handleCreateWorkshop} disabled={addSaving} style={{ opacity: addSaving ? 0.6 : 1 }}>
+            {addSaving ? (videoProgress !== null ? `Uploading Video ${videoProgress}%` : "Creating...") : "Create Workshop"}
+          </button>
+        </div>
+      </div>
 
       <MediaPickerModal 
         isOpen={mediaModalOpen}

@@ -881,8 +881,15 @@ const sendBlogRejectedEmail = async ({ to, authorName, blogTitle, reason }) => {
   });
 };
 
-const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, workshopTitle, completionDate, downloadUrl, certId }) => {
-  const linkUrl = certId ? `https://tapovana.onrender.com/api/certificates/download/${certId}` : downloadUrl;
+const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, workshopTitle, completionDate, downloadUrl, certId, participantId }) => {
+  const port = process.env.PORT || 5000;
+  const defaultUrl = process.env.NODE_ENV === "production" ? "https://tapovana.onrender.com" : `http://localhost:${port}`;
+  const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
+  
+  const linkUrl = participantId 
+    ? `${backendUrl}/download/certificate/${participantId}`
+    : (certId ? `${backendUrl}/api/certificates/download/${certId}` : downloadUrl);
+
   const html = emailWrapper(`
     <h1 style="color:#cda751;text-align:center;">Workshop Completed</h1>
     <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 20px 0 10px;">
@@ -893,11 +900,14 @@ const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, wor
     </p>
   `);
 
+  const textFallback = `Congratulations ${participantName || "Participant"} on completing the workshop "${workshopTitle}"!\n\nYou can download your certificate of completion directly from the following link:\n${linkUrl}\n\nBest regards,\nTapovana Team`;
+
   return transporter.sendMail({
     from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
     to,
     subject: `Your Tapovana Workshop Certificate – ${workshopTitle}`,
     html,
+    text: textFallback,
   });
 };
 

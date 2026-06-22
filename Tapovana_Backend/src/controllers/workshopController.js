@@ -1473,7 +1473,8 @@ const autoUpdateWorkshopStatuses = async () => {
                                     workshopTitle: w.title,
                                     completionDate: completionDateStr,
                                     downloadUrl: certUrl,
-                                    certId: certId
+                                    certId: certId,
+                                    participantId: att.id
                                 });
                                 await query(
                                     `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)
