@@ -257,10 +257,11 @@ const getCertificateDetails = async (req, res) => {
 
 // 5. DOWNLOAD CERTIFICATE PDF DIRECTLY (GET /api/certificates/download/:certificateId)
 const downloadCertificatePdf = async (req, res) => {
-    const { certificateId } = req.params;
+    const { certificateId, id } = req.params;
+    const certParam = certificateId || id;
     
     // Clean up filename suffix if request contains .pdf
-    let cleanId = certificateId;
+    let cleanId = certParam;
     if (cleanId && cleanId.endsWith('.pdf')) {
         cleanId = cleanId.slice(0, -4);
     }
