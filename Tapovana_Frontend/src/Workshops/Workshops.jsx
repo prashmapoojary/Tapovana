@@ -1266,14 +1266,16 @@ export default function Workshops() {
             </div>
 
             {/* Actions */}
-            <div style={{ display: "flex", gap: 12 }}>
-              <button className="ws-modal-btn-primary" style={{ flex: 1 }} onClick={handleStartEdit}>
-                Edit Workshop
-              </button>
-              <button className="ws-modal-btn-secondary" style={{ flex: 1, color: "#e74c3c", borderColor: "rgba(231,76,60,0.3)", background: "transparent" }} onClick={handleDeleteWorkshop}>
-                Delete Workshop
-              </button>
-            </div>
+            {liveStatus !== "completed" && (
+              <div style={{ display: "flex", gap: 12 }}>
+                <button className="ws-modal-btn-primary" style={{ flex: 1 }} onClick={handleStartEdit}>
+                  Edit Workshop
+                </button>
+                <button className="ws-modal-btn-secondary" style={{ flex: 1, color: "#e74c3c", borderColor: "rgba(231,76,60,0.3)", background: "transparent" }} onClick={handleDeleteWorkshop}>
+                  Delete Workshop
+                </button>
+              </div>
+            )}
           </>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -1296,17 +1298,19 @@ export default function Workshops() {
               </div>
               
               <div style={{ display: "flex", gap: "8px" }}>
-                <button 
-                  onClick={() => {
-                    setShowManualEnroll(!showManualEnroll);
-                    setPhoneError("");
-                    setManualEnrollForm({ name: "", email: "", phone: "" });
-                  }}
-                  className="ws-modal-btn-secondary"
-                  style={{ padding: "8px 16px", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}
-                >
-                  {showManualEnroll ? "Close Form" : "+ Enroll User"}
-                </button>
+                {liveStatus !== "completed" && (
+                  <button 
+                    onClick={() => {
+                      setShowManualEnroll(!showManualEnroll);
+                      setPhoneError("");
+                      setManualEnrollForm({ name: "", email: "", phone: "" });
+                    }}
+                    className="ws-modal-btn-secondary"
+                    style={{ padding: "8px 16px", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}
+                  >
+                    {showManualEnroll ? "Close Form" : "+ Enroll User"}
+                  </button>
+                )}
                 <button 
                   onClick={handleExportCSV}
                   className="ws-modal-btn-primary"
@@ -1423,9 +1427,9 @@ export default function Workshops() {
                             value={a.status} 
                             onChange={e => {
                               if (e.target.value === "delete") {
-                                handleDeleteAttendee(a.id);
+                                  handleDeleteAttendee(a.id);
                               } else {
-                                handleMarkAttendance(a.id, e.target.value);
+                                  handleMarkAttendance(a.id, e.target.value);
                               }
                             }}
                             style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "12px", outline: "none", cursor: "pointer", background: "white" }}
@@ -1433,7 +1437,7 @@ export default function Workshops() {
                             <option value="enrolled">Enrolled</option>
                             <option value="attended">Attended</option>
                             <option value="absent">Absent</option>
-                            <option value="delete">Delete Attendee</option>
+                            {liveStatus !== "completed" && <option value="delete">Delete Attendee</option>}
                           </select>
                         </td>
                       </tr>

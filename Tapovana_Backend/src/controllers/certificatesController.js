@@ -124,10 +124,10 @@ const generateCertificatesForWorkshop = async (req, res) => {
             }
         }
 
-        // Fetch attendees not absent
-        const attendeesRes = await query("SELECT id, name, email FROM attendees WHERE workshop_id = $1 AND status != 'absent'", [workshopId]);
+        // Fetch attendees marked as attended
+        const attendeesRes = await query("SELECT id, name, email FROM attendees WHERE workshop_id = $1 AND status = 'attended'", [workshopId]);
         if (!attendeesRes.rows.length) {
-            return res.status(400).json({ success: false, message: 'No participants available for certificate generation.' });
+            return res.status(400).json({ success: false, message: 'No attended participants available for certificate generation.' });
         }
 
         const port = process.env.PORT || 5000;
@@ -279,6 +279,14 @@ const downloadCertificatePdf = async (req, res) => {
         }
 
         const cert = certRes.rows[0];
+        
+        // Mark downloaded status to true
+        try {
+            await query('UPDATE certificates SET downloaded = TRUE WHERE id = $1', [cert.id]);
+        } catch (dbErr) {
+            console.error('Failed to update downloaded status for certificate:', dbErr.message);
+        }
+
         const certsDir = path.join(process.cwd(), 'certificates');
         let filePath = path.join(certsDir, `${cert.certificate_id}.pdf`);
 

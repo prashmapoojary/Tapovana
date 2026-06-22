@@ -1161,6 +1161,129 @@ const getWorkshopAttendees = async (req, res) => {
     }
 };
 
+// Helper: Generate and send certificate for a single attendee when marked attended
+const generateSingleAttendeeCertificate = async (attendeeId, workshopId) => {
+    try {
+        // Fetch attendee details
+        const attRes = await query('SELECT id, name, email, status FROM attendees WHERE id = $1', [attendeeId]);
+        if (!attRes.rows.length) return;
+        const att = attRes.rows[0];
+
+        // Fetch workshop details
+        const wsRes = await query('SELECT id, title, date, time, instructor_id, instructor FROM workshops WHERE id = $1', [workshopId]);
+        if (!wsRes.rows.length) return;
+        const workshop = wsRes.rows[0];
+
+        // Fetch instructor signature image
+        let signatureImage = null;
+        let instructorName = workshop.instructor || 'Workshop Instructor';
+        if (workshop.instructor_id && isValidUUID(workshop.instructor_id)) {
+            const instRes = await query('SELECT first_name, last_name, signature_image FROM team_members WHERE id = $1', [workshop.instructor_id]);
+            if (instRes.rows.length) {
+                const inst = instRes.rows[0];
+                instructorName = `${inst.first_name} ${inst.last_name}`.trim();
+                signatureImage = inst.signature_image;
+            }
+        }
+
+        // Check if certificate already exists
+        const certCheck = await query('SELECT id FROM certificates WHERE participant_id = $1 AND workshop_id = $2', [att.id, workshop.id]);
+        if (certCheck.rows.length > 0) {
+            console.log(`Certificate already exists for attendee ${att.id} in workshop ${workshop.id}`);
+            return;
+        }
+
+        const port = process.env.PORT || 5000;
+        const defaultUrl = process.env.NODE_ENV === 'production' ? 'https://tapovana.onrender.com' : `http://localhost:${port}`;
+        const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
+
+        // Generate unique certificate ID
+        const year = new Date().getFullYear();
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let rand = '';
+        for (let i = 0; i < 6; i++) {
+            rand += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        const certId = `CERT-${year}-${rand}`;
+        const certUrl = `${backendUrl}/download/certificate/${att.id}`;
+
+        let dateStr = workshop.date;
+        if (workshop.date instanceof Date) {
+            const y = workshop.date.getFullYear();
+            const m = String(workshop.date.getMonth() + 1).padStart(2, '0');
+            const d = String(workshop.date.getDate()).padStart(2, '0');
+            dateStr = `${y}-${m}-${d}`;
+        }
+        const compDateObj = new Date(dateStr);
+        const completionDateStr = compDateObj.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        // Generate PDF Buffer
+        const pdfBuffer = await generateCertificatePDF(
+            att.name,
+            workshop.title,
+            completionDateStr,
+            instructorName,
+            signatureImage,
+            certId
+        );
+
+        // Save file persistently to disk
+        const certsDir = path.join(process.cwd(), 'certificates');
+        if (!fs.existsSync(certsDir)) {
+            fs.mkdirSync(certsDir, { recursive: true });
+        }
+        const filePath = path.join(certsDir, `${certId}.pdf`);
+        fs.writeFileSync(filePath, pdfBuffer);
+
+        // Insert into database
+        await query(`
+            INSERT INTO certificates (certificate_id, participant_id, participant_name, workshop_id, workshop_name, instructor_id, pdf_url, completion_date)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `, [
+            certId,
+            att.id,
+            att.name,
+            workshop.id,
+            workshop.title,
+            workshop.instructor_id,
+            certUrl,
+            dateStr
+        ]);
+
+        // Send email notification
+        try {
+            await sendWorkshopCompletionCertificateEmail({
+                to: att.email,
+                participantName: att.name,
+                workshopTitle: workshop.title,
+                completionDate: completionDateStr,
+                downloadUrl: certUrl,
+                certId: certId,
+                participantId: att.id
+            });
+            await query(
+                `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)
+                 VALUES ($1, $2, 'sent', NOW())`,
+                [att.id, workshop.id]
+            );
+            console.log(`Certificate generated and emailed to attendee ${att.email} for workshop ${workshop.title}`);
+        } catch (emailErr) {
+            console.error(`Failed to send certificate email to ${att.email}:`, emailErr.message);
+            await query(
+                `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)
+                 VALUES ($1, $2, 'failed', NOW())`,
+                [att.id, workshop.id]
+            );
+        }
+    } catch (err) {
+        console.error('generateSingleAttendeeCertificate error:', err);
+    }
+};
+
 // UPDATE ATTENDEE ATTENDANCE STATUS (Admin Endpoint)
 const updateAttendeeAttendance = async (req, res) => {
     const { id, attendeeId } = req.params;
@@ -1180,8 +1303,12 @@ const updateAttendeeAttendance = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Attendee record not found.' });
         }
 
-        // If attendance status changes to 'attended' and the workshop is already Completed, reset completed_notified to false so they get their certificate
+        // If attendance status changes to 'attended', generate certificate and reset completed_notified if workshop is Completed
         if (status === 'attended') {
+            generateSingleAttendeeCertificate(attendeeId, id).catch(err => 
+                console.error("Error generating certificate on attendee status change:", err)
+            );
+
             const wsRes = await query('SELECT status FROM workshops WHERE id = $1', [id]);
             if (wsRes.rows.length && (wsRes.rows[0].status === 'Completed' || wsRes.rows[0].status === 'completed')) {
                 await query('UPDATE workshops SET completed_notified = FALSE WHERE id = $1', [id]);
@@ -1371,7 +1498,7 @@ const autoUpdateWorkshopStatuses = async () => {
 
             // 3. Send completed notifications if Newly/Already Completed
             if (newStatus === 'Completed') {
-                const attendeesRes = await query("SELECT id, email, name FROM attendees WHERE workshop_id = $1 AND status != 'absent'", [w.id]);
+                const attendeesRes = await query("SELECT id, email, name FROM attendees WHERE workshop_id = $1 AND status = 'attended'", [w.id]);
                 
                 // Determine if this is the initial transition to Completed status
                 const isInitialCompletion = (w.status !== 'Completed' && w.status !== 'completed');
