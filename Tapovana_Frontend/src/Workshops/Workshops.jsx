@@ -1437,7 +1437,7 @@ export default function Workshops() {
                             <option value="enrolled">Enrolled</option>
                             <option value="attended">Attended</option>
                             <option value="absent">Absent</option>
-                            {liveStatus !== "completed" && <option value="delete">Delete Attendee</option>}
+                            <option value="delete">Delete Attendee</option>
                           </select>
                         </td>
                       </tr>
