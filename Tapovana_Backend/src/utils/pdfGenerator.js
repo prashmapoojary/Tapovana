@@ -110,48 +110,42 @@ function drawLotusPattern(doc, x, y, scale) {
     doc.strokeColor('#d4af37');
     
     // Center petal
-    doc.beginPath()
-       .moveTo(0, -18)
+    doc.moveTo(0, -18)
        .bezierCurveTo(-5, -5, -5, 10, 0, 15)
        .bezierCurveTo(5, 10, 5, -5, 0, -18)
        .closePath()
        .fillAndStroke('#fff9e6', '#d4af37');
     
     // Outer left petal
-    doc.beginPath()
-       .moveTo(0, 15)
+    doc.moveTo(0, 15)
        .bezierCurveTo(-15, 5, -18, -8, -18, -8)
        .bezierCurveTo(-10, -3, -5, 5, 0, 15)
        .closePath()
        .fillAndStroke('#fff9e6', '#d4af37');
        
     // Outer right petal
-    doc.beginPath()
-       .moveTo(0, 15)
+    doc.moveTo(0, 15)
        .bezierCurveTo(15, 5, 18, -8, 18, -8)
        .bezierCurveTo(10, -3, 5, 5, 0, 15)
        .closePath()
        .fillAndStroke('#fff9e6', '#d4af37');
        
     // Far left petal
-    doc.beginPath()
-       .moveTo(0, 15)
+    doc.moveTo(0, 15)
        .bezierCurveTo(-22, 10, -26, 0, -26, 0)
        .bezierCurveTo(-14, 3, -5, 8, 0, 15)
        .closePath()
        .fillAndStroke('#fff9e6', '#d4af37');
        
     // Far right petal
-    doc.beginPath()
-       .moveTo(0, 15)
+    doc.moveTo(0, 15)
        .bezierCurveTo(22, 10, 26, 0, 26, 0)
        .bezierCurveTo(14, 3, 5, 8, 0, 15)
        .closePath()
        .fillAndStroke('#fff9e6', '#d4af37');
 
     // Draw small base circle
-    doc.beginPath()
-       .circle(0, 15, 2.5)
+    doc.circle(0, 15, 2.5)
        .fill('#d4af37');
 
     doc.restore();
@@ -164,8 +158,7 @@ function drawGoldSeal(doc, x, y) {
     doc.lineWidth(1);
     
     // Left ribbon
-    doc.beginPath()
-       .moveTo(x + 20, y + 25)
+    doc.moveTo(x + 20, y + 25)
        .lineTo(x + 10, y + 55)
        .lineTo(x + 20, y + 50)
        .lineTo(x + 30, y + 25)
@@ -173,8 +166,7 @@ function drawGoldSeal(doc, x, y) {
        .fillAndStroke('#d4af37', '#b8860b');
        
     // Right ribbon
-    doc.beginPath()
-       .moveTo(x + 30, y + 25)
+    doc.moveTo(x + 30, y + 25)
        .lineTo(x + 40, y + 50)
        .lineTo(x + 50, y + 55)
        .lineTo(x + 40, y + 25)
@@ -185,28 +177,27 @@ function drawGoldSeal(doc, x, y) {
     doc.translate(x + 30, y + 25);
     
     // Spiked outer wax seal circle (24 points)
-    doc.beginPath();
     const numPoints = 24;
     const outerRadius = 26;
     const innerRadius = 22;
-    for (let i = 0; i < numPoints * 2; i++) {
+    const firstAngle = 0;
+    const firstRadius = outerRadius;
+    doc.moveTo(Math.cos(firstAngle) * firstRadius, Math.sin(firstAngle) * firstRadius);
+    for (let i = 1; i < numPoints * 2; i++) {
         const angle = (i * Math.PI) / numPoints;
         const radius = (i % 2 === 0) ? outerRadius : innerRadius;
         const px = Math.cos(angle) * radius;
         const py = Math.sin(angle) * radius;
-        if (i === 0) doc.moveTo(px, py);
-        else doc.lineTo(px, py);
+        doc.lineTo(px, py);
     }
     doc.closePath().fillAndStroke('#d4af37', '#b8860b');
     
     // Inner round gold circle
-    doc.beginPath()
-       .circle(0, 0, 18)
+    doc.circle(0, 0, 18)
        .fillAndStroke('#d4af37', '#b8860b');
        
     // Inner dotted circle
-    doc.beginPath()
-       .circle(0, 0, 15)
+    doc.circle(0, 0, 15)
        .lineWidth(0.5)
        .dash(2, { space: 2 })
        .stroke();
