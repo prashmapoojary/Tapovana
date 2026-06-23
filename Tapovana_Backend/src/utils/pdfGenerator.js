@@ -151,70 +151,75 @@ function drawLotusPattern(doc, x, y, scale) {
     doc.restore();
 }
 
-function drawGoldSeal(doc, x, y) {
+function drawHalfMandala(doc, cx, cy) {
     doc.save();
-    
-    // Draw ribbons draping from bottom of the seal
     doc.lineWidth(1);
+    doc.strokeColor('#d4af37');
+
+    // Draw concentric half-circles facing left
+    const radii = [30, 60, 90, 120, 150, 180];
     
-    // Left ribbon
-    doc.moveTo(x + 20, y + 25)
-       .lineTo(x + 10, y + 55)
-       .lineTo(x + 20, y + 50)
-       .lineTo(x + 30, y + 25)
+    // Fill inner core
+    doc.arc(cx, cy, 30, Math.PI / 2, (3 * Math.PI) / 2)
        .closePath()
-       .fillAndStroke('#d4af37', '#b8860b');
-       
-    // Right ribbon
-    doc.moveTo(x + 30, y + 25)
-       .lineTo(x + 40, y + 50)
-       .lineTo(x + 50, y + 55)
-       .lineTo(x + 40, y + 25)
-       .closePath()
-       .fillAndStroke('#d4af37', '#b8860b');
-    
-    // Translate to center of seal
-    doc.translate(x + 30, y + 25);
-    
-    // Spiked outer wax seal circle (24 points)
-    const numPoints = 24;
-    const outerRadius = 26;
-    const innerRadius = 22;
-    const firstAngle = 0;
-    const firstRadius = outerRadius;
-    doc.moveTo(Math.cos(firstAngle) * firstRadius, Math.sin(firstAngle) * firstRadius);
-    for (let i = 1; i < numPoints * 2; i++) {
-        const angle = (i * Math.PI) / numPoints;
-        const radius = (i % 2 === 0) ? outerRadius : innerRadius;
-        const px = Math.cos(angle) * radius;
-        const py = Math.sin(angle) * radius;
-        doc.lineTo(px, py);
+       .fillAndStroke('#fff9e6', '#d4af37');
+
+    radii.forEach((r, idx) => {
+        doc.arc(cx, cy, r, Math.PI / 2, (3 * Math.PI) / 2)
+           .stroke();
+           
+        if (idx === 1) {
+            // Dotted intermediate arc
+            doc.save()
+               .arc(cx, cy, r + 5, Math.PI / 2, (3 * Math.PI) / 2)
+               .dash(2, { space: 3 })
+               .stroke()
+               .restore();
+        }
+    });
+
+    // Draw radiating spokes
+    const spokes = 18;
+    for (let i = 0; i <= spokes; i++) {
+        const angle = Math.PI / 2 + (i * Math.PI) / spokes;
+        const x1 = cx + Math.cos(angle) * 30;
+        const y1 = cy + Math.sin(angle) * 30;
+        const x2 = cx + Math.cos(angle) * 180;
+        const y2 = cy + Math.sin(angle) * 180;
+        
+        doc.moveTo(x1, y1)
+           .lineTo(x2, y2)
+           .stroke();
+           
+        // Spoke tip dots
+        doc.circle(x2 + Math.cos(angle) * 5, y2 + Math.sin(angle) * 5, 2)
+           .fill('#d4af37');
     }
-    doc.closePath().fillAndStroke('#d4af37', '#b8860b');
-    
-    // Inner round gold circle
-    doc.circle(0, 0, 18)
-       .fillAndStroke('#d4af37', '#b8860b');
-       
-    // Inner dotted circle
-    doc.circle(0, 0, 15)
-       .lineWidth(0.5)
-       .dash(2, { space: 2 })
-       .stroke();
-       
-    // Text inside seal
-    doc.font('Times-Bold')
-       .fontSize(5)
-       .fillColor('#000000')
-       .text('TAPOVANA', -15, -6, { width: 30, align: 'center' })
-       .fontSize(4)
-       .text('SEAL', -15, 1, { width: 30, align: 'center' });
-       
-    // Star emblem
-    doc.font('Times-Roman')
-       .fontSize(6)
-       .text('★', -15, 6, { width: 30, align: 'center' });
-       
+
+    // Outer decorative leaf petals
+    const leaves = 12;
+    for (let i = 0; i < leaves; i++) {
+        const startAngle = Math.PI / 2 + (i * Math.PI) / leaves;
+        const endAngle = Math.PI / 2 + ((i + 1) * Math.PI) / leaves;
+        const midAngle = (startAngle + endAngle) / 2;
+        
+        const sx = cx + Math.cos(startAngle) * 180;
+        const sy = cy + Math.sin(startAngle) * 180;
+        const ex = cx + Math.cos(endAngle) * 180;
+        const ey = cy + Math.sin(endAngle) * 180;
+        
+        const ctrlRadius = 210;
+        const ctrlX = cx + Math.cos(midAngle) * ctrlRadius;
+        const ctrlY = cy + Math.sin(midAngle) * ctrlRadius;
+        
+        doc.moveTo(sx, sy)
+           .quadraticCurveTo(ctrlX, ctrlY, ex, ey)
+           .stroke();
+           
+        doc.circle(ctrlX, ctrlY, 3)
+           .fill('#d4af37');
+    }
+
     doc.restore();
 }
 
@@ -254,117 +259,94 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                 console.warn('Failed to check or download cursive font:', err);
             }
 
-            // 1. Load background image (certificate_template.png) if it exists
-            const templatePath = path.join(__dirname, '../assets/certificate_template.png');
-            if (fs.existsSync(templatePath)) {
-                doc.image(templatePath, 0, 0, { width: width, height: height });
-            } else {
-                // Safe vector fallback if background image is missing (warm ivory/off-white background)
-                doc.rect(0, 0, width, height).fill('#FAF9F6');
-            }
+            // 1. Warm ivory background (FCFBF9) for a premium clean paper feel
+            doc.rect(0, 0, width, height).fill('#FCFBF9');
 
-            // 2. Draw thinner, elegant gold borders
+            // 2. Draw thin, elegant gold border around the certificate
             doc.save();
-            doc.rect(15, 15, width - 30, height - 30)
-               .lineWidth(1.5)
-               .strokeColor('#d4af37')
-               .stroke();
             doc.rect(20, 20, width - 40, height - 40)
-               .lineWidth(3.5)
+               .lineWidth(1.5)
                .strokeColor('#d4af37')
                .stroke();
             doc.restore();
 
-            // 3. Align decorative lotus patterns symmetrically on left and right sides
-            drawLotusPattern(doc, 42, height / 2, 0.9);
-            drawLotusPattern(doc, width - 42, height / 2, 0.9);
-            
-            // Draw lotuses in the corners as well for a premium feel
-            drawLotusPattern(doc, 42, 42, 0.6);
-            drawLotusPattern(doc, width - 42, 42, 0.6);
-            drawLotusPattern(doc, 42, height - 42, 0.6);
-            drawLotusPattern(doc, width - 42, height - 42, 0.6);
-
-            // 4. Render logo centered at the top
-            const logo = await getLogoBuffer();
-            const logoWidth = 65;
-            const logoX = (width - logoWidth) / 2;
-            const logoY = 55;
-            if (logo) {
-                try {
-                    doc.image(logo, logoX, logoY, { width: logoWidth });
-                } catch (imgErr) {
-                    console.warn('Failed to draw logo:', imgErr);
-                    renderTextLogo(doc, 0, logoY + 10, width);
-                }
-            } else {
-                renderTextLogo(doc, 0, logoY + 10, width);
+            // 3. Align decorative lotus patterns symmetrically repeating on the left edge
+            for (let yPos = 60; yPos <= 540; yPos += 96) {
+                drawLotusPattern(doc, 45, yPos, 0.7);
             }
 
-            // 5. Render title: "Certificate of Completion" centered at the top
+            // 4. Draw giant gold mandala centered on the right edge
+            drawHalfMandala(doc, width, height / 2);
+
+            // 5. Render title: "Certificate of Completion" centered at the top in black cursive
             const titleFont = signatureFontPath || 'Times-BoldItalic';
             doc.font(titleFont)
-               .fontSize(signatureFontPath ? 38 : 28)
-               .fillColor('#d4af37')
-               .text('Certificate of Completion', 0, 135, { width: width, align: 'center' });
+               .fontSize(signatureFontPath ? 42 : 32)
+               .fillColor('#000000')
+               .text('Certificate of Completion', 0, 80, { width: width - 100, align: 'center' });
 
             // 6. Recipient Section: "This is to certify that"
             doc.font('Times-Italic')
                .fontSize(16)
-               .fillColor('#555555')
-               .text('This is to certify that', 0, 195, { width: width, align: 'center' });
-
-            // Recipient's name in bold serif, larger font, centered
-            doc.font('Times-Bold')
-               .fontSize(40)
                .fillColor('#000000')
-               .text(participantName, 0, 225, { width: width, align: 'center' });
+               .text('This is to certify that', 0, 155, { width: width - 100, align: 'center' });
+
+            // Recipient's name in bold elegant cursive, larger font, centered
+            doc.font(titleFont)
+               .fontSize(signatureFontPath ? 46 : 36)
+               .fillColor('#000000')
+               .text(participantName, 0, 190, { width: width - 100, align: 'center' });
 
             // 7. Course Section: "has successfully completed"
             doc.font('Times-Italic')
-               .fontSize(15)
+               .fontSize(14)
                .fillColor('#555555')
-               .text('has successfully completed', 0, 280, { width: width, align: 'center' });
+               .text('has successfully completed', 0, 270, { width: width - 100, align: 'center' });
 
-            // Course name in uppercase emphasis, larger font size
+            // Course name in uppercase emphasis, larger bold serif font size
             doc.font('Times-Bold')
                .fontSize(28)
-               .fillColor('#d4af37')
-               .text(workshopTitle.toUpperCase(), 0, 308, { width: width, align: 'center' });
+               .fillColor('#000000')
+               .text(workshopTitle.toUpperCase(), 0, 300, { width: width - 100, align: 'center' });
 
             // 8. Footer Section
             const footerY = 415;
 
-            // Date Section: Labeled "Date of Completion" with date beneath in clean serif font
-            const leftColX = 75;
-            const dateColY = footerY + 20;
-            doc.font('Times-Bold')
-               .fontSize(12)
-               .fillColor('#d4af37')
-               .text('Date of Completion', leftColX, dateColY, { width: 200, align: 'center' });
-            
+            // Date Section: Labeled "Date of Completion" with date above the thin line
+            const dateLineY = 440;
+            doc.save();
+            doc.lineWidth(0.5)
+               .strokeColor('#aaaaaa')
+               .moveTo(80, dateLineY)
+               .lineTo(280, dateLineY)
+               .stroke();
+            doc.restore();
+
             doc.font('Times-Roman')
                .fontSize(12)
                .fillColor('#000000')
-               .text(completionDate, leftColX, dateColY + 18, { width: 200, align: 'center' });
+               .text(completionDate, 80, dateLineY - 18, { width: 200, align: 'center' });
 
-            // Center: Certificate ID
-            if (certificateId) {
-                doc.font('Times-Roman')
-                   .fontSize(11)
-                   .fillColor('#000000')
-                   .text(`Certificate ID: ${certificateId}`, (width - 200) / 2, footerY + 38, { width: 200, align: 'center' });
-            }
+            doc.font('Times-Italic')
+               .fontSize(11)
+               .fillColor('#555555')
+               .text('Date of Completion', 80, dateLineY + 5, { width: 200, align: 'center' });
 
-            // Right: Issuer Section (Awarded by + tagline/motto)
-            const rightColX = width - 275;
-            const issuerColY = footerY + 20;
+            // Signature Section: Line with Conductor's signature above and "Awarded by" below
+            const sigLineY = 515;
+            doc.save();
+            doc.lineWidth(0.5)
+               .strokeColor('#aaaaaa')
+               .moveTo(80, sigLineY)
+               .lineTo(280, sigLineY)
+               .stroke();
+            doc.restore();
             
-            // Signature Graphic placement (drawn above "Awarded by" text)
+            // Signature Graphic placement (drawn above the line)
             let signatureDrawn = false;
-            const sigWidth = 150;
-            const sigX = rightColX + (200 - sigWidth) / 2;
-            const sigY = footerY - 25;
+            const sigWidth = 130;
+            const sigX = 80 + (200 - sigWidth) / 2;
+            const sigY = sigLineY - 38;
 
             if (signatureImage && typeof signatureImage === 'string') {
                 try {
@@ -372,7 +354,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                         const matches = signatureImage.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
                         if (matches && matches.length === 3) {
                             const buffer = Buffer.from(matches[2], 'base64');
-                            doc.image(buffer, sigX, sigY, { width: sigWidth, height: 40 });
+                            doc.image(buffer, sigX, sigY, { width: sigWidth, height: 35 });
                             signatureDrawn = true;
                         }
                     } else if (signatureImage.startsWith('/') || /^[a-zA-Z]:[\\/]/i.test(signatureImage)) {
@@ -380,7 +362,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                             ? signatureImage 
                             : path.join(__dirname, '../../', signatureImage);
                         if (fs.existsSync(resolvedPath)) {
-                            doc.image(resolvedPath, sigX, sigY, { width: sigWidth, height: 40 });
+                            doc.image(resolvedPath, sigX, sigY, { width: sigWidth, height: 35 });
                             signatureDrawn = true;
                         }
                     }
@@ -395,9 +377,9 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                 if (signatureFontPath) {
                     try {
                         doc.font(signatureFontPath)
-                           .fontSize(24)
+                           .fontSize(22)
                            .fillColor('#000000')
-                           .text(signatureText, rightColX, sigY + 5, { width: 200, align: 'center' });
+                           .text(signatureText, 80, sigY + 5, { width: 200, align: 'center' });
                         signatureDrawn = true;
                     } catch (fontErr) {
                         console.warn('Failed to render loaded cursive font:', fontErr);
@@ -405,30 +387,52 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                 }
                 if (!signatureDrawn) {
                     doc.font('Times-Italic')
-                       .fontSize(20)
+                       .fontSize(18)
                        .fillColor('#1b4d3e')
-                       .text(signatureText, rightColX, sigY + 10, { width: 200, align: 'center' });
+                       .text(signatureText, 80, sigY + 10, { width: 200, align: 'center' });
                 }
             }
 
-            // Replace signature lines with "Awarded by" + organization name, with tagline/motto beneath in smaller italic text
             doc.font('Times-Italic')
-               .fontSize(12)
+               .fontSize(11)
                .fillColor('#555555')
-               .text('Awarded by', rightColX, issuerColY, { width: 200, align: 'center' });
+               .text('Awarded by', 80, sigLineY + 5, { width: 200, align: 'center' });
 
+            // Unique Certificate ID at the very bottom left
+            if (certificateId) {
+                doc.font('Times-Roman')
+                   .fontSize(9)
+                   .fillColor('#777777')
+                   .text(`Certificate ID: ${certificateId}`, 80, 560, { width: 200, align: 'center' });
+            }
+
+            // 9. Bottom Center/Right (Logo + Company Name + Tagline) instead of CN badge
+            const logoCenterX = 460;
+            const logoWidth = 55;
+            const logoX = logoCenterX - logoWidth / 2;
+            const logoY = 415;
+
+            // Load and draw Tapovana logo
+            const logo = await getLogoBuffer();
+            if (logo) {
+                try {
+                    doc.image(logo, logoX, logoY, { width: logoWidth });
+                } catch (imgErr) {
+                    console.warn('Failed to draw logo in footer:', imgErr);
+                }
+            }
+
+            // Company Name: TAPOVANA LIFE SPACE
             doc.font('Times-Bold')
-               .fontSize(16)
-               .fillColor('#d4af37')
-               .text('Tapovana Life Space', rightColX, issuerColY + 16, { width: 200, align: 'center' });
+               .fontSize(14)
+               .fillColor('#000000')
+               .text('TAPOVANA LIFE SPACE', logoCenterX - 120, logoY + 62, { width: 240, align: 'center', characterSpacing: 0.5 });
 
+            // Tagline: Path to Inner Harmony & Wellness
             doc.font('Times-Italic')
-               .fontSize(10)
+               .fontSize(9)
                .fillColor('#555555')
-               .text('Path to Inner Harmony & Wellness', rightColX, issuerColY + 34, { width: 200, align: 'center' });
-
-            // 9. Decorative Gold Seal/Stamp at bottom center for authenticity
-            drawGoldSeal(doc, (width - 60) / 2, footerY + 10);
+               .text('Path to Inner Harmony & Wellness', logoCenterX - 120, logoY + 78, { width: 240, align: 'center' });
 
             doc.end();
         } catch (err) {
