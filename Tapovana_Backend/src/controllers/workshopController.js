@@ -5,6 +5,7 @@ const path = require('path');
 const { sendAllocationEmail, sendWorkshopEnrollmentEmail, sendWorkshopRemovalEmail, sendWorkshopScheduledEmail, sendWorkshopOngoingEmail, sendWorkshopDeallocationEmail, sendWorkshopCompletedEmail, sendWorkshopAllocationNotificationEmail, sendWorkshopCompletionCertificateEmail } = require('../services/emailService');
 const { generateCertificatePDF } = require('../utils/pdfGenerator');
 const { checkStaffAllocationConflict, syncStaffMemberStatus } = require('../utils/conflictChecker');
+const { getLocalIpAddress } = require('../utils/ip');
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 
@@ -1194,7 +1195,8 @@ const generateSingleAttendeeCertificate = async (attendeeId, workshopId) => {
         }
 
         const port = process.env.PORT || 5000;
-        const defaultUrl = process.env.NODE_ENV === 'production' ? 'https://tapovana.onrender.com' : `http://localhost:${port}`;
+        const localIp = getLocalIpAddress();
+        const defaultUrl = process.env.NODE_ENV === 'production' ? 'https://tapovana.onrender.com' : `http://${localIp}:${port}`;
         const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
 
         // Generate unique certificate ID
@@ -1294,6 +1296,50 @@ const updateAttendeeAttendance = async (req, res) => {
     }
 
     try {
+        // Fetch workshop details to check if completed
+        const wsRes = await query('SELECT date, time, duration, status, start_time, end_time FROM workshops WHERE id = $1', [id]);
+        if (!wsRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Workshop not found.' });
+        }
+        const workshop = wsRes.rows[0];
+
+        let dateStr = workshop.date;
+        if (workshop.date instanceof Date) {
+            const year = workshop.date.getFullYear();
+            const month = String(workshop.date.getMonth() + 1).padStart(2, '0');
+            const day = String(workshop.date.getDate()).padStart(2, '0');
+            dateStr = `${year}-${month}-${day}`;
+        }
+        
+        const calculatedStatus = getStatus(dateStr, workshop.time, workshop.duration, workshop.start_time, workshop.end_time);
+        const isCompleted = (workshop.status === 'Completed' || workshop.status === 'completed' || calculatedStatus === 'Completed');
+
+        // Fetch attendee's current status
+        const attCheck = await query('SELECT status FROM attendees WHERE id = $1 AND workshop_id = $2', [attendeeId, id]);
+        if (!attCheck.rows.length) {
+            return res.status(404).json({ success: false, message: 'Attendee record not found.' });
+        }
+        const currentAttendeeStatus = attCheck.rows[0].status;
+
+        // Validation Rules:
+        if (!isCompleted) {
+            // Before completion: Do not allow status changes to Attended or Absent
+            if (status === 'attended' || status === 'absent') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Attendance status cannot be modified to Attended or Absent before the workshop is completed.'
+                });
+            }
+        } else {
+            // After completion: status change must be one-way (cannot revert Attended or Absent back to Enrolled)
+            if ((currentAttendeeStatus === 'attended' || currentAttendeeStatus === 'absent') && status === 'enrolled') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cannot revert attendee status back to Enrolled after they have been marked as Attended or Absent.'
+                });
+            }
+        }
+
         const result = await query(
             'UPDATE attendees SET status = $1, updated_at = NOW() WHERE workshop_id = $2 AND id = $3 RETURNING *',
             [status, id, attendeeId]
@@ -1309,8 +1355,7 @@ const updateAttendeeAttendance = async (req, res) => {
                 console.error("Error generating certificate on attendee status change:", err)
             );
 
-            const wsRes = await query('SELECT status FROM workshops WHERE id = $1', [id]);
-            if (wsRes.rows.length && (wsRes.rows[0].status === 'Completed' || wsRes.rows[0].status === 'completed')) {
+            if (isCompleted) {
                 await query('UPDATE workshops SET completed_notified = FALSE WHERE id = $1', [id]);
             }
         }
@@ -1524,7 +1569,8 @@ const autoUpdateWorkshopStatuses = async () => {
 
                 // Process attendees: generate certificate and send emails for anyone who doesn't have a certificate yet
                 const port = process.env.PORT || 5000;
-                const defaultUrl = process.env.NODE_ENV === 'production' ? 'https://tapovana.onrender.com' : `http://localhost:${port}`;
+                const localIp = getLocalIpAddress();
+                const defaultUrl = process.env.NODE_ENV === 'production' ? 'https://tapovana.onrender.com' : `http://${localIp}:${port}`;
                 const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
                 
                 // Fetch instructor details

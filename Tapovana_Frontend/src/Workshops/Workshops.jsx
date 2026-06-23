@@ -494,6 +494,17 @@ export default function Workshops() {
   };
 
   const handleMarkAttendance = async (attendeeId, status) => {
+    const isCompleted = getLiveStatus(selectedWs) === "completed";
+    if (!isCompleted && (status === "attended" || status === "absent")) {
+      triggerAlert("Cannot mark attendance before the workshop is completed.", false);
+      return;
+    }
+    const currentAttendee = attendees.find(a => a.id === attendeeId);
+    if (currentAttendee && (currentAttendee.status === "attended" || currentAttendee.status === "absent") && status === "enrolled") {
+      triggerAlert("Cannot revert attendee status back to Enrolled.", false);
+      return;
+    }
+
     try {
       const res = await apiFetch(`/api/workshops/${selectedWs.id}/attendees/${attendeeId}`, {
         method: "PATCH",
@@ -1434,9 +1445,9 @@ export default function Workshops() {
                             }}
                             style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "12px", outline: "none", cursor: "pointer", background: "white" }}
                           >
-                            <option value="enrolled">Enrolled</option>
-                            <option value="attended">Attended</option>
-                            <option value="absent">Absent</option>
+                            <option value="enrolled" disabled={a.status === "attended" || a.status === "absent"}>Enrolled</option>
+                            <option value="attended" disabled={getLiveStatus(selectedWs) !== "completed"}>Attended</option>
+                            <option value="absent" disabled={getLiveStatus(selectedWs) !== "completed"}>Absent</option>
                             <option value="delete">Delete Attendee</option>
                           </select>
                         </td>

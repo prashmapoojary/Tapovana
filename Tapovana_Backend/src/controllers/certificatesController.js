@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { generateCertificatePDF } = require('../utils/pdfGenerator');
 const { sendWorkshopCompletionCertificateEmail } = require('../services/emailService');
+const { getLocalIpAddress } = require('../utils/ip');
 
 // Helper: Validate UUID
 const isValidUUID = (id) => {
@@ -131,7 +132,8 @@ const generateCertificatesForWorkshop = async (req, res) => {
         }
 
         const port = process.env.PORT || 5000;
-        const defaultUrl = process.env.NODE_ENV === 'production' ? 'https://tapovana.onrender.com' : `http://localhost:${port}`;
+        const localIp = getLocalIpAddress();
+        const defaultUrl = process.env.NODE_ENV === 'production' ? 'https://tapovana.onrender.com' : `http://${localIp}:${port}`;
         const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
 
         let generatedCount = 0;
