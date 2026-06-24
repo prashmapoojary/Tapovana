@@ -331,7 +331,7 @@ const downloadCertificatePdf = async (req, res) => {
         }
 
         // Return headers for immediate browser download
-        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Type", "application/octet-stream");
         res.setHeader("Content-Disposition", `attachment; filename="Certificate-${cert.certificate_id}.pdf"`);
         res.setHeader("Content-Description", "File Transfer");
         res.setHeader("Content-Transfer-Encoding", "binary");
