@@ -257,6 +257,28 @@ const getCertificateDetails = async (req, res) => {
     }
 };
 
+// 4.5 GET PUBLIC CERTIFICATE DETAILS (GET /api/certificates/public/:certificateId)
+const getPublicCertificateDetails = async (req, res) => {
+    const { certificateId } = req.params;
+    try {
+        const certRes = await query(`
+            SELECT c.certificate_id, c.participant_name, c.workshop_name, c.completion_date, w.instructor AS instructor_name
+            FROM certificates c
+            JOIN workshops w ON w.id = c.workshop_id
+            WHERE c.certificate_id = $1 OR c.id::text = $1 OR c.participant_id::text = $1
+        `, [certificateId]);
+
+        if (!certRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Certificate details not found.' });
+        }
+
+        return res.json({ success: true, certificate: certRes.rows[0] });
+    } catch (err) {
+        console.error('getPublicCertificateDetails error:', err);
+        return res.status(500).json({ success: false, message: 'Server error retrieving certificate details.' });
+    }
+};
+
 // 5. DOWNLOAD CERTIFICATE PDF DIRECTLY (GET /api/certificates/download/:certificateId)
 const downloadCertificatePdf = async (req, res) => {
     const { certificateId, id } = req.params;
@@ -414,6 +436,7 @@ module.exports = {
     getCertificateStats,
     generateCertificatesForWorkshop,
     getCertificateDetails,
+    getPublicCertificateDetails,
     downloadCertificatePdf,
     resendCertificateEmail
 };

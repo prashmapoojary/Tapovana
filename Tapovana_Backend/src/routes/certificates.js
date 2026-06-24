@@ -5,14 +5,16 @@ const {
     getCertificateStats,
     generateCertificatesForWorkshop,
     getCertificateDetails,
+    getPublicCertificateDetails,
     downloadCertificatePdf,
     resendCertificateEmail
 } = require('../controllers/certificatesController');
 
 const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN')];
 
-// Public download endpoint
+// Public endpoints
 router.get('/download/:certificateId', downloadCertificatePdf);
+router.get('/public/:certificateId', getPublicCertificateDetails);
 
 // Protected endpoints
 router.get('/stats', ...adminOnly, getCertificateStats);

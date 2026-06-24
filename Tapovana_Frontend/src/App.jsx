@@ -23,6 +23,7 @@ const VedicLifePrograms = lazy(() => import("./VedicLifePrograms/VedicLifeProgra
 const Blogs = lazy(() => import("./Blogs/Blogs"));
 const MyAssignments = lazy(() => import("./MyAssignments/MyAssignments"));
 const Feedbacks = lazy(() => import("./Feedbacks/Feedbacks"));
+const CertificatePage = lazy(() => import("./Certificates/CertificatePage"));
 
 
 // Guard 1: Checks for a valid session token and handles forced password change
@@ -98,6 +99,8 @@ function App() {
             <Route path="/" element={<SignIn />} />
             <Route path="/set-password" element={<SetPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/certificate" element={<SafePage><CertificatePage /></SafePage>} />
+            <Route path="/certificate/:certificateId" element={<SafePage><CertificatePage /></SafePage>} />
             <Route path="/force-change-password" element={
               <ProtectedRoute isForceChangeRoute={true}>
                 <ForceChangePassword />
