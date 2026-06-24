@@ -913,10 +913,6 @@ const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, wor
     <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 25px 0;text-align:center;">
       <a href="${linkUrl}" style="display:inline-block;background:#cda751;color:#111;font-weight:bold;padding:12px 24px;border-radius:6px;text-decoration:none;">Download Certificate</a>
     </p>
-    <p style="color:#888888;font-size:12px;line-height:1.6;margin: 20px 0 0 0;text-align:center;">
-      If the button above does not work, you can copy and paste the following link into your browser:<br/>
-      <a href="${linkUrl}" style="color:#cda751;text-decoration:underline;">${linkUrl}</a>
-    </p>
   `);
 
   const textFallback = `Hello ${participantName || "Participant"},\n\nWe are pleased to confirm your attendance at our workshop "${workshopTitle}"!\n\nYou can download your certificate of completion directly from the following link:\n${linkUrl}\n\nBest regards,\nTapovana Team`;
