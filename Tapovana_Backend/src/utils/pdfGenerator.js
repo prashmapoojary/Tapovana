@@ -275,19 +275,19 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             // 2. Render Title: "Certificate of Completion"
             const titleFont = signatureFontPath || 'Times-BoldItalic';
             doc.font(titleFont)
-               .fontSize(signatureFontPath ? 54 : 42)
+               .fontSize(signatureFontPath ? 58 : 44)
                .fillColor('#1b1b1b')
                .text('Certificate of Completion', 50, 90, { width: width - 100, align: 'center' });
 
             // 3. Subheader: "This is to certify that"
             doc.font('Times-Italic')
-               .fontSize(18)
+               .fontSize(20)
                .fillColor('#555555')
                .text('This is to certify that', 50, 155, { width: width - 100, align: 'center' });
 
             // 4. Participant Name in cursive font, centered
             doc.font(titleFont)
-               .fontSize(signatureFontPath ? 60 : 48)
+               .fontSize(signatureFontPath ? 64 : 52)
                .fillColor('#1b1b1b')
                .text(participantName, 50, 185, { width: width - 100, align: 'center' });
 
@@ -302,13 +302,13 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
 
             // 5. Course Section: "has successfully completed"
             doc.font('Times-Italic')
-               .fontSize(18)
+               .fontSize(20)
                .fillColor('#555555')
                .text('has successfully completed', 50, 272, { width: width - 100, align: 'center' });
 
             // Course name in uppercase emphasis, larger bold serif font size
             doc.font('Times-Bold')
-               .fontSize(32)
+               .fontSize(35)
                .fillColor('#1b1b1b')
                .text(workshopTitle.toUpperCase(), 50, 300, { width: width - 100, align: 'center' });
 
@@ -325,7 +325,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             doc.restore();
 
             doc.font('Times-Roman')
-               .fontSize(14)
+               .fontSize(16)
                .fillColor('#1b1b1b')
                .text(completionDate, 90, lineY - 18, { width: 200, align: 'center' });
 
@@ -378,7 +378,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                 if (signatureFontPath) {
                     try {
                         doc.font(signatureFontPath)
-                           .fontSize(28)
+                           .fontSize(30)
                            .fillColor('#1b1b1b')
                            .text(signatureText, 551.89, sigY + 5, { width: 200, align: 'center' });
                         signatureDrawn = true;
@@ -388,7 +388,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                 }
                 if (!signatureDrawn) {
                     doc.font('Times-Italic')
-                       .fontSize(22)
+                       .fontSize(24)
                        .fillColor('#1b1b1b')
                        .text(signatureText, 551.89, sigY + 10, { width: 200, align: 'center' });
                 }
