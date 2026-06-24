@@ -12,6 +12,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // In development, redirect all outgoing emails to SMTP_USER so the developer receives them on their Gmail
+/*
 if (process.env.NODE_ENV === "development") {
   const originalSendMail = transporter.sendMail.bind(transporter);
   transporter.sendMail = function (mailOptions, callback) {
@@ -22,6 +23,7 @@ if (process.env.NODE_ENV === "development") {
     return originalSendMail(mailOptions, callback);
   };
 }
+*/
 
 const emailWrapper = (content) => `
 <!DOCTYPE html>
