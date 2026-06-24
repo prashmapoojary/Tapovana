@@ -244,7 +244,6 @@ function Customers() {
         <td><div className="skeleton-box" style={{ width: 60 }} /></td>
         <td><div className="skeleton-box" style={{ width: 40 }} /></td>
         <td><div className="skeleton-box" style={{ width: 80 }} /></td>
-        <td><div className="skeleton-box" style={{ width: 80 }} /></td>
         <td><div className="skeleton-box" style={{ width: 24, borderRadius: "50%" }} /></td>
       </tr>
     ))
@@ -309,7 +308,10 @@ function Customers() {
 
                 {/* 1. Profile Section */}
                 <div className="cust-drawer-section">
-                  <h4 className="cust-section-title" style={{ color: "#0F172A", borderBottom: "1px solid #E8E2D9", paddingBottom: "6px", fontWeight: "700" }}>Profile Details</h4>
+                  <div className="section-label-container" style={{ marginTop: "12px" }}>
+                    <div className="section-badge">01</div>
+                    <div className="section-title">Profile Details</div>
+                  </div>
                   <div className="cust-profile-card" style={{ display: "flex", gap: "16px", alignItems: "center" }}>
                     <img src={DefaultAvatar} className="cust-avatar" alt="Avatar" style={{ width: "64px", height: "64px", borderRadius: "50%", border: "2px solid #E8E2D9" }} />
                     <div>
@@ -330,7 +332,10 @@ function Customers() {
 
                 {/* 2. Service & Booking History Section */}
                 <div className="cust-drawer-section">
-                  <h4 className="cust-section-title" style={{ color: "#0F172A", borderBottom: "1px solid #E8E2D9", paddingBottom: "6px", fontWeight: "700" }}>Service & Booking History</h4>
+                  <div className="section-label-container" style={{ marginTop: "24px" }}>
+                    <div className="section-badge">02</div>
+                    <div className="section-title">Service & Booking History</div>
+                  </div>
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px" }}>
                       <thead>
@@ -361,7 +366,10 @@ function Customers() {
 
                 {/* 3. Membership & Benefits Section */}
                 <div className="cust-drawer-section">
-                  <h4 className="cust-section-title" style={{ color: "#0F172A", borderBottom: "1px solid #E8E2D9", paddingBottom: "6px", fontWeight: "700" }}>Membership & Benefits</h4>
+                  <div className="section-label-container" style={{ marginTop: "24px" }}>
+                    <div className="section-badge">03</div>
+                    <div className="section-title">Membership & Benefits</div>
+                  </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "13px", color: "#4a5568" }}>
                     <div>
                       <strong>Plan Type:</strong> {selectedCustomer.membership_status === "NONE" ? "Regular Guest" : `${selectedCustomer.membership_status} Plan`}
@@ -377,12 +385,7 @@ function Customers() {
               </div>
 
               <div className="drawer-footer">
-                <button className="cust-btn-danger" onClick={handleArchive}
-                  disabled={!canArchive || selectedCustomer.status === "ARCHIVED"}
-                  style={{ flex: 1, height: "38px" }}>
-                  {selectedCustomer.status === "ARCHIVED" ? "Archived" : "Archive Profile"}
-                </button>
-                <button className="btn-cancel" onClick={() => setSelectedCustomer(null)} style={{ flex: 1, height: "38px" }}>Close</button>
+                <button className="btn-save" onClick={() => setSelectedCustomer(null)} style={{ width: "100%", height: "42px", justifyContent: "center" }}>Close</button>
               </div>
             </div>
           </>
@@ -461,14 +464,13 @@ function Customers() {
                 <th className="sortable-th" onClick={() => handleSort("membership_status")}>TIER <SortIcon col="membership_status" /></th>
                 <th className="sortable-th" onClick={() => handleSort("total_bookings")}>SESSIONS <SortIcon col="total_bookings" /></th>
                 <th className="sortable-th" onClick={() => handleSort("total_spent")}>SPEND <SortIcon col="total_spent" /></th>
-                <th className="sortable-th" onClick={() => handleSort("last_activity")}>ACTIVITY <SortIcon col="last_activity" /></th>
                 <th>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {loading && customers.length === 0 ? renderSkeleton() : paginatedList.length === 0 ? (
                 <tr>
-                  <td colSpan="11">
+                  <td colSpan="10">
                     <div className="cust-empty-state">
                       <h3 className="cust-empty-title">No customers match your filters</h3>
                       <p className="cust-empty-sub">Try adjusting your search or filter selections.</p>
@@ -488,7 +490,6 @@ function Customers() {
                     <td><span className={"tier-badge " + (c.membership_status || "NONE").toLowerCase()}>{c.membership_status === "NONE" ? "Regular" : c.membership_status}</span></td>
                     <td><strong className="metric-gold">{c.total_bookings || 0}</strong></td>
                     <td className="metric-teal">₹{(c.total_spent || 0).toLocaleString("en-IN")}</td>
-                    <td className="cust-cell-email">{c.last_activity || "-"}</td>
                     <td onClick={(e) => { e.stopPropagation(); setSelectedCustomer(c); }} style={{ textAlign: "center" }}>
                       <img src={ActionIcon} alt="Actions" className="action-icon" />
                     </td>
