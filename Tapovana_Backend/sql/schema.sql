@@ -132,6 +132,6 @@ WITH new_member AS (
 )
 INSERT INTO login_credentials (member_id, password_hash, must_change)
 SELECT id,
-       crypt('Admin@1234', gen_salt('bf', 12)),
+       crypt('Pr@sh22N@gu29', gen_salt('bf', 12)),
        FALSE
 FROM new_member;
