@@ -512,11 +512,17 @@ function Home() {
   const serviceDemand = useMemo(() => {
     const rawDemand = data?.service_demand || {};
     const sorted = Object.entries(rawDemand)
-      .map(([serviceId, count]) => {
-        const meta = SERVICE_LOOKUP[serviceId] || { name: serviceId, category: "Wellness", price: 0 };
+      .map(([serviceId, value]) => {
+        const isObj = value && typeof value === 'object';
+        const countVal = isObj ? value.count : value;
+        const meta = SERVICE_LOOKUP[serviceId] || {
+          name: isObj && value.name ? value.name : serviceId,
+          category: isObj && value.category ? value.category : "Wellness",
+          price: isObj && value.price !== undefined ? value.price : 0
+        };
         return {
           serviceId,
-          count,
+          count: countVal,
           name: meta.name,
           category: meta.category,
           price: meta.price

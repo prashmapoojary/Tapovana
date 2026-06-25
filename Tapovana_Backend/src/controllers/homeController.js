@@ -127,13 +127,31 @@ exports.getAnalyticsDashboard = async (req, res) => {
     let today_bookings = 0, today_revenue = 0, active_customers = 0, pending_bookings = 0;
 
     try {
-      // Today's bookings
-      const bookingsRes = await query(`
+      // Combined bookings (service bookings + workshop registrations + Vedic program registrations)
+      const serviceBookingsRes = await query(`
         SELECT COUNT(*) as cnt
         FROM bookings
         WHERE booking_date >= $1 AND booking_date <= $2
       `, [startDate, endDate]);
-      today_bookings = parseInt(bookingsRes.rows[0]?.cnt || 0, 10);
+      
+      const workshopAttendeesRes = await query(`
+        SELECT COUNT(a.id) as cnt
+        FROM attendees a
+        JOIN workshops w ON a.workshop_id = w.id
+        WHERE w.date >= $1 AND w.date <= $2
+      `, [startDate, endDate]);
+
+      const vedicAttendeesRes = await query(`
+        SELECT COUNT(va.id) as cnt
+        FROM vedic_attendees va
+        JOIN vedic_programs vp ON va.program_id = vp.id
+        WHERE vp.start_date >= $1 AND vp.start_date <= $2
+      `, [startDate, endDate]);
+
+      today_bookings = 
+        parseInt(serviceBookingsRes.rows[0]?.cnt || 0, 10) +
+        parseInt(workshopAttendeesRes.rows[0]?.cnt || 0, 10) +
+        parseInt(vedicAttendeesRes.rows[0]?.cnt || 0, 10);
     } catch (e) {
       console.warn("[HomeController] Today's bookings count failed:", e.message);
     }
@@ -160,14 +178,34 @@ exports.getAnalyticsDashboard = async (req, res) => {
     }
 
     try {
-      // Pending bookings
-      const pendingRes = await query(`
+      // Pending bookings across bookings (PENDING), workshop attendees (enrolled), and vedic attendees (REGISTERED/CONFIRMED)
+      const pendingServicesRes = await query(`
         SELECT COUNT(*) as cnt
         FROM bookings
         WHERE booking_date >= $1 AND booking_date <= $2
-        AND status = 'Pending'
+        AND LOWER(status) = 'pending'
       `, [startDate, endDate]);
-      pending_bookings = parseInt(pendingRes.rows[0]?.cnt || 0, 10);
+
+      const pendingWorkshopsRes = await query(`
+        SELECT COUNT(a.id) as cnt
+        FROM attendees a
+        JOIN workshops w ON a.workshop_id = w.id
+        WHERE w.date >= $1 AND w.date <= $2
+        AND LOWER(a.status) = 'enrolled'
+      `, [startDate, endDate]);
+
+      const pendingVedicRes = await query(`
+        SELECT COUNT(va.id) as cnt
+        FROM vedic_attendees va
+        JOIN vedic_programs vp ON va.program_id = vp.id
+        WHERE vp.start_date >= $1 AND vp.start_date <= $2
+        AND LOWER(va.status) IN ('registered', 'confirmed')
+      `, [startDate, endDate]);
+
+      pending_bookings = 
+        parseInt(pendingServicesRes.rows[0]?.cnt || 0, 10) +
+        parseInt(pendingWorkshopsRes.rows[0]?.cnt || 0, 10) +
+        parseInt(pendingVedicRes.rows[0]?.cnt || 0, 10);
     } catch (e) {
       console.warn("[HomeController] Pending bookings count failed:", e.message);
     }
@@ -188,13 +226,32 @@ exports.getAnalyticsDashboard = async (req, res) => {
         const dayEnd = new Date(currentDate);
         dayEnd.setHours(23, 59, 59, 999);
 
-        // Get bookings count for this day
+        // Get aggregate bookings count for this day
         const dayBookingsRes = await query(`
           SELECT COUNT(*) as cnt
           FROM bookings
           WHERE booking_date >= $1 AND booking_date <= $2
         `, [dayStart, dayEnd]);
-        bookings_last_7_days.push(parseInt(dayBookingsRes.rows[0]?.cnt || 0, 10));
+
+        const dayWorkshopRes = await query(`
+          SELECT COUNT(a.id) as cnt
+          FROM attendees a
+          JOIN workshops w ON a.workshop_id = w.id
+          WHERE w.date >= $1 AND w.date <= $2
+        `, [dayStart, dayEnd]);
+
+        const dayVedicRes = await query(`
+          SELECT COUNT(va.id) as cnt
+          FROM vedic_attendees va
+          JOIN vedic_programs vp ON va.program_id = vp.id
+          WHERE vp.start_date >= $1 AND vp.start_date <= $2
+        `, [dayStart, dayEnd]);
+
+        bookings_last_7_days.push(
+          parseInt(dayBookingsRes.rows[0]?.cnt || 0, 10) +
+          parseInt(dayWorkshopRes.rows[0]?.cnt || 0, 10) +
+          parseInt(dayVedicRes.rows[0]?.cnt || 0, 10)
+        );
 
         // Get revenue for this day
         const dayRevenueRes = await query(`
@@ -228,6 +285,164 @@ exports.getAnalyticsDashboard = async (req, res) => {
       console.warn("[HomeController] Membership breakdown failed:", e.message);
     }
 
+    // Fetch Top Requested Services (Service Demand)
+    let service_demand = {};
+    try {
+      // 1. Service bookings demand
+      const serviceDemandRes = await query(`
+        SELECT b.service_name as name, COUNT(*) as cnt,
+               COALESCE(MAX(s.category), 'Wellness') as category,
+               COALESCE(MAX(s.base_price::float), 0) as price
+        FROM bookings b
+        LEFT JOIN services s ON LOWER(s.name) = LOWER(b.service_name)
+        WHERE b.booking_date >= $1 AND b.booking_date <= $2
+        GROUP BY b.service_name
+      `, [startDate, endDate]);
+
+      // 2. Workshop enrollments demand
+      const workshopDemandRes = await query(`
+        SELECT w.title as name, COUNT(a.id) as cnt,
+               'Workshop' as category,
+               COALESCE(w.price::float, 0) as price
+        FROM attendees a
+        JOIN workshops w ON a.workshop_id = w.id
+        WHERE w.date >= $1 AND w.date <= $2
+        GROUP BY w.title, w.price
+      `, [startDate, endDate]);
+
+      // 3. Vedic Life Package enrollments demand
+      const vedicDemandRes = await query(`
+        SELECT vp.title as name, COUNT(va.id) as cnt,
+               'Vedic Life' as category,
+               COALESCE(vp.price::float, 0) as price
+        FROM vedic_attendees va
+        JOIN vedic_programs vp ON va.program_id = vp.id
+        WHERE vp.start_date >= $1 AND vp.start_date <= $2
+        GROUP BY vp.title, vp.price
+      `, [startDate, endDate]);
+
+      const combinedDemand = {};
+
+      for (const row of serviceDemandRes.rows) {
+        combinedDemand[row.name] = {
+          count: parseInt(row.cnt || 0, 10),
+          name: row.name,
+          category: row.category,
+          price: parseFloat(row.price || 0)
+        };
+      }
+
+      for (const row of workshopDemandRes.rows) {
+        if (combinedDemand[row.name]) {
+          combinedDemand[row.name].count += parseInt(row.cnt || 0, 10);
+        } else {
+          combinedDemand[row.name] = {
+            count: parseInt(row.cnt || 0, 10),
+            name: row.name,
+            category: row.category,
+            price: parseFloat(row.price || 0)
+          };
+        }
+      }
+
+      for (const row of vedicDemandRes.rows) {
+        if (combinedDemand[row.name]) {
+          combinedDemand[row.name].count += parseInt(row.cnt || 0, 10);
+        } else {
+          combinedDemand[row.name] = {
+            count: parseInt(row.cnt || 0, 10),
+            name: row.name,
+            category: row.category,
+            price: parseFloat(row.price || 0)
+          };
+        }
+      }
+
+      const sortedDemand = {};
+      Object.entries(combinedDemand)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 5)
+        .forEach(([key, val]) => {
+          sortedDemand[key] = val;
+        });
+      service_demand = sortedDemand;
+
+      // Fallback: If empty, pull lifetime records for the top 5
+      if (Object.keys(service_demand).length === 0) {
+        const lfServiceRes = await query(`
+          SELECT b.service_name as name, COUNT(*) as cnt,
+                 COALESCE(MAX(s.category), 'Wellness') as category,
+                 COALESCE(MAX(s.base_price::float), 0) as price
+          FROM bookings b
+          LEFT JOIN services s ON LOWER(s.name) = LOWER(b.service_name)
+          GROUP BY b.service_name
+        `);
+
+        const lfWorkshopRes = await query(`
+          SELECT w.title as name, COUNT(a.id) as cnt,
+                 'Workshop' as category,
+                 COALESCE(w.price::float, 0) as price
+          FROM attendees a
+          JOIN workshops w ON a.workshop_id = w.id
+          GROUP BY w.title, w.price
+        `);
+
+        const lfVedicRes = await query(`
+          SELECT vp.title as name, COUNT(va.id) as cnt,
+                 'Vedic Life' as category,
+                 COALESCE(vp.price::float, 0) as price
+          FROM vedic_attendees va
+          JOIN vedic_programs vp ON va.program_id = vp.id
+          GROUP BY vp.title, vp.price
+        `);
+
+        const lfCombined = {};
+        for (const row of lfServiceRes.rows) {
+          lfCombined[row.name] = {
+            count: parseInt(row.cnt || 0, 10),
+            name: row.name,
+            category: row.category,
+            price: parseFloat(row.price || 0)
+          };
+        }
+        for (const row of lfWorkshopRes.rows) {
+          if (lfCombined[row.name]) {
+            lfCombined[row.name].count += parseInt(row.cnt || 0, 10);
+          } else {
+            lfCombined[row.name] = {
+              count: parseInt(row.cnt || 0, 10),
+              name: row.name,
+              category: row.category,
+              price: parseFloat(row.price || 0)
+            };
+          }
+        }
+        for (const row of lfVedicRes.rows) {
+          if (lfCombined[row.name]) {
+            lfCombined[row.name].count += parseInt(row.cnt || 0, 10);
+          } else {
+            lfCombined[row.name] = {
+              count: parseInt(row.cnt || 0, 10),
+              name: row.name,
+              category: row.category,
+              price: parseFloat(row.price || 0)
+            };
+          }
+        }
+
+        const sortedLf = {};
+        Object.entries(lfCombined)
+          .sort((a, b) => b[1].count - a[1].count)
+          .slice(0, 5)
+          .forEach(([key, val]) => {
+            sortedLf[key] = val;
+          });
+        service_demand = sortedLf;
+      }
+    } catch (e) {
+      console.warn("[HomeController] Service demand query failed:", e.message);
+    }
+
     res.json({
       success: true,
       stats: {
@@ -241,7 +456,8 @@ exports.getAnalyticsDashboard = async (req, res) => {
         revenue_last_7_days,
         daysOfWeek
       },
-      membership_breakdown
+      membership_breakdown,
+      service_demand
     });
   } catch (error) {
     console.error("[HomeController] Error getting analytics dashboard:", error);

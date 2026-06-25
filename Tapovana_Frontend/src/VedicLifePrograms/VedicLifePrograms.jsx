@@ -100,18 +100,19 @@ const fileToBase64 = (file) => new Promise((resolve, reject) => {
 
 // ─── Status style helper ──────────────────────────────────────────────────
 const getAttendeeStatusStyles = (status) => {
-  switch (status) {
-    case 'attended':
+  if (!status) return { bg: "rgba(205,167,81,0.12)", color: "#CDA751" };
+  switch (status.toUpperCase()) {
+    case 'ATTENDED':
       return { bg: "rgba(34,197,94,0.12)", color: "#16a34a" };
-    case 'checked_in':
+    case 'CHECKED_IN':
       return { bg: "rgba(13,148,136,0.12)", color: "#0d9488" };
-    case 'confirmed':
+    case 'CONFIRMED':
       return { bg: "rgba(79,70,229,0.12)", color: "#4f46e5" };
-    case 'registered':
+    case 'REGISTERED':
       return { bg: "rgba(205,167,81,0.12)", color: "#CDA751" };
-    case 'absent':
+    case 'ABSENT':
       return { bg: "rgba(239,68,68,0.12)", color: "#dc2626" };
-    case 'cancelled':
+    case 'CANCELLED':
       return { bg: "rgba(100,116,139,0.12)", color: "#64748b" };
     default:
       return { bg: "rgba(205,167,81,0.12)", color: "#CDA751" };
@@ -465,19 +466,20 @@ function EditableDate({ value, onSave }) {
 }
 
 function EditablePaymentStatus({ value, onSave }) {
-  const [val, setVal] = useState(value || "Pending");
+  const [val, setVal] = useState(value || "PENDING");
 
   useEffect(() => {
-    setVal(value || "Pending");
+    setVal(value || "PENDING");
   }, [value]);
 
   const getPaymentStyles = (status) => {
-    switch (status) {
-      case 'Paid':
+    if (!status) return { bg: "rgba(239,68,68,0.12)", color: "#dc2626" };
+    switch (status.toUpperCase()) {
+      case 'PAID':
         return { bg: "rgba(34,197,94,0.12)", color: "#16a34a" };
-      case 'Partially Paid':
+      case 'PARTIALLY_PAID':
         return { bg: "rgba(205,167,81,0.12)", color: "#CDA751" };
-      case 'Pending':
+      case 'PENDING':
       default:
         return { bg: "rgba(239,68,68,0.12)", color: "#dc2626" };
     }
@@ -507,18 +509,18 @@ function EditablePaymentStatus({ value, onSave }) {
         width: "auto"
       }}
     >
-      <option value="Pending">Pending</option>
-      <option value="Paid">Paid</option>
-      <option value="Partially Paid">Partially Paid</option>
+      <option value="PENDING">Pending</option>
+      <option value="PAID">Paid</option>
+      <option value="PARTIALLY_PAID">Partially Paid</option>
     </select>
   );
 }
 
 function EditableStatus({ value, onSave }) {
-  const [val, setVal] = useState(value || "registered");
+  const [val, setVal] = useState(value || "REGISTERED");
 
   useEffect(() => {
-    setVal(value || "registered");
+    setVal(value || "REGISTERED");
   }, [value]);
 
   const styles = getAttendeeStatusStyles(val);
@@ -545,12 +547,12 @@ function EditableStatus({ value, onSave }) {
         width: "auto"
       }}
     >
-      <option value="registered">Registered</option>
-      <option value="confirmed">Confirmed</option>
-      <option value="checked_in">Checked In</option>
-      <option value="attended">Attended</option>
-      <option value="absent">Absent</option>
-      <option value="cancelled">Cancelled</option>
+      <option value="REGISTERED">Registered</option>
+      <option value="CONFIRMED">Confirmed</option>
+      <option value="CHECKED_IN">Checked In</option>
+      <option value="ATTENDED">Attended</option>
+      <option value="ABSENT">Absent</option>
+      <option value="CANCELLED">Cancelled</option>
     </select>
   );
 }
@@ -618,7 +620,7 @@ export default function VedicLifePrograms() {
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
-  const [manualEnrollForm, setManualEnrollForm] = useState({ name: "", email: "", phone: "", accommodation_type: "", payment_status: "Pending", checkin_date: "", checkout_date: "" });
+  const [manualEnrollForm, setManualEnrollForm] = useState({ name: "", email: "", phone: "", accommodationType: "", paymentStatus: "PENDING", checkInDate: "", checkOutDate: "", status: "CONFIRMED" });
   const [manualEnrollSaving, setManualEnrollSaving] = useState(false);
   const [manualEnrollError, setManualEnrollError] = useState("");
   const [phoneError, setPhoneError] = useState("");
@@ -698,8 +700,8 @@ export default function VedicLifePrograms() {
         (a.email || "").toLowerCase().includes(attendeeSearch.toLowerCase()) ||
         (a.phone || "").toLowerCase().includes(attendeeSearch.toLowerCase());
       
-      const matchStatus = attendeeStatusFilter === "ALL" || a.status === attendeeStatusFilter;
-      const matchPayment = attendeePaymentFilter === "ALL" || (a.payment_status || "Pending") === attendeePaymentFilter;
+      const matchStatus = attendeeStatusFilter === "ALL" || (a.status || "").toUpperCase() === attendeeStatusFilter.toUpperCase();
+      const matchPayment = attendeePaymentFilter === "ALL" || (a.payment_status || "PENDING").toUpperCase() === attendeePaymentFilter.toUpperCase();
 
       return matchSearch && matchStatus && matchPayment;
     });
@@ -736,27 +738,57 @@ export default function VedicLifePrograms() {
       return;
     }
 
-    if (!manualEnrollForm.name.trim() || !manualEnrollForm.email.trim()) {
-      setManualEnrollError("Name and Email are required.");
+    if (!manualEnrollForm.name || !manualEnrollForm.name.trim()) {
+      setManualEnrollError("Name is required.");
+      return;
+    }
+    if (!/^[A-Za-z\s]+$/.test(manualEnrollForm.name.trim())) {
+      setManualEnrollError("Name must contain alphabets and spaces only.");
+      return;
+    }
+    if (manualEnrollForm.name.trim().length < 2) {
+      setManualEnrollError("Name must be at least 2 characters.");
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(manualEnrollForm.email.trim())) {
-      setManualEnrollError("Please enter a valid email address.");
+    if (!manualEnrollForm.email || !manualEnrollForm.email.trim()) {
+      setManualEnrollError("Email is required.");
+      return;
+    }
+    const emailLower = manualEnrollForm.email.trim().toLowerCase();
+    if (!emailLower.endsWith(".com") || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailLower)) {
+      setManualEnrollError("Valid email format ending with .com is required.");
       return;
     }
 
-    if (manualEnrollForm.phone && manualEnrollForm.phone.trim()) {
-      const phoneVal = manualEnrollForm.phone.trim();
-      if (!/^\d{10}$/.test(phoneVal)) {
-        setManualEnrollError("Phone number must be exactly 10 digits");
+    if (!manualEnrollForm.phone || !manualEnrollForm.phone.trim()) {
+      setManualEnrollError("Phone number is required.");
+      return;
+    }
+    if (!/^\d{10}$/.test(manualEnrollForm.phone.trim())) {
+      setManualEnrollError("Phone number must be exactly 10 digits and numeric only.");
+      return;
+    }
+
+    if (manualEnrollForm.accommodationType && manualEnrollForm.accommodationType.trim()) {
+      if (!/^[A-Za-z\s0-9-]+$/.test(manualEnrollForm.accommodationType.trim())) {
+        setManualEnrollError("Accommodation type must be text only.");
         return;
       }
     }
 
-    if (manualEnrollForm.checkin_date && manualEnrollForm.checkout_date) {
-      if (manualEnrollForm.checkout_date < manualEnrollForm.checkin_date) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (manualEnrollForm.checkInDate && manualEnrollForm.checkInDate < todayStr) {
+      setManualEnrollError("Check-in date cannot be in the past.");
+      return;
+    }
+    if (manualEnrollForm.checkOutDate && manualEnrollForm.checkOutDate < todayStr) {
+      setManualEnrollError("Check-out date cannot be in the past.");
+      return;
+    }
+
+    if (manualEnrollForm.checkInDate && manualEnrollForm.checkOutDate) {
+      if (manualEnrollForm.checkOutDate < manualEnrollForm.checkInDate) {
         setManualEnrollError("Check-out date must be on or after check-in date.");
         return;
       }
@@ -764,13 +796,16 @@ export default function VedicLifePrograms() {
 
     try {
       setManualEnrollSaving(true);
-      const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/enroll`, {
+      const res = await apiFetch(`/api/vedic-programs/attendees`, {
         method: "POST",
-        body: JSON.stringify(manualEnrollForm)
+        body: JSON.stringify({
+          ...manualEnrollForm,
+          programId: selectedProgram.id
+        })
       });
       if (res.success) {
         triggerAlert("User enrolled successfully!", true);
-        setManualEnrollForm({ name: "", email: "", phone: "", accommodation_type: "", payment_status: "Pending", checkin_date: "", checkout_date: "" });
+        setManualEnrollForm({ name: "", email: "", phone: "", accommodationType: "", paymentStatus: "PENDING", checkInDate: "", checkOutDate: "", status: "CONFIRMED" });
         setPhoneError("");
         setShowManualEnroll(false);
         await fetchPrograms();
@@ -790,7 +825,7 @@ export default function VedicLifePrograms() {
     const confirmed = await triggerConfirm("Are you sure you want to remove this attendee?");
     if (!confirmed) return;
     try {
-      const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/attendees/${attendeeId}`, {
+      const res = await apiFetch(`/api/vedic-programs/attendees/${attendeeId}`, {
         method: "DELETE"
       });
       if (res.success) {
@@ -808,7 +843,11 @@ export default function VedicLifePrograms() {
 
   const handleUpdateAttendeeField = async (attendeeId, field, value) => {
     try {
-      const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/attendees/${attendeeId}`, {
+      const isStatus = field === 'status';
+      const endpoint = isStatus 
+        ? `/api/vedic-programs/attendees/${attendeeId}/status`
+        : `/api/vedic-programs/attendees/${attendeeId}`;
+      const res = await apiFetch(endpoint, {
         method: "PATCH",
         body: JSON.stringify({ [field]: value })
       });
@@ -828,12 +867,12 @@ export default function VedicLifePrograms() {
 
   const handleCheckinAttendee = async (attendeeId) => {
     try {
-      const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/attendees/${attendeeId}/checkin`, {
+      const res = await apiFetch(`/api/vedic-programs/attendees/${attendeeId}/checkin`, {
         method: "PATCH"
       });
       if (res.success) {
         triggerAlert("Attendee checked in successfully!", true);
-        setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, status: "checked_in", checked_in_at: new Date().toISOString() } : a));
+        setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, status: "CHECKED_IN", checked_in_at: new Date().toISOString() } : a));
       } else {
         throw new Error(res.message || "Failed to check in attendee.");
       }
@@ -1241,12 +1280,12 @@ export default function VedicLifePrograms() {
                   }}
                 >
                   <option value="ALL">Status: All</option>
-                  <option value="registered">Registered</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="checked_in">Checked In</option>
-                  <option value="attended">Attended</option>
-                  <option value="absent">Absent</option>
-                  <option value="cancelled">Cancelled</option>
+                  <option value="REGISTERED">Registered</option>
+                  <option value="CONFIRMED">Confirmed</option>
+                  <option value="CHECKED_IN">Checked In</option>
+                  <option value="ATTENDED">Attended</option>
+                  <option value="ABSENT">Absent</option>
+                  <option value="CANCELLED">Cancelled</option>
                 </select>
                 <select 
                   value={attendeePaymentFilter} 
@@ -1263,9 +1302,9 @@ export default function VedicLifePrograms() {
                   }}
                 >
                   <option value="ALL">Payment: All</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Paid">Paid</option>
-                  <option value="Partially Paid">Partially Paid</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="PAID">Paid</option>
+                  <option value="PARTIALLY_PAID">Partially Paid</option>
                 </select>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
@@ -1345,8 +1384,8 @@ export default function VedicLifePrograms() {
                     <input 
                       type="text" 
                       placeholder="e.g. Deluxe Room" 
-                      value={manualEnrollForm.accommodation_type || ""} 
-                      onChange={e => setManualEnrollForm(p => ({ ...p, accommodation_type: e.target.value }))}
+                      value={manualEnrollForm.accommodationType || ""} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, accommodationType: e.target.value }))}
                       style={inputStyle}
                     />
                   </FormField>
@@ -1354,35 +1393,35 @@ export default function VedicLifePrograms() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
                   <FormField label="Payment Status">
                     <select 
-                      value={manualEnrollForm.payment_status} 
-                      onChange={e => setManualEnrollForm(p => ({ ...p, payment_status: e.target.value }))}
+                      value={manualEnrollForm.paymentStatus} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, paymentStatus: e.target.value }))}
                       style={inputStyle}
                     >
-                      <option value="Pending">Pending</option>
-                      <option value="Paid">Paid</option>
-                      <option value="Partially Paid">Partially Paid</option>
+                      <option value="PENDING">Pending</option>
+                      <option value="PAID">Paid</option>
+                      <option value="PARTIALLY_PAID">Partially Paid</option>
                     </select>
                   </FormField>
                   <FormField label="Check-In Date (Optional)">
                     <input 
                       type="date" 
-                      value={manualEnrollForm.checkin_date || ""} 
-                      onChange={e => setManualEnrollForm(p => ({ ...p, checkin_date: e.target.value }))}
+                      value={manualEnrollForm.checkInDate || ""} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, checkInDate: e.target.value }))}
                       style={inputStyle}
                     />
                   </FormField>
                   <FormField label="Check-Out Date (Optional)">
                     <input 
                       type="date" 
-                      value={manualEnrollForm.checkout_date || ""} 
-                      onChange={e => setManualEnrollForm(p => ({ ...p, checkout_date: e.target.value }))}
+                      value={manualEnrollForm.checkOutDate || ""} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, checkOutDate: e.target.value }))}
                       style={inputStyle}
                     />
                   </FormField>
                 </div>
                 {manualEnrollError && <div style={{ color: "#e74c3c", fontSize: 12, fontWeight: 600, marginBottom: 8 }}>{manualEnrollError}</div>}
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                  <button className="vedic-btn-cancel" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setShowManualEnroll(false); setPhoneError(""); setManualEnrollForm({ name: "", email: "", phone: "", accommodation_type: "", payment_status: "Pending", checkin_date: "", checkout_date: "" }); }}>Cancel</button>
+                  <button className="vedic-btn-cancel" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setShowManualEnroll(false); setPhoneError(""); setManualEnrollForm({ name: "", email: "", phone: "", accommodationType: "", paymentStatus: "PENDING", checkInDate: "", checkOutDate: "", status: "CONFIRMED" }); }}>Cancel</button>
                   <button className="vedic-btn-allocate" style={{ padding: "6px 12px", fontSize: 12 }} onClick={handleManualEnroll} disabled={manualEnrollSaving || !!phoneError}>
                     {manualEnrollSaving ? "Enrolling..." : "Submit Enrollment"}
                   </button>
@@ -1444,14 +1483,14 @@ export default function VedicLifePrograms() {
                           </td>
                           <td style={{ padding: "6px 12px" }}>
                             <EditableDate 
-                              value={a.checkin_date} 
-                              onSave={val => handleUpdateAttendeeField(a.id, 'checkin_date', val)} 
+                              value={a.check_in_date} 
+                              onSave={val => handleUpdateAttendeeField(a.id, 'check_in_date', val)} 
                             />
                           </td>
                           <td style={{ padding: "6px 12px" }}>
                             <EditableDate 
-                              value={a.checkout_date} 
-                              onSave={val => handleUpdateAttendeeField(a.id, 'checkout_date', val)} 
+                              value={a.check_out_date} 
+                              onSave={val => handleUpdateAttendeeField(a.id, 'check_out_date', val)} 
                             />
                           </td>
                           <td style={{ position: "relative", padding: "10px 16px" }}>
@@ -1459,17 +1498,33 @@ export default function VedicLifePrograms() {
                               <img src={ActionIcon} className="action-icon" alt="Actions" style={{ cursor: "pointer", width: "14px", height: "14px", opacity: 0.8 }}
                                 onClick={(e) => { e.stopPropagation(); setOpenActionMenu(openActionMenu === a.id ? null : a.id); }} />
                               {openActionMenu === a.id && (
-                                <div style={{ position: "absolute", right: 0, top: "100%", zIndex: 1000, background: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", minWidth: "140px", overflow: "hidden", textAlign: "left" }}>
-                                  {(a.status === "registered" || a.status === "confirmed") && (
-                                    <div onClick={(e) => { e.stopPropagation(); setOpenActionMenu(null); handleCheckinAttendee(a.id); }}
-                                      style={{ padding: "10px 16px", cursor: "pointer", fontSize: "14px", color: "#CDA751", display: "flex", alignItems: "center", gap: "8px" }}
+                                <div style={{ position: "absolute", right: 0, top: "100%", zIndex: 1000, background: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", minWidth: "150px", overflow: "hidden", textAlign: "left" }}>
+                                  {[
+                                    { label: "Registered", value: "REGISTERED" },
+                                    { label: "Confirmed", value: "CONFIRMED" },
+                                    { label: "Checked In", value: "CHECKED_IN" },
+                                    { label: "Attended", value: "ATTENDED" },
+                                    { label: "Absent", value: "ABSENT" },
+                                    { label: "Cancelled", value: "CANCELLED" }
+                                  ].map(opt => (
+                                    <div key={opt.value} onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenActionMenu(null);
+                                      if (opt.value === 'CHECKED_IN') {
+                                        handleCheckinAttendee(a.id);
+                                      } else {
+                                        handleUpdateAttendeeField(a.id, 'status', opt.value);
+                                      }
+                                    }}
+                                      style={{ padding: "8px 16px", cursor: "pointer", fontSize: "13px", color: (a.status || '').toUpperCase() === opt.value ? "#CDA751" : "#4a5568", fontWeight: (a.status || '').toUpperCase() === opt.value ? "700" : "500", display: "flex", alignItems: "center", gap: "8px" }}
                                       onMouseEnter={e => e.currentTarget.style.background = "#fcf8ed"}
                                       onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                                      Check In
+                                      {opt.label}
                                     </div>
-                                  )}
+                                  ))}
+                                  <div style={{ borderTop: "1px solid #e2e8f0", margin: "4px 0" }} />
                                   <div onClick={(e) => { e.stopPropagation(); setOpenActionMenu(null); handleDeleteAttendee(a.id); }}
-                                    style={{ padding: "10px 16px", cursor: "pointer", fontSize: "14px", color: "#e74c3c", display: "flex", alignItems: "center", gap: "8px" }}
+                                    style={{ padding: "8px 16px", cursor: "pointer", fontSize: "13px", color: "#e74c3c", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px" }}
                                     onMouseEnter={e => e.currentTarget.style.background = "#fdf2f2"}
                                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                                     Delete

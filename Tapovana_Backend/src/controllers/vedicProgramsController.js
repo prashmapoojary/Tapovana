@@ -1,6 +1,96 @@
 const { query } = require('../config/db');
 const { checkStaffAllocationConflict } = require('../utils/conflictChecker');
 
+const validateVedicAttendee = (data, isNew = true) => {
+    const { name, email, phone, status, accommodation_type, payment_status, checkin_date, checkout_date } = data;
+
+    if (isNew) {
+        if (!name || typeof name !== 'string' || !/^[A-Za-z\s]+$/.test(name) || name.trim().length < 2) {
+            return 'Name is required, must contain alphabets only, and be at least 2 characters.';
+        }
+        if (!email || typeof email !== 'string' || !email.trim().toLowerCase().endsWith('.com') || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            return 'Valid email format ending with .com is required.';
+        }
+        if (!phone || typeof phone !== 'string' || !/^\d{10}$/.test(phone.trim())) {
+            return 'Phone number must be exactly 10 digits and numeric only.';
+        }
+    } else {
+        if (name !== undefined) {
+            if (typeof name !== 'string' || !/^[A-Za-z\s]+$/.test(name) || name.trim().length < 2) {
+                return 'Name must contain alphabets only and be at least 2 characters.';
+            }
+        }
+        if (email !== undefined) {
+            if (typeof email !== 'string' || !email.trim().toLowerCase().endsWith('.com') || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+                return 'Valid email format ending with .com is required.';
+            }
+        }
+        if (phone !== undefined) {
+            if (typeof phone !== 'string' || !/^\d{10}$/.test(phone.trim())) {
+                return 'Phone number must be exactly 10 digits and numeric only.';
+            }
+        }
+    }
+
+    if (status) {
+        const validStatuses = ['REGISTERED','CONFIRMED','CHECKED_IN','ATTENDED','ABSENT','CANCELLED'];
+        if (!validStatuses.includes(status.toUpperCase())) {
+            return `Status must be one of: ${validStatuses.join(', ')}.`;
+        }
+    }
+
+    if (accommodation_type) {
+        if (typeof accommodation_type !== 'string' || !/^[A-Za-z\s0-9-]+$/.test(accommodation_type)) {
+            return 'Accommodation type must be text only.';
+        }
+    }
+
+    if (payment_status) {
+        const validPayment = ['PAID','PENDING','PARTIALLY_PAID'];
+        if (!validPayment.includes(payment_status.toUpperCase())) {
+            return `Payment Status must be one of: ${validPayment.join(', ')}.`;
+        }
+    }
+
+    if (checkin_date) {
+        const cid = new Date(checkin_date);
+        if (isNaN(cid.getTime())) {
+            return 'Check-in date is invalid.';
+        }
+        if (isNew) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (cid < today) {
+                return 'Check-in date cannot be in the past.';
+            }
+        }
+    }
+
+    if (checkout_date) {
+        const cod = new Date(checkout_date);
+        if (isNaN(cod.getTime())) {
+            return 'Check-out date is invalid.';
+        }
+        if (isNew) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (cod < today) {
+                return 'Check-out date cannot be in the past.';
+            }
+        }
+    }
+
+    if (checkin_date && checkout_date) {
+        const cid = new Date(checkin_date);
+        const cod = new Date(checkout_date);
+        if (cod < cid) {
+            return 'Check-out date must be on or after check-in date.';
+        }
+    }
+
+    return null;
+};
+
 const getVedicProgramStatus = (startDate, endDate) => {
     if (!startDate || !endDate) return 'Upcoming';
     
@@ -596,7 +686,7 @@ const updateVedicProgram = async (req, res) => {
                 changesStr += `Dates updated to: ${new Date(updatedProgram.start_date).toLocaleDateString()} to ${new Date(updatedProgram.end_date).toLocaleDateString()}\n`;
             }
 
-            const attendeesRes = await query('SELECT name, email FROM vedic_program_attendees WHERE program_id = $1 AND status NOT IN (\'cancelled\')', [programId]);
+            const attendeesRes = await query('SELECT name, email FROM vedic_attendees WHERE program_id = $1 AND status NOT IN (\'CANCELLED\')', [programId]);
             for (const a of attendeesRes.rows) {
                 if (a.email) {
                     try {
@@ -794,24 +884,37 @@ const updateVedicProgramStaff = async (req, res) => {
 
 // PUBLIC REGISTRATION ENDPOINT
 const registerAttendee = async (req, res) => {
-    const id = req.params.id || req.body.program_id || req.body.package_id || req.body.id || req.body.vedic_program_id || req.body.workshop_id;
+    const id = req.params.id || req.body.program_id || req.body.package_id || req.body.id || req.body.vedic_program_id || req.body.workshop_id || req.body.programId || req.body.packageId;
     const userObj = req.body.user || req.body;
     const name = userObj.name;
     const email = userObj.email;
     const phone = userObj.phone;
     const source = req.body.source || 'mobile';
 
-    if (!name || !email) {
-        return res.status(400).json({ success: false, message: 'Name and Email are required.' });
+    const accommodation_type = req.body.accommodationType || req.body.accommodation_type || null;
+    const payment_status = (req.body.paymentStatus || req.body.payment_status || 'PENDING').toUpperCase();
+    const checkin_date = req.body.checkInDate || req.body.checkin_date || null;
+    const checkout_date = req.body.checkOutDate || req.body.checkout_date || null;
+    const status = (req.body.status || 'REGISTERED').toUpperCase();
+
+    // Validation rules
+    const valErr = validateVedicAttendee({
+        name,
+        email,
+        phone,
+        status,
+        accommodation_type,
+        payment_status,
+        checkin_date,
+        checkout_date
+    }, true);
+
+    if (valErr) {
+        return res.status(400).json({ success: false, message: valErr });
     }
 
     if (!id) {
         return res.status(400).json({ success: false, message: 'Program ID is required.' });
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-        return res.status(400).json({ success: false, message: 'Invalid email format.' });
     }
 
     try {
@@ -821,8 +924,8 @@ const registerAttendee = async (req, res) => {
         }
         const program = progRes.rows[0];
 
-        const status = program.status || getVedicProgramStatus(program.start_date, program.end_date);
-        if (status !== 'Upcoming') {
+        const programStatus = program.status || getVedicProgramStatus(program.start_date, program.end_date);
+        if (programStatus !== 'Upcoming') {
             return res.status(400).json({ success: false, message: 'Registration is only allowed for upcoming programs.' });
         }
 
@@ -839,19 +942,14 @@ const registerAttendee = async (req, res) => {
             }
         }
 
-        const attendeeCheck = await query('SELECT 1 FROM vedic_program_attendees WHERE program_id = $1 AND email = $2', [id, email.toLowerCase().trim()]);
+        const attendeeCheck = await query('SELECT 1 FROM vedic_attendees WHERE program_id = $1 AND email = $2', [id, email.toLowerCase().trim()]);
         if (attendeeCheck.rows.length) {
             return res.status(400).json({ success: false, message: 'You are already registered for this program.' });
         }
 
-        const accommodation_type = req.body.accommodation_type || null;
-        const payment_status = req.body.payment_status || 'Pending';
-        const checkin_date = req.body.checkin_date || null;
-        const checkout_date = req.body.checkout_date || null;
-
         const result = await query(
-            "INSERT INTO vedic_program_attendees (program_id, name, email, phone, status, source, accommodation_type, payment_status, checkin_date, checkout_date) VALUES ($1, $2, $3, $4, 'registered', $5, $6, $7, $8, $9) RETURNING *",
-            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, source, accommodation_type, payment_status, checkin_date, checkout_date]
+            "INSERT INTO vedic_attendees (program_id, name, email, phone, status, source, accommodation_type, payment_status, check_in_date, check_out_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *",
+            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, status, source, accommodation_type, payment_status, checkin_date, checkout_date]
         );
 
         await query('UPDATE vedic_programs SET enrolled = enrolled + 1 WHERE id = $1', [id]);
@@ -929,24 +1027,37 @@ const registerAttendee = async (req, res) => {
 
 // ENROLL USER IN VEDIC PROGRAM (Admin manual enrollment)
 const enrollUserInVedicProgram = async (req, res) => {
-    const id = req.params.id || req.body.program_id || req.body.package_id || req.body.id || req.body.vedic_program_id || req.body.workshop_id;
+    const id = req.params.id || req.body.program_id || req.body.package_id || req.body.id || req.body.vedic_program_id || req.body.workshop_id || req.body.programId || req.body.packageId;
     const userObj = req.body.user || req.body;
     const name = userObj.name;
     const email = userObj.email;
     const phone = userObj.phone;
     const source = req.body.source || 'admin';
 
-    if (!name || !email) {
-        return res.status(400).json({ success: false, message: 'Name and Email are required.' });
+    const accommodation_type = req.body.accommodationType || req.body.accommodation_type || null;
+    const payment_status = (req.body.paymentStatus || req.body.payment_status || 'PENDING').toUpperCase();
+    const checkin_date = req.body.checkInDate || req.body.checkin_date || null;
+    const checkout_date = req.body.checkOutDate || req.body.checkout_date || null;
+    const status = (req.body.status || 'CONFIRMED').toUpperCase();
+
+    // Validation rules
+    const valErr = validateVedicAttendee({
+        name,
+        email,
+        phone,
+        status,
+        accommodation_type,
+        payment_status,
+        checkin_date,
+        checkout_date
+    }, true);
+
+    if (valErr) {
+        return res.status(400).json({ success: false, message: valErr });
     }
 
     if (!id) {
         return res.status(400).json({ success: false, message: 'Program ID is required.' });
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-        return res.status(400).json({ success: false, message: 'Invalid email format.' });
     }
 
     try {
@@ -956,8 +1067,8 @@ const enrollUserInVedicProgram = async (req, res) => {
         }
         const program = progRes.rows[0];
 
-        const status = program.status || getVedicProgramStatus(program.start_date, program.end_date);
-        if (status === 'Live' || status === 'Completed' || status === 'Cancelled') {
+        const programStatus = program.status || getVedicProgramStatus(program.start_date, program.end_date);
+        if (programStatus === 'Live' || programStatus === 'Completed' || programStatus === 'Cancelled') {
             return res.status(400).json({ success: false, message: 'Enrollment is closed as this program is ongoing, completed, or cancelled.' });
         }
 
@@ -974,19 +1085,14 @@ const enrollUserInVedicProgram = async (req, res) => {
             }
         }
 
-        const attendeeCheck = await query('SELECT 1 FROM vedic_program_attendees WHERE program_id = $1 AND email = $2', [id, email.toLowerCase().trim()]);
+        const attendeeCheck = await query('SELECT 1 FROM vedic_attendees WHERE program_id = $1 AND email = $2', [id, email.toLowerCase().trim()]);
         if (attendeeCheck.rows.length) {
             return res.status(400).json({ success: false, message: 'User is already enrolled in this program.' });
         }
 
-        const accommodation_type = req.body.accommodation_type || null;
-        const payment_status = req.body.payment_status || 'Pending';
-        const checkin_date = req.body.checkin_date || null;
-        const checkout_date = req.body.checkout_date || null;
-
         const result = await query(
-            "INSERT INTO vedic_program_attendees (program_id, name, email, phone, status, source, accommodation_type, payment_status, checkin_date, checkout_date) VALUES ($1, $2, $3, $4, 'confirmed', $5, $6, $7, $8, $9) RETURNING *",
-            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, source, accommodation_type, payment_status, checkin_date, checkout_date]
+            "INSERT INTO vedic_attendees (program_id, name, email, phone, status, source, accommodation_type, payment_status, check_in_date, check_out_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *",
+            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, status, source, accommodation_type, payment_status, checkin_date, checkout_date]
         );
 
         await query('UPDATE vedic_programs SET enrolled = enrolled + 1 WHERE id = $1', [id]);
@@ -1053,7 +1159,7 @@ const enrollUserInVedicProgram = async (req, res) => {
 const getVedicProgramAttendees = async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await query('SELECT * FROM vedic_program_attendees WHERE program_id = $1 ORDER BY created_at DESC', [id]);
+        const result = await query('SELECT * FROM vedic_attendees WHERE program_id = $1 ORDER BY created_at DESC', [id]);
         return res.json({
             success: true,
             status: 'success',
@@ -1068,44 +1174,52 @@ const getVedicProgramAttendees = async (req, res) => {
 
 // UPDATE VEDIC ATTENDEE ATTENDANCE STATUS (Admin Endpoint)
 const updateVedicAttendeeAttendance = async (req, res) => {
-    const { id, attendeeId } = req.params;
-    const { status, accommodation_type, payment_status, checkin_date, checkout_date } = req.body;
+    const attendeeId = req.params.attendeeId || req.params.id;
+    const { status, accommodationType, accommodation_type, paymentStatus, payment_status, checkInDate, checkin_date, checkOutDate, checkout_date } = req.body;
 
-    const validStatuses = ['registered', 'confirmed', 'checked_in', 'attended', 'absent', 'cancelled'];
-    if (status && !validStatuses.includes(status)) {
-        return res.status(400).json({ success: false, message: `Status must be one of: ${validStatuses.join(', ')}.` });
-    }
+    const accommodationVal = accommodationType !== undefined ? accommodationType : accommodation_type;
+    const paymentVal = paymentStatus !== undefined ? paymentStatus : payment_status;
+    const checkinVal = checkInDate !== undefined ? checkInDate : checkin_date;
+    const checkoutVal = checkOutDate !== undefined ? checkOutDate : checkout_date;
 
-    const validPaymentStatuses = ['Paid', 'Pending', 'Partially Paid'];
-    if (payment_status && !validPaymentStatuses.includes(payment_status)) {
-        return res.status(400).json({ success: false, message: `Payment Status must be one of: ${validPaymentStatuses.join(', ')}.` });
+    const valErr = validateVedicAttendee({
+        status,
+        accommodation_type: accommodationVal,
+        payment_status: paymentVal,
+        checkin_date: checkinVal,
+        checkout_date: checkoutVal
+    }, false);
+
+    if (valErr) {
+        return res.status(400).json({ success: false, message: valErr });
     }
 
     try {
         // Fetch current record
-        const attRes = await query('SELECT * FROM vedic_program_attendees WHERE program_id = $1 AND id = $2', [id, attendeeId]);
+        const attRes = await query('SELECT * FROM vedic_attendees WHERE id = $1', [attendeeId]);
         if (!attRes.rows.length) {
             return res.status(404).json({ success: false, message: 'Attendee record not found.' });
         }
         const current = attRes.rows[0];
+        const programId = current.program_id;
 
-        const finalStatus = status || current.status;
-        const finalAccommodation = accommodation_type !== undefined ? accommodation_type : current.accommodation_type;
-        const finalPaymentStatus = payment_status || current.payment_status || 'Pending';
-        const finalCheckinDate = checkin_date !== undefined ? checkin_date : current.checkin_date;
-        const finalCheckoutDate = checkout_date !== undefined ? checkout_date : current.checkout_date;
+        const finalStatus = status ? status.toUpperCase() : current.status;
+        const finalAccommodation = accommodationVal !== undefined ? accommodationVal : current.accommodation_type;
+        const finalPaymentStatus = paymentVal ? paymentVal.toUpperCase() : current.payment_status;
+        const finalCheckinDate = checkinVal !== undefined ? checkinVal : current.check_in_date;
+        const finalCheckoutDate = checkoutVal !== undefined ? checkoutVal : current.check_out_date;
 
         const result = await query(
-            `UPDATE vedic_program_attendees 
-             SET status = $1, accommodation_type = $2, payment_status = $3, checkin_date = $4, checkout_date = $5, updated_at = NOW() 
-             WHERE program_id = $6 AND id = $7 RETURNING *`,
-            [finalStatus, finalAccommodation, finalPaymentStatus, finalCheckinDate || null, finalCheckoutDate || null, id, attendeeId]
+            `UPDATE vedic_attendees 
+             SET status = $1, accommodation_type = $2, payment_status = $3, check_in_date = $4, check_out_date = $5, updated_at = NOW() 
+             WHERE id = $6 RETURNING *`,
+            [finalStatus, finalAccommodation, finalPaymentStatus, finalCheckinDate || null, finalCheckoutDate || null, attendeeId]
         );
 
         // Send email notification upon status changes (e.g. status changed by admin)
-        if (status && status !== current.status) {
+        if (status && status.toUpperCase() !== current.status) {
             try {
-                const progRes = await query('SELECT * FROM vedic_programs WHERE id = $1', [id]);
+                const progRes = await query('SELECT * FROM vedic_programs WHERE id = $1', [programId]);
                 if (progRes.rows.length) {
                     const program = progRes.rows[0];
                     const { sendVedicRegistrationEmail } = require('../services/emailService');
@@ -1146,7 +1260,7 @@ const updateVedicAttendeeAttendance = async (req, res) => {
                         startDate: program.start_date,
                         endDate: program.end_date,
                         time: program.time,
-                        status: status,
+                        status: status.toLowerCase(),
                         assignedStaff: assignedStaffStr
                     });
                     console.log(`Notification email sent to ${current.email} for status update to ${status}.`);
@@ -1165,16 +1279,16 @@ const updateVedicAttendeeAttendance = async (req, res) => {
 
 // CHECK-IN ATTENDEE (Admin Endpoint)
 const checkinAttendee = async (req, res) => {
-    const { id, attendeeId } = req.params;
+    const attendeeId = req.params.attendeeId || req.params.id;
     try {
-        const check = await query('SELECT 1 FROM vedic_program_attendees WHERE id = $1 AND program_id = $2', [attendeeId, id]);
+        const check = await query('SELECT 1 FROM vedic_attendees WHERE id = $1', [attendeeId]);
         if (!check.rows.length) {
             return res.status(404).json({ success: false, message: 'Attendee record not found.' });
         }
 
         const result = await query(
-            "UPDATE vedic_program_attendees SET status = 'checked_in', checked_in_at = NOW(), updated_at = NOW() WHERE program_id = $2 AND id = $3 RETURNING *",
-            [id, attendeeId]
+            "UPDATE vedic_attendees SET status = 'CHECKED_IN', checked_in_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *",
+            [attendeeId]
         );
 
         return res.json({ success: true, message: 'Attendee successfully checked in.', attendee: result.rows[0] });
@@ -1202,11 +1316,11 @@ const cancelVedicProgram = async (req, res) => {
         await query("DELETE FROM allocations WHERE id LIKE $1", [`vp-alloc-${programId}%`]);
 
         const attendeesRes = await query(
-            "SELECT name, email FROM vedic_program_attendees WHERE program_id = $1 AND status NOT IN ('cancelled')",
+            "SELECT name, email FROM vedic_attendees WHERE program_id = $1 AND status NOT IN ('CANCELLED')",
             [programId]
         );
         
-        await query("UPDATE vedic_program_attendees SET status = 'cancelled', updated_at = NOW() WHERE program_id = $1 AND status NOT IN ('cancelled')", [programId]);
+        await query("UPDATE vedic_attendees SET status = 'CANCELLED', updated_at = NOW() WHERE program_id = $1 AND status NOT IN ('CANCELLED')", [programId]);
 
         const { sendVedicCancellationEmail } = require('../services/emailService');
         for (const attendee of attendeesRes.rows) {
@@ -1271,17 +1385,19 @@ const cancelVedicProgram = async (req, res) => {
 
 // DELETE VEDIC PROGRAM ATTENDEE (Admin Endpoint)
 const deleteVedicProgramAttendee = async (req, res) => {
-    const { id, attendeeId } = req.params;
+    const attendeeId = req.params.attendeeId || req.params.id;
     try {
-        const check = await query('SELECT 1 FROM vedic_program_attendees WHERE id = $1 AND program_id = $2', [attendeeId, id]);
+        const check = await query('SELECT * FROM vedic_attendees WHERE id = $1', [attendeeId]);
         if (!check.rows.length) {
             return res.status(404).json({ success: false, message: 'Attendee record not found.' });
         }
+        const attendee = check.rows[0];
+        const programId = attendee.program_id;
 
-        await query('DELETE FROM vedic_program_attendees WHERE id = $1 AND program_id = $2', [attendeeId, id]);
-        await query('UPDATE vedic_programs SET enrolled = GREATEST(0, enrolled - 1) WHERE id = $1', [id]);
+        await query('DELETE FROM vedic_attendees WHERE id = $1', [attendeeId]);
+        await query('UPDATE vedic_programs SET enrolled = GREATEST(0, enrolled - 1) WHERE id = $1', [programId]);
 
-        const updatedRes = await query('SELECT * FROM vedic_program_attendees WHERE program_id = $1 ORDER BY created_at DESC', [id]);
+        const updatedRes = await query('SELECT * FROM vedic_attendees WHERE program_id = $1 ORDER BY created_at DESC', [programId]);
         return res.json({ success: true, message: 'Attendee deleted.', attendees: updatedRes.rows });
     } catch (err) {
         console.error('deleteVedicProgramAttendee error:', err);
@@ -1299,7 +1415,7 @@ const exportVedicProgramAttendees = async (req, res) => {
         }
         const title = progRes.rows[0].title;
 
-        const result = await query('SELECT name, email, phone, status, created_at FROM vedic_program_attendees WHERE program_id = $1 ORDER BY name ASC', [id]);
+        const result = await query('SELECT name, email, phone, status, created_at FROM vedic_attendees WHERE program_id = $1 ORDER BY name ASC', [id]);
         
         let csvContent = 'Name,Email,Phone,Status,Enrolled At\n';
         for (const row of result.rows) {
@@ -1373,7 +1489,7 @@ const sendVedicProgramReminders = async () => {
                 console.log(`[Reminder Scheduler] Sending ${diffDays}-day reminders for: "${p.title}"`);
 
                 const attendeesRes = await query(
-                    "SELECT name, email FROM vedic_program_attendees WHERE program_id = $1 AND status IN ('registered', 'confirmed')",
+                    "SELECT name, email FROM vedic_attendees WHERE program_id = $1 AND status IN ('REGISTERED', 'CONFIRMED')",
                     [p.id]
                 );
                 for (const a of attendeesRes.rows) {
