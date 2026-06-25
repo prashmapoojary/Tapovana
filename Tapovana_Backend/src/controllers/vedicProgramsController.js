@@ -794,11 +794,19 @@ const updateVedicProgramStaff = async (req, res) => {
 
 // PUBLIC REGISTRATION ENDPOINT
 const registerAttendee = async (req, res) => {
-    const { id } = req.params;
-    const { name, email, phone } = req.body;
+    const id = req.params.id || req.body.program_id || req.body.package_id || req.body.id || req.body.vedic_program_id || req.body.workshop_id;
+    const userObj = req.body.user || req.body;
+    const name = userObj.name;
+    const email = userObj.email;
+    const phone = userObj.phone;
+    const source = req.body.source || 'mobile';
 
     if (!name || !email) {
         return res.status(400).json({ success: false, message: 'Name and Email are required.' });
+    }
+
+    if (!id) {
+        return res.status(400).json({ success: false, message: 'Program ID is required.' });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -837,8 +845,8 @@ const registerAttendee = async (req, res) => {
         }
 
         const result = await query(
-            "INSERT INTO vedic_program_attendees (program_id, name, email, phone, status) VALUES ($1, $2, $3, $4, 'registered') RETURNING *",
-            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null]
+            "INSERT INTO vedic_program_attendees (program_id, name, email, phone, status, source) VALUES ($1, $2, $3, $4, 'registered', $5) RETURNING *",
+            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, source]
         );
 
         await query('UPDATE vedic_programs SET enrolled = enrolled + 1 WHERE id = $1', [id]);
@@ -900,10 +908,13 @@ const registerAttendee = async (req, res) => {
             console.error('Failed to send admin notification email:', err);
         }
 
+        const attendee = result.rows[0];
         return res.status(201).json({
             success: true,
+            status: 'success',
             message: 'Successfully registered for the program.',
-            attendee: result.rows[0]
+            attendee: attendee,
+            attendee_id: attendee.id
         });
     } catch (err) {
         console.error('registerAttendee error:', err);
@@ -913,11 +924,19 @@ const registerAttendee = async (req, res) => {
 
 // ENROLL USER IN VEDIC PROGRAM (Admin manual enrollment)
 const enrollUserInVedicProgram = async (req, res) => {
-    const { id } = req.params;
-    const { name, email, phone } = req.body;
+    const id = req.params.id || req.body.program_id || req.body.package_id || req.body.id || req.body.vedic_program_id || req.body.workshop_id;
+    const userObj = req.body.user || req.body;
+    const name = userObj.name;
+    const email = userObj.email;
+    const phone = userObj.phone;
+    const source = req.body.source || 'admin';
 
     if (!name || !email) {
         return res.status(400).json({ success: false, message: 'Name and Email are required.' });
+    }
+
+    if (!id) {
+        return res.status(400).json({ success: false, message: 'Program ID is required.' });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -956,8 +975,8 @@ const enrollUserInVedicProgram = async (req, res) => {
         }
 
         const result = await query(
-            "INSERT INTO vedic_program_attendees (program_id, name, email, phone, status) VALUES ($1, $2, $3, $4, 'confirmed') RETURNING *",
-            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null]
+            "INSERT INTO vedic_program_attendees (program_id, name, email, phone, status, source) VALUES ($1, $2, $3, $4, 'confirmed', $5) RETURNING *",
+            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, source]
         );
 
         await query('UPDATE vedic_programs SET enrolled = enrolled + 1 WHERE id = $1', [id]);
@@ -1006,10 +1025,13 @@ const enrollUserInVedicProgram = async (req, res) => {
             console.error('Failed to send enrollment email to manually added user:', err);
         }
 
+        const attendee = result.rows[0];
         return res.status(201).json({
             success: true,
+            status: 'success',
             message: 'Successfully enrolled in program.',
-            attendee: result.rows[0]
+            attendee: attendee,
+            attendee_id: attendee.id
         });
     } catch (err) {
         console.error('enrollUserInVedicProgram error:', err);
@@ -1022,7 +1044,12 @@ const getVedicProgramAttendees = async (req, res) => {
     const { id } = req.params;
     try {
         const result = await query('SELECT * FROM vedic_program_attendees WHERE program_id = $1 ORDER BY created_at DESC', [id]);
-        return res.json({ success: true, attendees: result.rows });
+        return res.json({
+            success: true,
+            status: 'success',
+            program_id: id,
+            attendees: result.rows
+        });
     } catch (err) {
         console.error('getVedicProgramAttendees error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
@@ -1337,11 +1364,14 @@ const sendVedicProgramReminders = async () => {
 
 // MOBILE ENDPOINT HOOK FOR VEDIC PACKAGES ENROLLMENT
 const registerAttendeeFromMobile = async (req, res) => {
-    const programId = req.body.program_id || req.body.package_id || req.body.id || req.body.vedic_program_id;
+    const programId = req.body.program_id || req.body.package_id || req.body.id || req.body.vedic_program_id || req.body.workshop_id;
     if (!programId) {
         return res.status(400).json({ success: false, message: 'Program ID / Package ID is required.' });
     }
     req.params.id = programId;
+    if (!req.body.source) {
+        req.body.source = 'mobile';
+    }
     return registerAttendee(req, res);
 };
 

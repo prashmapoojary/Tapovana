@@ -26,6 +26,7 @@ router.get('/certificates/download/:id', require('../controllers/certificatesCon
 router.get('/:id', getWorkshopById);
 
 // Public User Enrollment (Mobile Side Simulation)
+router.post('/enroll', enrollUserInWorkshop);
 router.post('/:id/enroll', enrollUserInWorkshop);
 router.get('/:id/video', streamWorkshopVideo);
 

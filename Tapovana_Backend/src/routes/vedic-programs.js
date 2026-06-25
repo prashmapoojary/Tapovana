@@ -38,6 +38,7 @@ router.delete('/:id', ...adminOnly, deleteVedicProgram);
 router.post('/:id/register', registerAttendee);
 
 // Attendee Management (Admin Side)
+router.post('/enroll', ...adminOnly, enrollUserInVedicProgram);
 router.post('/:id/enroll', ...adminOnly, enrollUserInVedicProgram);
 router.get('/:id/attendees', ...adminOnly, getVedicProgramAttendees);
 router.patch('/:id/attendees/:attendeeId/checkin', ...adminOnly, checkinAttendee);

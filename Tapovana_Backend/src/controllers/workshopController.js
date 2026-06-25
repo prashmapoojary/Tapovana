@@ -1078,21 +1078,30 @@ const completeWorkshopAllocation = async (req, res) => {
 
 // ENROLL USER IN WORKSHOP (Public Mobile Endpoint / Admin manual)
 const enrollUserInWorkshop = async (req, res) => {
-    const { id } = req.params;
-    const { name, email, phone } = req.body;
+    const workshopId = req.params.id || req.body.workshop_id;
+    const userObj = req.body.user || req.body;
+    const name = userObj.name;
+    const email = userObj.email;
+    const phone = userObj.phone;
+    const source = req.body.source || 'admin';
+    const certificate_eligible = req.body.certificate_eligible !== undefined ? req.body.certificate_eligible : true;
 
     if (!name || !email) {
         return res.status(400).json({ success: false, message: 'Name and Email are required.' });
     }
 
+    if (!workshopId) {
+        return res.status(400).json({ success: false, message: 'Workshop ID is required.' });
+    }
+
     try {
         try {
-            await validateWorkshopActions(id);
+            await validateWorkshopActions(workshopId);
         } catch (valErr) {
             return res.status(400).json({ success: false, message: valErr.message });
         }
 
-        const wsRes = await query('SELECT * FROM workshops WHERE id = $1', [id]);
+        const wsRes = await query('SELECT * FROM workshops WHERE id = $1', [workshopId]);
         if (!wsRes.rows.length) {
             return res.status(404).json({ success: false, message: 'Workshop not found.' });
         }
@@ -1105,15 +1114,15 @@ const enrollUserInWorkshop = async (req, res) => {
         }
 
         // Already enrolled check
-        const attendeeCheck = await query('SELECT 1 FROM attendees WHERE workshop_id = $1 AND email = $2', [id, email.toLowerCase().trim()]);
+        const attendeeCheck = await query('SELECT 1 FROM attendees WHERE workshop_id = $1 AND email = $2', [workshopId, email.toLowerCase().trim()]);
         if (attendeeCheck.rows.length) {
             return res.status(400).json({ success: false, message: 'User is already enrolled in this workshop.' });
         }
 
         // Insert enrollment first
         const result = await query(
-            'INSERT INTO attendees (workshop_id, name, email, phone) VALUES ($1, $2, $3, $4) RETURNING *',
-            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null]
+            'INSERT INTO attendees (workshop_id, name, email, phone, source, certificate_eligible) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [workshopId, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, source, certificate_eligible]
         );
 
         // Send confirmation notification/email synchronously AFTER database insert but before final response
@@ -1132,17 +1141,21 @@ const enrollUserInWorkshop = async (req, res) => {
         }
 
         // Update enrolled count
-        await query('UPDATE workshops SET enrolled = enrolled + 1 WHERE id = $1', [id]);
+        await query('UPDATE workshops SET enrolled = enrolled + 1 WHERE id = $1', [workshopId]);
 
         // If workshop is already completed, reset completed_notified to false so the background scheduler generates certificate for the new attendee
         if (workshop.status === 'Completed' || workshop.status === 'completed') {
-            await query('UPDATE workshops SET completed_notified = FALSE WHERE id = $1', [id]);
+            await query('UPDATE workshops SET completed_notified = FALSE WHERE id = $1', [workshopId]);
         }
 
+        const attendee = result.rows[0];
         return res.status(201).json({
             success: true,
+            status: 'success',
             message: 'Successfully enrolled in workshop.',
-            attendee: result.rows[0]
+            attendee: attendee,
+            attendee_id: attendee.id,
+            certificate_eligible: attendee.certificate_eligible
         });
     } catch (err) {
         console.error('enrollUserInWorkshop error:', err);
@@ -1155,7 +1168,12 @@ const getWorkshopAttendees = async (req, res) => {
     const { id } = req.params;
     try {
         const result = await query('SELECT * FROM attendees WHERE workshop_id = $1 ORDER BY created_at DESC', [id]);
-        return res.json({ success: true, attendees: result.rows });
+        return res.json({
+            success: true,
+            status: 'success',
+            workshop_id: id,
+            attendees: result.rows
+        });
     } catch (err) {
         console.error('getWorkshopAttendees error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
@@ -1543,7 +1561,7 @@ const autoUpdateWorkshopStatuses = async () => {
 
             // 3. Send completed notifications if Newly/Already Completed
             if (newStatus === 'Completed') {
-                const attendeesRes = await query("SELECT id, email, name FROM attendees WHERE workshop_id = $1 AND status = 'attended'", [w.id]);
+                const attendeesRes = await query("SELECT id, email, name FROM attendees WHERE workshop_id = $1 AND status = 'attended' AND certificate_eligible = true", [w.id]);
                 
                 // Determine if this is the initial transition to Completed status
                 const isInitialCompletion = (w.status !== 'Completed' && w.status !== 'completed');

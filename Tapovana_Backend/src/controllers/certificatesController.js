@@ -126,7 +126,7 @@ const generateCertificatesForWorkshop = async (req, res) => {
         }
 
         // Fetch attendees marked as attended
-        const attendeesRes = await query("SELECT id, name, email FROM attendees WHERE workshop_id = $1 AND status = 'attended'", [workshopId]);
+        const attendeesRes = await query("SELECT id, name, email FROM attendees WHERE workshop_id = $1 AND status = 'attended' AND certificate_eligible = true", [workshopId]);
         if (!attendeesRes.rows.length) {
             return res.status(400).json({ success: false, message: 'No attended participants available for certificate generation.' });
         }
