@@ -853,6 +853,9 @@ export default function VedicLifePrograms() {
       });
       if (res.success) {
         setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, ...res.attendee } : a));
+        if (selectedProgram) {
+          await fetchAttendees(selectedProgram.id);
+        }
       } else {
         throw new Error(res.message || "Failed to update attendee.");
       }
@@ -873,6 +876,9 @@ export default function VedicLifePrograms() {
       if (res.success) {
         triggerAlert("Attendee checked in successfully!", true);
         setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, status: "CHECKED_IN", checked_in_at: new Date().toISOString() } : a));
+        if (selectedProgram) {
+          await fetchAttendees(selectedProgram.id);
+        }
       } else {
         throw new Error(res.message || "Failed to check in attendee.");
       }
@@ -1463,10 +1469,23 @@ export default function VedicLifePrograms() {
                           <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>{a.email}</td>
                           <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>{a.phone || "-"}</td>
                           <td style={{ padding: "10px 16px" }}>
-                            <EditableStatus 
-                              value={a.status} 
-                              onSave={val => handleUpdateAttendeeField(a.id, 'status', val)} 
-                            />
+                            {(() => {
+                              const styles = getAttendeeStatusStyles(a.status);
+                              return (
+                                <span style={{
+                                  padding: "4px 10px",
+                                  borderRadius: "12px",
+                                  fontSize: "11px",
+                                  fontWeight: "700",
+                                  background: styles.bg,
+                                  color: styles.color,
+                                  textTransform: "uppercase",
+                                  display: "inline-block"
+                                }}>
+                                  {(a.status || 'REGISTERED').replace('_', ' ')}
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td style={{ padding: "6px 12px", width: "150px" }}>
                             <EditableText 
