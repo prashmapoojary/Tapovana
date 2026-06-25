@@ -260,7 +260,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             }
 
             // 1. Draw the pink + gold background template image
-            const templatePath = path.join(__dirname, '../assets/certificate_template.png');
+            const templatePath = path.join(__dirname, '../assets/certificate_template copy.png');
             if (fs.existsSync(templatePath)) {
                 doc.image(templatePath, 0, 0, { width: width, height: height });
             } else {

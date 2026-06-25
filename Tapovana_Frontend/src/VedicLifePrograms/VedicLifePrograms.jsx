@@ -375,7 +375,146 @@ function ProgramForm({ form, onChange, instructors, mode, onSearchPexels }) {
   );
 }
 
+// ─── Editable Table Components ──────────────────────────────────────────
+function EditableText({ value, onSave, placeholder = "" }) {
+  const [val, setVal] = useState(value || "");
+  
+  useEffect(() => {
+    setVal(value || "");
+  }, [value]);
+
+  return (
+    <input 
+      type="text" 
+      value={val} 
+      placeholder={placeholder}
+      onChange={e => setVal(e.target.value)}
+      onBlur={() => {
+        if (val !== (value || "")) {
+          onSave(val);
+        }
+      }}
+      style={{
+        border: "1px solid transparent",
+        background: "transparent",
+        fontSize: "13px",
+        padding: "4px 6px",
+        width: "100%",
+        borderRadius: "4px",
+        outline: "none",
+        color: "#2d3748",
+        transition: "all 0.2s"
+      }}
+      onFocus={e => {
+        e.target.style.border = "1px solid #CDA751";
+        e.target.style.background = "#fff";
+      }}
+      onBlurCapture={e => {
+        e.target.style.border = "1px solid transparent";
+        e.target.style.background = "transparent";
+      }}
+    />
+  );
+}
+
+function EditableDate({ value, onSave }) {
+  const formatDateForInput = (val) => {
+    if (!val) return "";
+    return val.split("T")[0];
+  };
+
+  const [val, setVal] = useState(formatDateForInput(value));
+
+  useEffect(() => {
+    setVal(formatDateForInput(value));
+  }, [value]);
+
+  return (
+    <input 
+      type="date" 
+      value={val} 
+      onChange={e => setVal(e.target.value)}
+      onBlur={() => {
+        const original = formatDateForInput(value);
+        if (val !== original) {
+          onSave(val || null);
+        }
+      }}
+      style={{
+        border: "1px solid transparent",
+        background: "transparent",
+        fontSize: "13px",
+        padding: "4px 6px",
+        width: "120px",
+        borderRadius: "4px",
+        outline: "none",
+        color: "#2d3748",
+        transition: "all 0.2s"
+      }}
+      onFocus={e => {
+        e.target.style.border = "1px solid #CDA751";
+        e.target.style.background = "#fff";
+      }}
+      onBlurCapture={e => {
+        e.target.style.border = "1px solid transparent";
+        e.target.style.background = "transparent";
+      }}
+    />
+  );
+}
+
+function EditablePaymentStatus({ value, onSave }) {
+  const [val, setVal] = useState(value || "Pending");
+
+  useEffect(() => {
+    setVal(value || "Pending");
+  }, [value]);
+
+  const getPaymentStyles = (status) => {
+    switch (status) {
+      case 'Paid':
+        return { bg: "rgba(34,197,94,0.12)", color: "#16a34a" };
+      case 'Partially Paid':
+        return { bg: "rgba(205,167,81,0.12)", color: "#CDA751" };
+      case 'Pending':
+      default:
+        return { bg: "rgba(239,68,68,0.12)", color: "#dc2626" };
+    }
+  };
+
+  const styles = getPaymentStyles(val);
+
+  return (
+    <select 
+      value={val} 
+      onChange={e => {
+        const newVal = e.target.value;
+        setVal(newVal);
+        onSave(newVal);
+      }}
+      style={{
+        padding: "4px 8px",
+        borderRadius: "12px",
+        border: "none",
+        fontSize: "11px",
+        fontWeight: "700",
+        outline: "none",
+        cursor: "pointer",
+        background: styles.bg,
+        color: styles.color,
+        textTransform: "uppercase",
+        width: "auto"
+      }}
+    >
+      <option value="Pending">Pending</option>
+      <option value="Paid">Paid</option>
+      <option value="Partially Paid">Partially Paid</option>
+    </select>
+  );
+}
+
 // ─── Main Component ─────────────────────────────────────────────────────
+
 export default function VedicLifePrograms() {
   const { allocateStaff, triggerAlert, triggerConfirm } = useAllocations();
   const [programs, setPrograms] = useState([]);
@@ -427,8 +566,10 @@ export default function VedicLifePrograms() {
   const [attendeesLoading, setAttendeesLoading] = useState(false);
   const [attendeesError, setAttendeesError] = useState("");
   const [attendeeSearch, setAttendeeSearch] = useState("");
+  const [attendeeStatusFilter, setAttendeeStatusFilter] = useState("ALL");
+  const [attendeePaymentFilter, setAttendeePaymentFilter] = useState("ALL");
   const [showManualEnroll, setShowManualEnroll] = useState(false);
-  const [manualEnrollForm, setManualEnrollForm] = useState({ name: "", email: "", phone: "" });
+  const [manualEnrollForm, setManualEnrollForm] = useState({ name: "", email: "", phone: "", accommodation_type: "", payment_status: "Pending", checkin_date: "", checkout_date: "" });
   const [manualEnrollSaving, setManualEnrollSaving] = useState(false);
   const [manualEnrollError, setManualEnrollError] = useState("");
   const [phoneError, setPhoneError] = useState("");
@@ -505,10 +646,15 @@ export default function VedicLifePrograms() {
     return attendees.filter(a => {
       const matchSearch = !attendeeSearch ||
         (a.name || "").toLowerCase().includes(attendeeSearch.toLowerCase()) ||
-        (a.email || "").toLowerCase().includes(attendeeSearch.toLowerCase());
-      return matchSearch;
+        (a.email || "").toLowerCase().includes(attendeeSearch.toLowerCase()) ||
+        (a.phone || "").toLowerCase().includes(attendeeSearch.toLowerCase());
+      
+      const matchStatus = attendeeStatusFilter === "ALL" || a.status === attendeeStatusFilter;
+      const matchPayment = attendeePaymentFilter === "ALL" || (a.payment_status || "Pending") === attendeePaymentFilter;
+
+      return matchSearch && matchStatus && matchPayment;
     });
-  }, [attendees, attendeeSearch]);
+  }, [attendees, attendeeSearch, attendeeStatusFilter, attendeePaymentFilter]);
 
   const fetchAttendees = async (programId) => {
     try {
@@ -560,6 +706,13 @@ export default function VedicLifePrograms() {
       }
     }
 
+    if (manualEnrollForm.checkin_date && manualEnrollForm.checkout_date) {
+      if (manualEnrollForm.checkout_date < manualEnrollForm.checkin_date) {
+        setManualEnrollError("Check-out date must be on or after check-in date.");
+        return;
+      }
+    }
+
     try {
       setManualEnrollSaving(true);
       const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/enroll`, {
@@ -568,7 +721,7 @@ export default function VedicLifePrograms() {
       });
       if (res.success) {
         triggerAlert("User enrolled successfully!", true);
-        setManualEnrollForm({ name: "", email: "", phone: "" });
+        setManualEnrollForm({ name: "", email: "", phone: "", accommodation_type: "", payment_status: "Pending", checkin_date: "", checkout_date: "" });
         setPhoneError("");
         setShowManualEnroll(false);
         await fetchPrograms();
@@ -604,21 +757,24 @@ export default function VedicLifePrograms() {
     }
   };
 
-  const handleMarkAttendance = async (attendeeId, status) => {
+  const handleUpdateAttendeeField = async (attendeeId, field, value) => {
     try {
       const res = await apiFetch(`/api/vedic-programs/${selectedProgram.id}/attendees/${attendeeId}`, {
         method: "PATCH",
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ [field]: value })
       });
       if (res.success) {
-        triggerAlert("Attendance status updated.", true);
-        setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, status } : a));
+        setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, ...res.attendee } : a));
       } else {
-        throw new Error(res.message || "Failed to update status.");
+        throw new Error(res.message || "Failed to update attendee.");
       }
     } catch (err) {
-      triggerAlert(err.message || "Error updating attendance.", false);
+      triggerAlert(err.message || "Error updating attendee details.", false);
     }
+  };
+
+  const handleMarkAttendance = async (attendeeId, status) => {
+    await handleUpdateAttendeeField(attendeeId, 'status', status);
   };
 
   const handleCheckinAttendee = async (attendeeId) => {
@@ -1010,15 +1166,58 @@ export default function VedicLifePrograms() {
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {/* Header controls for Attendees */}
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 12px", background: "white", flex: 1, minWidth: 200 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                <input 
-                  type="text" 
-                  placeholder="Search attendee..." 
-                  value={attendeeSearch} 
-                  onChange={e => setAttendeeSearch(e.target.value)} 
-                  style={{ border: "none", outline: "none", fontSize: 13, width: "100%", background: "transparent" }}
-                />
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", flex: 1, minWidth: 300 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 12px", background: "white", flex: 1, minWidth: 180 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                  <input 
+                    type="text" 
+                    placeholder="Search attendee..." 
+                    value={attendeeSearch} 
+                    onChange={e => setAttendeeSearch(e.target.value)} 
+                    style={{ border: "none", outline: "none", fontSize: 13, width: "100%", background: "transparent" }}
+                  />
+                </div>
+                <select 
+                  value={attendeeStatusFilter} 
+                  onChange={e => setAttendeeStatusFilter(e.target.value)}
+                  style={{ 
+                    padding: "7px 12px", 
+                    borderRadius: 8, 
+                    border: "1px solid #e2e8f0", 
+                    fontSize: 13, 
+                    outline: "none", 
+                    background: "white",
+                    color: "#4a5568",
+                    cursor: "pointer"
+                  }}
+                >
+                  <option value="ALL">Status: All</option>
+                  <option value="registered">Registered</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="checked_in">Checked In</option>
+                  <option value="attended">Attended</option>
+                  <option value="absent">Absent</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+                <select 
+                  value={attendeePaymentFilter} 
+                  onChange={e => setAttendeePaymentFilter(e.target.value)}
+                  style={{ 
+                    padding: "7px 12px", 
+                    borderRadius: 8, 
+                    border: "1px solid #e2e8f0", 
+                    fontSize: 13, 
+                    outline: "none", 
+                    background: "white",
+                    color: "#4a5568",
+                    cursor: "pointer"
+                  }}
+                >
+                  <option value="ALL">Payment: All</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Partially Paid">Partially Paid</option>
+                </select>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button 
@@ -1033,7 +1232,7 @@ export default function VedicLifePrograms() {
                     onClick={() => {
                       setShowManualEnroll(!showManualEnroll);
                       setPhoneError("");
-                      setManualEnrollForm({ name: "", email: "", phone: "" });
+                      setManualEnrollForm({ name: "", email: "", phone: "", accommodation_type: "", payment_status: "Pending", checkin_date: "", checkout_date: "" });
                     }} 
                     className="vedic-btn-allocate" 
                     style={{ padding: "8px 12px", fontSize: 12 }}
@@ -1070,7 +1269,7 @@ export default function VedicLifePrograms() {
                     />
                   </FormField>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                   <FormField label="Phone Number (Optional)">
                     <input 
                       type="text" 
@@ -1093,10 +1292,48 @@ export default function VedicLifePrograms() {
                       </span>
                     )}
                   </FormField>
+                  <FormField label="Accommodation Type (Optional)">
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Deluxe Room" 
+                      value={manualEnrollForm.accommodation_type || ""} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, accommodation_type: e.target.value }))}
+                      style={inputStyle}
+                    />
+                  </FormField>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <FormField label="Payment Status">
+                    <select 
+                      value={manualEnrollForm.payment_status} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, payment_status: e.target.value }))}
+                      style={inputStyle}
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Paid">Paid</option>
+                      <option value="Partially Paid">Partially Paid</option>
+                    </select>
+                  </FormField>
+                  <FormField label="Check-In Date (Optional)">
+                    <input 
+                      type="date" 
+                      value={manualEnrollForm.checkin_date || ""} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, checkin_date: e.target.value }))}
+                      style={inputStyle}
+                    />
+                  </FormField>
+                  <FormField label="Check-Out Date (Optional)">
+                    <input 
+                      type="date" 
+                      value={manualEnrollForm.checkout_date || ""} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, checkout_date: e.target.value }))}
+                      style={inputStyle}
+                    />
+                  </FormField>
                 </div>
                 {manualEnrollError && <div style={{ color: "#e74c3c", fontSize: 12, fontWeight: 600, marginBottom: 8 }}>{manualEnrollError}</div>}
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                  <button className="vedic-btn-cancel" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setShowManualEnroll(false); setPhoneError(""); setManualEnrollForm({ name: "", email: "", phone: "" }); }}>Cancel</button>
+                  <button className="vedic-btn-cancel" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setShowManualEnroll(false); setPhoneError(""); setManualEnrollForm({ name: "", email: "", phone: "", accommodation_type: "", payment_status: "Pending", checkin_date: "", checkout_date: "" }); }}>Cancel</button>
                   <button className="vedic-btn-allocate" style={{ padding: "6px 12px", fontSize: 12 }} onClick={handleManualEnroll} disabled={manualEnrollSaving || !!phoneError}>
                     {manualEnrollSaving ? "Enrolling..." : "Submit Enrollment"}
                   </button>
@@ -1105,7 +1342,7 @@ export default function VedicLifePrograms() {
             )}
 
             {/* Attendees Table */}
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, background: "white", overflow: "hidden" }}>
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, background: "white", overflowX: "auto" }}>
               {attendeesLoading ? (
                 <div style={{ padding: 30, textAlign: "center", color: "#64748B" }}>Loading attendees...</div>
               ) : attendeesError ? (
@@ -1115,13 +1352,17 @@ export default function VedicLifePrograms() {
                   {attendeeSearch ? "No attendees match your search." : "No users enrolled in this program yet."}
                 </div>
               ) : (
-                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", minWidth: "900px" }}>
                   <thead>
                     <tr style={{ background: "#f8f9fb", borderBottom: "1px solid #e2e8f0" }}>
                       <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Name</th>
                       <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Email</th>
                       <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Phone</th>
                       <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Status</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Accommodation</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Payment Status</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Check-In</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Check-Out</th>
                       <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Actions</th>
                     </tr>
                   </thead>
@@ -1145,6 +1386,31 @@ export default function VedicLifePrograms() {
                             }}>
                               {a.status}
                             </span>
+                          </td>
+                          <td style={{ padding: "6px 12px", width: "150px" }}>
+                            <EditableText 
+                              value={a.accommodation_type} 
+                              placeholder="Add Accommodation..."
+                              onSave={val => handleUpdateAttendeeField(a.id, 'accommodation_type', val)} 
+                            />
+                          </td>
+                          <td style={{ padding: "6px 12px" }}>
+                            <EditablePaymentStatus 
+                              value={a.payment_status} 
+                              onSave={val => handleUpdateAttendeeField(a.id, 'payment_status', val)} 
+                            />
+                          </td>
+                          <td style={{ padding: "6px 12px" }}>
+                            <EditableDate 
+                              value={a.checkin_date} 
+                              onSave={val => handleUpdateAttendeeField(a.id, 'checkin_date', val)} 
+                            />
+                          </td>
+                          <td style={{ padding: "6px 12px" }}>
+                            <EditableDate 
+                              value={a.checkout_date} 
+                              onSave={val => handleUpdateAttendeeField(a.id, 'checkout_date', val)} 
+                            />
                           </td>
                           <td style={{ padding: "10px 16px" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

@@ -844,9 +844,14 @@ const registerAttendee = async (req, res) => {
             return res.status(400).json({ success: false, message: 'You are already registered for this program.' });
         }
 
+        const accommodation_type = req.body.accommodation_type || null;
+        const payment_status = req.body.payment_status || 'Pending';
+        const checkin_date = req.body.checkin_date || null;
+        const checkout_date = req.body.checkout_date || null;
+
         const result = await query(
-            "INSERT INTO vedic_program_attendees (program_id, name, email, phone, status, source) VALUES ($1, $2, $3, $4, 'registered', $5) RETURNING *",
-            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, source]
+            "INSERT INTO vedic_program_attendees (program_id, name, email, phone, status, source, accommodation_type, payment_status, checkin_date, checkout_date) VALUES ($1, $2, $3, $4, 'registered', $5, $6, $7, $8, $9) RETURNING *",
+            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, source, accommodation_type, payment_status, checkin_date, checkout_date]
         );
 
         await query('UPDATE vedic_programs SET enrolled = enrolled + 1 WHERE id = $1', [id]);
@@ -974,9 +979,14 @@ const enrollUserInVedicProgram = async (req, res) => {
             return res.status(400).json({ success: false, message: 'User is already enrolled in this program.' });
         }
 
+        const accommodation_type = req.body.accommodation_type || null;
+        const payment_status = req.body.payment_status || 'Pending';
+        const checkin_date = req.body.checkin_date || null;
+        const checkout_date = req.body.checkout_date || null;
+
         const result = await query(
-            "INSERT INTO vedic_program_attendees (program_id, name, email, phone, status, source) VALUES ($1, $2, $3, $4, 'confirmed', $5) RETURNING *",
-            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, source]
+            "INSERT INTO vedic_program_attendees (program_id, name, email, phone, status, source, accommodation_type, payment_status, checkin_date, checkout_date) VALUES ($1, $2, $3, $4, 'confirmed', $5, $6, $7, $8, $9) RETURNING *",
+            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, source, accommodation_type, payment_status, checkin_date, checkout_date]
         );
 
         await query('UPDATE vedic_programs SET enrolled = enrolled + 1 WHERE id = $1', [id]);
@@ -1059,24 +1069,94 @@ const getVedicProgramAttendees = async (req, res) => {
 // UPDATE VEDIC ATTENDEE ATTENDANCE STATUS (Admin Endpoint)
 const updateVedicAttendeeAttendance = async (req, res) => {
     const { id, attendeeId } = req.params;
-    const { status } = req.body;
+    const { status, accommodation_type, payment_status, checkin_date, checkout_date } = req.body;
 
     const validStatuses = ['registered', 'confirmed', 'checked_in', 'attended', 'absent', 'cancelled'];
-    if (!validStatuses.includes(status)) {
+    if (status && !validStatuses.includes(status)) {
         return res.status(400).json({ success: false, message: `Status must be one of: ${validStatuses.join(', ')}.` });
     }
 
-    try {
-        const result = await query(
-            'UPDATE vedic_program_attendees SET status = $1, updated_at = NOW() WHERE program_id = $2 AND id = $3 RETURNING *',
-            [status, id, attendeeId]
-        );
+    const validPaymentStatuses = ['Paid', 'Pending', 'Partially Paid'];
+    if (payment_status && !validPaymentStatuses.includes(payment_status)) {
+        return res.status(400).json({ success: false, message: `Payment Status must be one of: ${validPaymentStatuses.join(', ')}.` });
+    }
 
-        if (!result.rows.length) {
+    try {
+        // Fetch current record
+        const attRes = await query('SELECT * FROM vedic_program_attendees WHERE program_id = $1 AND id = $2', [id, attendeeId]);
+        if (!attRes.rows.length) {
             return res.status(404).json({ success: false, message: 'Attendee record not found.' });
         }
+        const current = attRes.rows[0];
 
-        return res.json({ success: true, message: 'Attendance status updated.', attendee: result.rows[0] });
+        const finalStatus = status || current.status;
+        const finalAccommodation = accommodation_type !== undefined ? accommodation_type : current.accommodation_type;
+        const finalPaymentStatus = payment_status || current.payment_status || 'Pending';
+        const finalCheckinDate = checkin_date !== undefined ? checkin_date : current.checkin_date;
+        const finalCheckoutDate = checkout_date !== undefined ? checkout_date : current.checkout_date;
+
+        const result = await query(
+            `UPDATE vedic_program_attendees 
+             SET status = $1, accommodation_type = $2, payment_status = $3, checkin_date = $4, checkout_date = $5, updated_at = NOW() 
+             WHERE program_id = $6 AND id = $7 RETURNING *`,
+            [finalStatus, finalAccommodation, finalPaymentStatus, finalCheckinDate || null, finalCheckoutDate || null, id, attendeeId]
+        );
+
+        // Send email notification upon status changes (e.g. status changed by admin)
+        if (status && status !== current.status) {
+            try {
+                const progRes = await query('SELECT * FROM vedic_programs WHERE id = $1', [id]);
+                if (progRes.rows.length) {
+                    const program = progRes.rows[0];
+                    const { sendVedicRegistrationEmail } = require('../services/emailService');
+                    
+                    // Fetch assigned staff text for email
+                    let assignedStaffStr = "None assigned";
+                    try {
+                        const staffList = [];
+                        if (program.lead_consultant_id) {
+                            const leadRes = await query("SELECT first_name, last_name, r.name as role_name FROM team_members tm JOIN roles r ON tm.role_id = r.id WHERE tm.id = $1", [program.lead_consultant_id]);
+                            if (leadRes.rows.length) {
+                                const rName = leadRes.rows[0].role_name.toLowerCase() === 'doctor' ? 'Dr.' : 'Therapist';
+                                staffList.push(`${rName} ${leadRes.rows[0].first_name} ${leadRes.rows[0].last_name} (Lead Consultant)`);
+                            }
+                        }
+                        const specsRes = await query(`
+                            SELECT tm.first_name, tm.last_name, r.name as role_name 
+                            FROM vedic_program_staff vps
+                            JOIN team_members tm ON vps.staff_id = tm.id
+                            JOIN roles r ON tm.role_id = r.id
+                            WHERE vps.program_id = $1
+                        `, [program.id]);
+                        for (const row of specsRes.rows) {
+                            const rName = row.role_name.toLowerCase() === 'doctor' ? 'Dr.' : 'Therapist';
+                            staffList.push(`${rName} ${row.first_name} ${row.last_name} (Specialist)`);
+                        }
+                        if (staffList.length > 0) {
+                            assignedStaffStr = staffList.join(", ");
+                        }
+                    } catch (staffErr) {
+                        console.error('Failed to fetch assigned staff for status change email:', staffErr);
+                    }
+
+                    await sendVedicRegistrationEmail({
+                        to: current.email,
+                        userName: current.name,
+                        programTitle: program.title,
+                        startDate: program.start_date,
+                        endDate: program.end_date,
+                        time: program.time,
+                        status: status,
+                        assignedStaff: assignedStaffStr
+                    });
+                    console.log(`Notification email sent to ${current.email} for status update to ${status}.`);
+                }
+            } catch (emailErr) {
+                console.error('Failed to send status update email notification:', emailErr);
+            }
+        }
+
+        return res.json({ success: true, message: 'Attendee updated successfully.', attendee: result.rows[0] });
     } catch (err) {
         console.error('updateVedicAttendeeAttendance error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
