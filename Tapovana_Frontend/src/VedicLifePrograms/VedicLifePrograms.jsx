@@ -8,6 +8,7 @@ import { getUser } from "../utils/session";
 import { getImageUrl } from "../utils/image";
 import MediaPickerModal from "../components/MediaPickerModal";
 import SearchIcon from "../assets/searchIcon.svg";
+import ActionIcon from "../assets/Button.svg";
 
 // ─── Status checker ─────────────────────────────────────────────────────
 const getProgramStatus = (program) => {
@@ -513,6 +514,47 @@ function EditablePaymentStatus({ value, onSave }) {
   );
 }
 
+function EditableStatus({ value, onSave }) {
+  const [val, setVal] = useState(value || "registered");
+
+  useEffect(() => {
+    setVal(value || "registered");
+  }, [value]);
+
+  const styles = getAttendeeStatusStyles(val);
+
+  return (
+    <select 
+      value={val} 
+      onChange={e => {
+        const newVal = e.target.value;
+        setVal(newVal);
+        onSave(newVal);
+      }}
+      style={{
+        padding: "4px 8px",
+        borderRadius: "12px",
+        border: "none",
+        fontSize: "11px",
+        fontWeight: "700",
+        outline: "none",
+        cursor: "pointer",
+        background: styles.bg,
+        color: styles.color,
+        textTransform: "uppercase",
+        width: "auto"
+      }}
+    >
+      <option value="registered">Registered</option>
+      <option value="confirmed">Confirmed</option>
+      <option value="checked_in">Checked In</option>
+      <option value="attended">Attended</option>
+      <option value="absent">Absent</option>
+      <option value="cancelled">Cancelled</option>
+    </select>
+  );
+}
+
 // ─── Main Component ─────────────────────────────────────────────────────
 
 export default function VedicLifePrograms() {
@@ -569,6 +611,13 @@ export default function VedicLifePrograms() {
   const [attendeeStatusFilter, setAttendeeStatusFilter] = useState("ALL");
   const [attendeePaymentFilter, setAttendeePaymentFilter] = useState("ALL");
   const [showManualEnroll, setShowManualEnroll] = useState(false);
+  const [openActionMenu, setOpenActionMenu] = useState(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setOpenActionMenu(null);
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
   const [manualEnrollForm, setManualEnrollForm] = useState({ name: "", email: "", phone: "", accommodation_type: "", payment_status: "Pending", checkin_date: "", checkout_date: "" });
   const [manualEnrollSaving, setManualEnrollSaving] = useState(false);
   const [manualEnrollError, setManualEnrollError] = useState("");
@@ -1375,17 +1424,10 @@ export default function VedicLifePrograms() {
                           <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>{a.email}</td>
                           <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>{a.phone || "-"}</td>
                           <td style={{ padding: "10px 16px" }}>
-                            <span style={{ 
-                              fontSize: 11, 
-                              fontWeight: 700, 
-                              padding: "3px 8px", 
-                              borderRadius: 12,
-                              textTransform: "uppercase",
-                              background: statusStyles.bg,
-                              color: statusStyles.color
-                            }}>
-                              {a.status}
-                            </span>
+                            <EditableStatus 
+                              value={a.status} 
+                              onSave={val => handleUpdateAttendeeField(a.id, 'status', val)} 
+                            />
                           </td>
                           <td style={{ padding: "6px 12px", width: "150px" }}>
                             <EditableText 
@@ -1412,44 +1454,28 @@ export default function VedicLifePrograms() {
                               onSave={val => handleUpdateAttendeeField(a.id, 'checkout_date', val)} 
                             />
                           </td>
-                          <td style={{ padding: "10px 16px" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              {(a.status === "registered" || a.status === "confirmed") && (
-                                <button 
-                                  onClick={() => handleCheckinAttendee(a.id)}
-                                  style={{ 
-                                    background: "#CDA751", 
-                                    color: "white", 
-                                    border: "none", 
-                                    borderRadius: 4, 
-                                    padding: "4px 8px", 
-                                    fontSize: 11, 
-                                    fontWeight: 600, 
-                                    cursor: "pointer" 
-                                  }}
-                                >
-                                  Check In
-                                </button>
+                          <td style={{ position: "relative", padding: "10px 16px" }}>
+                            <div style={{ position: "relative", display: "inline-block" }}>
+                              <img src={ActionIcon} className="action-icon" alt="Actions" style={{ cursor: "pointer", width: "14px", height: "14px", opacity: 0.8 }}
+                                onClick={(e) => { e.stopPropagation(); setOpenActionMenu(openActionMenu === a.id ? null : a.id); }} />
+                              {openActionMenu === a.id && (
+                                <div style={{ position: "absolute", right: 0, top: "100%", zIndex: 1000, background: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", minWidth: "140px", overflow: "hidden", textAlign: "left" }}>
+                                  {(a.status === "registered" || a.status === "confirmed") && (
+                                    <div onClick={(e) => { e.stopPropagation(); setOpenActionMenu(null); handleCheckinAttendee(a.id); }}
+                                      style={{ padding: "10px 16px", cursor: "pointer", fontSize: "14px", color: "#CDA751", display: "flex", alignItems: "center", gap: "8px" }}
+                                      onMouseEnter={e => e.currentTarget.style.background = "#fcf8ed"}
+                                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                                      Check In
+                                    </div>
+                                  )}
+                                  <div onClick={(e) => { e.stopPropagation(); setOpenActionMenu(null); handleDeleteAttendee(a.id); }}
+                                    style={{ padding: "10px 16px", cursor: "pointer", fontSize: "14px", color: "#e74c3c", display: "flex", alignItems: "center", gap: "8px" }}
+                                    onMouseEnter={e => e.currentTarget.style.background = "#fdf2f2"}
+                                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                                    Delete
+                                  </div>
+                                </div>
                               )}
-                              <select 
-                                value={a.status} 
-                                onChange={e => {
-                                  if (e.target.value === "delete") {
-                                    handleDeleteAttendee(a.id);
-                                  } else {
-                                    handleMarkAttendance(a.id, e.target.value);
-                                  }
-                                }}
-                                style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #e2e8f0", fontSize: 12, outline: "none", cursor: "pointer", background: "white" }}
-                              >
-                                <option value="registered">Registered</option>
-                                <option value="confirmed">Confirmed</option>
-                                <option value="checked_in">Checked In</option>
-                                <option value="attended">Attended</option>
-                                <option value="absent">Absent</option>
-                                <option value="cancelled">Cancelled</option>
-                                <option value="delete">Delete Attendee</option>
-                              </select>
                             </div>
                           </td>
                         </tr>
