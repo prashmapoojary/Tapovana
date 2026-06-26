@@ -895,7 +895,7 @@ const sendBlogRejectedEmail = async ({ to, authorName, blogTitle, reason }) => {
   });
 };
 
-const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, workshopTitle, completionDate, downloadUrl, certId, participantId }) => {
+const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, workshopTitle, completionDate, downloadUrl, certId, participantId, pdfBuffer }) => {
   const port = process.env.PORT || 5000;
   const defaultUrl = process.env.NODE_ENV === "production" ? "https://tapovana.onrender.com" : `http://localhost:${port}`;
   const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
@@ -912,20 +912,35 @@ const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, wor
     <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 15px 0;">
       We are pleased to confirm your attendance at our workshop <strong>${workshopTitle}</strong> on ${completionDate}.
     </p>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 10px 0;">
+      Your certificate is attached to this email as a PDF. You can also download it anytime using the button below:
+    </p>
     <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 25px 0;text-align:center;">
       <a href="${linkUrl}" style="display:inline-block;background:#cda751;color:#111;font-weight:bold;padding:12px 24px;border-radius:6px;text-decoration:none;">Download Certificate</a>
     </p>
   `);
 
-  const textFallback = `Hello ${participantName || "Participant"},\n\nWe are pleased to confirm your attendance at our workshop "${workshopTitle}"!\n\nYou can download your certificate of completion directly from the following link:\n${linkUrl}\n\nBest regards,\nTapovana Team`;
+  const textFallback = `Hello ${participantName || "Participant"},\n\nWe are pleased to confirm your attendance at our workshop "${workshopTitle}"!\n\nYour certificate is attached to this email. You can also download it from:\n${linkUrl}\n\nBest regards,\nTapovana Team`;
 
-  return transporter.sendMail({
+  const mailOptions = {
     from: `"${process.env.EMAIL_FROM_NAME || 'Tapovana'}" <${process.env.EMAIL_FROM_ADDRESS || 'no-reply@tapovana.com'}>`,
     to,
     subject: "Your Tapovana Workshop Certificate",
     html,
     text: textFallback,
-  });
+  };
+
+  // Attach PDF buffer if provided (ensures offline download from email)
+  if (pdfBuffer && Buffer.isBuffer(pdfBuffer)) {
+    const filename = certId ? `Certificate-${certId}.pdf` : 'Tapovana-Certificate.pdf';
+    mailOptions.attachments = [{
+      filename,
+      content: pdfBuffer,
+      contentType: 'application/pdf'
+    }];
+  }
+
+  return transporter.sendMail(mailOptions);
 };
 
 module.exports = { 

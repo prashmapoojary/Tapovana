@@ -200,7 +200,8 @@ const generateCertificatesForWorkshop = async (req, res) => {
                         completionDate: completionDateStr,
                         downloadUrl: certUrl,
                         certId: certificateId,
-                        participantId: att.id
+                        participantId: att.id,
+                        pdfBuffer
                     });
                     await query(
                         `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)
@@ -569,7 +570,8 @@ const issueWorkshopCertificate = async (req, res) => {
                 completionDate: completionDateStr,
                 downloadUrl: pdfUrl,
                 certId: verificationId,
-                participantId: attendee.id
+                participantId: attendee.id,
+                pdfBuffer
             });
             await query(
                 `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)

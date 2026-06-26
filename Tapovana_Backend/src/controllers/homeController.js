@@ -171,182 +171,112 @@ exports.getAnalyticsDashboard = async (req, res) => {
       }
     }
 
-    // Build trend queries promises
-    const trendsPromises = [];
-    slots.forEach(slot => {
-      trendsPromises.push(
-        safeQuery(`
-          SELECT COUNT(*) as cnt
-          FROM bookings
-          WHERE booking_date >= $1 AND booking_date <= $2
-        `, [slot.slotStart, slot.slotEnd]),
-        safeQuery(`
-          SELECT COUNT(a.id) as cnt
-          FROM attendees a
-          JOIN workshops w ON a.workshop_id = w.id
-          WHERE w.date >= $1 AND w.date <= $2
-        `, [slot.slotStart, slot.slotEnd]),
-        safeQuery(`
-          SELECT COUNT(va.id) as cnt
-          FROM vedic_attendees va
-          JOIN vedic_programs vp ON va.program_id = vp.id
-          WHERE vp.start_date >= $1 AND vp.start_date <= $2
-        `, [slot.slotStart, slot.slotEnd]),
-        safeQuery(`
-          SELECT COALESCE(SUM(amount), 0) as total
-          FROM transactions
-          WHERE created_at >= $1 AND created_at <= $2
-          AND status IN ('COMPLETED', 'PAID')
-        `, [slot.slotStart, slot.slotEnd])
-      );
-    });
+    // ── Single-roundtrip bulk fetch ──────────────────────────────────────────
+    // Escape ISO date strings for use in non-parameterized multi-statement SQL.
+    // This is safe because the dates are constructed from validated Date objects,
+    // not from raw user input.
+    const startIso = startDate.toISOString();
+    const endIso = endDate.toISOString();
 
-    // Execute all primary queries in parallel
-    const [
-      // Stats queries
-      serviceBookingsRes,
-      workshopAttendeesRes,
-      vedicAttendeesRes,
-      revenueRes,
-      customersRes,
-      pendingServicesRes,
-      pendingWorkshopsRes,
-      pendingVedicRes,
+    const { pool } = require('../config/db');
+    let bulkResults;
+    try {
+      bulkResults = await pool.query(`
+        SELECT COUNT(*) as cnt FROM customers;
 
-      // Trends queries (28 elements)
-      ...trendsResultsAndOthers
-    ] = await Promise.all([
-      // 1. Stats queries
-      safeQuery(`
-        SELECT COUNT(*) as cnt
-        FROM bookings
-        WHERE booking_date >= $1 AND booking_date <= $2
-      `, [startDate, endDate]),
-      safeQuery(`
-        SELECT COUNT(a.id) as cnt
-        FROM attendees a
-        JOIN workshops w ON a.workshop_id = w.id
-        WHERE w.date >= $1 AND w.date <= $2
-      `, [startDate, endDate]),
-      safeQuery(`
-        SELECT COUNT(va.id) as cnt
-        FROM vedic_attendees va
-        JOIN vedic_programs vp ON va.program_id = vp.id
-        WHERE vp.start_date >= $1 AND vp.start_date <= $2
-      `, [startDate, endDate]),
-      safeQuery(`
-        SELECT COALESCE(SUM(amount), 0) as total
-        FROM transactions
-        WHERE created_at >= $1 AND created_at <= $2
-        AND status IN ('COMPLETED', 'PAID')
-      `, [startDate, endDate]),
-      safeQuery("SELECT COUNT(*) as cnt FROM customers"),
-      safeQuery(`
-        SELECT COUNT(*) as cnt
-        FROM bookings
-        WHERE booking_date >= $1 AND booking_date <= $2
-        AND LOWER(status) = 'pending'
-      `, [startDate, endDate]),
-      safeQuery(`
-        SELECT COUNT(a.id) as cnt
-        FROM attendees a
-        JOIN workshops w ON a.workshop_id = w.id
-        WHERE w.date >= $1 AND w.date <= $2
-        AND LOWER(a.status) = 'enrolled'
-      `, [startDate, endDate]),
-      safeQuery(`
-        SELECT COUNT(va.id) as cnt
-        FROM vedic_attendees va
-        JOIN vedic_programs vp ON va.program_id = vp.id
-        WHERE vp.start_date >= $1 AND vp.start_date <= $2
-        AND LOWER(va.status) IN ('registered', 'confirmed')
-      `, [startDate, endDate]),
-
-      // 2. Trend queries (28 promises)
-      ...trendsPromises,
-
-      // 3. Membership breakdown query
-      safeQuery(`
         SELECT membership_status, COUNT(*) as cnt
         FROM customers
-        WHERE join_date >= $1 AND join_date <= $2
-        GROUP BY membership_status
-      `, [startDate, endDate]),
+        WHERE join_date >= '${startIso}' AND join_date <= '${endIso}'
+        GROUP BY membership_status;
 
-      // 4. Service demand queries
-      safeQuery(`
-        SELECT b.service_name as name, COUNT(*) as cnt,
-               COALESCE(MAX(s.category), 'Wellness') as category,
-               COALESCE(MAX(s.base_price::float), 0) as price
-        FROM bookings b
-        LEFT JOIN services s ON LOWER(s.name) = LOWER(b.service_name)
-        WHERE b.booking_date >= $1 AND b.booking_date <= $2
-        GROUP BY b.service_name
-      `, [startDate, endDate]),
-      safeQuery(`
-        SELECT w.title as name, COUNT(a.id) as cnt,
-               'Workshop' as category,
-               COALESCE(w.price::float, 0) as price
+        SELECT booking_date, status, service_name
+        FROM bookings
+        WHERE booking_date >= '${startIso}' AND booking_date <= '${endIso}';
+
+        SELECT w.date, a.status, w.title, w.price
         FROM attendees a
         JOIN workshops w ON a.workshop_id = w.id
-        WHERE w.date >= $1 AND w.date <= $2
-        GROUP BY w.title, w.price
-      `, [startDate, endDate]),
-      safeQuery(`
-        SELECT vp.title as name, COUNT(va.id) as cnt,
-               'Vedic Life' as category,
-               COALESCE(vp.price::float, 0) as price
+        WHERE w.date >= '${startIso}' AND w.date <= '${endIso}';
+
+        SELECT vp.start_date, va.status, vp.title, vp.price
         FROM vedic_attendees va
         JOIN vedic_programs vp ON va.program_id = vp.id
-        WHERE vp.start_date >= $1 AND vp.start_date <= $2
-        GROUP BY vp.title, vp.price
-      `, [startDate, endDate])
-    ]);
+        WHERE vp.start_date >= '${startIso}' AND vp.start_date <= '${endIso}';
 
-    // Extract trends, membership, and demand from the tail of the array
-    const trendsResults = trendsResultsAndOthers.slice(0, 28);
-    const membershipRes = trendsResultsAndOthers[28];
-    const serviceDemandRes = trendsResultsAndOthers[29];
-    const workshopDemandRes = trendsResultsAndOthers[30];
-    const vedicDemandRes = trendsResultsAndOthers[31];
+        SELECT created_at, amount, status
+        FROM transactions
+        WHERE created_at >= '${startIso}' AND created_at <= '${endIso}';
 
-    // Compute stats totals
-    const today_bookings = 
-      parseInt(serviceBookingsRes.rows[0]?.cnt || 0, 10) +
-      parseInt(workshopAttendeesRes.rows[0]?.cnt || 0, 10) +
-      parseInt(vedicAttendeesRes.rows[0]?.cnt || 0, 10);
+        SELECT LOWER(name) as name, category, base_price::float as price
+        FROM services;
+      `);
+    } catch (bulkErr) {
+      console.warn('[HomeController] Bulk query failed, returning empty sets:', bulkErr.message);
+      bulkResults = Array(7).fill({ rows: [] });
+    }
 
-    const today_revenue = parseFloat(revenueRes.rows[0]?.total || 0);
-    const active_customers = parseInt(customersRes.rows[0]?.cnt || 0, 10);
+    // Ensure bulkResults is always an array (pg returns array for multi-statement)
+    if (!Array.isArray(bulkResults)) {
+      bulkResults = [bulkResults];
+    }
 
-    const pending_bookings = 
-      parseInt(pendingServicesRes.rows[0]?.cnt || 0, 10) +
-      parseInt(pendingWorkshopsRes.rows[0]?.cnt || 0, 10) +
-      parseInt(pendingVedicRes.rows[0]?.cnt || 0, 10);
+    const customersRows    = (bulkResults[0] || { rows: [] }).rows;
+    const membershipRows   = (bulkResults[1] || { rows: [] }).rows;
+    const bookingsRows     = (bulkResults[2] || { rows: [] }).rows;
+    const workshopRows     = (bulkResults[3] || { rows: [] }).rows;
+    const vedicRows        = (bulkResults[4] || { rows: [] }).rows;
+    const transactionRows  = (bulkResults[5] || { rows: [] }).rows;
+    const servicesRows     = (bulkResults[6] || { rows: [] }).rows;
 
-    // Compute trend arrays
+    // ── Stats computation (in-memory) ────────────────────────────────────────
+    const today_bookings =
+      bookingsRows.length +
+      workshopRows.length +
+      vedicRows.length;
+
+    const today_revenue = transactionRows
+      .filter(t => ['COMPLETED', 'PAID'].includes((t.status || '').toUpperCase()))
+      .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+
+    const active_customers = parseInt(customersRows[0]?.cnt || 0, 10);
+
+    const pending_bookings =
+      bookingsRows.filter(b => (b.status || '').toLowerCase() === 'pending').length +
+      workshopRows.filter(a => (a.status || '').toLowerCase() === 'enrolled').length +
+      vedicRows.filter(va => ['registered', 'confirmed'].includes((va.status || '').toLowerCase())).length;
+
+    // ── Trend computation (in-memory bucketing) ──────────────────────────────
+    const inSlot = (dateVal, slotStart, slotEnd) => {
+      if (!dateVal) return false;
+      const d = new Date(dateVal);
+      return d >= slotStart && d <= slotEnd;
+    };
+
     const bookings_last_7_days = [];
     const revenue_last_7_days = [];
     const daysOfWeek = slots.map(s => s.label);
 
     for (let i = 0; i < 7; i++) {
-      const idx = i * 4;
-      const dayBookingsRes = trendsResults[idx];
-      const dayWorkshopRes = trendsResults[idx + 1];
-      const dayVedicRes = trendsResults[idx + 2];
-      const dayRevenueRes = trendsResults[idx + 3];
+      const slot = slots[i];
 
       bookings_last_7_days.push(
-        parseInt(dayBookingsRes.rows[0]?.cnt || 0, 10) +
-        parseInt(dayWorkshopRes.rows[0]?.cnt || 0, 10) +
-        parseInt(dayVedicRes.rows[0]?.cnt || 0, 10)
+        bookingsRows.filter(b => inSlot(b.booking_date, slot.slotStart, slot.slotEnd)).length +
+        workshopRows.filter(w => inSlot(w.date, slot.slotStart, slot.slotEnd)).length +
+        vedicRows.filter(v => inSlot(v.start_date, slot.slotStart, slot.slotEnd)).length
       );
 
-      revenue_last_7_days.push(parseFloat(dayRevenueRes.rows[0]?.total || 0));
+      revenue_last_7_days.push(
+        transactionRows
+          .filter(t =>
+            ['COMPLETED', 'PAID'].includes((t.status || '').toUpperCase()) &&
+            inSlot(t.created_at, slot.slotStart, slot.slotEnd)
+          )
+          .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0)
+      );
     }
 
-    // Process Membership breakdown
-    let membership_breakdown = membershipRes.rows.reduce((acc, row) => {
+    // ── Membership breakdown ─────────────────────────────────────────────────
+    let membership_breakdown = membershipRows.reduce((acc, row) => {
       const status = (row.membership_status || 'NONE').toUpperCase();
       acc[status] = parseInt(row.cnt || 0, 10);
       return acc;
@@ -370,42 +300,46 @@ exports.getAnalyticsDashboard = async (req, res) => {
       }
     }
 
-    // Process Service Demand
+    // ── Service Demand (in-memory) ───────────────────────────────────────────
+    // Build a lookup map from the services table for category/price metadata
+    const servicesMap = {};
+    servicesRows.forEach(s => {
+      servicesMap[s.name] = { category: s.category, price: s.price };
+    });
+
     const combinedDemand = {};
-    for (const row of serviceDemandRes.rows) {
-      combinedDemand[row.name] = {
-        count: parseInt(row.cnt || 0, 10),
-        name: row.name,
-        category: row.category,
-        price: parseFloat(row.price || 0)
-      };
-    }
 
-    for (const row of workshopDemandRes.rows) {
-      if (combinedDemand[row.name]) {
-        combinedDemand[row.name].count += parseInt(row.cnt || 0, 10);
+    bookingsRows.forEach(b => {
+      if (!b.service_name) return;
+      const name = b.service_name;
+      const lowerName = name.toLowerCase();
+      const meta = servicesMap[lowerName] || { category: 'Wellness', price: 0 };
+      if (combinedDemand[name]) {
+        combinedDemand[name].count += 1;
       } else {
-        combinedDemand[row.name] = {
-          count: parseInt(row.cnt || 0, 10),
-          name: row.name,
-          category: row.category,
-          price: parseFloat(row.price || 0)
-        };
+        combinedDemand[name] = { count: 1, name, category: meta.category, price: meta.price };
       }
-    }
+    });
 
-    for (const row of vedicDemandRes.rows) {
-      if (combinedDemand[row.name]) {
-        combinedDemand[row.name].count += parseInt(row.cnt || 0, 10);
+    workshopRows.forEach(w => {
+      if (!w.title) return;
+      const name = w.title;
+      if (combinedDemand[name]) {
+        combinedDemand[name].count += 1;
       } else {
-        combinedDemand[row.name] = {
-          count: parseInt(row.cnt || 0, 10),
-          name: row.name,
-          category: row.category,
-          price: parseFloat(row.price || 0)
-        };
+        combinedDemand[name] = { count: 1, name, category: 'Workshop', price: parseFloat(w.price || 0) };
       }
-    }
+    });
+
+    vedicRows.forEach(vp => {
+      if (!vp.title) return;
+      const name = vp.title;
+      if (combinedDemand[name]) {
+        combinedDemand[name].count += 1;
+      } else {
+        combinedDemand[name] = { count: 1, name, category: 'Vedic Life', price: parseFloat(vp.price || 0) };
+      }
+    });
 
     let service_demand = {};
     Object.entries(combinedDemand)
