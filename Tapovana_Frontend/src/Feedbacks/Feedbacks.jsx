@@ -52,6 +52,7 @@ const INITIAL_FEEDBACKS = [
 
 export default function Feedbacks() {
   const [feedbacks, setFeedbacks] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [openActionMenu, setOpenActionMenu] = useState(null);
   
   // Filter states
@@ -71,6 +72,7 @@ export default function Feedbacks() {
   useEffect(() => {
     const fetchFeedbacks = async () => {
       try {
+        setLoading(true);
         const response = await fetch('https://tapoclg.onrender.com/api/reviews');
         const data = await response.json();
         if (data.success && Array.isArray(data.reviews)) {
@@ -99,6 +101,8 @@ export default function Feedbacks() {
         }
       } catch (err) {
         console.error('Error fetching feedbacks:', err);
+      } finally {
+        setLoading(false);
       }
     };
     fetchFeedbacks();
@@ -351,7 +355,13 @@ export default function Feedbacks() {
               </tr>
             </thead>
             <tbody>
-              {filteredFeedbacks.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '32px', color: '#cda751', fontWeight: 600 }}>
+                    Loading feedbacks...
+                  </td>
+                </tr>
+              ) : filteredFeedbacks.length === 0 ? (
                 <tr>
                   <td colSpan="8" style={{ textAlign: 'center', padding: '32px', color: '#64748B' }}>
                     No feedbacks found matching the filter criteria.
