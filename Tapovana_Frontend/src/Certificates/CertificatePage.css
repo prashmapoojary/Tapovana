@@ -1,0 +1,413 @@
+@import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+.certificate-page-container {
+  width: 100%;
+  min-height: 100vh;
+  background-color: #f7f9fa;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 3rem 1.5rem;
+  box-sizing: border-box;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.certificate-viewer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  max-width: 100%;
+}
+
+/* Fixed size container for the certificate to keep PDF rendering perfect */
+.certificate-frame {
+  position: relative;
+  width: 842px; /* A4 landscape width in pixels */
+  height: 595px; /* A4 landscape height in pixels */
+  background-color: #ffffff;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Background image matching the pink/gold glitter template */
+.certificate-bg-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  z-index: 1;
+}
+
+/* Overlay content container */
+.certificate-overlay-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4.2rem 6rem 3rem 6rem;
+}
+
+/* Title: "Certificate" */
+.cert-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 8rem; /* Large serif title matching the image */
+  font-weight: 700;
+  color: #7a4e35; /* copper-brown */
+  margin: 0;
+  text-align: center;
+  line-height: 1;
+}
+
+/* Subtitle: "OF COMPLETION" */
+.cert-subtitle {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.87rem; /* +10% of 1.7rem */
+  font-weight: 600;
+  color: #7a4e35;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin: 0.15rem 0 0.4rem 0;
+  text-align: center;
+}
+
+/* Flourish Divider */
+.cert-flourish-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 360px; /* matching backend flourish */
+  margin: 0.2rem 0 0.8rem 0;
+}
+
+.flourish-line {
+  flex: 1;
+  height: 0.8px;
+  background-color: #c4967a;
+}
+
+.flourish-diamond {
+  width: 8px;
+  height: 8px;
+  background-color: #c4967a;
+  transform: rotate(45deg);
+  border: 0.8px solid #a0735a;
+}
+
+/* Intro: "This is to certify that" */
+.cert-intro {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 1.87rem; /* +10% of 1.7rem */
+  color: #3d2b1f; /* bodyColor matching backend */
+  margin: 0 0 0.6rem 0;
+  text-align: center;
+}
+
+/* Recipient details */
+.cert-recipient {
+  width: 75%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.cert-recipient-name {
+  font-family: 'Alex Brush', cursive;
+  font-size: 6.82rem; /* +10% of 6.2rem */
+  font-weight: 400;
+  color: #3d2b1f;
+  margin: 0;
+  text-align: center;
+  line-height: 1;
+}
+
+.cert-recipient-line {
+  width: 100%;
+  height: 0.8px;
+  background-color: #c4967a;
+  margin-top: 0.2rem;
+}
+
+/* Unique Verification ID directly under name line */
+.cert-id-below-name {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.66rem; /* +10% of 0.6rem */
+  color: #666666;
+  letter-spacing: 0.5px;
+  margin-top: 0.2rem;
+  margin-bottom: 0.6rem;
+  text-align: center;
+  text-transform: lowercase;
+}
+
+/* Achievement text: "has successfully completed" */
+.cert-achievement {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 1.76rem; /* +10% of 1.6rem */
+  color: #3d2b1f;
+  margin: 0 0 0.5rem 0;
+  text-align: center;
+}
+
+/* Course Name */
+.cert-course-name {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  font-size: 3.08rem; /* +10% of 2.8rem */
+  text-transform: uppercase;
+  color: #3d2b1f;
+  letter-spacing: 1.5px;
+  margin: 0 0 2rem 0;
+  text-align: center;
+  max-width: 90%;
+  line-height: 1.2;
+}
+
+/* Footer Section */
+.cert-footer-row {
+  position: absolute;
+  bottom: 3.2rem;
+  left: 6rem;
+  right: 6rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.cert-footer-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.col-left {
+  width: 200px;
+}
+
+.col-right {
+  width: 200px;
+}
+
+.col-center {
+  width: 180px;
+}
+
+.footer-value-text {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.65rem; /* +10% of 1.5rem */
+  color: #3d2b1f;
+  text-align: center;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cursive-sig {
+  font-family: 'Alex Brush', cursive;
+  font-size: 3.08rem; /* +10% of 2.8rem */
+  line-height: 1;
+}
+
+.footer-value-divider {
+  width: 100%;
+  height: 0.8px;
+  background-color: #c4967a;
+  margin: 0.4rem 0;
+}
+
+.footer-label-text {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  font-size: 0.99rem; /* +10% of 0.9rem */
+  text-transform: uppercase;
+  color: #777777;
+  letter-spacing: 0.8px;
+  text-align: center;
+}
+
+/* Seal & Branding in Center Column */
+.seal-badge-container {
+  width: 55px;
+  height: 55px;
+  margin-bottom: 0.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.seal-logo-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.footer-company-name {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 1.265rem; /* +10% of 1.15rem */
+  color: #3d2b1f;
+  letter-spacing: 2px;
+  text-align: center;
+}
+
+.footer-company-tagline {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 0.935rem; /* +10% of 0.85rem */
+  color: #c4967a;
+  margin-top: 1px;
+  text-align: center;
+}
+
+/* Unique Verification ID Badge */
+.cert-id-badge {
+  position: absolute;
+  bottom: 1.2rem;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.6rem;
+  color: #999999;
+  letter-spacing: 0.5px;
+  text-align: center;
+  width: 100%;
+  left: 0;
+}
+
+/* Action controls & buttons */
+.certificate-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+}
+
+.validation-note {
+  font-size: 0.85rem;
+  color: #666666;
+  text-align: center;
+}
+
+.certificate-download-btn {
+  padding: 0.9rem 2.2rem;
+  background-color: #cda751;
+  color: #111111;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(205, 167, 81, 0.3);
+  transition: all 0.2s ease;
+  letter-spacing: 0.5px;
+}
+
+.certificate-download-btn:hover {
+  background-color: #bfa045;
+  box-shadow: 0 6px 20px rgba(205, 167, 81, 0.4);
+  transform: translateY(-1px);
+}
+
+.certificate-download-btn:active {
+  transform: translateY(1px);
+}
+
+/* Loading & Error States styling */
+.certificate-page-loading,
+.certificate-page-error {
+  width: 100%;
+  min-height: 100vh;
+  background-color: #f7f9fa;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+  font-family: 'Montserrat', sans-serif;
+  color: #333333;
+}
+
+.spinner {
+  width: 45px;
+  height: 45px;
+  border: 4px solid rgba(205, 167, 81, 0.15);
+  border-radius: 50%;
+  border-top-color: #cda751;
+  animation: spin 1s ease-in-out infinite;
+}
+
+.certificate-page-error h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 2rem;
+  color: #d32f2f;
+  margin: 0;
+}
+
+.certificate-page-error p {
+  color: #666666;
+  margin: 0;
+}
+
+.retry-btn {
+  padding: 0.6rem 1.8rem;
+  background-color: #333333;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.retry-btn:hover {
+  background-color: #111111;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* CSS scale down for smaller screens to make the A4 frame responsive */
+@media (max-width: 900px) {
+  .certificate-frame {
+    transform: scale(0.85);
+    transform-origin: center top;
+    margin-bottom: -90px;
+  }
+}
+
+@media (max-width: 760px) {
+  .certificate-frame {
+    transform: scale(0.7);
+    transform-origin: center top;
+    margin-bottom: -180px;
+  }
+}
+
+@media (max-width: 600px) {
+  .certificate-frame {
+    transform: scale(0.55);
+    transform-origin: center top;
+    margin-bottom: -270px;
+  }
+}
+
+@media (max-width: 480px) {
+  .certificate-frame {
+    transform: scale(0.42);
+    transform-origin: center top;
+    margin-bottom: -340px;
+  }
+}

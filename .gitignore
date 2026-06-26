@@ -39,4 +39,4 @@ lerna-debug.log*
 # Backups and Uploads
 uploads/
 *.sql
-certificates/
+Tapovana_Backend/certificates/
