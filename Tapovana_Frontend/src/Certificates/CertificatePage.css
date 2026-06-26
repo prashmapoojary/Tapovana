@@ -23,8 +23,10 @@
 /* Fixed size container for the certificate to keep PDF rendering perfect */
 .certificate-frame {
   position: relative;
-  width: 842px; /* A4 landscape width in pixels */
-  height: 595px; /* A4 landscape height in pixels */
+  width: 842px;
+  /* A4 landscape width in pixels */
+  height: 595px;
+  /* A4 landscape height in pixels */
   background-color: #ffffff;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
   border-radius: 4px;
@@ -59,9 +61,11 @@
 /* Title: "Certificate" */
 .cert-title {
   font-family: 'Playfair Display', serif;
-  font-size: 8rem; /* Large serif title matching the image */
-  font-weight: 700;
-  color: #7a4e35; /* copper-brown */
+  font-size: 12rem;
+  /* Large serif title matching the image */
+  font-weight: 1000;
+  color: #7a4e35;
+  /* copper-brown */
   margin: 0;
   text-align: center;
   line-height: 1;
@@ -70,7 +74,8 @@
 /* Subtitle: "OF COMPLETION" */
 .cert-subtitle {
   font-family: 'Playfair Display', serif;
-  font-size: 1.87rem; /* +10% of 1.7rem */
+  font-size: 1.87rem;
+  /* +10% of 1.7rem */
   font-weight: 600;
   color: #7a4e35;
   letter-spacing: 2px;
@@ -79,36 +84,14 @@
   text-align: center;
 }
 
-/* Flourish Divider */
-.cert-flourish-divider {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 360px; /* matching backend flourish */
-  margin: 0.2rem 0 0.8rem 0;
-}
-
-.flourish-line {
-  flex: 1;
-  height: 0.8px;
-  background-color: #c4967a;
-}
-
-.flourish-diamond {
-  width: 8px;
-  height: 8px;
-  background-color: #c4967a;
-  transform: rotate(45deg);
-  border: 0.8px solid #a0735a;
-}
-
 /* Intro: "This is to certify that" */
 .cert-intro {
   font-family: 'Playfair Display', serif;
   font-style: italic;
-  font-size: 1.87rem; /* +10% of 1.7rem */
-  color: #3d2b1f; /* bodyColor matching backend */
+  font-size: 3rem;
+  /* +10% of 1.7rem */
+  color: #3d2b1f;
+  /* bodyColor matching backend */
   margin: 0 0 0.6rem 0;
   text-align: center;
 }
@@ -124,7 +107,8 @@
 
 .cert-recipient-name {
   font-family: 'Alex Brush', cursive;
-  font-size: 6.82rem; /* +10% of 6.2rem */
+  font-size: 6.82rem;
+  /* +10% of 6.2rem */
   font-weight: 400;
   color: #3d2b1f;
   margin: 0;
@@ -142,7 +126,8 @@
 /* Unique Verification ID directly under name line */
 .cert-id-below-name {
   font-family: 'Montserrat', sans-serif;
-  font-size: 0.66rem; /* +10% of 0.6rem */
+  font-size: 1rem;
+  /* +10% of 0.6rem */
   color: #666666;
   letter-spacing: 0.5px;
   margin-top: 0.2rem;
@@ -155,7 +140,8 @@
 .cert-achievement {
   font-family: 'Playfair Display', serif;
   font-style: italic;
-  font-size: 1.76rem; /* +10% of 1.6rem */
+  font-size: 2rem;
+  /* +10% of 1.6rem */
   color: #3d2b1f;
   margin: 0 0 0.5rem 0;
   text-align: center;
@@ -165,7 +151,8 @@
 .cert-course-name {
   font-family: 'Playfair Display', serif;
   font-weight: 700;
-  font-size: 3.08rem; /* +10% of 2.8rem */
+  font-size: 4rem;
+  /* +10% of 2.8rem */
   text-transform: uppercase;
   color: #3d2b1f;
   letter-spacing: 1.5px;
@@ -178,7 +165,7 @@
 /* Footer Section */
 .cert-footer-row {
   position: absolute;
-  bottom: 3.2rem;
+  bottom: 4rem;
   left: 6rem;
   right: 6rem;
   display: flex;
@@ -206,7 +193,8 @@
 
 .footer-value-text {
   font-family: 'Playfair Display', serif;
-  font-size: 1.65rem; /* +10% of 1.5rem */
+  font-size: 2rem;
+  /* +10% of 1.5rem */
   color: #3d2b1f;
   text-align: center;
   min-height: 28px;
@@ -217,7 +205,8 @@
 
 .cursive-sig {
   font-family: 'Alex Brush', cursive;
-  font-size: 3.08rem; /* +10% of 2.8rem */
+  font-size: 4rem;
+  /* +10% of 2.8rem */
   line-height: 1;
 }
 
@@ -231,7 +220,8 @@
 .footer-label-text {
   font-family: 'Montserrat', sans-serif;
   font-weight: 500;
-  font-size: 0.99rem; /* +10% of 0.9rem */
+  font-size: 1.2rem;
+  /* +10% of 0.9rem */
   text-transform: uppercase;
   color: #777777;
   letter-spacing: 0.8px;
@@ -257,7 +247,8 @@
 .footer-company-name {
   font-family: 'Montserrat', sans-serif;
   font-weight: 700;
-  font-size: 1.265rem; /* +10% of 1.15rem */
+  font-size: 2rem;
+  /* +10% of 1.15rem */
   color: #3d2b1f;
   letter-spacing: 2px;
   text-align: center;
@@ -266,7 +257,8 @@
 .footer-company-tagline {
   font-family: 'Playfair Display', serif;
   font-style: italic;
-  font-size: 0.935rem; /* +10% of 0.85rem */
+  font-size: 0.935rem;
+  /* +10% of 0.85rem */
   color: #c4967a;
   margin-top: 1px;
   text-align: center;
@@ -376,7 +368,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* CSS scale down for smaller screens to make the A4 frame responsive */
