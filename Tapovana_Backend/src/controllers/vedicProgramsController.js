@@ -184,31 +184,40 @@ const autoUpdateVedicProgramStatuses = async () => {
 // GET ALL VEDIC PROGRAMS
 const getAllVedicPrograms = async (req, res) => {
     try {
-        const result = await query(
-            `SELECT vp.*, tm.first_name AS consultant_first_name, tm.last_name AS consultant_last_name 
-             FROM vedic_programs vp 
-             LEFT JOIN team_members tm ON tm.id = vp.lead_consultant_id 
-             ORDER BY vp.created_at DESC`
-        );
+        const [result, staffRes] = await Promise.all([
+            query(
+                `SELECT vp.*, tm.first_name AS consultant_first_name, tm.last_name AS consultant_last_name 
+                 FROM vedic_programs vp 
+                 LEFT JOIN team_members tm ON tm.id = vp.lead_consultant_id 
+                 ORDER BY vp.created_at DESC`
+            ),
+            query(`SELECT program_id, staff_id FROM vedic_program_staff`)
+        ]);
 
-        const programs = [];
-        for (const r of result.rows) {
-            const staffRes = await query(
-                `SELECT staff_id FROM vedic_program_staff WHERE program_id = $1`,
-                [r.id]
-            );
-            const assigned_staff_ids = staffRes.rows.map(s => s.staff_id);
+        const staffMap = {};
+        for (const row of staffRes.rows) {
+            if (!staffMap[row.program_id]) {
+                staffMap[row.program_id] = [];
+            }
+            staffMap[row.program_id].push(row.staff_id);
+        }
+
+        const updatePromises = [];
+        const programs = result.rows.map((r) => {
+            const assigned_staff_ids = staffMap[r.id] || [];
             const consultant_name = r.lead_consultant_id ? `${r.consultant_first_name || ''} ${r.consultant_last_name || ''}`.trim() : null;
 
             let status = r.status || 'Upcoming';
             if (status !== 'Cancelled') {
                 status = getVedicProgramStatus(r.start_date, r.end_date);
                 if (r.status !== status) {
-                    await query('UPDATE vedic_programs SET status = $1 WHERE id = $2', [status, r.id]);
+                    updatePromises.push(
+                        query('UPDATE vedic_programs SET status = $1 WHERE id = $2', [status, r.id])
+                    );
                 }
             }
 
-            programs.push({
+            return {
                 id: r.id,
                 title: r.title,
                 type: r.type,
@@ -229,7 +238,11 @@ const getAllVedicPrograms = async (req, res) => {
                 registrationDeadline: r.registration_deadline ? r.registration_deadline.toISOString().split('T')[0] : null,
                 status: status,
                 assigned_staff_ids
-            });
+            };
+        });
+
+        if (updatePromises.length > 0) {
+            await Promise.all(updatePromises);
         }
 
         return res.json({ success: true, programs });

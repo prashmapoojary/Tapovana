@@ -292,7 +292,9 @@ const syncWorkshopAllocations = async (workshopId) => {
 // GET ALL WORKSHOPS
 const getAllWorkshops = async (req, res) => {
     try {
-        await autoUpdateWorkshopStatuses();
+        // Run status updater in background
+        autoUpdateWorkshopStatuses().catch(err => console.error("Error in background workshop status update:", err));
+
         const { category, status, page = 1, limit = 50 } = req.query;
         const conditions = [];
         const values = [];
@@ -304,22 +306,25 @@ const getAllWorkshops = async (req, res) => {
         const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
         const offset = (parseInt(page) - 1) * parseInt(limit);
 
-        const countResult = await query('SELECT COUNT(*) FROM workshops w ' + whereClause, values);
+        // Fetch counts, workshops list, and video mappings in parallel
+        const [countResult, result, videosRes] = await Promise.all([
+            query('SELECT COUNT(*) FROM workshops w ' + whereClause, values),
+            query(
+                'SELECT w.*, tm.first_name AS created_by_first_name, tm.last_name AS created_by_last_name FROM workshops w LEFT JOIN team_members tm ON tm.id = w.created_by ' + whereClause + ' ORDER BY w.date DESC LIMIT $' + idx + ' OFFSET $' + (idx + 1),
+                [...values, parseInt(limit), offset]
+            ),
+            query('SELECT workshop_id FROM workshop_videos')
+        ]);
+
         const total = parseInt(countResult.rows[0].count);
+        const videoIds = new Set(videosRes.rows.map(r => r.workshop_id));
 
-        const result = await query(
-            'SELECT w.*, tm.first_name AS created_by_first_name, tm.last_name AS created_by_last_name FROM workshops w LEFT JOIN team_members tm ON tm.id = w.created_by ' + whereClause + ' ORDER BY w.date DESC LIMIT $' + idx + ' OFFSET $' + (idx + 1),
-            [...values, parseInt(limit), offset]
-        );
-
-        const workshops = [];
-        for (const w of result.rows) {
-            const hasVideoRes = await query('SELECT EXISTS(SELECT 1 FROM workshop_videos WHERE workshop_id = $1)', [w.id]);
-            if (hasVideoRes.rows[0].exists) {
+        const workshops = result.rows.map(w => {
+            if (videoIds.has(w.id)) {
                 w.video_url = `/api/workshops/${w.id}/video`;
             }
-            workshops.push(w);
-        }
+            return w;
+        });
 
         return res.json({
             success: true,
