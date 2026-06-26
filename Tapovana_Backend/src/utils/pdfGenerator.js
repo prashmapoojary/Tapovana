@@ -287,16 +287,16 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                });
 
             // ── 4. TITLE: "Certificate" (large, elegant serif) ──────────────────
-            // +40% from original 52pt = ~73pt
+            // +75% from original 52pt = ~91pt
             const titleY = logoY + logoWidth + 28;
             doc.font('Times-Bold')
-               .fontSize(73)
+               .fontSize(91)
                .fillColor(titleColor)
                .text('Certificate', 50, titleY, { width: width - 100, align: 'center' });
 
             // ── 5. SUBTITLE: "of Completion" ────────────────────────────────────
-            // +10% from original 34pt = ~38pt
-            const subtitleY = titleY + 68;
+            // +10% from original 20pt = ~22pt (using titleY + 82 to avoid overlap)
+            const subtitleY = titleY + 82;
             doc.font('Times-Roman')
                .fontSize(22)
                .fillColor(titleColor)
@@ -393,8 +393,17 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                .fillColor('#888888')
                .text('Date of Completion', 90, lineY + 6, { width: 200, align: 'center' });
 
-            // ─── Center Column: Wax Seal + Company Name ─────────────────────────
-            drawWaxSeal(doc, cx, lineY - 28, 26, 'T');
+            // ─── Center Column: Tapovana Logo + Company Name ─────────────────────────
+             const footerLogoWidth = 55;
+             const footerLogoX = cx - footerLogoWidth / 2;
+             const footerLogoY = lineY - 55;
+             if (logo) {
+                 try {
+                     doc.image(logo, footerLogoX, footerLogoY, { width: footerLogoWidth });
+                 } catch (imgErr) {
+                     console.warn('Failed to draw logo in footer:', imgErr);
+                 }
+             }
 
             doc.font('Times-Bold')
                .fontSize(13)
