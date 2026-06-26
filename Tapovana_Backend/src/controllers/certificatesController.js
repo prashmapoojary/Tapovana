@@ -431,6 +431,253 @@ const resendCertificateEmail = async (req, res) => {
     }
 };
 
+const crypto = require('crypto');
+
+// POST /api/workshops/:id/certificates
+const issueWorkshopCertificate = async (req, res) => {
+    const workshopId = req.params.id;
+    const { attendeeId } = req.body;
+
+    if (!isValidUUID(workshopId) || !isValidUUID(attendeeId)) {
+        return res.status(400).json({ success: false, message: 'Invalid workshop ID or attendee ID format.' });
+    }
+
+    try {
+        // 1. Fetch workshop details
+        const wsRes = await query(
+            'SELECT id, title, date, instructor_id, instructor FROM workshops WHERE id = $1',
+            [workshopId]
+        );
+        if (!wsRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Workshop not found.' });
+        }
+        const workshop = wsRes.rows[0];
+
+        // 2. Fetch attendee details
+        const attRes = await query(
+            'SELECT id, name, email, status FROM attendees WHERE id = $1 AND workshop_id = $2',
+            [attendeeId, workshopId]
+        );
+        if (!attRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Attendee not found for this workshop.' });
+        }
+        const attendee = attRes.rows[0];
+
+        // 3. Attendee Status Validation
+        if (!attendee.status || attendee.status.toUpperCase() !== 'ATTENDED') {
+            return res.status(400).json({
+                success: false,
+                message: `Certificate can only be issued if attendee status is 'ATTENDED' (current status: ${attendee.status}).`
+            });
+        }
+
+        // 4. Fetch Instructor Signature
+        let signatureFile = req.body.instructorSignature;
+        let instructorName = workshop.instructor || 'Workshop Instructor';
+        let instructorId = workshop.instructor_id;
+
+        if (instructorId && isValidUUID(instructorId)) {
+            const instRes = await query(
+                'SELECT first_name, last_name, signature_image FROM team_members WHERE id = $1',
+                [instructorId]
+            );
+            if (instRes.rows.length) {
+                const inst = instRes.rows[0];
+                instructorName = `${inst.first_name} ${inst.last_name}`.trim();
+                if (!signatureFile) {
+                    signatureFile = inst.signature_image;
+                }
+            }
+        }
+
+        // Validate Instructor Signature exists
+        if (!signatureFile) {
+            return res.status(400).json({
+                success: false,
+                message: 'Instructor digital signature is required but does not exist for the assigned instructor.'
+            });
+        }
+
+        // 5. Verification ID Logic
+        let verificationId = req.body.verificationId;
+        if (!verificationId) {
+            const newUuid = crypto.randomUUID();
+            verificationId = `CERT-${newUuid}`;
+        }
+
+        // Check uniqueness of verification ID
+        const checkCert = await query(
+            'SELECT id FROM workshop_certificates WHERE verification_id = $1',
+            [verificationId]
+        );
+        if (checkCert.rows.length > 0) {
+            return res.status(400).json({ success: false, message: 'Verification ID must be unique.' });
+        }
+
+        // 6. Setup backend base URL
+        const port = process.env.PORT || 5000;
+        const localIp = getLocalIpAddress();
+        const defaultUrl = process.env.NODE_ENV === 'production' ? 'https://tapovana.onrender.com' : `http://${localIp}:${port}`;
+        const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
+
+        const pdfUrl = req.body.pdfUrl || `${backendUrl}/api/workshops/${workshop.id}/certificates/${verificationId}`;
+
+        // 7. Format Dates
+        let dateStr = workshop.date;
+        if (workshop.date instanceof Date) {
+            const year = workshop.date.getFullYear();
+            const month = String(workshop.date.getMonth() + 1).padStart(2, '0');
+            const day = String(workshop.date.getDate()).padStart(2, '0');
+            dateStr = `${year}-${month}-${day}`;
+        }
+        const compDateObj = new Date(dateStr);
+        const completionDateStr = compDateObj.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        // 8. Generate Certificate PDF and Save
+        const pdfBuffer = await generateCertificatePDF(
+            attendee.name,
+            workshop.title,
+            completionDateStr,
+            instructorName,
+            signatureFile,
+            verificationId
+        );
+
+        const certsDir = path.join(process.cwd(), 'uploads', 'certificates');
+        if (!fs.existsSync(certsDir)) {
+            fs.mkdirSync(certsDir, { recursive: true });
+        }
+        const filePath = path.join(certsDir, `${verificationId}.pdf`);
+        fs.writeFileSync(filePath, pdfBuffer);
+
+        // 9. Store in Database
+        await query(`
+            INSERT INTO workshop_certificates (attendee_id, workshop_id, verification_id, instructor_id, signature_file, pdf_url)
+            VALUES ($1, $2, $3, $4, $5, $6)
+        `, [attendee.id, workshop.id, verificationId, instructorId, signatureFile, pdfUrl]);
+
+        // 10. Deliver Email with Certificate URL
+        try {
+            await sendWorkshopCompletionCertificateEmail({
+                to: attendee.email,
+                participantName: attendee.name,
+                workshopTitle: workshop.title,
+                completionDate: completionDateStr,
+                downloadUrl: pdfUrl,
+                certId: verificationId,
+                participantId: attendee.id
+            });
+            await query(
+                `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)
+                 VALUES ($1, $2, 'sent', NOW())`,
+                [attendee.id, workshop.id]
+            );
+        } catch (emailErr) {
+            console.error(`[WorkshopCertificates] Failed to send certificate email:`, emailErr.message);
+            await query(
+                `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)
+                 VALUES ($1, $2, 'failed', NOW())`,
+                [attendee.id, workshop.id]
+            );
+        }
+
+        return res.status(201).json({
+            success: true,
+            attendeeId: attendee.id,
+            workshopId: workshop.id,
+            verificationId,
+            instructorSignature: signatureFile,
+            pdfUrl
+        });
+
+    } catch (err) {
+        console.error('issueWorkshopCertificate error:', err);
+        return res.status(500).json({ success: false, message: 'Server error generating certificate.' });
+    }
+};
+
+// GET /api/workshops/:id/certificates/:verificationId
+const downloadWorkshopCertificate = async (req, res) => {
+    const { id, verificationId } = req.params;
+    try {
+        const certRes = await query(`
+            SELECT wc.*, a.name AS participant_name, a.email AS participant_email, 
+                   w.title AS workshop_title, w.date AS workshop_date, w.instructor,
+                   tm.first_name, tm.last_name
+            FROM workshop_certificates wc
+            JOIN attendees a ON a.id = wc.attendee_id
+            JOIN workshops w ON w.id = wc.workshop_id
+            JOIN team_members tm ON tm.id = wc.instructor_id
+            WHERE wc.verification_id = $1 AND wc.workshop_id = $2
+        `, [verificationId, id]);
+
+        if (!certRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Certificate record not found.' });
+        }
+
+        const cert = certRes.rows[0];
+        const certsDir = path.join(process.cwd(), 'uploads', 'certificates');
+        const filePath = path.join(certsDir, `${verificationId}.pdf`);
+
+        // Regenerate if file missing from filesystem
+        if (!fs.existsSync(filePath)) {
+            if (!fs.existsSync(certsDir)) {
+                fs.mkdirSync(certsDir, { recursive: true });
+            }
+
+            let dateStr = cert.workshop_date;
+            if (cert.workshop_date instanceof Date) {
+                const year = cert.workshop_date.getFullYear();
+                const month = String(cert.workshop_date.getMonth() + 1).padStart(2, '0');
+                const day = String(cert.workshop_date.getDate()).padStart(2, '0');
+                dateStr = `${year}-${month}-${day}`;
+            }
+            const compDateObj = new Date(dateStr);
+            const completionDateStr = compDateObj.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            const instructorName = `${cert.first_name} ${cert.last_name}`.trim();
+
+            const pdfBuffer = await generateCertificatePDF(
+                cert.participant_name,
+                cert.workshop_title,
+                completionDateStr,
+                instructorName,
+                cert.signature_file,
+                verificationId
+            );
+            fs.writeFileSync(filePath, pdfBuffer);
+        }
+
+        // Return headers for immediate download
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="Certificate-${verificationId}.pdf"`);
+        res.setHeader("Content-Description", "File Transfer");
+        res.setHeader("Content-Transfer-Encoding", "binary");
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+
+        const stream = fs.createReadStream(filePath);
+        stream.on('error', (streamErr) => {
+            console.error('downloadWorkshopCertificate stream error:', streamErr);
+            if (!res.headersSent) {
+                res.status(500).json({ success: false, message: 'Server error streaming certificate.' });
+            }
+        });
+        return stream.pipe(res);
+
+    } catch (err) {
+        console.error('downloadWorkshopCertificate error:', err);
+        return res.status(500).json({ success: false, message: 'Server error downloading certificate.' });
+    }
+};
+
 module.exports = {
     getAllCertificates,
     getCertificateStats,
@@ -438,5 +685,7 @@ module.exports = {
     getCertificateDetails,
     getPublicCertificateDetails,
     downloadCertificatePdf,
-    resendCertificateEmail
+    resendCertificateEmail,
+    issueWorkshopCertificate,
+    downloadWorkshopCertificate
 };

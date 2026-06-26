@@ -46,4 +46,9 @@ router.patch('/:id/attendees/:attendeeId', ...adminOnly, updateAttendeeAttendanc
 router.delete('/:id/attendees/:attendeeId', ...adminOnly, deleteWorkshopAttendee);
 router.get('/:id/attendees/export', ...adminOnly, exportWorkshopAttendees);
 
+// Workshop Certificates Management
+const { issueWorkshopCertificate, downloadWorkshopCertificate } = require('../controllers/certificatesController');
+router.post('/:id/certificates', ...adminOnly, issueWorkshopCertificate);
+router.get('/:id/certificates/:verificationId', downloadWorkshopCertificate);
+
 module.exports = router;

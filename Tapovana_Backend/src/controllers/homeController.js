@@ -210,77 +210,192 @@ exports.getAnalyticsDashboard = async (req, res) => {
       console.warn("[HomeController] Pending bookings count failed:", e.message);
     }
 
-    // Fetch trends (last 7 days)
+    // Fetch trends (exactly 7 intervals based on the active filter)
     const bookings_last_7_days = [];
     const revenue_last_7_days = [];
-    const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(today.getDate() - 6);
+    const daysOfWeek = [];
+
+    const formatLabel = (date) => {
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      return `${mm}/${dd}`;
+    };
 
     try {
-      for (let i = 0; i < 7; i++) {
-        const currentDate = new Date(sevenDaysAgo);
-        currentDate.setDate(sevenDaysAgo.getDate() + i);
-        const dayStart = new Date(currentDate);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(currentDate);
-        dayEnd.setHours(23, 59, 59, 999);
+      if (filter === 'today') {
+        for (let i = 0; i < 7; i++) {
+          const slotStart = new Date(startDate);
+          slotStart.setHours(8 + i * 2, 0, 0, 0);
+          const slotEnd = new Date(startDate);
+          slotEnd.setHours(8 + i * 2 + 1, 59, 59, 999);
 
-        // Get aggregate bookings count for this day
-        const dayBookingsRes = await query(`
-          SELECT COUNT(*) as cnt
-          FROM bookings
-          WHERE booking_date >= $1 AND booking_date <= $2
-        `, [dayStart, dayEnd]);
+          const label = `${String(8 + i * 2).padStart(2, '0')}:00-${String(8 + (i + 1) * 2).padStart(2, '0')}:00`;
+          daysOfWeek.push(label);
 
-        const dayWorkshopRes = await query(`
-          SELECT COUNT(a.id) as cnt
-          FROM attendees a
-          JOIN workshops w ON a.workshop_id = w.id
-          WHERE w.date >= $1 AND w.date <= $2
-        `, [dayStart, dayEnd]);
+          // Get aggregate bookings count for this slot
+          const dayBookingsRes = await query(`
+            SELECT COUNT(*) as cnt
+            FROM bookings
+            WHERE booking_date >= $1 AND booking_date <= $2
+          `, [slotStart, slotEnd]);
 
-        const dayVedicRes = await query(`
-          SELECT COUNT(va.id) as cnt
-          FROM vedic_attendees va
-          JOIN vedic_programs vp ON va.program_id = vp.id
-          WHERE vp.start_date >= $1 AND vp.start_date <= $2
-        `, [dayStart, dayEnd]);
+          const dayWorkshopRes = await query(`
+            SELECT COUNT(a.id) as cnt
+            FROM attendees a
+            JOIN workshops w ON a.workshop_id = w.id
+            WHERE w.date >= $1 AND w.date <= $2
+          `, [slotStart, slotEnd]);
 
-        bookings_last_7_days.push(
-          parseInt(dayBookingsRes.rows[0]?.cnt || 0, 10) +
-          parseInt(dayWorkshopRes.rows[0]?.cnt || 0, 10) +
-          parseInt(dayVedicRes.rows[0]?.cnt || 0, 10)
-        );
+          const dayVedicRes = await query(`
+            SELECT COUNT(va.id) as cnt
+            FROM vedic_attendees va
+            JOIN vedic_programs vp ON va.program_id = vp.id
+            WHERE vp.start_date >= $1 AND vp.start_date <= $2
+          `, [slotStart, slotEnd]);
 
-        // Get revenue for this day
-        const dayRevenueRes = await query(`
-          SELECT COALESCE(SUM(amount), 0) as total
-          FROM transactions
-          WHERE created_at >= $1 AND created_at <= $2
-          AND status IN ('COMPLETED', 'PAID')
-        `, [dayStart, dayEnd]);
-        revenue_last_7_days.push(parseFloat(dayRevenueRes.rows[0]?.total || 0));
+          bookings_last_7_days.push(
+            parseInt(dayBookingsRes.rows[0]?.cnt || 0, 10) +
+            parseInt(dayWorkshopRes.rows[0]?.cnt || 0, 10) +
+            parseInt(dayVedicRes.rows[0]?.cnt || 0, 10)
+          );
+
+          // Get revenue for this slot
+          const dayRevenueRes = await query(`
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM transactions
+            WHERE created_at >= $1 AND created_at <= $2
+            AND status IN ('COMPLETED', 'PAID')
+          `, [slotStart, slotEnd]);
+          revenue_last_7_days.push(parseFloat(dayRevenueRes.rows[0]?.total || 0));
+        }
+      } else if (filter === 'week') {
+        const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        for (let i = 0; i < 7; i++) {
+          const slotStart = new Date(startDate);
+          slotStart.setDate(startDate.getDate() + i);
+          slotStart.setHours(0, 0, 0, 0);
+          const slotEnd = new Date(slotStart);
+          slotEnd.setHours(23, 59, 59, 999);
+
+          const label = weekdayNames[slotStart.getDay()];
+          daysOfWeek.push(label);
+
+          const dayBookingsRes = await query(`
+            SELECT COUNT(*) as cnt
+            FROM bookings
+            WHERE booking_date >= $1 AND booking_date <= $2
+          `, [slotStart, slotEnd]);
+
+          const dayWorkshopRes = await query(`
+            SELECT COUNT(a.id) as cnt
+            FROM attendees a
+            JOIN workshops w ON a.workshop_id = w.id
+            WHERE w.date >= $1 AND w.date <= $2
+          `, [slotStart, slotEnd]);
+
+          const dayVedicRes = await query(`
+            SELECT COUNT(va.id) as cnt
+            FROM vedic_attendees va
+            JOIN vedic_programs vp ON va.program_id = vp.id
+            WHERE vp.start_date >= $1 AND vp.start_date <= $2
+          `, [slotStart, slotEnd]);
+
+          bookings_last_7_days.push(
+            parseInt(dayBookingsRes.rows[0]?.cnt || 0, 10) +
+            parseInt(dayWorkshopRes.rows[0]?.cnt || 0, 10) +
+            parseInt(dayVedicRes.rows[0]?.cnt || 0, 10)
+          );
+
+          const dayRevenueRes = await query(`
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM transactions
+            WHERE created_at >= $1 AND created_at <= $2
+            AND status IN ('COMPLETED', 'PAID')
+          `, [slotStart, slotEnd]);
+          revenue_last_7_days.push(parseFloat(dayRevenueRes.rows[0]?.total || 0));
+        }
+      } else {
+        // month or custom
+        const diffMs = endDate.getTime() - startDate.getTime();
+        const stepMs = diffMs / 7;
+        for (let i = 0; i < 7; i++) {
+          const slotStart = new Date(startDate.getTime() + Math.floor(i * stepMs));
+          const slotEnd = new Date(startDate.getTime() + Math.floor((i + 1) * stepMs) - 1);
+
+          daysOfWeek.push(formatLabel(slotStart));
+
+          const dayBookingsRes = await query(`
+            SELECT COUNT(*) as cnt
+            FROM bookings
+            WHERE booking_date >= $1 AND booking_date <= $2
+          `, [slotStart, slotEnd]);
+
+          const dayWorkshopRes = await query(`
+            SELECT COUNT(a.id) as cnt
+            FROM attendees a
+            JOIN workshops w ON a.workshop_id = w.id
+            WHERE w.date >= $1 AND w.date <= $2
+          `, [slotStart, slotEnd]);
+
+          const dayVedicRes = await query(`
+            SELECT COUNT(va.id) as cnt
+            FROM vedic_attendees va
+            JOIN vedic_programs vp ON va.program_id = vp.id
+            WHERE vp.start_date >= $1 AND vp.start_date <= $2
+          `, [slotStart, slotEnd]);
+
+          bookings_last_7_days.push(
+            parseInt(dayBookingsRes.rows[0]?.cnt || 0, 10) +
+            parseInt(dayWorkshopRes.rows[0]?.cnt || 0, 10) +
+            parseInt(dayVedicRes.rows[0]?.cnt || 0, 10)
+          );
+
+          const dayRevenueRes = await query(`
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM transactions
+            WHERE created_at >= $1 AND created_at <= $2
+            AND status IN ('COMPLETED', 'PAID')
+          `, [slotStart, slotEnd]);
+          revenue_last_7_days.push(parseFloat(dayRevenueRes.rows[0]?.total || 0));
+        }
       }
     } catch (e) {
       console.warn("[HomeController] Trends fetch failed:", e.message);
       // Fallback to dummy trends
       bookings_last_7_days.push(18, 22, 15, 28, 31, 19, 23);
       revenue_last_7_days.push(32000, 41500, 28000, 52000, 61000, 38500, 47500);
+      daysOfWeek.push('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun');
     }
 
-    // Fetch membership breakdown
-    let membership_breakdown = { NONE: 1, SILVER: 0, GOLD: 0, PLATINUM: 0 };
+    // Fetch membership breakdown (filtered by join_date inside the active range, with lifetime fallback if 0)
+    let membership_breakdown = { NONE: 0, SILVER: 0, GOLD: 0, PLATINUM: 0 };
     try {
       const membershipRes = await query(`
         SELECT membership_status, COUNT(*) as cnt
         FROM customers
+        WHERE join_date >= $1 AND join_date <= $2
         GROUP BY membership_status
-      `);
+      `, [startDate, endDate]);
       membership_breakdown = membershipRes.rows.reduce((acc, row) => {
-        acc[row.membership_status] = parseInt(row.cnt || 0, 10);
+        const status = (row.membership_status || 'NONE').toUpperCase();
+        acc[status] = parseInt(row.cnt || 0, 10);
         return acc;
       }, { NONE: 0, SILVER: 0, GOLD: 0, PLATINUM: 0 });
+
+      const totalNewMembers = Object.values(membership_breakdown).reduce((sum, count) => sum + count, 0);
+      if (totalNewMembers === 0) {
+        // Fallback: If 0 signups in active period, pull lifetime totals
+        const lfMembershipRes = await query(`
+          SELECT membership_status, COUNT(*) as cnt
+          FROM customers
+          GROUP BY membership_status
+        `);
+        membership_breakdown = lfMembershipRes.rows.reduce((acc, row) => {
+          const status = (row.membership_status || 'NONE').toUpperCase();
+          acc[status] = parseInt(row.cnt || 0, 10);
+          return acc;
+        }, { NONE: 0, SILVER: 0, GOLD: 0, PLATINUM: 0 });
+      }
     } catch (e) {
       console.warn("[HomeController] Membership breakdown failed:", e.message);
     }
