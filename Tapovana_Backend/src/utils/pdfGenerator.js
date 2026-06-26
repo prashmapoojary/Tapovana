@@ -263,40 +263,19 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             const bodyColor = '#3D2B1F';      // dark brown for body text
             const accentColor = '#C4967A';    // rose-gold accent
 
-            // ── 2. TAPOVANA LOGO (top center, 25% larger) ───────────────────────
-            const logoWidth = 69; // was 55, now +25%
-            const logoX = cx - logoWidth / 2;
-            const logoY = 35;
-
             const logo = await getLogoBuffer();
-            if (logo) {
-                try {
-                    doc.image(logo, logoX, logoY, { width: logoWidth });
-                } catch (imgErr) {
-                    console.warn('Failed to draw logo at top:', imgErr);
-                }
-            }
-
-            // ── 3. TAGLINE (below logo) ─────────────────────────────────────────
-            doc.font('Times-Italic')
-               .fontSize(11)
-               .fillColor(accentColor)
-               .text('nurturing wisdom through tradition', 50, logoY + logoWidth + 5, {
-                   width: width - 100,
-                   align: 'center'
-               });
 
             // ── 4. TITLE: "Certificate" (large, elegant serif) ──────────────────
-            // +75% from original 52pt = ~91pt
-            const titleY = logoY + logoWidth + 28;
+            // +75% from original 52pt = ~95pt (very large, matching template image)
+            const titleY = 65;
             doc.font('Times-Bold')
-               .fontSize(91)
+               .fontSize(95)
                .fillColor(titleColor)
                .text('Certificate', 50, titleY, { width: width - 100, align: 'center' });
 
             // ── 5. SUBTITLE: "of Completion" ────────────────────────────────────
-            // +10% from original 20pt = ~22pt (using titleY + 82 to avoid overlap)
-            const subtitleY = titleY + 82;
+            // +10% from original 20pt = ~22pt (centered below the large title)
+            const subtitleY = titleY + 85;
             doc.font('Times-Roman')
                .fontSize(22)
                .fillColor(titleColor)
