@@ -181,7 +181,14 @@ function MyAssignments() {
   useEffect(() => {
     const fetchMemberships = async () => {
       try {
-        const response = await fetch("https://tapoclg.onrender.com/api/membership");
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+        const response = await fetch("https://tapoclg.onrender.com/api/membership", {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
         if (response.ok) {
           const res = await response.json();
           if (res && (res.success || Array.isArray(res))) {

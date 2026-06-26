@@ -73,7 +73,14 @@ export default function Feedbacks() {
     const fetchFeedbacks = async () => {
       try {
         setLoading(true);
-        const response = await fetch('https://tapoclg.onrender.com/api/reviews');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+        const response = await fetch('https://tapoclg.onrender.com/api/reviews', {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
         const data = await response.json();
         if (data.success && Array.isArray(data.reviews)) {
           const mappedFeedbacks = data.reviews.map(item => {
@@ -98,9 +105,12 @@ export default function Feedbacks() {
             };
           });
           setFeedbacks(mappedFeedbacks);
+        } else {
+          setFeedbacks(INITIAL_FEEDBACKS);
         }
       } catch (err) {
-        console.error('Error fetching feedbacks:', err);
+        console.error('Error fetching feedbacks, using INITIAL_FEEDBACKS fallback:', err);
+        setFeedbacks(INITIAL_FEEDBACKS);
       } finally {
         setLoading(false);
       }
