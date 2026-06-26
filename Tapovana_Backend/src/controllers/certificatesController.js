@@ -400,6 +400,44 @@ const resendCertificateEmail = async (req, res) => {
             day: 'numeric'
         });
 
+        // Load saved PDF from disk for attachment
+        let pdfBuffer = null;
+        const certsDir = path.join(process.cwd(), 'certificates');
+        const filePath = path.join(certsDir, `${cert.certificate_id}.pdf`);
+        if (fs.existsSync(filePath)) {
+            pdfBuffer = fs.readFileSync(filePath);
+        } else {
+            // Try uploads/certificates directory too
+            const altPath = path.join(process.cwd(), 'uploads', 'certificates', `${cert.certificate_id}.pdf`);
+            if (fs.existsSync(altPath)) {
+                pdfBuffer = fs.readFileSync(altPath);
+            } else {
+                // Regenerate if file is missing
+                try {
+                    let signatureImage = null;
+                    let instructorName = cert.instructor || 'Workshop Instructor';
+                    if (cert.instructor_id && isValidUUID(cert.instructor_id)) {
+                        const instRes = await query('SELECT first_name, last_name, signature_image FROM team_members WHERE id = $1', [cert.instructor_id]);
+                        if (instRes.rows.length) {
+                            const inst = instRes.rows[0];
+                            instructorName = `${inst.first_name} ${inst.last_name}`.trim();
+                            signatureImage = inst.signature_image;
+                        }
+                    }
+                    pdfBuffer = await generateCertificatePDF(
+                        cert.participant_name,
+                        cert.workshop_name,
+                        completionDateStr,
+                        instructorName,
+                        signatureImage,
+                        cert.certificate_id
+                    );
+                } catch (genErr) {
+                    console.warn('Failed to regenerate PDF for resend:', genErr.message);
+                }
+            }
+        }
+
         // Resend email
         try {
             await sendWorkshopCompletionCertificateEmail({
@@ -409,7 +447,8 @@ const resendCertificateEmail = async (req, res) => {
                 completionDate: completionDateStr,
                 downloadUrl: cert.pdf_url,
                 certId: cert.certificate_id,
-                participantId: cert.participant_id
+                participantId: cert.participant_id,
+                pdfBuffer
             });
             await query(
                 `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)
