@@ -5,6 +5,9 @@ const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT, 10),
   secure: process.env.SMTP_SECURE === "true",
+  pool: true,              // Reuse TCP connections (huge speedup)
+  maxConnections: 3,       // Up to 3 parallel connections
+  maxMessages: 100,        // Up to 100 emails per connection before reconnect
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,

@@ -67,7 +67,10 @@ const loginPassword = async (req, res) => {
         );
 
         console.log("LOGIN OTP DEV:", otp);
-        await sendOtpEmail({ to: member.email, firstName: member.first_name, otp, purpose: "login" });
+
+        // Fire-and-forget: send email in background, respond immediately
+        sendOtpEmail({ to: member.email, firstName: member.first_name, otp, purpose: "login" })
+            .catch(emailErr => console.error("Failed to send OTP email:", emailErr.message));
 
         return res.json({
             success: true,

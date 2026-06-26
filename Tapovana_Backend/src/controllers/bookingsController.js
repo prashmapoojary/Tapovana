@@ -397,8 +397,8 @@ const getAllBookings = async (req, res) => {
     try {
         const { status, date_from, date_to, page = 1, limit = 10 } = req.query;
 
-        // 1. Ingest any new bookings from Render to local database
-        await syncIncomingBookings();
+        // 1. Ingest new bookings in background (fire-and-forget, don't block response)
+        syncIncomingBookings().catch(e => console.error('Background sync error:', e));
 
         // 2. Query bookings from local database ONLY
         let dbQuery = "SELECT * FROM bookings WHERE 1=1";
@@ -432,10 +432,39 @@ const getAllBookings = async (req, res) => {
         const startIndex = (pg - 1) * lim;
         const paginatedBookings = allBookings.slice(startIndex, startIndex + lim);
 
-        const enrichedBookings = [];
-        for (const b of paginatedBookings) {
-            enrichedBookings.push(await enrichBookingObject(req, b));
+        // Batch-load all service images in ONE query instead of N+1 per-booking
+        const serviceNames = [...new Set(paginatedBookings.map(b => b.service_name).filter(Boolean))];
+        const serviceImageMap = {};
+        if (serviceNames.length > 0) {
+            try {
+                const svcRes = await query(
+                    `SELECT LOWER(name) as name, image_url FROM services WHERE LOWER(name) = ANY($1::text[])`,
+                    [serviceNames.map(n => n.trim().toLowerCase())]
+                );
+                for (const row of svcRes.rows) {
+                    if (row.image_url) serviceImageMap[row.name] = row.image_url;
+                }
+            } catch (e) {
+                console.warn('Batch service image lookup failed:', e.message);
+            }
         }
+
+        // Enrich bookings in-memory (no per-booking DB calls)
+        const enrichedBookings = paginatedBookings.map(booking => {
+            let profilePhoto = null;
+            if (booking.profile_pic) {
+                profilePhoto = booking.profile_pic.startsWith('http')
+                    ? booking.profile_pic
+                    : `https://tapoclg.onrender.com${booking.profile_pic.startsWith('/') ? '' : '/'}${booking.profile_pic}`;
+            }
+            const lowerName = booking.service_name ? booking.service_name.trim().toLowerCase() : '';
+            const serviceImage = serviceImageMap[lowerName] || null;
+            return {
+                ...booking,
+                profilePhoto,
+                serviceImage: serviceImage ? getFullImageUrl(req, serviceImage) : null
+            };
+        });
 
         return res.json({
             success: true,
