@@ -158,11 +158,53 @@ export default function Membership() {
 
   // ─── Fetch members from BOTH mobile (Render) AND admin backend ─────
   const fetchMembers = useCallback(async () => {
-    try {
-      setDataLoading(true);
+    setDataLoading(true);
+    let adminMembers = [];
+    let mobileMembers = [];
 
-      // 1. Fetch from mobile app (Render API)
-      let mobileMembers = [];
+    // Helper to merge and update members state
+    const updateMembersState = (admin, mobile) => {
+      const mergedMap = new Map();
+      for (const m of mobile) {
+        mergedMap.set(m.email, m);
+      }
+      for (const m of admin) {
+        mergedMap.set(m.email, m);
+      }
+      setMembers(Array.from(mergedMap.values()));
+    };
+
+    // 1. Fetch from admin backend (usually instant)
+    const adminPromise = (async () => {
+      try {
+        const adminRes = await apiFetch("/api/memberships");
+        if (adminRes.success && adminRes.memberships) {
+          adminMembers = adminRes.memberships.map((m) => ({
+            id: "admin-" + m.id,
+            name: m.name || "Unknown",
+            email: m.email || "-",
+            phone: m.phone || "-",
+            tier: (m.tier || "SILVER").toUpperCase(),
+            joinDate: m.join_date || null,
+            expiryDate: m.expiry_date || null,
+            sessions: m.sessions || 0,
+            totalSpent: m.total_spent || 0,
+            status: m.status || "active",
+            profile_photo_url: m.profile_photo_url || null,
+            profilePhoto: m.profilePhoto || null,
+            source: "admin"
+          }));
+          // Render local data immediately
+          updateMembersState(adminMembers, mobileMembers);
+          setDataLoading(false); // Hide the main loading spinner
+        }
+      } catch (err) {
+        console.warn("Admin API fetch failed", err);
+      }
+    })();
+
+    // 2. Fetch from mobile app (Render API - could be slow due to cold start)
+    const mobilePromise = (async () => {
       try {
         const mobileRes = await fetch(RENDER_MEMBERSHIP_API);
         const mobileData = await mobileRes.json();
@@ -192,50 +234,19 @@ export default function Membership() {
               source: "mobile"
             };
           });
+          // Merge in mobile data when it finishes loading
+          updateMembersState(adminMembers, mobileMembers);
         }
-      } catch {
-        console.log("Mobile API fetch failed, using admin data only");
+      } catch (err) {
+        console.warn("Mobile API fetch failed, using admin data only", err);
       }
+    })();
 
-      // 2. Fetch from admin backend
-      let adminMembers = [];
-      try {
-        const adminRes = await apiFetch("/api/memberships");
-        if (adminRes.success && adminRes.memberships) {
-          adminMembers = adminRes.memberships.map((m) => ({
-            id: "admin-" + m.id,
-            name: m.name || "Unknown",
-            email: m.email || "-",
-            phone: m.phone || "-",
-            tier: (m.tier || "SILVER").toUpperCase(),
-            joinDate: m.join_date || null,
-            expiryDate: m.expiry_date || null,
-            sessions: m.sessions || 0,
-            totalSpent: m.total_spent || 0,
-            status: m.status || "active",
-            profile_photo_url: m.profile_photo_url || null,
-            profilePhoto: m.profilePhoto || null,
-            source: "admin"
-          }));
-        }
-      } catch {
-        console.log("Admin API fetch failed");
-      }
-
-      // 3. Merge: avoid duplicates by email (admin overwrites mobile)
-      const mergedMap = new Map();
-      for (const m of mobileMembers) {
-        mergedMap.set(m.email, m);
-      }
-      for (const m of adminMembers) {
-        mergedMap.set(m.email, m);
-      }
-
-      const merged = Array.from(mergedMap.values());
-      console.log("Total merged members:", merged.length, "(Mobile:", mobileMembers.length, "+ Admin:", adminMembers.length, ")");
-      setMembers(merged);
-    } catch {
-      setMembers([]);
+    // Wait for both to settle to finalize
+    try {
+      await Promise.all([adminPromise, mobilePromise]);
+    } catch (err) {
+      console.warn("Error loading members:", err);
       triggerAlert("Failed to load members.");
     } finally {
       setDataLoading(false);
