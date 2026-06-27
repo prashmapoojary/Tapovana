@@ -899,12 +899,13 @@ const sendBlogRejectedEmail = async ({ to, authorName, blogTitle, reason }) => {
 };
 
 const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, workshopTitle, completionDate, downloadUrl, certId, participantId, pdfBuffer }) => {
-  const rawFrontendUrl = process.env.FRONTEND_URL || (process.env.NODE_ENV === "production" ? "https://tapovana-admin.onrender.com" : "http://localhost:5173");
-  const frontendBase = rawFrontendUrl.replace(/\/$/, "");
+  const port = process.env.PORT || 5000;
+  const defaultUrl = process.env.NODE_ENV === "production" ? "https://tapovana.onrender.com" : `http://localhost:${port}`;
+  const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
   
-  const linkUrl = certId 
-    ? `${frontendBase}/certificate/${certId}`
-    : (participantId ? `${frontendBase}/certificate/${participantId}` : downloadUrl);
+  const linkUrl = participantId 
+    ? `${backendUrl}/download/certificate/${participantId}`
+    : (certId ? `${backendUrl}/api/certificates/download/${certId}` : downloadUrl);
 
   const html = emailWrapper(`
     <h1 style="color:#cda751;text-align:center;">Workshop Completed</h1>
