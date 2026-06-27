@@ -1,5 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Montserrat:wght@300;400;500;600;700&display=swap');
+Here’s a **rewritten CSS file** tailored to match the **first certificate template** you want — with the **soft brown+gold theme**,
+corrected font sizes,
+spacing,
+and the stylized cursive “a” using *Alex Brush*. This ensures the certificate looks exactly like your reference design: ```css @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Montserrat:wght@300;400;500;600;700&display=swap');
 
+/* Page container */
 .certificate-page-container {
   width: 100%;
   min-height: 100vh;
@@ -20,13 +24,13 @@
   max-width: 100%;
 }
 
-/* Fixed size container for the certificate to keep PDF rendering perfect */
+/* Certificate frame */
 .certificate-frame {
   position: relative;
   width: 842px;
-  /* A4 landscape width in pixels */
+  /* A4 landscape width */
   height: 595px;
-  /* A4 landscape height in pixels */
+  /* A4 landscape height */
   background-color: #ffffff;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
   border-radius: 4px;
@@ -34,7 +38,7 @@
   user-select: none;
 }
 
-/* Background image matching the pink/gold glitter template */
+/* Background image */
 .certificate-bg-image {
   position: absolute;
   top: 0;
@@ -45,7 +49,7 @@
   z-index: 1;
 }
 
-/* Overlay content container */
+/* Overlay content */
 .certificate-overlay-content {
   position: relative;
   width: 100%;
@@ -55,74 +59,77 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 4.2rem 6rem 3rem 6rem;
+  padding: 4rem 6rem 3rem 6rem;
 }
 
-/* Title: "Certificate" */
+/* Title: "certificate" */
 .cert-title {
   font-family: 'Playfair Display', serif;
-  font-size: 4.8rem;
-  /* Large serif title matching the image */
+  font-size: 4.6rem;
   font-weight: 700;
   color: #8e624c;
   /* soft brown */
   margin: 0;
   text-align: center;
   line-height: 1;
+  text-transform: lowercase;
 }
 
 /* Subtitle: "OF COMPLETION" */
 .cert-subtitle {
   font-family: 'Playfair Display', serif;
-  font-size: 1.25rem;
+  font-size: 1.4rem;
   font-weight: 600;
   color: #8e624c;
-  letter-spacing: 5px;
+  letter-spacing: 4px;
   text-transform: uppercase;
-  margin: 0.4rem 0 0.5rem 0;
+  margin: 0.4rem 0 0.8rem 0;
   text-align: center;
 }
 
-/* Intro: "This is to certify that" */
+/* Intro text */
 .cert-intro {
   font-family: 'Playfair Display', serif;
   font-style: italic;
-  font-size: 1.15rem;
+  font-size: 1.2rem;
   color: #3d2b1f;
-  margin: 0.6rem 0 0.6rem 0;
+  margin: 0.6rem 0;
   text-align: center;
+  text-transform: lowercase;
 }
 
-/* Recipient details */
+/* Recipient */
 .cert-recipient {
   width: 75%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.3rem;
 }
 
 .cert-recipient-name {
   font-family: 'Alex Brush', cursive;
-  font-size: 3.5rem;
+  /* stylized 'a' */
+  font-size: 3.6rem;
   font-weight: 400;
   color: #3d2b1f;
   margin: 0;
   text-align: center;
   line-height: 1.2;
+  text-transform: lowercase;
 }
 
 .cert-recipient-line {
   width: 80%;
-  height: 0.8px;
+  height: 1px;
   background-color: #c4967a;
-  margin-top: 0.1rem;
+  margin-top: 0.2rem;
 }
 
-/* Unique Verification ID directly under name line */
+/* Verification ID */
 .cert-id-below-name {
   font-family: 'Montserrat', sans-serif;
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   color: #666666;
   letter-spacing: 0.5px;
   margin-top: 0.4rem;
@@ -131,33 +138,35 @@
   text-transform: lowercase;
 }
 
-/* Achievement text: "has successfully completed" */
+/* Achievement text */
 .cert-achievement {
   font-family: 'Playfair Display', serif;
   font-style: italic;
-  font-size: 1.15rem;
+  font-size: 1.2rem;
   color: #3d2b1f;
   margin: 0 0 0.6rem 0;
   text-align: center;
+  text-transform: lowercase;
 }
 
-/* Course Name */
+/* Course name */
 .cert-course-name {
   font-family: 'Playfair Display', serif;
   font-weight: 700;
-  font-size: 2rem;
+  font-size: 2.1rem;
   color: #3d2b1f;
   letter-spacing: 1.5px;
   margin: 0 0 1.5rem 0;
   text-align: center;
   max-width: 90%;
   line-height: 1.3;
+  text-transform: lowercase;
 }
 
-/* Footer Section */
+/* Footer row */
 .cert-footer-row {
   position: absolute;
-  bottom: 3.2rem;
+  bottom: 3rem;
   left: 5rem;
   right: 5rem;
   display: flex;
@@ -171,10 +180,7 @@
   align-items: center;
 }
 
-.col-left {
-  width: 200px;
-}
-
+.col-left,
 .col-right {
   width: 200px;
 }
@@ -183,26 +189,29 @@
   width: 180px;
 }
 
+/* Footer values */
 .footer-value-text {
   font-family: 'Playfair Display', serif;
-  font-size: 1.15rem;
+  font-size: 1.2rem;
   color: #3d2b1f;
   text-align: center;
   min-height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
+  text-transform: lowercase;
 }
 
 .cursive-sig {
   font-family: 'Alex Brush', cursive;
-  font-size: 2.2rem;
+  font-size: 2.4rem;
   line-height: 1;
+  text-transform: lowercase;
 }
 
 .footer-value-divider {
   width: 100%;
-  height: 0.8px;
+  height: 1px;
   background-color: #c4967a;
   margin: 0.3rem 0;
 }
@@ -210,14 +219,14 @@
 .footer-label-text {
   font-family: 'Montserrat', sans-serif;
   font-weight: 500;
-  font-size: 0.75rem;
-  text-transform: uppercase;
+  font-size: 0.8rem;
+  text-transform: lowercase;
   color: #888888;
   letter-spacing: 0.5px;
   text-align: center;
 }
 
-/* Seal & Branding in Center Column */
+/* Seal & branding */
 .seal-badge-container {
   width: 50px;
   height: 50px;
@@ -236,35 +245,24 @@
 .footer-company-name {
   font-family: 'Montserrat', sans-serif;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 1rem;
   color: #3d2b1f;
   letter-spacing: 1px;
   text-align: center;
+  text-transform: lowercase;
 }
 
 .footer-company-tagline {
   font-family: 'Playfair Display', serif;
   font-style: italic;
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   color: #c4967a;
-  margin-top: 1px;
+  margin-top: 2px;
   text-align: center;
+  text-transform: lowercase;
 }
 
-/* Unique Verification ID Badge */
-.cert-id-badge {
-  position: absolute;
-  bottom: 1.2rem;
-  font-family: 'Montserrat', sans-serif;
-  font-size: 0.6rem;
-  color: #999999;
-  letter-spacing: 0.5px;
-  text-align: center;
-  width: 100%;
-  left: 0;
-}
-
-/* Action controls & buttons */
+/* Validation note & button */
 .certificate-actions {
   display: flex;
   flex-direction: column;
@@ -274,16 +272,17 @@
 }
 
 .validation-note {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: #666666;
   text-align: center;
+  text-transform: lowercase;
 }
 
 .certificate-download-btn {
   padding: 0.9rem 2.2rem;
   background-color: #cda751;
   color: #111111;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 600;
   border: none;
   border-radius: 6px;
@@ -291,6 +290,7 @@
   box-shadow: 0 4px 14px rgba(205, 167, 81, 0.3);
   transition: all 0.2s ease;
   letter-spacing: 0.5px;
+  text-transform: lowercase;
 }
 
 .certificate-download-btn:hover {
@@ -303,7 +303,40 @@
   transform: translateY(1px);
 }
 
-/* Loading & Error States styling */
+/* Responsive scaling */
+@media (max-width: 900px) {
+  .certificate-frame {
+    transform: scale(0.85);
+    transform-origin: center top;
+    margin-bottom: -90px;
+  }
+}
+
+@media (max-width: 760px) {
+  .certificate-frame {
+    transform: scale(0.7);
+    transform-origin: center top;
+    margin-bottom: -180px;
+  }
+}
+
+@media (max-width: 600px) {
+  .certificate-frame {
+    transform: scale(0.55);
+    transform-origin: center top;
+    margin-bottom: -270px;
+  }
+}
+
+@media (max-width: 480px) {
+  .certificate-frame {
+    transform: scale(0.42);
+    transform-origin: center top;
+    margin-bottom: -340px;
+  }
+}
+
+/* Error & Loading states */
 .certificate-page-loading,
 .certificate-page-error {
   width: 100%;
@@ -348,6 +381,7 @@
   cursor: pointer;
   font-weight: 500;
   transition: background-color 0.2s;
+  text-transform: lowercase;
 }
 
 .retry-btn:hover {
@@ -357,38 +391,5 @@
 @keyframes spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-/* CSS scale down for smaller screens to make the A4 frame responsive */
-@media (max-width: 900px) {
-  .certificate-frame {
-    transform: scale(0.85);
-    transform-origin: center top;
-    margin-bottom: -90px;
-  }
-}
-
-@media (max-width: 760px) {
-  .certificate-frame {
-    transform: scale(0.7);
-    transform-origin: center top;
-    margin-bottom: -180px;
-  }
-}
-
-@media (max-width: 600px) {
-  .certificate-frame {
-    transform: scale(0.55);
-    transform-origin: center top;
-    margin-bottom: -270px;
-  }
-}
-
-@media (max-width: 480px) {
-  .certificate-frame {
-    transform: scale(0.42);
-    transform-origin: center top;
-    margin-bottom: -340px;
   }
 }
