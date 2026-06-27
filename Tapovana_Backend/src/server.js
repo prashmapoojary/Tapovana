@@ -44,8 +44,15 @@ app.use(rateLimit({
     max: process.env.NODE_ENV === 'production' ? 120 : 999999, // Disabled for dev to avoid 429
 }));
 
-app.get("/health", (_req, res) => {
-    res.json({ success: true, status: "ok", service: "tapovana-backend" });
+app.get("/health", async (_req, res) => {
+    try {
+        const { query } = require('./config/db');
+        await query('SELECT 1');
+        res.json({ success: true, status: "ok", database: "connected", service: "tapovana-backend" });
+    } catch (err) {
+        console.error('[Health Check] Database ping failed:', err.message);
+        res.status(500).json({ success: false, status: "error", message: "Database connection failed", error: err.message });
+    }
 });
 
 app.use("/api/admin", authRoutes);
@@ -89,14 +96,14 @@ app.listen(PORT, () => {
     console.log(`🌿 Tapovana Backend running on port ${PORT}`);
     console.log(`ENV: ${process.env.NODE_ENV || "development"}`);
 
-    // ── Self-ping keep-alive (prevents Render free-tier sleep) ──────────────
-    // Pings own /health endpoint every 13 minutes via HTTPS.
-    // Works as a secondary layer alongside the GitHub Actions external cron.
+    // ── Self-ping keep-alive (prevents Render free-tier sleep & Neon suspension) ─
+    // Pings own /health endpoint every 4 minutes via HTTPS.
+    // Keeps Neon serverless DB warm (auto-suspends on 5 min inactivity) and pooled connections active.
     const https = require("https");
     const SELF_URL = process.env.RENDER_EXTERNAL_URL || process.env.SELF_URL;
 
     if (SELF_URL) {
-        const pingInterval = 13 * 60 * 1000; // 13 minutes
+        const pingInterval = 4 * 60 * 1000; // 4 minutes
 
         const selfPing = () => {
             const url = `${SELF_URL}/health`;
@@ -107,13 +114,13 @@ app.listen(PORT, () => {
             });
         };
 
-        // First ping after 2 minutes (let server fully boot), then every 13 min
+        // First ping after 1 minute (let server fully boot), then every 4 min
         setTimeout(() => {
             selfPing();
             setInterval(selfPing, pingInterval);
-        }, 2 * 60 * 1000);
+        }, 1 * 60 * 1000);
 
-        console.log(`[KeepAlive] 🟢 Self-ping scheduled every 13 min → ${SELF_URL}/health`);
+        console.log(`[KeepAlive] 🟢 Self-ping scheduled every 4 min → ${SELF_URL}/health`);
     } else {
         console.log("[KeepAlive] ℹ️  RENDER_EXTERNAL_URL not set — self-ping disabled (local dev mode).");
     }
