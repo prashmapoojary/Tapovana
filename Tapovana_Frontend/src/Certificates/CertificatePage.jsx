@@ -162,6 +162,13 @@ const CertificatePage = () => {
     );
   }
 
+  const getInstructorNameFontSize = (name) => {
+    if (!name) return {};
+    if (name.length > 18) return { fontSize: '1.8rem' };
+    if (name.length > 12) return { fontSize: '2.4rem' };
+    return {};
+  };
+
   return (
     <div className="certificate-page-container">
       <div className="certificate-viewer">
@@ -210,7 +217,9 @@ const CertificatePage = () => {
 
               {/* Right: Signature and Conductor Name */}
               <div className="cert-footer-col col-right">
-                <div className="footer-value-text cursive-sig">{certData.instructorName}</div>
+                <div className="footer-value-text cursive-sig" style={getInstructorNameFontSize(certData.instructorName)}>
+                  {certData.instructorName}
+                </div>
                 <div className="footer-value-divider"></div>
                 <div className="footer-label-text">Workshop Instructor</div>
               </div>
