@@ -545,7 +545,19 @@ export default function Workshops() {
   const handleExportCSV = async () => {
     try {
       const token = sessionStorage.getItem("access_token") || "";
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+      const API_BASE = (() => {
+  if (typeof window === "undefined") return "https://tapovana.onrender.com";
+  const hostname = window.location.hostname;
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    /^192\.168\./.test(hostname) ||
+    /^10\./.test(hostname)
+  ) {
+    return `http://${hostname}:5000`;
+  }
+  return import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
+})();
       const headers = {};
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
@@ -1229,7 +1241,7 @@ export default function Workshops() {
                       onLoadedMetadata={handleLoadedMetadata}
                       style={{ width: "100%", maxHeight: 400, borderRadius: 8, display: "block" }}
                     >
-                      <source src={displayVideo.startsWith("http") || displayVideo.startsWith("blob:") ? displayVideo : `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}${displayVideo}`} type="video/mp4" />
+                      <source src={displayVideo.startsWith("http") || displayVideo.startsWith("blob:") ? displayVideo : `${API_BASE}${displayVideo}`} type="video/mp4" />
                     </video>
                   )}
                 </div>

@@ -74,7 +74,7 @@ const getMemberAvatarUrl = (profilePhoto, url, source) => {
   if (profilePhoto) return profilePhoto;
   if (!url) return DefaultAvatar;
   if (url.startsWith("http") || url.startsWith("data:")) return url;
-  const base = source === "mobile" ? "https://tapovana.onrender.com" : (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000");
+  const base = source === "mobile" ? "https://tapovana.onrender.com" : API_BASE;
 
   if (url.includes("uploads/")) {
     const idx = url.indexOf("uploads/");

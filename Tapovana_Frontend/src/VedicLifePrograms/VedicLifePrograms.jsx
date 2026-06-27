@@ -908,7 +908,7 @@ export default function VedicLifePrograms() {
 
   const handleExportCSV = () => {
     const token = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
-    const url = `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api/vedic-programs/${selectedProgram.id}/attendees/export?token=${token}`;
+    const url = `${API_BASE}/api/vedic-programs/${selectedProgram.id}/attendees/export?token=${token}`;
     window.open(url, "_blank");
   };
 

@@ -1,6 +1,22 @@
 import { getToken } from "../utils/session";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+export const getApiBase = () => {
+  if (typeof window === "undefined") {
+    return "https://tapovana.onrender.com";
+  }
+  const hostname = window.location.hostname;
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    /^192\.168\./.test(hostname) ||
+    /^10\./.test(hostname)
+  ) {
+    return `http://${hostname}:5000`;
+  }
+  return "https://tapovana.onrender.com";
+};
+
+export const API_BASE = getApiBase();
 
 export async function apiFetch(path, options = {}) {
   const token = getToken();

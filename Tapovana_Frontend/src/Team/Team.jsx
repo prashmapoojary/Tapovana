@@ -13,7 +13,19 @@ import ProfilePlaceholder from "../assets/profileIconDefault.png";
 import { apiFetch } from "../api/http";
 import { useAllocations } from "../utils/AllocationContext";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE = (() => {
+  if (typeof window === "undefined") return "https://tapovana.onrender.com";
+  const hostname = window.location.hostname;
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    /^192\.168\./.test(hostname) ||
+    /^10\./.test(hostname)
+  ) {
+    return `http://${hostname}:5000`;
+  }
+  return import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
+})();
 
 const EditMemberDrawer = ({ user, onClose }) => {
   const [photoPreview, setPhotoPreview] = useState(null);
