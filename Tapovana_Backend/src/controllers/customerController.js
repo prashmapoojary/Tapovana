@@ -33,7 +33,7 @@ const getCustomersList = async () => {
 
   // 2. Try external API as fallback
   try {
-    const res = await globalThis.fetch("https://tapoclg.onrender.com/api/customer");
+    const res = await globalThis.fetch("https://tapovana.onrender.com/api/customer");
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data)) return data;

@@ -68,13 +68,13 @@ function getPageNumbers(current, total) {
 
 const BLANK_ENROLL = { name: "", email: "", phone: "", tier: "SILVER" };
 
-const RENDER_MEMBERSHIP_API = "https://tapoclg.onrender.com/api/membership";
+const RENDER_MEMBERSHIP_API = "https://tapovana.onrender.com/api/membership";
 
 const getMemberAvatarUrl = (profilePhoto, url, source) => {
   if (profilePhoto) return profilePhoto;
   if (!url) return DefaultAvatar;
   if (url.startsWith("http") || url.startsWith("data:")) return url;
-  const base = source === "mobile" ? "https://tapoclg.onrender.com" : (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000");
+  const base = source === "mobile" ? "https://tapovana.onrender.com" : (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000");
 
   if (url.includes("uploads/")) {
     const idx = url.indexOf("uploads/");
@@ -230,7 +230,7 @@ export default function Membership() {
               totalSpent: 0,
               status: "active",
               profile_photo_url: m.profile_pic || null,
-              profilePhoto: m.profile_pic ? (m.profile_pic.startsWith("http") ? m.profile_pic : `https://tapoclg.onrender.com${m.profile_pic.startsWith("/") ? "" : "/"}${m.profile_pic}`) : null,
+              profilePhoto: m.profile_pic ? (m.profile_pic.startsWith("http") ? m.profile_pic : `https://tapovana.onrender.com${m.profile_pic.startsWith("/") ? "" : "/"}${m.profile_pic}`) : null,
               source: "mobile"
             };
           });

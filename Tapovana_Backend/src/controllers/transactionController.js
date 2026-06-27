@@ -33,7 +33,7 @@ const getTransactionsList = async () => {
   }
 
   try {
-    const res = await globalThis.fetch("https://tapoclg.onrender.com/api/transaction");
+    const res = await globalThis.fetch("https://tapovana.onrender.com/api/transaction");
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data)) return data;

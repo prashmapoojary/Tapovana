@@ -2,10 +2,10 @@ const fetch = require("node:process") ? globalThis.fetch : null;
 
 async function test() {
   const paths = [
-    "https://tapoclg.onrender.com/customer",
-    "https://tapoclg.onrender.com/transaction",
-    "https://tapoclg.onrender.com/customers",
-    "https://tapoclg.onrender.com/transactions"
+    "https://tapovana.onrender.com/customer",
+    "https://tapovana.onrender.com/transaction",
+    "https://tapovana.onrender.com/customers",
+    "https://tapovana.onrender.com/transactions"
   ];
   for (const url of paths) {
     try {

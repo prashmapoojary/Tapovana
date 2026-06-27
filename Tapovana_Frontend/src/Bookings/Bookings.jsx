@@ -105,7 +105,7 @@ function Bookings() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4500);
 
-        const response = await fetch("https://tapoclg.onrender.com/api/membership", {
+        const response = await fetch("https://tapovana.onrender.com/api/membership", {
           signal: controller.signal
         });
         clearTimeout(timeoutId);
@@ -117,7 +117,7 @@ function Bookings() {
             const mappedMembers = rawList.map((m) => {
               let profilePhoto = m.profile_photo_url || m.profile_pic || null;
               if (profilePhoto && !profilePhoto.startsWith("http")) {
-                profilePhoto = `https://tapoclg.onrender.com${profilePhoto.startsWith("/") ? "" : "/"}${profilePhoto}`;
+                profilePhoto = `https://tapovana.onrender.com${profilePhoto.startsWith("/") ? "" : "/"}${profilePhoto}`;
               }
               return {
                 id: m.id || m.user_id,
@@ -466,7 +466,7 @@ function Bookings() {
                       if (pic.startsWith("http")) {
                         avatarSrc = pic;
                       } else {
-                        avatarSrc = `https://tapoclg.onrender.com${pic.startsWith("/") ? "" : "/"}${pic}`;
+                        avatarSrc = `https://tapovana.onrender.com${pic.startsWith("/") ? "" : "/"}${pic}`;
                       }
                     } else if (membership?.profilePhoto) {
                       avatarSrc = membership.profilePhoto;

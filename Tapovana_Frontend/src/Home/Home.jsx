@@ -44,6 +44,25 @@ const DUMMY_DASHBOARD_DATA = {
     "SVC-003": 53,
     "SVC-004": 48,
     "SVC-005": 39
+  },
+  service_demand_services: {
+    "SVC-001": { count: 87, name: "Deep Tissue Massage", category: "Body Care", price: 2500 },
+    "SVC-002": { count: 64, name: "Facial Treatment", category: "Skin Care", price: 2000 },
+    "SVC-003": { count: 53, name: "Hair Spa", category: "Hair Care", price: 1800 },
+    "SVC-004": { count: 48, name: "Meditation Session", category: "Wellness", price: 500 },
+    "SVC-005": { count: 39, name: "Yoga Class", category: "Wellness", price: 800 }
+  },
+  service_demand_workshops: {
+    "WS-001": { count: 42, name: "Yoga Basics", category: "Yoga", price: 1500 },
+    "WS-002": { count: 35, name: "Nutrition 101", category: "Nutrition", price: 1200 },
+    "WS-003": { count: 28, name: "Meditation Masters", category: "Meditation", price: 1000 },
+    "WS-004": { count: 21, name: "Mindfulness Retreat", category: "Mindfulness", price: 2000 }
+  },
+  service_demand_vedic: {
+    "VL-001": { count: 55, name: "Ayurveda Healing", category: "Ayurveda", price: 3500 },
+    "VL-002": { count: 47, name: "Healthy Lifestyle", category: "Healthy Lifestyle", price: 3000 },
+    "VL-003": { count: 39, name: "Yoga Sadhana", category: "Yoga", price: 2800 },
+    "VL-004": { count: 32, name: "Panchakarma Detox", category: "Ayurveda", price: 5000 }
   }
 };
 
@@ -88,7 +107,7 @@ function ConflictRow({ conflict, getSuggestions, onReassignSuccess, triggerAlert
     if (conflict.type === 'service' && conflict.session_id) {
       const fetchClientEmail = async () => {
         try {
-          const response = await fetch(`https://tapoclg.onrender.com/api/bookings/${conflict.session_id}`, {
+          const response = await fetch(`https://tapovana.onrender.com/api/bookings/${conflict.session_id}`, {
             headers: {
               "Content-Type": "application/json"
             }
@@ -308,6 +327,7 @@ function Home() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [showCustomPicker, setShowCustomPicker] = useState(false);
+  const [activeDemandTab, setActiveDemandTab] = useState("overall");
 
   // States for interactive SVG charts tooltips
   const [bookingHoverIdx, setBookingHoverIdx] = useState(null);
@@ -508,20 +528,19 @@ function Home() {
     return { total, segments };
   }, [membershipData]);
 
-  // Service demand (top 5 lists)
-  const serviceDemand = useMemo(() => {
-    const rawDemand = data?.service_demand || {};
-    const sorted = Object.entries(rawDemand)
-      .map(([serviceId, value]) => {
+  // Service, Workshop, and Vedic Life demands
+  const processDemand = (rawDemand, defaultCategory, lookupMap = {}) => {
+    const sorted = Object.entries(rawDemand || {})
+      .map(([id, value]) => {
         const isObj = value && typeof value === 'object';
         const countVal = isObj ? value.count : value;
-        const meta = SERVICE_LOOKUP[serviceId] || {
-          name: isObj && value.name ? value.name : serviceId,
-          category: isObj && value.category ? value.category : "Wellness",
+        const meta = lookupMap[id] || {
+          name: isObj && value.name ? value.name : id,
+          category: isObj && value.category ? value.category : defaultCategory,
           price: isObj && value.price !== undefined ? value.price : 0
         };
         return {
-          serviceId,
+          serviceId: id,
           count: countVal,
           name: meta.name,
           category: meta.category,
@@ -536,7 +555,119 @@ function Home() {
       ...s,
       percent: Math.round((s.count / maxCount) * 100)
     }));
+  };
+
+  const overallDemand = useMemo(() => {
+    return processDemand(data?.service_demand, "Wellness", SERVICE_LOOKUP);
   }, [data]);
+
+  const servicesDemand = useMemo(() => {
+    const raw = data?.service_demand_services || 
+      (data?.service_demand ? Object.fromEntries(
+        Object.entries(data.service_demand).filter(([_, v]) => 
+          (v && typeof v === 'object' && v.category !== 'Workshop' && v.category !== 'Vedic Life') || 
+          SERVICE_LOOKUP[v] || SERVICE_LOOKUP[_]
+        )
+      ) : {});
+    return processDemand(raw, "Wellness", SERVICE_LOOKUP);
+  }, [data]);
+
+  const workshopsDemand = useMemo(() => {
+    const raw = data?.service_demand_workshops ||
+      (data?.service_demand ? Object.fromEntries(
+        Object.entries(data.service_demand).filter(([_, v]) => 
+          (v && typeof v === 'object' && v.category === 'Workshop') || _.startsWith('WS-')
+        )
+      ) : {});
+    return processDemand(raw, "Workshop");
+  }, [data]);
+
+  const vedicDemand = useMemo(() => {
+    const raw = data?.service_demand_vedic ||
+      (data?.service_demand ? Object.fromEntries(
+        Object.entries(data.service_demand).filter(([_, v]) => 
+          (v && typeof v === 'object' && v.category === 'Vedic Life') || _.startsWith('VL-')
+        )
+      ) : {});
+    return processDemand(raw, "Vedic Life");
+  }, [data]);
+
+  const activeDemandList = useMemo(() => {
+    if (activeDemandTab === "workshops") return workshopsDemand;
+    if (activeDemandTab === "vedic") return vedicDemand;
+    if (activeDemandTab === "services") return servicesDemand;
+    return overallDemand;
+  }, [activeDemandTab, overallDemand, servicesDemand, workshopsDemand, vedicDemand]);
+
+  const getDisplayName = (item) => {
+    const name = item.name;
+    if (activeDemandTab === "overall") {
+      const isWorkshop = item.category === "Workshop";
+      const isVedic = item.category === "Vedic Life";
+      const suffix = isWorkshop ? " (Workshop)" : isVedic ? " (Vedic)" : " (Service)";
+      return name.endsWith(suffix) ? name : `${name}${suffix}`;
+    }
+    // Under specific tabs, remove any of the suffixes
+    return name
+      .replace(/ \(Service\)$/i, "")
+      .replace(/ \(Workshop\)$/i, "")
+      .replace(/ \(Vedic\)$/i, "");
+  };
+
+  const getStatsLabels = (item) => {
+    const isWorkshop = item?.category === "Workshop";
+    const isVedic = item?.category === "Vedic Life";
+    
+    if (activeDemandTab === "workshops" || (activeDemandTab === "overall" && isWorkshop)) {
+      return { countLabel: "Attendees", priceLabel: "Price" };
+    }
+    if (activeDemandTab === "vedic" || (activeDemandTab === "overall" && isVedic)) {
+      return { countLabel: "Attendees", priceLabel: "Program Fee" };
+    }
+    return { countLabel: "Bookings", priceLabel: "Base Rate" };
+  };
+
+  const getDemandColor = (item) => {
+    const isWorkshop = item?.category === "Workshop";
+    const isVedic = item?.category === "Vedic Life";
+    
+    if (isWorkshop) return "teal";
+    if (isVedic) return "grey";
+    return "gold";
+  };
+
+  const getChartSubtitles = () => {
+    if (dateFilter === "today") {
+      return {
+        booking: "Today's appointment count",
+        bookingTooltip: "Appointments",
+        revenue: "Today's billing tracking",
+        revenueTooltip: "Revenue"
+      };
+    }
+    if (dateFilter === "week") {
+      return {
+        booking: "Last 7 days appointment count",
+        bookingTooltip: "Bookings",
+        revenue: "Last 7 days billing tracking",
+        revenueTooltip: "Revenue"
+      };
+    }
+    if (dateFilter === "month") {
+      return {
+        booking: "This month's appointment count",
+        bookingTooltip: "Bookings",
+        revenue: "This month's billing tracking",
+        revenueTooltip: "Revenue"
+      };
+    }
+    return {
+      booking: "Custom range appointment count",
+      bookingTooltip: "Bookings",
+      revenue: "Custom range billing tracking",
+      revenueTooltip: "Revenue"
+    };
+  };
 
 
 
@@ -772,7 +903,7 @@ function Home() {
           <div className="chart-card-header">
             <div>
               <h3 className="chart-card-title">Booking Trends</h3>
-              <div className="chart-card-subtitle">Last 7 days appointment count</div>
+              <div className="chart-card-subtitle">{getChartSubtitles().booking}</div>
             </div>
           </div>
           <div className="svg-chart-container">
@@ -857,8 +988,8 @@ function Home() {
                   opacity: 1
                 }}
               >
-                <div className="chart-tooltip-title">{daysOfWeek[bookingHoverIdx]} Day</div>
-                <div className="chart-tooltip-value">{bookingTrend[bookingHoverIdx]} Bookings</div>
+                <div className="chart-tooltip-title">{daysOfWeek[bookingHoverIdx]}</div>
+                <div className="chart-tooltip-value">{bookingTrend[bookingHoverIdx]} {getChartSubtitles().bookingTooltip}</div>
               </div>
             )}
           </div>
@@ -869,7 +1000,7 @@ function Home() {
           <div className="chart-card-header">
             <div>
               <h3 className="chart-card-title">Revenue Performance</h3>
-              <div className="chart-card-subtitle">Last 7 days billing tracking</div>
+              <div className="chart-card-subtitle">{getChartSubtitles().revenue}</div>
             </div>
           </div>
           <div className="svg-chart-container">
@@ -947,7 +1078,7 @@ function Home() {
                   opacity: 1
                 }}
               >
-                <div className="chart-tooltip-title">{daysOfWeek[revenueHoverIdx]} Revenue</div>
+                <div className="chart-tooltip-title">{daysOfWeek[revenueHoverIdx]}</div>
                 <div className="chart-tooltip-value">₹{revenueTrend[revenueHoverIdx].toLocaleString("en-IN")}</div>
               </div>
             )}
@@ -960,25 +1091,51 @@ function Home() {
         {/* Service Demand List */}
         <div className="demand-card">
           <div className="bottom-card-header">
-            <h3 className="bottom-card-title">Top Requested Services</h3>
+            <h3 className="bottom-card-title">Top Requested Service</h3>
+            <div className="demand-tabs">
+              <button
+                className={`demand-tab-btn ${activeDemandTab === "overall" ? "active overall" : ""}`}
+                onClick={() => setActiveDemandTab("overall")}
+              >
+                Overall
+              </button>
+              <button
+                className={`demand-tab-btn ${activeDemandTab === "services" ? "active services" : ""}`}
+                onClick={() => setActiveDemandTab("services")}
+              >
+                Services
+              </button>
+              <button
+                className={`demand-tab-btn ${activeDemandTab === "workshops" ? "active workshops" : ""}`}
+                onClick={() => setActiveDemandTab("workshops")}
+              >
+                Workshops
+              </button>
+              <button
+                className={`demand-tab-btn ${activeDemandTab === "vedic" ? "active vedic" : ""}`}
+                onClick={() => setActiveDemandTab("vedic")}
+              >
+                Vedic Life
+              </button>
+            </div>
           </div>
           <div className="demand-list">
-            {serviceDemand.map((service, idx) => (
+            {activeDemandList.map((service, idx) => (
               <div className="demand-item" key={service.serviceId || idx}>
                 <div className="demand-info">
-                  <div className="demand-name">{service.name}</div>
+                  <div className="demand-name">{getDisplayName(service)}</div>
                   <div className="demand-progress-container">
-                    <div className="demand-progress-bar" style={{ width: `${service.percent}%` }} />
+                    <div className={`demand-progress-bar ${getDemandColor(service)}`} style={{ width: `${service.percent}%` }} />
                   </div>
                 </div>
                 <div className="demand-stats">
-                  <div className="demand-count">{service.count} Bookings</div>
-                  <div className="demand-label">Base Rate: ₹{service.price}</div>
+                  <div className={`demand-count ${getDemandColor(service)}`}>{service.count} {getStatsLabels(service).countLabel}</div>
+                  <div className="demand-label">{getStatsLabels(service).priceLabel}: ₹{service.price}</div>
                 </div>
               </div>
             ))}
-            {serviceDemand.length === 0 && (
-              <p style={{ color: "#7b8a9a", fontSize: "14px" }}>No service demand records logged.</p>
+            {activeDemandList.length === 0 && (
+              <p style={{ color: "#7b8a9a", fontSize: "14px" }}>No {activeDemandTab} demand records logged.</p>
             )}
           </div>
         </div>

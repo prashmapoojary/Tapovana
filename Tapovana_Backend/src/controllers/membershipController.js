@@ -55,7 +55,7 @@ const getAllMemberships = async (req, res) => {
         // Fetch remote memberships to get latest profile pictures
         let remoteMembers = [];
         try {
-            const response = await fetch('https://tapoclg.onrender.com/api/membership');
+            const response = await fetch('https://tapovana.onrender.com/api/membership');
             if (response.ok) {
                 const data = await response.json();
                 remoteMembers = data.success ? (data.memberships || []) : [];
@@ -80,7 +80,7 @@ const getAllMemberships = async (req, res) => {
                 if (pic.startsWith('http')) {
                     profilePhoto = pic;
                 } else if (pic.startsWith('/uploads/profile_photo-') || remoteMembersMap.has(emailKey)) {
-                    profilePhoto = `https://tapoclg.onrender.com${pic.startsWith('/') ? '' : '/'}${pic}`;
+                    profilePhoto = `https://tapovana.onrender.com${pic.startsWith('/') ? '' : '/'}${pic}`;
                 } else {
                     // Local server upload
                     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
@@ -118,7 +118,7 @@ const getMembershipById = async (req, res) => {
         let remotePic = null;
         if (row.email) {
             try {
-                const response = await fetch('https://tapoclg.onrender.com/api/membership');
+                const response = await fetch('https://tapovana.onrender.com/api/membership');
                 if (response.ok) {
                     const data = await response.json();
                     const remoteMembers = data.success ? (data.memberships || []) : [];
@@ -138,7 +138,7 @@ const getMembershipById = async (req, res) => {
             if (pic.startsWith('http')) {
                 profilePhoto = pic;
             } else if (pic.startsWith('/uploads/profile_photo-') || remotePic) {
-                profilePhoto = `https://tapoclg.onrender.com${pic.startsWith('/') ? '' : '/'}${pic}`;
+                profilePhoto = `https://tapovana.onrender.com${pic.startsWith('/') ? '' : '/'}${pic}`;
             } else {
                 // Local server upload
                 const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
@@ -162,7 +162,7 @@ const enrichMembership = (req, row) => {
         if (pic.startsWith('http')) {
             profilePhoto = pic;
         } else if (pic.startsWith('/uploads/profile_photo-')) {
-            profilePhoto = `https://tapoclg.onrender.com${pic.startsWith('/') ? '' : '/'}${pic}`;
+            profilePhoto = `https://tapovana.onrender.com${pic.startsWith('/') ? '' : '/'}${pic}`;
         } else {
             // Local server upload
             const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
@@ -273,7 +273,7 @@ const updateTier = async (req, res) => {
 // ─── Sync from Render API ─────────────────────────────────────────────
 const syncFromRender = async (req, res) => {
     try {
-        const response = await fetch('https://tapoclg.onrender.com/api/membership');
+        const response = await fetch('https://tapovana.onrender.com/api/membership');
         const data = await response.json();
         if (!data.success || !data.memberships) return res.status(400).json({ success: false, message: 'Failed to fetch from Render API.' });
 

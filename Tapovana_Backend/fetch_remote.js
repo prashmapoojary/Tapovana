@@ -1,6 +1,6 @@
 async function run() {
     try {
-        const response = await fetch('https://tapoclg.onrender.com/api/bookings?limit=100');
+        const response = await fetch('https://tapovana.onrender.com/api/bookings?limit=100');
         const data = await response.json();
         console.log(JSON.stringify(data, null, 2));
     } catch (err) {

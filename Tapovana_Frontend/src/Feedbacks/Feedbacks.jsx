@@ -76,7 +76,7 @@ export default function Feedbacks() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4500);
 
-        const response = await fetch('https://tapoclg.onrender.com/api/reviews', {
+        const response = await fetch('https://tapovana.onrender.com/api/reviews', {
           signal: controller.signal
         });
         clearTimeout(timeoutId);

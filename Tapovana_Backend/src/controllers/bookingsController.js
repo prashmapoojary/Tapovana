@@ -74,7 +74,7 @@ const enrichBookingObject = async (req, booking) => {
         if (booking.profile_pic.startsWith('http')) {
             profilePhoto = booking.profile_pic;
         } else {
-            profilePhoto = `https://tapoclg.onrender.com${booking.profile_pic.startsWith('/') ? '' : '/'}${booking.profile_pic}`;
+            profilePhoto = `https://tapovana.onrender.com${booking.profile_pic.startsWith('/') ? '' : '/'}${booking.profile_pic}`;
         }
     }
     
@@ -159,7 +159,7 @@ const logBookingAudit = async (bookingId, status, therapistId, therapistName, no
 // Helper: Ingest/Sync bookings from the mobile app endpoint into the local DB
 const syncIncomingBookings = async () => {
     try {
-        const response = await fetch('https://tapoclg.onrender.com/api/bookings?limit=100');
+        const response = await fetch('https://tapovana.onrender.com/api/bookings?limit=100');
         if (response.ok) {
             const data = await response.json();
             const remoteBookings = data.success ? (data.bookings || []) : [];
@@ -455,7 +455,7 @@ const getAllBookings = async (req, res) => {
             if (booking.profile_pic) {
                 profilePhoto = booking.profile_pic.startsWith('http')
                     ? booking.profile_pic
-                    : `https://tapoclg.onrender.com${booking.profile_pic.startsWith('/') ? '' : '/'}${booking.profile_pic}`;
+                    : `https://tapovana.onrender.com${booking.profile_pic.startsWith('/') ? '' : '/'}${booking.profile_pic}`;
             }
             const lowerName = booking.service_name ? booking.service_name.trim().toLowerCase() : '';
             const serviceImage = serviceImageMap[lowerName] || null;
@@ -513,7 +513,7 @@ const ensureBookingExistsLocally = async (bookingId) => {
 
     // Try fetching single booking directly by ID first
     try {
-        const response = await fetch(`https://tapoclg.onrender.com/api/bookings/${bookingId}`);
+        const response = await fetch(`https://tapovana.onrender.com/api/bookings/${bookingId}`);
         if (response.ok) {
             const data = await response.json();
             if (data.success && data.booking) {
@@ -542,7 +542,7 @@ const ensureBookingExistsLocally = async (bookingId) => {
 
     // Fallback to bulk fetch
     try {
-        const response = await fetch('https://tapoclg.onrender.com/api/bookings?limit=100');
+        const response = await fetch('https://tapovana.onrender.com/api/bookings?limit=100');
         const data = await response.json();
         if (data.success && data.bookings) {
             const remoteBooking = data.bookings.find(b => String(b.id) === String(bookingId));
@@ -990,7 +990,7 @@ const assignTherapist = async (req, res) => {
 // SYNC BOOKINGS FROM RENDER API (mobile app data)
 const syncFromRender = async (req, res) => {
     try {
-        const response = await fetch('https://tapoclg.onrender.com/api/bookings?limit=100');
+        const response = await fetch('https://tapovana.onrender.com/api/bookings?limit=100');
         const data = await response.json();
 
         if (!data.success || !data.bookings) {

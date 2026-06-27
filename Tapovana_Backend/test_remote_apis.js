@@ -1,7 +1,7 @@
 async function run() {
     const urls = [
-        'https://tapoclg.onrender.com/api/bookings?limit=5',
-        'https://tapoclg.onrender.com/api/membership',
+        'https://tapovana.onrender.com/api/bookings?limit=5',
+        'https://tapovana.onrender.com/api/membership',
         'https://tapovana-backend.onrender.com/api/bookings?limit=5',
         'https://tapovana-backend.onrender.com/api/membership'
     ];

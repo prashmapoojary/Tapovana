@@ -409,7 +409,63 @@
 }
 
 .bottom-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.demand-tabs {
+  display: flex;
+  background: #f8fafc;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  gap: 4px;
+}
+
+.demand-tab-btn {
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: 'Manrope', sans-serif;
+}
+
+.demand-tab-btn:hover {
+  color: #0f172a;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.demand-tab-btn.active {
+  color: white;
+}
+
+.demand-tab-btn.active.overall {
+  background: #188A94;
+  box-shadow: 0 2px 6px rgba(24, 138, 148, 0.2);
+}
+
+.demand-tab-btn.active.services {
+  background: #cda751;
+  box-shadow: 0 2px 6px rgba(205, 167, 81, 0.2);
+}
+
+.demand-tab-btn.active.workshops {
+  background: #188A94;
+  box-shadow: 0 2px 6px rgba(24, 138, 148, 0.2);
+}
+
+.demand-tab-btn.active.vedic {
+  background: #8e9fa7;
+  box-shadow: 0 2px 6px rgba(142, 159, 167, 0.2);
 }
 
 .bottom-card-title {
@@ -461,9 +517,20 @@
 
 .demand-progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #188A94 0%, #3bc0c5 100%);
   border-radius: 3px;
   transition: width 0.8s ease-out;
+}
+
+.demand-progress-bar.gold {
+  background: linear-gradient(90deg, #cda751 0%, #e5c16f 100%);
+}
+
+.demand-progress-bar.teal {
+  background: linear-gradient(90deg, #188A94 0%, #3bc0c5 100%);
+}
+
+.demand-progress-bar.grey {
+  background: linear-gradient(90deg, #8e9fa7 0%, #cbd5e0 100%);
 }
 
 .demand-stats {
@@ -476,7 +543,18 @@
 .demand-count {
   font-size: 14px;
   font-weight: 700;
+}
+
+.demand-count.gold {
+  color: #cda751;
+}
+
+.demand-count.teal {
   color: #188A94;
+}
+
+.demand-count.grey {
+  color: #8e9fa7;
 }
 
 .demand-label {

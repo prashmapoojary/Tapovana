@@ -307,6 +307,9 @@ exports.getAnalyticsDashboard = async (req, res) => {
       servicesMap[s.name] = { category: s.category, price: s.price };
     });
 
+    const servicesDemand = {};
+    const workshopsDemand = {};
+    const vedicDemand = {};
     const combinedDemand = {};
 
     bookingsRows.forEach(b => {
@@ -314,40 +317,66 @@ exports.getAnalyticsDashboard = async (req, res) => {
       const name = b.service_name;
       const lowerName = name.toLowerCase();
       const meta = servicesMap[lowerName] || { category: 'Wellness', price: 0 };
+      const item = { count: 1, name, category: meta.category, price: meta.price };
+      if (servicesDemand[name]) {
+        servicesDemand[name].count += 1;
+      } else {
+        servicesDemand[name] = { ...item };
+      }
       if (combinedDemand[name]) {
         combinedDemand[name].count += 1;
       } else {
-        combinedDemand[name] = { count: 1, name, category: meta.category, price: meta.price };
+        combinedDemand[name] = { ...item };
       }
     });
 
     workshopRows.forEach(w => {
       if (!w.title) return;
       const name = w.title;
+      const item = { count: 1, name, category: 'Workshop', price: parseFloat(w.price || 0) };
+      if (workshopsDemand[name]) {
+        workshopsDemand[name].count += 1;
+      } else {
+        workshopsDemand[name] = { ...item };
+      }
       if (combinedDemand[name]) {
         combinedDemand[name].count += 1;
       } else {
-        combinedDemand[name] = { count: 1, name, category: 'Workshop', price: parseFloat(w.price || 0) };
+        combinedDemand[name] = { ...item };
       }
     });
 
     vedicRows.forEach(vp => {
       if (!vp.title) return;
       const name = vp.title;
+      const item = { count: 1, name, category: 'Vedic Life', price: parseFloat(vp.price || 0) };
+      if (vedicDemand[name]) {
+        vedicDemand[name].count += 1;
+      } else {
+        vedicDemand[name] = { ...item };
+      }
       if (combinedDemand[name]) {
         combinedDemand[name].count += 1;
       } else {
-        combinedDemand[name] = { count: 1, name, category: 'Vedic Life', price: parseFloat(vp.price || 0) };
+        combinedDemand[name] = { ...item };
       }
     });
 
-    let service_demand = {};
-    Object.entries(combinedDemand)
-      .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 5)
-      .forEach(([key, val]) => {
-        service_demand[key] = val;
-      });
+    const getTop5 = (demandObj) => {
+      const sorted = {};
+      Object.entries(demandObj)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 5)
+        .forEach(([key, val]) => {
+          sorted[key] = val;
+        });
+      return sorted;
+    };
+
+    let service_demand = getTop5(combinedDemand);
+    let service_demand_services = getTop5(servicesDemand);
+    let service_demand_workshops = getTop5(workshopsDemand);
+    let service_demand_vedic = getTop5(vedicDemand);
 
     // Fallback: If empty, pull lifetime records for the top 5
     if (Object.keys(service_demand).length === 0) {
@@ -380,47 +409,53 @@ exports.getAnalyticsDashboard = async (req, res) => {
         ]);
 
         const lfCombined = {};
+        const lfServices = {};
+        const lfWorkshops = {};
+        const lfVedic = {};
+
         for (const row of lfServiceRes.rows) {
-          lfCombined[row.name] = {
+          const item = {
             count: parseInt(row.cnt || 0, 10),
             name: row.name,
             category: row.category,
             price: parseFloat(row.price || 0)
           };
+          lfCombined[row.name] = { ...item };
+          lfServices[row.name] = { ...item };
         }
         for (const row of lfWorkshopRes.rows) {
+          const item = {
+            count: parseInt(row.cnt || 0, 10),
+            name: row.name,
+            category: row.category,
+            price: parseFloat(row.price || 0)
+          };
+          lfWorkshops[row.name] = { ...item };
           if (lfCombined[row.name]) {
-            lfCombined[row.name].count += parseInt(row.cnt || 0, 10);
+            lfCombined[row.name].count += item.count;
           } else {
-            lfCombined[row.name] = {
-              count: parseInt(row.cnt || 0, 10),
-              name: row.name,
-              category: row.category,
-              price: parseFloat(row.price || 0)
-            };
+            lfCombined[row.name] = { ...item };
           }
         }
         for (const row of lfVedicRes.rows) {
+          const item = {
+            count: parseInt(row.cnt || 0, 10),
+            name: row.name,
+            category: row.category,
+            price: parseFloat(row.price || 0)
+          };
+          lfVedic[row.name] = { ...item };
           if (lfCombined[row.name]) {
-            lfCombined[row.name].count += parseInt(row.cnt || 0, 10);
+            lfCombined[row.name].count += item.count;
           } else {
-            lfCombined[row.name] = {
-              count: parseInt(row.cnt || 0, 10),
-              name: row.name,
-              category: row.category,
-              price: parseFloat(row.price || 0)
-            };
+            lfCombined[row.name] = { ...item };
           }
         }
 
-        const sortedLf = {};
-        Object.entries(lfCombined)
-          .sort((a, b) => b[1].count - a[1].count)
-          .slice(0, 5)
-          .forEach(([key, val]) => {
-            sortedLf[key] = val;
-          });
-        service_demand = sortedLf;
+        service_demand = getTop5(lfCombined);
+        service_demand_services = getTop5(lfServices);
+        service_demand_workshops = getTop5(lfWorkshops);
+        service_demand_vedic = getTop5(lfVedic);
       } catch (e) {
         console.warn("[HomeController] Service demand fallback query failed:", e.message);
       }
@@ -440,7 +475,10 @@ exports.getAnalyticsDashboard = async (req, res) => {
         daysOfWeek
       },
       membership_breakdown,
-      service_demand
+      service_demand,
+      service_demand_services,
+      service_demand_workshops,
+      service_demand_vedic
     });
   } catch (error) {
     console.error("[HomeController] Error getting analytics dashboard:", error);
