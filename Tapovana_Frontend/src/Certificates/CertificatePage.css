@@ -88,7 +88,7 @@
 .cert-intro {
   font-family: 'Playfair Display', serif;
   font-style: italic;
-  font-size: 1.4rem;
+  font-size: 1.5rem;
   color: #3d2b1f;
   margin: 0.6rem 0 0.8rem 0;
   text-align: center;
@@ -105,7 +105,7 @@
 
 .cert-recipient-name {
   font-family: 'Alex Brush', cursive;
-  font-size: 3.8rem;
+  font-size: 4.0 rem;
   font-weight: 400;
   color: #3d2b1f;
   margin: 0 0 2rem 0;
@@ -114,7 +114,7 @@
 }
 
 .cert-recipient-line {
-  width: 90%;
+  width: 100%;
   height: 1px;
   background-color: #c4967a;
   margin-top: 0.2rem;
@@ -124,7 +124,7 @@
 /* Verification ID */
 .cert-id-below-name {
   font-family: 'Montserrat', sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.7rem;
   color: #666666;
   letter-spacing: 0.5px;
   margin-top: 0.2rem;
@@ -137,7 +137,7 @@
 .cert-achievement {
   font-family: 'Playfair Display', serif;
   font-style: italic;
-  font-size: 1.4rem;
+  font-size: 1.5rem;
   color: #3d2b1f;
   margin: 0.4rem 0 0.6rem 0;
   text-align: center;
@@ -146,8 +146,8 @@
 /* Course name */
 .cert-course-name {
   font-family: 'Playfair Display', serif;
-  font-weight: 700;
-  font-size: 2.4rem;
+  font-weight: 650;
+  font-size: 2.0 rem;
   color: #3d2b1f;
   letter-spacing: 1.5px;
   margin: 0.4rem 0 1.5rem 0;
@@ -163,7 +163,8 @@
   bottom: 1.8rem;
   left: 5rem;
   right: 5rem;
-  height: 140px; /* fixed height footer container */
+  height: 140px;
+  /* fixed height footer container */
   display: flex;
   justify-content: space-between;
   align-items: stretch;
@@ -257,7 +258,8 @@
   font-family: 'Playfair Display', serif;
   font-style: italic;
   font-size: 0.9rem;
-  color: #3d2b1f; /* dark brown */
+  color: #3d2b1f;
+  /* dark brown */
   text-align: center;
   white-space: nowrap;
   position: absolute;
