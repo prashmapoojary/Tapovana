@@ -313,7 +313,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             }
 
             // Underline under participant name
-            const nameUnderlineY = nameY + 48;
+            const nameUnderlineY = nameY + 68;
             doc.save();
             doc.lineWidth(1)
                .strokeColor('#c4967a')
