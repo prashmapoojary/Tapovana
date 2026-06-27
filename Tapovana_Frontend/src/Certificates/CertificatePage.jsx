@@ -173,8 +173,8 @@ const CertificatePage = () => {
           />
 
           <div className="certificate-overlay-content">
-            <p className="cert-intro">this is to certify that</p>
-            
+            <p className="cert-intro">This is to certify that</p>
+
             <div className="cert-recipient">
               <h2 className="cert-recipient-name">{certData.participantName}</h2>
               <div className="cert-recipient-line"></div>
@@ -196,7 +196,7 @@ const CertificatePage = () => {
               <div className="cert-footer-col col-left">
                 <div className="footer-value-text">{certData.completionDate}</div>
                 <div className="footer-value-divider"></div>
-                <div className="footer-label-text">date of completion</div>
+                <div className="footer-label-text">Date of Completion</div>
               </div>
 
               {/* Center: Tapovana Logo & Branding */}
@@ -204,7 +204,7 @@ const CertificatePage = () => {
                 <div className="seal-badge-container">
                   <img src={tapovanaLogo} alt="Tapovana Logo" className="seal-logo-img" />
                 </div>
-                <div className="footer-company-name">tapovana</div>
+                <div className="footer-company-name">TAPOVANA</div>
                 <div className="footer-company-tagline">nurturing wisdom through tradition</div>
               </div>
 

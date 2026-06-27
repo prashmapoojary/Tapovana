@@ -345,7 +345,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             doc.font('Times-Bold')
                .fontSize(48)
                .fillColor(bodyColor)
-               .text(workshopTitle, 50, workshopY, { width: width - 100, align: 'center' });
+               .text(workshopTitle.toUpperCase(), 50, workshopY, { width: width - 100, align: 'center' });
 
             // ── 12. FOOTER SECTION ──────────────────────────────────────────────
             const lineY = 490;
