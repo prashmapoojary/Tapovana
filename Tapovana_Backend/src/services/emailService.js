@@ -918,8 +918,11 @@ const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, wor
     <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 10px 0;">
       Your certificate is attached to this email as a PDF. You can also download it anytime using the button below:
     </p>
-    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 25px 0;text-align:center;">
+    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 10px 0;text-align:center;">
       <a href="${linkUrl}" style="display:inline-block;background:#cda751;color:#111;font-weight:bold;padding:12px 24px;border-radius:6px;text-decoration:none;">Download Certificate</a>
+    </p>
+    <p style="color:#aaaaaa;font-size:13px;line-height:1.6;margin: 0 0 25px 0;text-align:center;">
+      If the button doesn't work, <a href="${linkUrl}" style="color:#cda751;text-decoration:underline;">click here to download</a>.
     </p>
   `);
 
