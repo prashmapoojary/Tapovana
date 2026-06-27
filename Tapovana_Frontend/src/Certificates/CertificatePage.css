@@ -61,11 +61,11 @@
 /* Title: "Certificate" */
 .cert-title {
   font-family: 'Playfair Display', serif;
-  font-size: 12rem;
+  font-size: 4.8rem;
   /* Large serif title matching the image */
-  font-weight: 1000;
-  color: #7a4e35;
-  /* copper-brown */
+  font-weight: 700;
+  color: #8e624c;
+  /* soft brown */
   margin: 0;
   text-align: center;
   line-height: 1;
@@ -74,13 +74,12 @@
 /* Subtitle: "OF COMPLETION" */
 .cert-subtitle {
   font-family: 'Playfair Display', serif;
-  font-size: 1.87rem;
-  /* +10% of 1.7rem */
+  font-size: 1.25rem;
   font-weight: 600;
-  color: #7a4e35;
-  letter-spacing: 2px;
+  color: #8e624c;
+  letter-spacing: 5px;
   text-transform: uppercase;
-  margin: 0.15rem 0 0.4rem 0;
+  margin: 0.4rem 0 0.5rem 0;
   text-align: center;
 }
 
@@ -88,11 +87,9 @@
 .cert-intro {
   font-family: 'Playfair Display', serif;
   font-style: italic;
-  font-size: 3rem;
-  /* +10% of 1.7rem */
+  font-size: 1.15rem;
   color: #3d2b1f;
-  /* bodyColor matching backend */
-  margin: 0 0 0.6rem 0;
+  margin: 0.6rem 0 0.6rem 0;
   text-align: center;
 }
 
@@ -102,36 +99,34 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.2rem;
 }
 
 .cert-recipient-name {
   font-family: 'Alex Brush', cursive;
-  font-size: 6.82rem;
-  /* +10% of 6.2rem */
+  font-size: 3.5rem;
   font-weight: 400;
   color: #3d2b1f;
   margin: 0;
   text-align: center;
-  line-height: 1;
+  line-height: 1.2;
 }
 
 .cert-recipient-line {
-  width: 100%;
+  width: 80%;
   height: 0.8px;
   background-color: #c4967a;
-  margin-top: 0.2rem;
+  margin-top: 0.1rem;
 }
 
 /* Unique Verification ID directly under name line */
 .cert-id-below-name {
   font-family: 'Montserrat', sans-serif;
-  font-size: 1rem;
-  /* +10% of 0.6rem */
+  font-size: 0.65rem;
   color: #666666;
   letter-spacing: 0.5px;
-  margin-top: 0.2rem;
-  margin-bottom: 0.6rem;
+  margin-top: 0.4rem;
+  margin-bottom: 0.8rem;
   text-align: center;
   text-transform: lowercase;
 }
@@ -140,10 +135,9 @@
 .cert-achievement {
   font-family: 'Playfair Display', serif;
   font-style: italic;
-  font-size: 2rem;
-  /* +10% of 1.6rem */
+  font-size: 1.15rem;
   color: #3d2b1f;
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.6rem 0;
   text-align: center;
 }
 
@@ -151,23 +145,21 @@
 .cert-course-name {
   font-family: 'Playfair Display', serif;
   font-weight: 700;
-  font-size: 4rem;
-  /* +10% of 2.8rem */
-  text-transform: uppercase;
+  font-size: 2rem;
   color: #3d2b1f;
   letter-spacing: 1.5px;
-  margin: 0 0 2rem 0;
+  margin: 0 0 1.5rem 0;
   text-align: center;
   max-width: 90%;
-  line-height: 1.2;
+  line-height: 1.3;
 }
 
 /* Footer Section */
 .cert-footer-row {
   position: absolute;
-  bottom: 4rem;
-  left: 6rem;
-  right: 6rem;
+  bottom: 3.2rem;
+  left: 5rem;
+  right: 5rem;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
@@ -193,8 +185,7 @@
 
 .footer-value-text {
   font-family: 'Playfair Display', serif;
-  font-size: 2rem;
-  /* +10% of 1.5rem */
+  font-size: 1.15rem;
   color: #3d2b1f;
   text-align: center;
   min-height: 28px;
@@ -205,8 +196,7 @@
 
 .cursive-sig {
   font-family: 'Alex Brush', cursive;
-  font-size: 4rem;
-  /* +10% of 2.8rem */
+  font-size: 2.2rem;
   line-height: 1;
 }
 
@@ -214,24 +204,23 @@
   width: 100%;
   height: 0.8px;
   background-color: #c4967a;
-  margin: 0.4rem 0;
+  margin: 0.3rem 0;
 }
 
 .footer-label-text {
   font-family: 'Montserrat', sans-serif;
   font-weight: 500;
-  font-size: 1.2rem;
-  /* +10% of 0.9rem */
+  font-size: 0.75rem;
   text-transform: uppercase;
-  color: #777777;
-  letter-spacing: 0.8px;
+  color: #888888;
+  letter-spacing: 0.5px;
   text-align: center;
 }
 
 /* Seal & Branding in Center Column */
 .seal-badge-container {
-  width: 55px;
-  height: 55px;
+  width: 50px;
+  height: 50px;
   margin-bottom: 0.2rem;
   display: flex;
   align-items: center;
@@ -247,18 +236,16 @@
 .footer-company-name {
   font-family: 'Montserrat', sans-serif;
   font-weight: 700;
-  font-size: 2rem;
-  /* +10% of 1.15rem */
+  font-size: 0.95rem;
   color: #3d2b1f;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
   text-align: center;
 }
 
 .footer-company-tagline {
   font-family: 'Playfair Display', serif;
   font-style: italic;
-  font-size: 0.935rem;
-  /* +10% of 0.85rem */
+  font-size: 0.65rem;
   color: #c4967a;
   margin-top: 1px;
   text-align: center;
