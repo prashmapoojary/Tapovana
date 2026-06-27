@@ -21,10 +21,14 @@ const CertificatePage = () => {
   });
 
   useEffect(() => {
-    // Determine apiBase dynamically based on browser location to support both local hotspot and production domain
     const getApiBase = () => {
       const hostname = window.location.hostname;
-      if (hostname === "localhost" || hostname === "127.0.0.1" || /^192\.168\./.test(hostname) || /^10\./.test(hostname)) {
+      if (
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        /^192\.168\./.test(hostname) ||
+        /^10\./.test(hostname)
+      ) {
         return `http://${hostname}:5000`;
       }
       return import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
@@ -37,15 +41,14 @@ const CertificatePage = () => {
         try {
           const apiBase = getApiBase();
           const response = await fetch(`${apiBase}/api/certificates/public/${certificateId}`);
-          
+
           if (!response.ok) {
             throw new Error("Certificate not found or invalid ID.");
           }
-          
+
           const result = await response.json();
           if (result.success && result.certificate) {
             const cert = result.certificate;
-            // Format date beautifully
             let formattedDate = cert.completion_date;
             try {
               const d = new Date(cert.completion_date);
@@ -65,30 +68,34 @@ const CertificatePage = () => {
               instructorName: cert.instructor_name || "Workshop Instructor",
               certificateId: cert.certificate_id
             });
-            return; // Successful retrieval from API
+            return;
           } else {
             throw new Error("Failed to load certificate data.");
           }
         } catch (err) {
-          console.error("Error fetching certificate details, trying offline query params fallback:", err);
-          
-          // Offline fallback: Use query parameters if they are supplied in the URL
+          console.error("Error fetching certificate details:", err);
+
           const name = searchParams.get("name");
           const workshop = searchParams.get("workshop");
           if (name || workshop) {
             setCertData({
               participantName: name || "Jane Doe",
               workshopTitle: workshop || "Vedic Wellness & Meditation Masterclass",
-              completionDate: searchParams.get("date") || new Date().toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric"
-              }),
+              completionDate:
+                searchParams.get("date") ||
+                new Date().toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric"
+                }),
               instructorName: searchParams.get("instructor") || "Acharya Tapovan",
               certificateId: certificateId
             });
           } else {
-            setError(err.message || "Failed to retrieve certificate validation details. Check your network connection.");
+            setError(
+              err.message ||
+              "Failed to retrieve certificate validation details. Check your network connection."
+            );
           }
         } finally {
           setLoading(false);
@@ -97,14 +104,15 @@ const CertificatePage = () => {
 
       fetchCertificate();
     } else {
-      // 2. Fallback to query params or default props for direct visual testing
       const name = searchParams.get("name") || "Jane Doe";
       const workshop = searchParams.get("workshop") || "Vedic Wellness & Meditation Masterclass";
-      const date = searchParams.get("date") || new Date().toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric"
-      });
+      const date =
+        searchParams.get("date") ||
+        new Date().toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric"
+        });
       const instructor = searchParams.get("instructor") || "Acharya Tapovan";
       const certId = searchParams.get("certId") || "CERT-2026-TEST";
 
@@ -123,15 +131,11 @@ const CertificatePage = () => {
     if (!element) return;
 
     const opt = {
-      margin:       0,
-      filename:     `Tapovana_Certificate_${certData.participantName.replace(/\s+/g, "_")}.pdf`,
-      image:        { type: "jpeg", quality: 0.98 },
-      html2canvas:  { 
-        scale: 2, 
-        useCORS: true,
-        logging: false
-      },
-      jsPDF:        { unit: "mm", format: "a4", orientation: "landscape" }
+      margin: 0,
+      filename: `Tapovana_Certificate_${certData.participantName.replace(/\s+/g, "_")}.pdf`,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: "mm", format: "a4", orientation: "landscape" }
     };
 
     html2pdf().set(opt).from(element).save();
@@ -151,7 +155,9 @@ const CertificatePage = () => {
       <div className="certificate-page-error">
         <h2>Certificate Verification Failed</h2>
         <p>{error}</p>
-        <button onClick={() => window.location.reload()} className="retry-btn">Retry</button>
+        <button onClick={() => window.location.reload()} className="retry-btn">
+          Retry
+        </button>
       </div>
     );
   }
@@ -159,33 +165,18 @@ const CertificatePage = () => {
   return (
     <div className="certificate-page-container">
       <div className="certificate-viewer">
-        
-        {/* Certificate Frame to print/download */}
         <div className="certificate-frame" ref={certificateRef}>
-          {/* Background template image */}
-          <img 
-            src={certificateTemplate} 
-            alt="Certificate Background Template" 
-            className="certificate-bg-image" 
+          <img
+            src={certificateTemplate}
+            alt="Certificate Background Template"
+            className="certificate-bg-image"
           />
 
-          {/* Foreground certificate content */}
           <div className="certificate-overlay-content">
-            <h1 className="cert-title">Certificate</h1>
-            <h2 className="cert-subtitle">OF COMPLETION</h2>
-
-            {/* Flourish Divider */}
-            <div className="cert-flourish-divider">
-              <span className="flourish-line"></span>
-              <span className="flourish-diamond"></span>
-              <span className="flourish-line"></span>
-            </div>
-
-            <p className="cert-intro">This is to certify that</p>
+            <p className="cert-intro">this is to certify that</p>
             
             <div className="cert-recipient">
               <h2 className="cert-recipient-name">{certData.participantName}</h2>
-              <div className="cert-recipient-line"></div>
             </div>
 
             {/* Unique Verification ID directly under name line */}
@@ -203,8 +194,7 @@ const CertificatePage = () => {
               {/* Left: Completion Date */}
               <div className="cert-footer-col col-left">
                 <div className="footer-value-text">{certData.completionDate}</div>
-                <div className="footer-value-divider"></div>
-                <div className="footer-label-text">Date of Completion</div>
+                <div className="footer-label-text">date of completion</div>
               </div>
 
               {/* Center: Tapovana Logo & Branding */}
@@ -212,27 +202,25 @@ const CertificatePage = () => {
                 <div className="seal-badge-container">
                   <img src={tapovanaLogo} alt="Tapovana Logo" className="seal-logo-img" />
                 </div>
-                <div className="footer-company-name">TAPOVANA</div>
+                <div className="footer-company-name">tapovana</div>
                 <div className="footer-company-tagline">nurturing wisdom through tradition</div>
               </div>
 
               {/* Right: Signature and Conductor Name */}
               <div className="cert-footer-col col-right">
                 <div className="footer-value-text cursive-sig">{certData.instructorName}</div>
-                <div className="footer-value-divider"></div>
-                <div className="footer-label-text">Awarded by (Signature)</div>
+                <div className="footer-label-text">workshop instructor</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Action Controls */}
         <div className="certificate-actions">
           <p className="validation-note">
-            ✓ Official Tapovana Verified Certificate. Secure and authentic.
+            ✓ official tapovana verified certificate. secure and authentic.
           </p>
           <button className="certificate-download-btn" onClick={handleDownload}>
-            Download PDF Certificate
+            download pdf certificate
           </button>
         </div>
       </div>

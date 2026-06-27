@@ -1,7 +1,4 @@
-Here’s a **rewritten CSS file** tailored to match the **first certificate template** you want — with the **soft brown+gold theme**,
-corrected font sizes,
-spacing,
-and the stylized cursive “a” using *Alex Brush*. This ensures the certificate looks exactly like your reference design: ```css @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Montserrat:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Montserrat:wght@300;400;500;600;700&display=swap');
 
 /* Page container */
 .certificate-page-container {
@@ -59,7 +56,7 @@ and the stylized cursive “a” using *Alex Brush*. This ensures the certificat
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 4rem 6rem 3rem 6rem;
+  padding: 13rem 6rem 3rem 6rem;
 }
 
 /* Title: "certificate" */
@@ -104,7 +101,7 @@ and the stylized cursive “a” using *Alex Brush*. This ensures the certificat
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 0.3rem;
+  margin-bottom: 1.8rem; /* space for the background line to sit below name */
 }
 
 .cert-recipient-name {
@@ -189,7 +186,6 @@ and the stylized cursive “a” using *Alex Brush*. This ensures the certificat
   width: 180px;
 }
 
-/* Footer values */
 .footer-value-text {
   font-family: 'Playfair Display', serif;
   font-size: 1.2rem;
@@ -200,6 +196,7 @@ and the stylized cursive “a” using *Alex Brush*. This ensures the certificat
   align-items: center;
   justify-content: center;
   text-transform: lowercase;
+  white-space: nowrap;
 }
 
 .cursive-sig {
@@ -224,6 +221,7 @@ and the stylized cursive “a” using *Alex Brush*. This ensures the certificat
   color: #888888;
   letter-spacing: 0.5px;
   text-align: center;
+  margin-top: 10px;
 }
 
 /* Seal & branding */
