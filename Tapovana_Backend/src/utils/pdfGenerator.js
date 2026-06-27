@@ -287,17 +287,17 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             // ── 7. "This is to certify that" (italic serif) ─────────────────────
             const certifyY = flourishY + 16;
             doc.font('Times-Italic')
-               .fontSize(18)
+               .fontSize(27)
                .fillColor(bodyColor)
                .text('this is to certify that', 50, certifyY, { width: width - 100, align: 'center' });
 
             // ── 8. ATTENDEE NAME (cursive, large) ───────────────────────────────
-            const nameY = certifyY + 28;
+            const nameY = certifyY + 36;
             let nameDrawn = false;
             if (signatureFontPath) {
                 try {
                     doc.font(signatureFontPath)
-                       .fontSize(56)
+                       .fontSize(84)
                        .fillColor(bodyColor)
                        .text(participantName, 50, nameY, { width: width - 100, align: 'center' });
                     nameDrawn = true;
@@ -307,13 +307,13 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             }
             if (!nameDrawn) {
                 doc.font('Times-BoldItalic')
-                   .fontSize(45)
+                   .fontSize(68)
                    .fillColor(bodyColor)
                    .text(participantName, 50, nameY, { width: width - 100, align: 'center' });
             }
 
             // Underline under participant name
-            const nameUnderlineY = nameY + 56;
+            const nameUnderlineY = nameY + 84;
             /*
             doc.save();
             doc.lineWidth(0.8)
@@ -327,25 +327,25 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             // ── 9. VERIFICATION ID (below name, serif, not bold, smaller) ───────
             if (certificateId) {
                 doc.font('Times-Roman')
-                   .fontSize(10)
+                   .fontSize(15)
                    .fillColor('#666666')
-                   .text(`verification id: ${certificateId.toLowerCase()}`, 50, nameUnderlineY + 6, {
+                   .text(`verification id: ${certificateId.toLowerCase()}`, 50, nameUnderlineY + 12, {
                        width: width - 100,
                        align: 'center'
                    });
             }
 
             // ── 10. "has successfully completed" (italic serif) ─────────────────
-            const completedY = nameUnderlineY + 24;
+            const completedY = nameUnderlineY + 45;
             doc.font('Times-Italic')
-               .fontSize(18)
+               .fontSize(27)
                .fillColor(bodyColor)
                .text('has successfully completed', 50, completedY, { width: width - 100, align: 'center' });
 
             // ── 11. WORKSHOP TITLE (bold serif, preserves original casing) ──────
-            const workshopY = completedY + 26;
+            const workshopY = completedY + 38;
             doc.font('Times-Bold')
-               .fontSize(32)
+               .fontSize(48)
                .fillColor(bodyColor)
                .text(workshopTitle, 50, workshopY, { width: width - 100, align: 'center' });
 
@@ -364,19 +364,19 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             */
 
             doc.font('Times-Italic')
-               .fontSize(18)
+               .fontSize(27)
                .fillColor(bodyColor)
-               .text(completionDate, 90, lineY - 20, { width: 200, align: 'center' });
+               .text(completionDate, 90, lineY - 28, { width: 200, align: 'center' });
 
             doc.font('Times-Italic')
-               .fontSize(12)
+               .fontSize(18)
                .fillColor('#888888')
                .text('date of completion', 90, lineY + 6, { width: 200, align: 'center' });
 
             // ─── Center Column: Tapovana Logo + Company Name ─────────────────────────
-             const footerLogoWidth = 50;
+             const footerLogoWidth = 75;
              const footerLogoX = cx - footerLogoWidth / 2;
-             const footerLogoY = lineY - 55;
+             const footerLogoY = lineY - 78;
              if (logo) {
                  try {
                      doc.image(logo, footerLogoX, footerLogoY, { width: footerLogoWidth });
@@ -386,14 +386,14 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
              }
 
             doc.font('Times-Bold')
-               .fontSize(15)
+               .fontSize(22)
                .fillColor(bodyColor)
-               .text('tapovana', cx - 100, lineY + 18, { width: 200, align: 'center' });
+               .text('tapovana', cx - 100, lineY + 14, { width: 200, align: 'center' });
 
             doc.font('Times-Italic')
-               .fontSize(10.5)
+               .fontSize(16)
                .fillColor(accentColor)
-               .text('nurturing wisdom through tradition', cx - 100, lineY + 34, { width: 200, align: 'center' });
+               .text('nurturing wisdom through tradition', cx - 100, lineY + 38, { width: 200, align: 'center' });
 
             // ─── Right Column: Instructor Signature ─────────────────────────────
             /*
@@ -408,9 +408,9 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
 
             // Signature Graphic placement (drawn above the line)
             let signatureDrawn = false;
-            const sigWidth = 130;
+            const sigWidth = 195;
             const sigX = 551.89 + (200 - sigWidth) / 2;
-            const sigY = lineY - 38;
+            const sigY = lineY - 55;
 
             if (signatureImage && typeof signatureImage === 'string') {
                 try {
@@ -418,7 +418,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                         const matches = signatureImage.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
                         if (matches && matches.length === 3) {
                             const buffer = Buffer.from(matches[2], 'base64');
-                            doc.image(buffer, sigX, sigY, { width: sigWidth, height: 35 });
+                            doc.image(buffer, sigX, sigY, { width: sigWidth, height: 52 });
                             signatureDrawn = true;
                         }
                     } else if (signatureImage.startsWith('/') || /^[a-zA-Z]:[\\/]/i.test(signatureImage)) {
@@ -426,14 +426,14 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                             ? signatureImage 
                             : path.join(__dirname, '../../', signatureImage);
                         if (fs.existsSync(resolvedPath)) {
-                            doc.image(resolvedPath, sigX, sigY, { width: sigWidth, height: 35 });
+                            doc.image(resolvedPath, sigX, sigY, { width: sigWidth, height: 52 });
                             signatureDrawn = true;
                         }
                     } else {
                         // Fallback checking in uploads directory
                         const uploadsPath = path.join(__dirname, '../../uploads', signatureImage);
                         if (fs.existsSync(uploadsPath)) {
-                            doc.image(uploadsPath, sigX, sigY, { width: sigWidth, height: 35 });
+                            doc.image(uploadsPath, sigX, sigY, { width: sigWidth, height: 52 });
                             signatureDrawn = true;
                         }
                     }
@@ -448,7 +448,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                 if (signatureFontPath) {
                     try {
                         doc.font(signatureFontPath)
-                           .fontSize(35)
+                           .fontSize(52)
                            .fillColor(bodyColor)
                            .text(signatureText, 551.89, sigY + 5, { width: 200, align: 'center' });
                         signatureDrawn = true;
@@ -458,14 +458,14 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                 }
                 if (!signatureDrawn) {
                     doc.font('Times-BoldItalic')
-                       .fontSize(24)
+                       .fontSize(36)
                        .fillColor(bodyColor)
                        .text(signatureText, 551.89, sigY + 10, { width: 200, align: 'center' });
                 }
             }
 
             doc.font('Times-Italic')
-               .fontSize(12)
+               .fontSize(18)
                .fillColor('#888888')
                .text('workshop instructor', 551.89, lineY + 6, { width: 200, align: 'center' });
 

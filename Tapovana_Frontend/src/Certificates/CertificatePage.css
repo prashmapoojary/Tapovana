@@ -56,7 +56,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 13rem 6rem 3rem 6rem;
+  padding: 10.5rem 6rem 3rem 6rem;
 }
 
 /* Title: "certificate" */
@@ -88,26 +88,25 @@
 .cert-intro {
   font-family: 'Playfair Display', serif;
   font-style: italic;
-  font-size: 1.2rem;
+  font-size: 1.8rem;
   color: #3d2b1f;
   margin: 0.6rem 0;
   text-align: center;
   text-transform: lowercase;
 }
 
-/* Recipient */
 .cert-recipient {
   width: 75%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 1.8rem; /* space for the background line to sit below name */
+  margin-bottom: 2.2rem; /* space for the background line to sit below name */
 }
 
 .cert-recipient-name {
   font-family: 'Alex Brush', cursive;
   /* stylized 'a' */
-  font-size: 3.6rem;
+  font-size: 5.4rem;
   font-weight: 400;
   color: #3d2b1f;
   margin: 0;
@@ -126,7 +125,7 @@
 /* Verification ID */
 .cert-id-below-name {
   font-family: 'Montserrat', sans-serif;
-  font-size: 0.7rem;
+  font-size: 1.1rem;
   color: #666666;
   letter-spacing: 0.5px;
   margin-top: 0.4rem;
@@ -139,7 +138,7 @@
 .cert-achievement {
   font-family: 'Playfair Display', serif;
   font-style: italic;
-  font-size: 1.2rem;
+  font-size: 1.8rem;
   color: #3d2b1f;
   margin: 0 0 0.6rem 0;
   text-align: center;
@@ -150,7 +149,7 @@
 .cert-course-name {
   font-family: 'Playfair Display', serif;
   font-weight: 700;
-  font-size: 2.1rem;
+  font-size: 3.2rem;
   color: #3d2b1f;
   letter-spacing: 1.5px;
   margin: 0 0 1.5rem 0;
@@ -163,7 +162,7 @@
 /* Footer row */
 .cert-footer-row {
   position: absolute;
-  bottom: 3rem;
+  bottom: 2.4rem;
   left: 5rem;
   right: 5rem;
   display: flex;
@@ -188,7 +187,7 @@
 
 .footer-value-text {
   font-family: 'Playfair Display', serif;
-  font-size: 1.2rem;
+  font-size: 1.8rem;
   color: #3d2b1f;
   text-align: center;
   min-height: 28px;
@@ -201,7 +200,7 @@
 
 .cursive-sig {
   font-family: 'Alex Brush', cursive;
-  font-size: 2.4rem;
+  font-size: 3.6rem;
   line-height: 1;
   text-transform: lowercase;
 }
@@ -216,7 +215,7 @@
 .footer-label-text {
   font-family: 'Montserrat', sans-serif;
   font-weight: 500;
-  font-size: 0.8rem;
+  font-size: 1.2rem;
   text-transform: lowercase;
   color: #888888;
   letter-spacing: 0.5px;
@@ -226,8 +225,8 @@
 
 /* Seal & branding */
 .seal-badge-container {
-  width: 50px;
-  height: 50px;
+  width: 75px;
+  height: 75px;
   margin-bottom: 0.2rem;
   display: flex;
   align-items: center;
@@ -243,7 +242,7 @@
 .footer-company-name {
   font-family: 'Montserrat', sans-serif;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 1.5rem;
   color: #3d2b1f;
   letter-spacing: 1px;
   text-align: center;
@@ -253,7 +252,7 @@
 .footer-company-tagline {
   font-family: 'Playfair Display', serif;
   font-style: italic;
-  font-size: 0.7rem;
+  font-size: 1.05rem;
   color: #c4967a;
   margin-top: 2px;
   text-align: center;
