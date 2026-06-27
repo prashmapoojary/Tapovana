@@ -105,7 +105,7 @@
 
 .cert-recipient-name {
   font-family: 'Alex Brush', cursive;
-  font-size: 4.0 rem;
+  font-size: 5.0 rem;
   font-weight: 400;
   color: #17110e;
   margin: 0 0 2rem 0;
@@ -146,7 +146,7 @@
 /* Course name */
 .cert-course-name {
   font-family: 'Playfair Display', serif;
-  font-weight: 650;
+  font-weight: 500;
   font-size: 2.0 rem;
   color: #0c0a08;
   letter-spacing: 1.5px;
