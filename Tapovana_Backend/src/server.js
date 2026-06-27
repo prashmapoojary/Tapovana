@@ -215,7 +215,6 @@ app.listen(PORT, () => {
             }
 
             console.log("[Migration] Database base64 images migration complete.");
-        }
 
             // Convert absolute /uploads/ paths back to relative /uploads/ paths
             const absoluteResult = await query("SELECT id, name, image_url FROM services WHERE image_url LIKE '%/uploads/%'");
