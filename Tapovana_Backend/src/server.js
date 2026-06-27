@@ -1,5 +1,14 @@
 // Reload trigger
 require("dotenv").config();
+
+// Automatically normalize and override environment settings in production/Render cloud
+const isCloud = process.env.RENDER === "true" || process.env.RENDER_EXTERNAL_URL;
+if (isCloud) {
+    process.env.NODE_ENV = "production";
+    process.env.FRONTEND_URL = "https://tapovana-admin.onrender.com";
+    process.env.BACKEND_URL = "https://tapovana.onrender.com";
+}
+
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
