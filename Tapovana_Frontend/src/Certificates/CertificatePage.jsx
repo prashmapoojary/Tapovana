@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import "./CertificatePage.css";
 import certificateTemplate from "../assets/certificate_template.png";
-import tapovanaLogo from "../assets/logo.png";
+import tapovanaLogo from "../assets/Tapovana.png";
 import html2pdf from "html2pdf.js";
 
 const CertificatePage = () => {
@@ -204,7 +204,6 @@ const CertificatePage = () => {
                 <div className="seal-badge-container">
                   <img src={tapovanaLogo} alt="Tapovana Logo" className="seal-logo-img" />
                 </div>
-                <div className="footer-company-name">TAPOVANA</div>
                 <div className="footer-company-tagline">nurturing wisdom through tradition</div>
               </div>
 
@@ -212,7 +211,7 @@ const CertificatePage = () => {
               <div className="cert-footer-col col-right">
                 <div className="footer-value-text cursive-sig">{certData.instructorName}</div>
                 <div className="footer-value-divider"></div>
-                <div className="footer-label-text">workshop instructor</div>
+                <div className="footer-label-text">Awarded by (Signature)</div>
               </div>
             </div>
           </div>

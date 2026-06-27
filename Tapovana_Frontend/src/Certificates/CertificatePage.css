@@ -90,7 +90,7 @@
   font-style: italic;
   font-size: 1.8rem;
   color: #3d2b1f;
-  margin: 0.6rem 0;
+  margin: 0.6rem 0 0.1rem 0;
   text-align: center;
 }
 
@@ -99,13 +99,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 2.2rem; /* space for the background line to sit below name */
+  margin-top: -0.4rem;
+  margin-bottom: 2rem; /* space for the background line to sit below name */
 }
 
 .cert-recipient-name {
   font-family: 'Alex Brush', cursive;
   /* stylized 'a' */
-  font-size: 5.4rem;
+  font-size: 4.6rem;
   font-weight: 400;
   color: #3d2b1f;
   margin: 0;
@@ -146,7 +147,7 @@
 .cert-course-name {
   font-family: 'Playfair Display', serif;
   font-weight: 700;
-  font-size: 3.2rem;
+  font-size: 2.7rem;
   color: #3d2b1f;
   letter-spacing: 1.5px;
   margin: 0 0 1.5rem 0;
@@ -179,12 +180,12 @@
 }
 
 .col-center {
-  width: 180px;
+  width: 340px;
 }
 
 .footer-value-text {
   font-family: 'Playfair Display', serif;
-  font-size: 1.8rem;
+  font-size: 1.6rem;
   color: #3d2b1f;
   text-align: center;
   min-height: 28px;
@@ -196,7 +197,7 @@
 
 .cursive-sig {
   font-family: 'Alex Brush', cursive;
-  font-size: 3.6rem;
+  font-size: 3.2rem;
   line-height: 1;
 }
 
@@ -219,8 +220,8 @@
 
 /* Seal & branding */
 .seal-badge-container {
-  width: 75px;
-  height: 75px;
+  width: 95px;
+  height: 95px;
   margin-bottom: 0.2rem;
   display: flex;
   align-items: center;
@@ -247,9 +248,10 @@
   font-family: 'Playfair Display', serif;
   font-style: italic;
   font-size: 1.05rem;
-  color: #c4967a;
-  margin-top: 2px;
+  color: #3d2b1f; /* dark brown */
+  margin-top: 4px;
   text-align: center;
+  white-space: nowrap;
 }
 
 /* Validation note & button */
