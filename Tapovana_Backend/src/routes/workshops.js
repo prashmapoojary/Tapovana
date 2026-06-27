@@ -14,7 +14,8 @@ const {
     exportWorkshopAttendees,
     deleteWorkshopAttendee,
     uploadVideoChunk,
-    streamWorkshopVideo
+    streamWorkshopVideo,
+    getWorkshopImage
 } = require('../controllers/workshopController');
 
 const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN')];
@@ -24,6 +25,7 @@ const staffOrAdmin = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCT
 router.get('/', getAllWorkshops);
 router.get('/certificates/download/:id', require('../controllers/certificatesController').downloadCertificatePdf);
 router.get('/:id', getWorkshopById);
+router.get('/:id/image', getWorkshopImage);
 
 // Public User Enrollment (Mobile Side Simulation)
 router.post('/enroll', enrollUserInWorkshop);

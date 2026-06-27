@@ -135,27 +135,31 @@ app.listen(PORT, () => {
             const path = require("path");
             const UPLOADS_DIR = path.join(__dirname, "../uploads");
 
-            const result = await query("SELECT id, name, image_url FROM services WHERE image_url LIKE 'data:image/%'");
-            if (result.rows.length > 0) {
-                console.log(`[Migration] Found ${result.rows.length} services with base64 images. Converting to files...`);
-                
-                // Ensure uploads directory exists
+            // Helper to ensure uploads dir
+            const ensureUploads = () => {
                 if (!fs.existsSync(UPLOADS_DIR)) {
                     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
                 }
+            };
 
+            const extMap = {
+                'image/jpeg': '.jpg',
+                'image/jpg': '.jpg',
+                'image/png': '.png',
+                'image/gif': '.gif',
+                'image/webp': '.webp',
+                'image/svg+xml': '.svg'
+            };
+
+            // 1. Migrate Services
+            const result = await query("SELECT id, name, image_url FROM services WHERE image_url LIKE 'data:image/%'");
+            if (result.rows.length > 0) {
+                console.log(`[Migration] Found ${result.rows.length} services with base64 images. Converting to files...`);
+                ensureUploads();
                 for (const row of result.rows) {
                     const matches = row.image_url.match(/^data:(image\/(jpeg|png|webp|gif|svg\+xml));base64,([\s\S]+)$/);
                     if (matches && matches.length === 4) {
                         const mime = matches[1];
-                        const extMap = {
-                            'image/jpeg': '.jpg',
-                            'image/jpg': '.jpg',
-                            'image/png': '.png',
-                            'image/gif': '.gif',
-                            'image/webp': '.webp',
-                            'image/svg+xml': '.svg'
-                        };
                         const ext = extMap[mime] || '.png';
                         const buffer = Buffer.from(matches[3].replace(/\s/g, ''), 'base64');
                         const filename = uuidv4() + ext;
@@ -166,8 +170,52 @@ app.listen(PORT, () => {
                         console.log(`[Migration] Converted image for service: "${row.name}" -> ${newUrl}`);
                     }
                 }
-                console.log("[Migration] Database base64 images migration complete.");
             }
+
+            // 2. Migrate Workshops
+            const wsResult = await query("SELECT id, title, image_url FROM workshops WHERE image_url LIKE 'data:image/%'");
+            if (wsResult.rows.length > 0) {
+                console.log(`[Migration] Found ${wsResult.rows.length} workshops with base64 images. Converting to files...`);
+                ensureUploads();
+                for (const row of wsResult.rows) {
+                    const matches = row.image_url.match(/^data:(image\/(jpeg|png|webp|gif|svg\+xml));base64,([\s\S]+)$/);
+                    if (matches && matches.length === 4) {
+                        const mime = matches[1];
+                        const ext = extMap[mime] || '.png';
+                        const buffer = Buffer.from(matches[3].replace(/\s/g, ''), 'base64');
+                        const filename = uuidv4() + ext;
+                        fs.writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
+                        
+                        const newUrl = '/uploads/' + filename;
+                        await query('UPDATE workshops SET image_url = $1 WHERE id = $2', [newUrl, row.id]);
+                        console.log(`[Migration] Converted image for workshop: "${row.title}" -> ${newUrl}`);
+                    }
+                }
+            }
+
+            // 3. Migrate Vedic Programs
+            const vpResult = await query("SELECT id, title, image_url FROM vedic_programs WHERE image_url LIKE 'data:image/%'");
+            if (vpResult.rows.length > 0) {
+                console.log(`[Migration] Found ${vpResult.rows.length} vedic programs with base64 images. Converting to files...`);
+                ensureUploads();
+                for (const row of vpResult.rows) {
+                    const matches = row.image_url.match(/^data:(image\/(jpeg|png|webp|gif|svg\+xml));base64,([\s\S]+)$/);
+                    if (matches && matches.length === 4) {
+                        const mime = matches[1];
+                        const ext = extMap[mime] || '.png';
+                        const buffer = Buffer.from(matches[3].replace(/\s/g, ''), 'base64');
+                        const filename = uuidv4() + ext;
+                        fs.writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
+                        
+                        const newUrl = '/uploads/' + filename;
+                        await query('UPDATE vedic_programs SET image_url = $1 WHERE id = $2', [newUrl, row.id]);
+                        console.log(`[Migration] Converted image for program: "${row.title}" -> ${newUrl}`);
+                    }
+                }
+            }
+
+            console.log("[Migration] Database base64 images migration complete.");
+        }
 
             // Convert absolute /uploads/ paths back to relative /uploads/ paths
             const absoluteResult = await query("SELECT id, name, image_url FROM services WHERE image_url LIKE '%/uploads/%'");

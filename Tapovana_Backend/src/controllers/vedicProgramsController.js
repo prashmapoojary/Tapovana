@@ -217,6 +217,11 @@ const getAllVedicPrograms = async (req, res) => {
                 }
             }
 
+            let displayImageUrl = r.image_url;
+            if (displayImageUrl && displayImageUrl.startsWith('data:image/')) {
+                displayImageUrl = `/api/vedic-programs/${r.id}/image`;
+            }
+
             return {
                 id: r.id,
                 title: r.title,
@@ -234,7 +239,7 @@ const getAllVedicPrograms = async (req, res) => {
                 consultant_name: consultant_name,
                 services: r.services,
                 languages: r.languages,
-                image_url: r.image_url,
+                image_url: displayImageUrl,
                 registrationDeadline: r.registration_deadline ? r.registration_deadline.toISOString().split('T')[0] : null,
                 status: status,
                 assigned_staff_ids
@@ -1584,6 +1589,36 @@ const registerAttendeeFromMobile = async (req, res) => {
     return registerAttendee(req, res);
 };
 
+// GET VEDIC PROGRAM IMAGE (Binary Stream)
+const getVedicProgramImage = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await query('SELECT image_url FROM vedic_programs WHERE id = $1', [id]);
+        if (!result.rows.length || !result.rows[0].image_url) {
+            return res.status(404).send('Image not found');
+        }
+        const imgData = result.rows[0].image_url;
+        if (imgData.startsWith('data:image/')) {
+            const matches = imgData.match(/^data:(image\/(jpeg|png|webp|gif|svg\+xml));base64,([\s\S]+)$/);
+            if (matches && matches.length === 4) {
+                const contentType = matches[1];
+                const buffer = Buffer.from(matches[3].replace(/\s/g, ''), 'base64');
+                res.setHeader('Content-Type', contentType);
+                res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+                return res.send(buffer);
+            }
+        }
+        // If it's a normal URL or relative uploads file, redirect to it
+        if (imgData.startsWith('/uploads/')) {
+            return res.redirect(imgData);
+        }
+        return res.redirect(imgData);
+    } catch (err) {
+        console.error('getVedicProgramImage error:', err);
+        return res.status(500).send('Server error');
+    }
+};
+
 module.exports = {
     getAllVedicPrograms,
     createVedicProgram,
@@ -1601,5 +1636,6 @@ module.exports = {
     deleteVedicProgram,
     autoUpdateVedicProgramStatuses,
     sendVedicProgramReminders,
-    registerAttendeeFromMobile
+    registerAttendeeFromMobile,
+    getVedicProgramImage
 };

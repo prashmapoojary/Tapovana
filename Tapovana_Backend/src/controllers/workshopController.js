@@ -323,6 +323,9 @@ const getAllWorkshops = async (req, res) => {
             if (videoIds.has(w.id)) {
                 w.video_url = `/api/workshops/${w.id}/video`;
             }
+            if (w.image_url && w.image_url.startsWith('data:image/')) {
+                w.image_url = `/api/workshops/${w.id}/image`;
+            }
             return w;
         });
 
@@ -353,6 +356,9 @@ const getWorkshopById = async (req, res) => {
         const hasVideoRes = await query('SELECT EXISTS(SELECT 1 FROM workshop_videos WHERE workshop_id = $1)', [workshop.id]);
         if (hasVideoRes.rows[0].exists) {
             workshop.video_url = `/api/workshops/${workshop.id}/video`;
+        }
+        if (workshop.image_url && workshop.image_url.startsWith('data:image/')) {
+            workshop.image_url = `/api/workshops/${workshop.id}/image`;
         }
 
         return res.json({ success: true, workshop });
@@ -1820,6 +1826,36 @@ const streamWorkshopVideo = async (req, res) => {
     }
 };
 
+// GET WORKSHOP IMAGE (Binary Stream)
+const getWorkshopImage = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await query('SELECT image_url FROM workshops WHERE id = $1', [id]);
+        if (!result.rows.length || !result.rows[0].image_url) {
+            return res.status(404).send('Image not found');
+        }
+        const imgData = result.rows[0].image_url;
+        if (imgData.startsWith('data:image/')) {
+            const matches = imgData.match(/^data:(image\/(jpeg|png|webp|gif|svg\+xml));base64,([\s\S]+)$/);
+            if (matches && matches.length === 4) {
+                const contentType = matches[1];
+                const buffer = Buffer.from(matches[3].replace(/\s/g, ''), 'base64');
+                res.setHeader('Content-Type', contentType);
+                res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+                return res.send(buffer);
+            }
+        }
+        // If it's a normal URL or relative uploads file, redirect to it
+        if (imgData.startsWith('/uploads/')) {
+            return res.redirect(imgData);
+        }
+        return res.redirect(imgData);
+    } catch (err) {
+        console.error('getWorkshopImage error:', err);
+        return res.status(500).send('Server error');
+    }
+};
+
 // DOWNLOAD CERTIFICATE PDF (Delegated to certificatesController)
 const downloadCertificate = async (req, res) => {
     const { downloadCertificatePdf } = require('./certificatesController');
@@ -1833,5 +1869,5 @@ module.exports = {
     enrollUserInWorkshop, getWorkshopAttendees,
     updateAttendeeAttendance, exportWorkshopAttendees,
     deleteWorkshopAttendee, uploadVideoChunk, streamWorkshopVideo,
-    autoUpdateWorkshopStatuses, downloadCertificate
+    autoUpdateWorkshopStatuses, downloadCertificate, getWorkshopImage
 };
