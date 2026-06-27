@@ -204,6 +204,7 @@ const CertificatePage = () => {
                 <div className="seal-badge-container">
                   <img src={tapovanaLogo} alt="Tapovana Logo" className="seal-logo-img" />
                 </div>
+                <div className="footer-company-name">TAPOVANA</div>
                 <div className="footer-company-tagline">nurturing wisdom through tradition</div>
               </div>
 
@@ -211,7 +212,7 @@ const CertificatePage = () => {
               <div className="cert-footer-col col-right">
                 <div className="footer-value-text cursive-sig">{certData.instructorName}</div>
                 <div className="footer-value-divider"></div>
-                <div className="footer-label-text">Awarded by (Signature)</div>
+                <div className="footer-label-text">Workshop Instructor</div>
               </div>
             </div>
           </div>

@@ -287,17 +287,17 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             // ── 7. "This is to certify that" (italic serif) ─────────────────────
             const certifyY = flourishY + 16;
             doc.font('Times-Italic')
-               .fontSize(27)
+               .fontSize(20)
                .fillColor(bodyColor)
                .text('This is to certify that', 50, certifyY, { width: width - 100, align: 'center' });
 
             // ── 8. ATTENDEE NAME (cursive, large) ───────────────────────────────
-            const nameY = certifyY + 20;
+            const nameY = certifyY + 36;
             let nameDrawn = false;
             if (signatureFontPath) {
                 try {
                     doc.font(signatureFontPath)
-                       .fontSize(72)
+                       .fontSize(60)
                        .fillColor(bodyColor)
                        .text(participantName, 50, nameY, { width: width - 100, align: 'center' });
                     nameDrawn = true;
@@ -307,13 +307,13 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             }
             if (!nameDrawn) {
                 doc.font('Times-BoldItalic')
-                   .fontSize(58)
+                   .fontSize(48)
                    .fillColor(bodyColor)
                    .text(participantName, 50, nameY, { width: width - 100, align: 'center' });
             }
 
             // Underline under participant name
-            const nameUnderlineY = nameY + 58;
+            const nameUnderlineY = nameY + 48;
             doc.save();
             doc.lineWidth(1)
                .strokeColor('#c4967a')
@@ -325,30 +325,30 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             // ── 9. VERIFICATION ID (below name, serif, not bold, smaller) ───────
             if (certificateId) {
                 doc.font('Times-Roman')
-                   .fontSize(15)
+                   .fontSize(12)
                    .fillColor('#666666')
-                   .text(`verification id: ${certificateId.toLowerCase()}`, 50, nameUnderlineY + 8, {
+                   .text(`verification id: ${certificateId.toLowerCase()}`, 50, nameUnderlineY + 12, {
                        width: width - 100,
                        align: 'center'
                    });
             }
 
             // ── 10. "has successfully completed" (italic serif) ─────────────────
-            const completedY = nameUnderlineY + 30;
+            const completedY = nameUnderlineY + 36;
             doc.font('Times-Italic')
-               .fontSize(27)
+               .fontSize(20)
                .fillColor(bodyColor)
                .text('has successfully completed', 50, completedY, { width: width - 100, align: 'center' });
 
             // ── 11. WORKSHOP TITLE (bold serif, preserves original casing) ──────
-            const workshopY = completedY + 28;
+            const workshopY = completedY + 34;
             doc.font('Times-Bold')
-               .fontSize(41)
+               .fontSize(36)
                .fillColor(bodyColor)
                .text(workshopTitle.toUpperCase(), 50, workshopY, { width: width - 100, align: 'center' });
 
             // ── 12. FOOTER SECTION ──────────────────────────────────────────────
-            const lineY = 490;
+            const lineY = 515;
 
             // ─── Left Column: Date of Completion ────────────────────────────────
             doc.save();
@@ -381,10 +381,15 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                  }
              }
 
+            doc.font('Times-Bold')
+               .fontSize(18)
+               .fillColor(bodyColor)
+               .text('TAPOVANA', cx - 100, lineY + 14, { width: 200, align: 'center' });
+
             doc.font('Times-Italic')
                .fontSize(13)
                .fillColor('#3d2b1f') // dark brown
-               .text('nurturing wisdom through tradition', cx - 150, lineY + 28, { width: 300, align: 'center' });
+               .text('nurturing wisdom through tradition', cx - 150, lineY + 34, { width: 300, align: 'center' });
 
             // ─── Right Column: Instructor Signature ─────────────────────────────
             doc.save();
