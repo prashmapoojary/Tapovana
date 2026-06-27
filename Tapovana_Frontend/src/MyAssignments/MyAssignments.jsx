@@ -154,8 +154,6 @@ function MyAssignments() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [backendAssignments, setBackendAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [memberships, setMemberships] = useState([]);
-  const [bookings, setBookings] = useState([]);
 
   const isStaffUser = loggedInUser?.role === 'DOCTOR' || loggedInUser?.role === 'THERAPIST';
 
@@ -175,53 +173,6 @@ function MyAssignments() {
       }
     };
     fetchAssignments();
-  }, []);
-
-  // ─── Fetch membership data for profile photos ───
-  useEffect(() => {
-    const fetchMemberships = async () => {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4500);
-
-        const response = await fetch("https://tapovana.onrender.com/api/membership", {
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          const res = await response.json();
-          if (res && (res.success || Array.isArray(res))) {
-            const rawList = res.memberships || res.data || (Array.isArray(res) ? res : []);
-            const mappedMembers = rawList.map((m) => ({
-              id: m.id || m.user_id,
-              name: m.name || m.customer_name,
-              email: m.email || m.customer_email,
-              profile_photo_url: m.profile_photo_url || m.profile_pic || null
-            }));
-            setMemberships(mappedMembers);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch memberships:", err);
-      }
-    };
-    fetchMemberships();
-  }, []);
-
-  // ─── Fetch bookings data for customer info ───
-  useEffect(() => {
-    const fetchBookings = async () => {
-      try {
-        const res = await apiFetch('/api/bookings');
-        if (res.success) {
-          setBookings(res.bookings || []);
-        }
-      } catch (err) {
-        console.error('Failed to fetch bookings:', err);
-      }
-    };
-    fetchBookings();
   }, []);
 
 
