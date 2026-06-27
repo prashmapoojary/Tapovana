@@ -177,6 +177,7 @@ const CertificatePage = () => {
             
             <div className="cert-recipient">
               <h2 className="cert-recipient-name">{certData.participantName}</h2>
+              <div className="cert-recipient-line"></div>
             </div>
 
             {/* Unique Verification ID directly under name line */}
@@ -194,6 +195,7 @@ const CertificatePage = () => {
               {/* Left: Completion Date */}
               <div className="cert-footer-col col-left">
                 <div className="footer-value-text">{certData.completionDate}</div>
+                <div className="footer-value-divider"></div>
                 <div className="footer-label-text">date of completion</div>
               </div>
 
@@ -209,6 +211,7 @@ const CertificatePage = () => {
               {/* Right: Signature and Conductor Name */}
               <div className="cert-footer-col col-right">
                 <div className="footer-value-text cursive-sig">{certData.instructorName}</div>
+                <div className="footer-value-divider"></div>
                 <div className="footer-label-text">workshop instructor</div>
               </div>
             </div>

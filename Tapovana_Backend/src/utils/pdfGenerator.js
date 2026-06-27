@@ -313,16 +313,14 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             }
 
             // Underline under participant name
-            const nameUnderlineY = nameY + 84;
-            /*
+            const nameUnderlineY = nameY + 68;
             doc.save();
-            doc.lineWidth(0.8)
-               .strokeColor(accentColor)
+            doc.lineWidth(1)
+               .strokeColor('#c4967a')
                .moveTo(cx - 200, nameUnderlineY)
                .lineTo(cx + 200, nameUnderlineY)
                .stroke();
             doc.restore();
-            */
 
             // ── 9. VERIFICATION ID (below name, serif, not bold, smaller) ───────
             if (certificateId) {
@@ -353,15 +351,13 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             const lineY = 490;
 
             // ─── Left Column: Date of Completion ────────────────────────────────
-            /*
             doc.save();
-            doc.lineWidth(0.8)
-               .strokeColor(accentColor)
+            doc.lineWidth(1)
+               .strokeColor('#c4967a')
                .moveTo(90, lineY)
                .lineTo(290, lineY)
                .stroke();
             doc.restore();
-            */
 
             doc.font('Times-Italic')
                .fontSize(27)
@@ -396,15 +392,13 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                .text('nurturing wisdom through tradition', cx - 100, lineY + 38, { width: 200, align: 'center' });
 
             // ─── Right Column: Instructor Signature ─────────────────────────────
-            /*
             doc.save();
-            doc.lineWidth(0.8)
-               .strokeColor(accentColor)
+            doc.lineWidth(1)
+               .strokeColor('#c4967a')
                .moveTo(551.89, lineY)
                .lineTo(751.89, lineY)
                .stroke();
             doc.restore();
-            */
 
             // Signature Graphic placement (drawn above the line)
             let signatureDrawn = false;
