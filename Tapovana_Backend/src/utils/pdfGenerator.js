@@ -31,23 +31,20 @@ function getLogoBuffer() {
  * Automatically downloads and caches the cursive signature font from Google Fonts GitHub repo.
  * Handles HTTP redirects gracefully.
  */
-function downloadFontIfNotExist() {
-    if (cachedFontPath && fs.existsSync(cachedFontPath)) {
-        return Promise.resolve(cachedFontPath);
+function downloadAlexFont() {
+    if (cachedAlexFontPath && fs.existsSync(cachedAlexFontPath)) {
+        return Promise.resolve(cachedAlexFontPath);
     }
-
     const fontDir = path.join(__dirname, '../assets');
     if (!fs.existsSync(fontDir)) {
         fs.mkdirSync(fontDir, { recursive: true });
     }
-
     const fontPath = path.join(fontDir, 'AlexBrush-Regular.ttf');
     if (fs.existsSync(fontPath)) {
-        // Simple sanity check of the file format
         try {
             const stat = fs.statSync(fontPath);
             if (stat.size > 1000) {
-                cachedFontPath = fontPath;
+                cachedAlexFontPath = fontPath;
                 return Promise.resolve(fontPath);
             } else {
                 fs.unlinkSync(fontPath);
@@ -56,39 +53,84 @@ function downloadFontIfNotExist() {
             fs.unlinkSync(fontPath);
         }
     }
-
     return new Promise((resolve) => {
-        console.log('Tapovana Certificate: Downloading signature font from Google Fonts GitHub repository...');
+        console.log('Tapovana Certificate: Downloading Alex Brush font...');
         const url = 'https://github.com/google/fonts/raw/main/ofl/alexbrush/AlexBrush-Regular.ttf';
         const file = fs.createWriteStream(fontPath);
-        
         const download = (targetUrl) => {
             https.get(targetUrl, (response) => {
                 if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-                    // Follow redirection (e.g. raw.githubusercontent.com)
                     download(response.headers.location);
                 } else if (response.statusCode === 200) {
                     response.pipe(file);
                     file.on('finish', () => {
                         file.close();
-                        console.log('Tapovana Certificate: Signature font cached successfully at:', fontPath);
-                        cachedFontPath = fontPath;
+                        cachedAlexFontPath = fontPath;
                         resolve(fontPath);
                     });
                 } else {
                     file.close();
                     fs.unlink(fontPath, () => {});
-                    console.warn(`Failed to download font: HTTP Status ${response.statusCode}`);
                     resolve(null);
                 }
             }).on('error', (err) => {
                 file.close();
                 fs.unlink(fontPath, () => {});
-                console.warn('Failed to download cursive signature font:', err.message);
                 resolve(null);
             });
         };
+        download(url);
+    });
+}
 
+function downloadHerrFont() {
+    if (cachedHerrFontPath && fs.existsSync(cachedHerrFontPath)) {
+        return Promise.resolve(cachedHerrFontPath);
+    }
+    const fontDir = path.join(__dirname, '../assets');
+    if (!fs.existsSync(fontDir)) {
+        fs.mkdirSync(fontDir, { recursive: true });
+    }
+    const fontPath = path.join(fontDir, 'HerrVonMuellerhoff-Regular.ttf');
+    if (fs.existsSync(fontPath)) {
+        try {
+            const stat = fs.statSync(fontPath);
+            if (stat.size > 1000) {
+                cachedHerrFontPath = fontPath;
+                return Promise.resolve(fontPath);
+            } else {
+                fs.unlinkSync(fontPath);
+            }
+        } catch (e) {
+            fs.unlinkSync(fontPath);
+        }
+    }
+    return new Promise((resolve) => {
+        console.log('Tapovana Certificate: Downloading Herr Von Muellerhoff font...');
+        const url = 'https://github.com/google/fonts/raw/main/ofl/herrvonmuellerhoff/HerrVonMuellerhoff-Regular.ttf';
+        const file = fs.createWriteStream(fontPath);
+        const download = (targetUrl) => {
+            https.get(targetUrl, (response) => {
+                if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                    download(response.headers.location);
+                } else if (response.statusCode === 200) {
+                    response.pipe(file);
+                    file.on('finish', () => {
+                        file.close();
+                        cachedHerrFontPath = fontPath;
+                        resolve(fontPath);
+                    });
+                } else {
+                    file.close();
+                    fs.unlink(fontPath, () => {});
+                    resolve(null);
+                }
+            }).on('error', (err) => {
+                file.close();
+                fs.unlink(fontPath, () => {});
+                resolve(null);
+            });
+        };
         download(url);
     });
 }
@@ -230,12 +272,14 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             doc.on('end', () => resolve(Buffer.concat(chunks)));
             doc.on('error', (err) => reject(err));
 
-            // Ensure signature font is downloaded and ready
-            let signatureFontPath = null;
+            // Ensure fonts are downloaded and ready
+            let alexFontPath = null;
+            let herrFontPath = null;
             try {
-                signatureFontPath = await downloadFontIfNotExist();
+                alexFontPath = await downloadAlexFont();
+                herrFontPath = await downloadHerrFont();
             } catch (err) {
-                console.warn('Failed to check or download cursive font:', err);
+                console.warn('Failed to check or download cursive fonts:', err);
             }
 
             // ── 1. BACKGROUND ──────────────────────────────────────────────────
@@ -294,9 +338,9 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             // ── 8. ATTENDEE NAME (cursive, large) ───────────────────────────────
             const nameY = certifyY + 36;
             let nameDrawn = false;
-            if (signatureFontPath) {
+            if (alexFontPath) {
                 try {
-                    doc.font(signatureFontPath)
+                    doc.font(alexFontPath)
                        .fontSize(60)
                        .fillColor(bodyColor)
                        .text(participantName, 50, nameY, { width: width - 100, align: 'center' });
@@ -439,10 +483,17 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             // Fallback cursive signature text if image not drawn
             if (!signatureDrawn) {
                 const signatureText = conductorName || 'Workshop Instructor';
-                if (signatureFontPath) {
+                if (herrFontPath) {
                     try {
-                        doc.font(signatureFontPath)
-                           .fontSize(47)
+                        const len = signatureText.length;
+                        let fontSize = 47;
+                        if (len <= 10) fontSize = 47;
+                        else if (len <= 18) fontSize = 38;
+                        else if (len <= 26) fontSize = 28;
+                        else fontSize = 20;
+
+                        doc.font(herrFontPath)
+                           .fontSize(fontSize)
                            .fillColor(bodyColor)
                            .text(signatureText, 551.89, sigY + 5, { width: 200, align: 'center' });
                         signatureDrawn = true;
@@ -461,7 +512,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             doc.font('Times-Italic')
                .fontSize(16)
                .fillColor('#888888')
-               .text('Awarded by (Signature)', 551.89, lineY + 6, { width: 200, align: 'center' });
+               .text('Workshop Instructor', 551.89, lineY + 6, { width: 200, align: 'center' });
 
             doc.end();
         } catch (err) {
