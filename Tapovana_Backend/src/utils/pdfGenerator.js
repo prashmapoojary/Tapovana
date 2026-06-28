@@ -452,11 +452,11 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                 if (qaskinFontPath) {
                     try {
                         const len = signatureText.length;
-                        let fontSize = 40;
-                        if (len <= 10) fontSize = 40;
-                        else if (len <= 18) fontSize = 30;
-                        else if (len <= 26) fontSize = 22;
-                        else fontSize = 17;
+                        let fontSize = 32;
+                        if (len <= 10) fontSize = 32;
+                        else if (len <= 18) fontSize = 24;
+                        else if (len <= 26) fontSize = 18;
+                        else fontSize = 14;
 
                         doc.font(qaskinFontPath)
                            .fontSize(fontSize)
