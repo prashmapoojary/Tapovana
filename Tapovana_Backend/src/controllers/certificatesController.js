@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { generateCertificatePDF } = require('../utils/pdfGenerator');
 const { sendWorkshopCompletionCertificateEmail } = require('../services/emailService');
-const { getLocalIpAddress } = require('../utils/ip');
+const { getPublicBaseUrl } = require('../utils/publicUrl');
 
 // Helper: Validate UUID
 const isValidUUID = (id) => {
@@ -131,11 +131,8 @@ const generateCertificatesForWorkshop = async (req, res) => {
             return res.status(400).json({ success: false, message: 'No attended participants available for certificate generation.' });
         }
 
-        const port = process.env.PORT || 5000;
-        const localIp = getLocalIpAddress();
-        const isCloud = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_URL;
-        const defaultUrl = isCloud ? 'https://tapovana.onrender.com' : `http://${localIp}:${port}`;
-        const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
+        // Always use production URL for certificate links stored in DB and sent in emails
+        const backendUrl = getPublicBaseUrl();
 
         let generatedCount = 0;
         for (const att of attendeesRes.rows) {
@@ -559,12 +556,8 @@ const issueWorkshopCertificate = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Verification ID must be unique.' });
         }
 
-        // 6. Setup backend base URL
-        const port = process.env.PORT || 5000;
-        const localIp = getLocalIpAddress();
-        const isCloud = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_URL;
-        const defaultUrl = isCloud ? 'https://tapovana.onrender.com' : `http://${localIp}:${port}`;
-        const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
+        // 6. Setup backend base URL — always use production URL for customer-facing links
+        const backendUrl = getPublicBaseUrl();
 
         const pdfUrl = req.body.pdfUrl || `${backendUrl}/api/workshops/${workshop.id}/certificates/${verificationId}`;
 

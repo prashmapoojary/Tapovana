@@ -5,7 +5,7 @@ const path = require('path');
 const { sendAllocationEmail, sendWorkshopEnrollmentEmail, sendWorkshopRemovalEmail, sendWorkshopScheduledEmail, sendWorkshopOngoingEmail, sendWorkshopDeallocationEmail, sendWorkshopCompletedEmail, sendWorkshopAllocationNotificationEmail, sendWorkshopCompletionCertificateEmail } = require('../services/emailService');
 const { generateCertificatePDF } = require('../utils/pdfGenerator');
 const { checkStaffAllocationConflict, syncStaffMemberStatus } = require('../utils/conflictChecker');
-const { getLocalIpAddress } = require('../utils/ip');
+const { getPublicBaseUrl } = require('../utils/publicUrl');
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 
@@ -1223,11 +1223,7 @@ const generateSingleAttendeeCertificate = async (attendeeId, workshopId) => {
             return;
         }
 
-        const port = process.env.PORT || 5000;
-        const localIp = getLocalIpAddress();
-        const isCloud = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_URL;
-        const defaultUrl = isCloud ? 'https://tapovana.onrender.com' : `http://${localIp}:${port}`;
-        const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
+        const backendUrl = getPublicBaseUrl();
 
         // Generate unique certificate ID
         const year = new Date().getFullYear();
@@ -1598,11 +1594,7 @@ const autoUpdateWorkshopStatuses = async () => {
                 }
 
                 // Process attendees: generate certificate and send emails for anyone who doesn't have a certificate yet
-                const port = process.env.PORT || 5000;
-                const localIp = getLocalIpAddress();
-                const isCloud = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_URL;
-                const defaultUrl = isCloud ? 'https://tapovana.onrender.com' : `http://${localIp}:${port}`;
-                const backendUrl = process.env.BACKEND_URL || process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL || defaultUrl;
+                const backendUrl = getPublicBaseUrl();
                 
                 // Fetch instructor details
                 let signatureImage = null;
