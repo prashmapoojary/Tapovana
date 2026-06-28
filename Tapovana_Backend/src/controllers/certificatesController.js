@@ -27,7 +27,7 @@ const getAllCertificates = async (req, res) => {
     try {
         const { search = '', page = 1, limit = 50 } = req.query;
         const offset = (parseInt(page) - 1) * parseInt(limit);
-        
+
         let conditions = [];
         let values = [];
         let idx = 1;
@@ -74,7 +74,7 @@ const getCertificateStats = async (req, res) => {
     try {
         const totalRes = await query('SELECT COUNT(*) FROM certificates');
         const uniqueWorkshopsRes = await query('SELECT COUNT(DISTINCT workshop_id) FROM certificates');
-        
+
         // Stats by month
         const monthlyRes = await query(`
             SELECT TO_CHAR(generated_at, 'YYYY-MM') AS month, COUNT(*) AS count
@@ -140,7 +140,7 @@ const generateCertificatesForWorkshop = async (req, res) => {
         let generatedCount = 0;
         for (const att of attendeesRes.rows) {
             const certCheck = await query('SELECT id FROM certificates WHERE participant_id = $1 AND workshop_id = $2', [att.id, workshop.id]);
-            
+
             if (certCheck.rows.length === 0) {
                 const certificateId = generateUniqueCertificateId();
                 const certUrl = `${backendUrl}/api/certificates/download/${certificateId}`;
@@ -285,7 +285,7 @@ const getPublicCertificateDetails = async (req, res) => {
 const downloadCertificatePdf = async (req, res) => {
     const { certificateId, id } = req.params;
     const certParam = certificateId || id;
-    
+
     // Clean up filename suffix if request contains .pdf
     let cleanId = certParam;
     if (cleanId && cleanId.endsWith('.pdf')) {
@@ -306,7 +306,7 @@ const downloadCertificatePdf = async (req, res) => {
         }
 
         const cert = certRes.rows[0];
-        
+
         // Mark downloaded status to true
         try {
             await query('UPDATE certificates SET downloaded = TRUE WHERE id = $1', [cert.id]);

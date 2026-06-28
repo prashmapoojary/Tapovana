@@ -729,33 +729,11 @@ export default function Workshops() {
   // ─── Save edit ─────────────────────────────────────────────────────────
   const handleSaveEdit = async () => {
     setEditError("");
-    if (!editForm.title.trim()) { setEditError("Title is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
-    if (!editForm.instructor_id) { setEditError("Instructor selection is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
-    if (editForm.price === "" || Number(editForm.price) <= 0) { setEditError("Price must be greater than 0"); triggerAlert("Validation failed. Please check inputs.", false); return; }
-
-    const parseDateInput = (dateStr) => {
-      if (!dateStr) return null;
-      if (dateStr instanceof Date) return dateStr;
-      const dmy = String(dateStr).match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
-      if (dmy) {
-        return new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10));
-      }
-      const parsed = new Date(dateStr);
-      return isNaN(parsed.getTime()) ? null : parsed;
-    };
-
-    const selectedDateObj = parseDateInput(editForm.date);
-    if (selectedDateObj) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const selectedMidnight = new Date(selectedDateObj);
-      selectedMidnight.setHours(0, 0, 0, 0);
-      
-      if (selectedMidnight < today) {
-        setEditError("Cannot schedule a workshop on a past date.");
-        triggerAlert("Validation failed. Please check inputs.", false);
-        return;
-      }
+    const validationError = validateWorkshopForm(editForm);
+    if (validationError) {
+      setEditError(validationError);
+      triggerAlert("Validation failed. Please check inputs.", false);
+      return;
     }
 
     const ws = workshops.find(w => w.id === selectedWs?.id) || selectedWs;
@@ -875,35 +853,11 @@ export default function Workshops() {
   // ─── Create Workshop ───────────────────────────────────────────────────
   const handleCreateWorkshop = async () => {
     setAddError("");
-    if (!addForm.title.trim()) { setAddError("Title is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
-    if (!addForm.instructor_id) { setAddError("Instructor selection is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
-    if (!addForm.date) { setAddError("Date is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
-    if (!addForm.price) { setAddError("Price is required"); triggerAlert("Validation failed. Please check inputs.", false); return; }
-    if (Number(addForm.price) <= 0) { setAddError("Price must be greater than 0"); triggerAlert("Validation failed. Please check inputs.", false); return; }
-
-    const parseDateInput = (dateStr) => {
-      if (!dateStr) return null;
-      if (dateStr instanceof Date) return dateStr;
-      const dmy = String(dateStr).match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
-      if (dmy) {
-        return new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10));
-      }
-      const parsed = new Date(dateStr);
-      return isNaN(parsed.getTime()) ? null : parsed;
-    };
-
-    const selectedDateObj = parseDateInput(addForm.date);
-    if (selectedDateObj) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const selectedMidnight = new Date(selectedDateObj);
-      selectedMidnight.setHours(0, 0, 0, 0);
-      
-      if (selectedMidnight < today) {
-        setAddError("Cannot schedule a workshop on a past date.");
-        triggerAlert("Validation failed. Please check inputs.", false);
-        return;
-      }
+    const validationError = validateWorkshopForm(addForm);
+    if (validationError) {
+      setAddError(validationError);
+      triggerAlert("Validation failed. Please check inputs.", false);
+      return;
     }
 
     // Check staff allocation conflict attempts
@@ -1746,4 +1700,124 @@ export default function Workshops() {
       />
     </div>
   );
+}
+
+// ─── Form validation helper ───────────────────────────────────────────────
+function validateWorkshopForm(form) {
+  // 1. Program Title
+  const title = (form.title || "").trim();
+  if (!title) {
+    return "Program Title is required.";
+  }
+  if (title.length < 3 || title.length > 100) {
+    return "Program Title must be between 3 and 100 characters.";
+  }
+  const titleRegex = /^[A-Za-z0-9\s.,!?'"()\-&/:;@#+]+$/;
+  if (!titleRegex.test(title)) {
+    return "Program Title contains invalid characters. Only letters, numbers, spaces, and basic punctuation are allowed.";
+  }
+
+  // 2. Category
+  const category = (form.category || "").trim();
+  if (!category || category === "Select Category") {
+    return "Category selection is required.";
+  }
+
+  // 3. Instructor
+  const instructorId = (form.instructor_id || "").trim();
+  if (!instructorId) {
+    return "Instructor selection is required.";
+  }
+
+  // 4. Date
+  const dateStr = (form.date || "").trim();
+  if (!dateStr) {
+    return "Date is required.";
+  }
+
+  const parseDateInput = (dStr) => {
+    if (!dStr) return null;
+    const dmy = dStr.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+    if (dmy) {
+      return new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10));
+    }
+    const ymd = dStr.match(/^(\d{4})[-/](\d{2})[-/](\d{2})$/);
+    if (ymd) {
+      return new Date(parseInt(ymd[1], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[3], 10));
+    }
+    const parsed = new Date(dStr);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const selectedDateObj = parseDateInput(dateStr);
+  if (!selectedDateObj) {
+    return "Invalid date format.";
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const selectedMidnight = new Date(selectedDateObj);
+  selectedMidnight.setHours(0, 0, 0, 0);
+
+  if (selectedMidnight < today) {
+    return "You cannot choose a previous date.";
+  }
+
+  // 5. Start Time
+  const timeStr = (form.time || "").trim();
+  if (!timeStr) {
+    return "Start Time is required.";
+  }
+
+  const parseTimeInput = (tStr) => {
+    if (!tStr) return null;
+    const matchAmpm = tStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (matchAmpm) {
+      let h = parseInt(matchAmpm[1], 10);
+      const m = parseInt(matchAmpm[2], 10);
+      if (matchAmpm[3].toUpperCase() === "PM" && h !== 12) h += 12;
+      if (matchAmpm[3].toUpperCase() === "AM" && h === 12) h = 0;
+      return { hours: h, minutes: m };
+    }
+    const match24 = tStr.match(/^(\d{1,2}):(\d{2})$/);
+    if (match24) {
+      return { hours: parseInt(match24[1], 10), minutes: parseInt(match24[2], 10) };
+    }
+    return null;
+  };
+
+  const timeParsed = parseTimeInput(timeStr);
+  if (!timeParsed) {
+    return "Invalid start time format.";
+  }
+
+  if (selectedMidnight.getTime() === today.getTime()) {
+    const now = new Date();
+    const currentHours = now.getHours();
+    const currentMinutes = now.getMinutes();
+
+    if (timeParsed.hours < currentHours || (timeParsed.hours === currentHours && timeParsed.minutes <= currentMinutes)) {
+      return "You cannot choose a previous time.";
+    }
+  }
+
+  // 6. Duration
+  if (form.duration === undefined || form.duration === null || String(form.duration).trim() === "") {
+    return "Duration is required.";
+  }
+  const durationNum = Number(form.duration);
+  if (isNaN(durationNum) || !Number.isInteger(durationNum) || durationNum < 15 || durationNum > 480) {
+    return "Duration must be between 15 and 480 minutes.";
+  }
+
+  // 7. Price
+  if (form.price === undefined || form.price === null || String(form.price).trim() === "") {
+    return "Price is required.";
+  }
+  const priceNum = Number(form.price);
+  if (isNaN(priceNum) || priceNum < 100 || priceNum > 50000) {
+    return "Price must be between Rs. 100 and Rs. 50,000.";
+  }
+
+  return null;
 }
