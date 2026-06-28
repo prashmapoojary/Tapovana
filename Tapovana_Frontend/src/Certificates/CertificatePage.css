@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Montserrat:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Mr+De+Haviland&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Montserrat:wght@300;400;500;600;700&display=swap');
 
 /* Page container */
 .certificate-page-container {
@@ -201,7 +201,7 @@
 }
 
 .cursive-sig {
-  font-family: 'Alex Brush', cursive;
+  font-family: 'Mr De Haviland', cursive;
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
