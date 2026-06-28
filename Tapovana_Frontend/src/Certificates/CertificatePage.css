@@ -398,3 +398,74 @@
     transform: rotate(360deg);
   }
 }
+
+/* Toast Notification Styles */
+.toast-notification {
+  visibility: hidden;
+  opacity: 0;
+  min-width: 320px;
+  background-color: #1a1a1a;
+  color: #ffffff;
+  text-align: center;
+  border-radius: 8px;
+  padding: 16px;
+  position: fixed;
+  z-index: 1000;
+  left: 50%;
+  transform: translate(-50%, 50px);
+  bottom: 30px;
+  font-size: 0.95rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  border-left: 4px solid #4CAF50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.toast-notification.show {
+  visibility: visible;
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  text-align: left;
+}
+
+.toast-text {
+  font-weight: 500;
+}
+
+.toast-open-link {
+  color: #cda751;
+  text-decoration: underline;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.toast-open-link:hover {
+  color: #bfa045;
+}
+
+.toast-close-btn {
+  background: none;
+  border: none;
+  color: #888888;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toast-close-btn:hover {
+  color: #ffffff;
+}

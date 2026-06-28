@@ -441,30 +441,18 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                 const signatureText = conductorName || 'Workshop Instructor';
                 if (signatureFontPath) {
                     try {
-                        let sigFontSize = 47;
-                        if (signatureText.length > 18) {
-                            sigFontSize = 26;
-                        } else if (signatureText.length > 12) {
-                            sigFontSize = 35;
-                        }
                         doc.font(signatureFontPath)
-                           .fontSize(sigFontSize)
+                           .fontSize(47)
                            .fillColor(bodyColor)
-                           .text(signatureText, 551.89, sigY + (47 - sigFontSize)/2 + 5, { width: 200, align: 'center' });
+                           .text(signatureText, 551.89, sigY + 5, { width: 200, align: 'center' });
                         signatureDrawn = true;
                     } catch (fontErr) {
                         console.warn('Failed to render loaded cursive font:', fontErr);
                     }
                 }
                 if (!signatureDrawn) {
-                    let fallbackSigFontSize = 32;
-                    if (signatureText.length > 18) {
-                        fallbackSigFontSize = 20;
-                    } else if (signatureText.length > 12) {
-                        fallbackSigFontSize = 26;
-                    }
                     doc.font('Times-BoldItalic')
-                       .fontSize(fallbackSigFontSize)
+                       .fontSize(32)
                        .fillColor(bodyColor)
                        .text(signatureText, 551.89, sigY + 10, { width: 200, align: 'center' });
                 }
@@ -473,7 +461,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             doc.font('Times-Italic')
                .fontSize(16)
                .fillColor('#888888')
-               .text('Workshop Instructor', 551.89, lineY + 6, { width: 200, align: 'center' });
+               .text('Awarded by (Signature)', 551.89, lineY + 6, { width: 200, align: 'center' });
 
             doc.end();
         } catch (err) {

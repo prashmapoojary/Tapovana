@@ -19,7 +19,9 @@ const CertificatePage = () => {
     instructorName: "",
     certificateId: ""
   });
-  const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: "", linkUrl: "" });
+  const [loadingDownload, setLoadingDownload] = useState(false);
+  const toastTimeoutRef = useRef(null);
 
   useEffect(() => {
     const getApiBase = () => {
@@ -131,7 +133,8 @@ const CertificatePage = () => {
     const element = certificateRef.current;
     if (!element) return;
 
-    setDownloadSuccess(false);
+    setLoadingDownload(true);
+    setToast({ show: false, message: "", linkUrl: "" });
 
     const opt = {
       margin: 0,
@@ -141,29 +144,31 @@ const CertificatePage = () => {
       jsPDF: { unit: "mm", format: "a4", orientation: "landscape" }
     };
 
-    html2pdf().set(opt).from(element).save().then(() => {
-      setDownloadSuccess(true);
-      setTimeout(() => setDownloadSuccess(false), 8000);
-    }).catch(err => {
-      console.error("PDF download failed:", err);
-    });
-  };
+    const worker = html2pdf().set(opt).from(element);
+    worker.save().then(() => {
+      return worker.output('blob');
+    }).then((blob) => {
+      const blobUrl = URL.createObjectURL(blob);
+      setToast({
+        show: true,
+        message: "✅ Certificate downloaded successfully!",
+        linkUrl: blobUrl
+      });
+      setLoadingDownload(false);
 
-  const handleViewPdf = () => {
-    const getApiBase = () => {
-      const hostname = window.location.hostname;
-      if (
-        hostname === "localhost" ||
-        hostname === "127.0.0.1" ||
-        /^192\.168\./.test(hostname) ||
-        /^10\./.test(hostname)
-      ) {
-        return `http://${hostname}:5000`;
-      }
-      return import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
-    };
-    const apiBase = getApiBase();
-    window.open(`${apiBase}/api/certificates/download/${certificateId || certData.certificateId}?view=true`, "_blank");
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+      toastTimeoutRef.current = setTimeout(() => {
+        setToast(prev => ({ ...prev, show: false }));
+      }, 6000);
+    }).catch(err => {
+      console.error("PDF generation/download error:", err);
+      setLoadingDownload(false);
+      setToast({
+        show: true,
+        message: "❌ Download failed. Please try opening in Chrome or Safari.",
+        linkUrl: ""
+      });
+    });
   };
 
   if (loading) {
@@ -186,13 +191,6 @@ const CertificatePage = () => {
       </div>
     );
   }
-
-  const getInstructorNameFontSize = (name) => {
-    if (!name) return {};
-    if (name.length > 18) return { fontSize: '1.8rem' };
-    if (name.length > 12) return { fontSize: '2.4rem' };
-    return {};
-  };
 
   return (
     <div className="certificate-page-container">
@@ -242,9 +240,7 @@ const CertificatePage = () => {
 
               {/* Right: Signature and Conductor Name */}
               <div className="cert-footer-col col-right">
-                <div className="footer-value-text cursive-sig" style={getInstructorNameFontSize(certData.instructorName)}>
-                  {certData.instructorName}
-                </div>
+                <div className="footer-value-text cursive-sig">{certData.instructorName}</div>
                 <div className="footer-value-divider"></div>
                 <div className="footer-label-text">Workshop Instructor</div>
               </div>
@@ -256,47 +252,37 @@ const CertificatePage = () => {
           <p className="validation-note">
             ✓ official tapovana verified certificate. secure and authentic.
           </p>
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
-            <button className="certificate-download-btn" onClick={handleDownload}>
-              download pdf certificate
-            </button>
-            <button 
-              className="certificate-view-btn" 
-              onClick={handleViewPdf}
-              style={{
-                padding: "0.9rem 2.2rem",
-                backgroundColor: "transparent",
-                color: "#cda751",
-                fontSize: "1rem",
-                fontWeight: "600",
-                border: "2px solid #cda751",
-                borderRadius: "6px",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                letterSpacing: "0.5px",
-                textTransform: "lowercase"
-              }}
-            >
-              view pdf in browser
-            </button>
+          <button 
+            className="certificate-download-btn" 
+            onClick={handleDownload} 
+            disabled={loadingDownload}
+            style={{ opacity: loadingDownload ? 0.7 : 1 }}
+          >
+            {loadingDownload ? "generating PDF..." : "download pdf certificate"}
+          </button>
+        </div>
+
+        {/* Slide-up Toast Notification */}
+        <div className={`toast-notification ${toast.show ? "show" : ""}`}>
+          <div className="toast-content">
+            <span className="toast-text">{toast.message}</span>
+            {toast.linkUrl && (
+              <a 
+                href={toast.linkUrl} 
+                target="_blank" 
+                rel="noreferrer" 
+                className="toast-open-link"
+              >
+                click here to open
+              </a>
+            )}
           </div>
-          {downloadSuccess && (
-            <div className="download-success-message" style={{
-              marginTop: "12px",
-              padding: "10px 20px",
-              backgroundColor: "rgba(34,197,94,0.1)",
-              border: "1px solid #22c55e",
-              borderRadius: "6px",
-              color: "#15803d",
-              fontSize: "0.9rem",
-              fontWeight: 500,
-              textAlign: "center",
-              maxWidth: "100%",
-              boxSizing: "border-box"
-            }}>
-              ✓ certificate download initiated. if it didn't start, try the "view pdf in browser" button or open the link directly in chrome/safari.
-            </div>
-          )}
+          <button 
+            className="toast-close-btn" 
+            onClick={() => setToast(prev => ({ ...prev, show: false }))}
+          >
+            ✕
+          </button>
         </div>
       </div>
     </div>
