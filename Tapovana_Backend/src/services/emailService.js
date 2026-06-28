@@ -899,28 +899,43 @@ const sendBlogRejectedEmail = async ({ to, authorName, blogTitle, reason }) => {
 };
 
 const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, workshopTitle, completionDate, downloadUrl, certId, participantId, pdfBuffer }) => {
-  const frontendUrl = process.env.FRONTEND_URL || "https://tapovana-admin.onrender.com";
-  
-  const linkUrl = certId 
-    ? `${frontendUrl}/certificate/${certId}`
-    : (participantId ? `${frontendUrl}/certificate/${participantId}` : downloadUrl);
+  const baseUrl = process.env.BASE_URL || process.env.APP_URL || process.env.BACKEND_URL || "https://tapovana.onrender.com";
+  // Force use of the production URL if it resolves to a local address/localhost
+  const secureBaseUrl = (!baseUrl || baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1") || baseUrl.includes("10.")) 
+    ? "https://tapovana.onrender.com" 
+    : baseUrl;
+
+  let linkUrl = "";
+  if (downloadUrl) {
+    linkUrl = downloadUrl;
+    if (linkUrl.includes("localhost") || linkUrl.includes("127.0.0.1") || linkUrl.includes("10.")) {
+      linkUrl = linkUrl.replace(/http:\/\/[^\/]+/g, "https://tapovana.onrender.com");
+    }
+  } else if (certId) {
+    linkUrl = `${secureBaseUrl}/api/certificates/download/${certId}`;
+  } else {
+    linkUrl = "https://tapovana.onrender.com";
+  }
 
   const html = emailWrapper(`
-    <h1 style="color:#cda751;text-align:center;">Workshop Completed</h1>
+    <h1 style="color:#cda751;text-align:center;margin: 20px 0 10px;">✅ Your certificate is ready!</h1>
     <p style="color:#ffffff;font-size:16px;line-height:1.6;margin: 20px 0 10px;">
       Hello ${participantName || "Participant"},
     </p>
     <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 15px 0;">
-      We are pleased to confirm your attendance at our workshop <strong>${workshopTitle}</strong> on ${completionDate}.
+      We are pleased to inform you that your certificate for completing the workshop <strong>${workshopTitle}</strong> on ${completionDate} has been generated successfully.
     </p>
-    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 10px 0;">
-      Your certificate is attached to this email as a PDF. You can also download it anytime using the button below:
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 15px 0;">
+      Certificate ID: <code>${certId || "N/A"}</code>
     </p>
-    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 0 0 10px 0;text-align:center;">
-      <a href="${linkUrl}" style="display:inline-block;background:#cda751;color:#111;font-weight:bold;padding:12px 24px;border-radius:6px;text-decoration:none;">Download Certificate</a>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 15px 0;">
+      Your certificate is also attached to this email as a PDF. Please click the button below to view and download your certificate:
+    </p>
+    <p style="color:#cccccc;font-size:15px;line-height:1.6;margin: 25px 0;text-align:center;">
+      <a href="${linkUrl}" style="display:inline-block;background:#cda751;color:#111;font-weight:bold;padding:14px 28px;border-radius:6px;text-decoration:none;font-size:16px;">View Certificate</a>
     </p>
     <p style="color:#aaaaaa;font-size:13px;line-height:1.6;margin: 0 0 25px 0;text-align:center;">
-      If the button doesn't work, <a href="${linkUrl}" style="color:#cda751;text-decoration:underline;">click here to download</a>.
+      If the button doesn't work, <a href="${linkUrl}" style="color:#cda751;text-decoration:underline;">Click here to view your certificate</a>.
     </p>
   `);
 
@@ -934,7 +949,6 @@ const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, wor
     text: textFallback,
   };
 
-  // Attach PDF buffer if provided (ensures offline download from email)
   if (pdfBuffer && Buffer.isBuffer(pdfBuffer)) {
     const filename = certId ? `Certificate-${certId}.pdf` : 'Tapovana-Certificate.pdf';
     mailOptions.attachments = [{
