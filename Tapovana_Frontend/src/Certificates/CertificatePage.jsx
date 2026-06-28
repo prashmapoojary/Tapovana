@@ -23,6 +23,14 @@ const CertificatePage = () => {
   const [loadingDownload, setLoadingDownload] = useState(false);
   const toastTimeoutRef = useRef(null);
 
+  const getSignatureFontSize = (name) => {
+    const len = (name || "").length;
+    if (len <= 10) return "2.6rem";
+    if (len <= 18) return "2rem";
+    if (len <= 26) return "1.5rem";
+    return "1.2rem";
+  };
+
   useEffect(() => {
     const getApiBase = () => {
       const hostname = window.location.hostname;
@@ -240,7 +248,12 @@ const CertificatePage = () => {
 
               {/* Right: Signature and Conductor Name */}
               <div className="cert-footer-col col-right">
-                <div className="footer-value-text cursive-sig">{certData.instructorName}</div>
+                <div 
+                  className="footer-value-text cursive-sig"
+                  style={{ fontSize: getSignatureFontSize(certData.instructorName) }}
+                >
+                  {certData.instructorName}
+                </div>
                 <div className="footer-value-divider"></div>
                 <div className="footer-label-text">Workshop Instructor</div>
               </div>
