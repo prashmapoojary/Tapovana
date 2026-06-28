@@ -355,11 +355,12 @@ const downloadCertificatePdf = async (req, res) => {
         }
 
         // Return headers for immediate browser download
+        const disposition = req.query.view === 'true' ? 'inline' : 'attachment';
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
         res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `attachment; filename="certificate-${cert.certificate_id}.pdf"`);
+        res.setHeader("Content-Disposition", `${disposition}; filename="certificate-${cert.certificate_id}.pdf"`);
         res.setHeader("Content-Description", "File Transfer");
         res.setHeader("Content-Transfer-Encoding", "binary");
         res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -703,8 +704,9 @@ const downloadWorkshopCertificate = async (req, res) => {
         }
 
         // Return headers for immediate download
+        const disposition = req.query.view === 'true' ? 'inline' : 'attachment';
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `attachment; filename="Certificate-${verificationId}.pdf"`);
+        res.setHeader("Content-Disposition", `${disposition}; filename="Certificate-${verificationId}.pdf"`);
         res.setHeader("Content-Description", "File Transfer");
         res.setHeader("Content-Transfer-Encoding", "binary");
         res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");

@@ -19,6 +19,7 @@ const CertificatePage = () => {
     instructorName: "",
     certificateId: ""
   });
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   useEffect(() => {
     const getApiBase = () => {
@@ -130,6 +131,8 @@ const CertificatePage = () => {
     const element = certificateRef.current;
     if (!element) return;
 
+    setDownloadSuccess(false);
+
     const opt = {
       margin: 0,
       filename: `Tapovana_Certificate_${certData.participantName.replace(/\s+/g, "_")}.pdf`,
@@ -138,7 +141,29 @@ const CertificatePage = () => {
       jsPDF: { unit: "mm", format: "a4", orientation: "landscape" }
     };
 
-    html2pdf().set(opt).from(element).save();
+    html2pdf().set(opt).from(element).save().then(() => {
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 8000);
+    }).catch(err => {
+      console.error("PDF download failed:", err);
+    });
+  };
+
+  const handleViewPdf = () => {
+    const getApiBase = () => {
+      const hostname = window.location.hostname;
+      if (
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        /^192\.168\./.test(hostname) ||
+        /^10\./.test(hostname)
+      ) {
+        return `http://${hostname}:5000`;
+      }
+      return import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
+    };
+    const apiBase = getApiBase();
+    window.open(`${apiBase}/api/certificates/download/${certificateId || certData.certificateId}?view=true`, "_blank");
   };
 
   if (loading) {
@@ -231,9 +256,47 @@ const CertificatePage = () => {
           <p className="validation-note">
             ✓ official tapovana verified certificate. secure and authentic.
           </p>
-          <button className="certificate-download-btn" onClick={handleDownload}>
-            download pdf certificate
-          </button>
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
+            <button className="certificate-download-btn" onClick={handleDownload}>
+              download pdf certificate
+            </button>
+            <button 
+              className="certificate-view-btn" 
+              onClick={handleViewPdf}
+              style={{
+                padding: "0.9rem 2.2rem",
+                backgroundColor: "transparent",
+                color: "#cda751",
+                fontSize: "1rem",
+                fontWeight: "600",
+                border: "2px solid #cda751",
+                borderRadius: "6px",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                letterSpacing: "0.5px",
+                textTransform: "lowercase"
+              }}
+            >
+              view pdf in browser
+            </button>
+          </div>
+          {downloadSuccess && (
+            <div className="download-success-message" style={{
+              marginTop: "12px",
+              padding: "10px 20px",
+              backgroundColor: "rgba(34,197,94,0.1)",
+              border: "1px solid #22c55e",
+              borderRadius: "6px",
+              color: "#15803d",
+              fontSize: "0.9rem",
+              fontWeight: 500,
+              textAlign: "center",
+              maxWidth: "100%",
+              boxSizing: "border-box"
+            }}>
+              ✓ certificate download initiated. if it didn't start, try the "view pdf in browser" button or open the link directly in chrome/safari.
+            </div>
+          )}
         </div>
       </div>
     </div>
