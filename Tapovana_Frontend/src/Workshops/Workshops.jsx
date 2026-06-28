@@ -1719,13 +1719,13 @@ function validateWorkshopForm(form) {
 
   // 2. Category
   const category = (form.category || "").trim();
-  if (!category || category === "Select Category") {
+  if (!category || category === "Select Category" || category.toLowerCase() === "select category" || category.toLowerCase() === "placeholder") {
     return "Category selection is required.";
   }
 
   // 3. Instructor
   const instructorId = (form.instructor_id || "").trim();
-  if (!instructorId) {
+  if (!instructorId || instructorId.toLowerCase() === "select instructor" || instructorId.toLowerCase() === "select" || instructorId.toLowerCase() === "placeholder") {
     return "Instructor selection is required.";
   }
 
@@ -1754,6 +1754,25 @@ function validateWorkshopForm(form) {
     return "Invalid date format.";
   }
 
+  // Double check that it's a real valid date (e.g., handles 31-02-2026 correctly)
+  const dmyRegex = /^(\d{2})[-/](\d{2})[-/](\d{4})$/;
+  const parts = dateStr.split(/[-/]/);
+  let parsedDay, parsedMonth, parsedYear;
+  if (dmyRegex.test(dateStr)) {
+    parsedDay = parseInt(parts[0], 10);
+    parsedMonth = parseInt(parts[1], 10);
+    parsedYear = parseInt(parts[2], 10);
+  } else {
+    parsedYear = parseInt(parts[0], 10);
+    parsedMonth = parseInt(parts[1], 10);
+    parsedDay = parseInt(parts[2], 10);
+  }
+  if (selectedDateObj.getDate() !== parsedDay || 
+      selectedDateObj.getMonth() + 1 !== parsedMonth || 
+      selectedDateObj.getFullYear() !== parsedYear) {
+    return "Invalid date.";
+  }
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const selectedMidnight = new Date(selectedDateObj);
@@ -1767,6 +1786,12 @@ function validateWorkshopForm(form) {
   const timeStr = (form.time || "").trim();
   if (!timeStr) {
     return "Start Time is required.";
+  }
+
+  const ampmRegex = /^(0?[1-9]|1[0-2]):[0-5][0-9]\s*(AM|PM|am|pm)$/;
+  const militaryRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+  if (!ampmRegex.test(timeStr) && !militaryRegex.test(timeStr)) {
+    return "Start time must be in HH:MM AM/PM format.";
   }
 
   const parseTimeInput = (tStr) => {
