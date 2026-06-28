@@ -83,56 +83,22 @@ function downloadAlexFont() {
     });
 }
 
-function downloadHerrFont() {
-    if (cachedHerrFontPath && fs.existsSync(cachedHerrFontPath)) {
-        return Promise.resolve(cachedHerrFontPath);
+let cachedQaskinFontPath = null;
+
+function loadQaskinFont() {
+    if (cachedQaskinFontPath && fs.existsSync(cachedQaskinFontPath)) {
+        return Promise.resolve(cachedQaskinFontPath);
     }
     const fontDir = path.join(__dirname, '../assets');
-    if (!fs.existsSync(fontDir)) {
-        fs.mkdirSync(fontDir, { recursive: true });
-    }
-    const fontPath = path.join(fontDir, 'HerrVonMuellerhoff-Regular.ttf');
+    const fontPath = path.join(fontDir, 'Qaskin.ttf');
+    
     if (fs.existsSync(fontPath)) {
-        try {
-            const stat = fs.statSync(fontPath);
-            if (stat.size > 1000) {
-                cachedHerrFontPath = fontPath;
-                return Promise.resolve(fontPath);
-            } else {
-                fs.unlinkSync(fontPath);
-            }
-        } catch (e) {
-            fs.unlinkSync(fontPath);
-        }
+        cachedQaskinFontPath = fontPath;
+        return Promise.resolve(fontPath);
+    } else {
+        console.warn(`[pdfGenerator] Qaskin.ttf not found in ${fontDir}.`);
+        return Promise.resolve(null);
     }
-    return new Promise((resolve) => {
-        console.log('Tapovana Certificate: Downloading Herr Von Muellerhoff font...');
-        const url = 'https://github.com/google/fonts/raw/main/ofl/herrvonmuellerhoff/HerrVonMuellerhoff-Regular.ttf';
-        const file = fs.createWriteStream(fontPath);
-        const download = (targetUrl) => {
-            https.get(targetUrl, (response) => {
-                if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-                    download(response.headers.location);
-                } else if (response.statusCode === 200) {
-                    response.pipe(file);
-                    file.on('finish', () => {
-                        file.close();
-                        cachedHerrFontPath = fontPath;
-                        resolve(fontPath);
-                    });
-                } else {
-                    file.close();
-                    fs.unlink(fontPath, () => {});
-                    resolve(null);
-                }
-            }).on('error', (err) => {
-                file.close();
-                fs.unlink(fontPath, () => {});
-                resolve(null);
-            });
-        };
-        download(url);
-    });
 }
 
 /**
@@ -274,12 +240,12 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
 
             // Ensure fonts are downloaded and ready
             let alexFontPath = null;
-            let herrFontPath = null;
+            let qaskinFontPath = null;
             try {
                 alexFontPath = await downloadAlexFont();
-                herrFontPath = await downloadHerrFont();
+                qaskinFontPath = await loadQaskinFont();
             } catch (err) {
-                console.warn('Failed to check or download cursive fonts:', err);
+                console.warn('Failed to check or load cursive fonts:', err);
             }
 
             // ── 1. BACKGROUND ──────────────────────────────────────────────────
@@ -483,22 +449,22 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             // Fallback cursive signature text if image not drawn
             if (!signatureDrawn) {
                 const signatureText = conductorName || 'Workshop Instructor';
-                if (herrFontPath) {
+                if (qaskinFontPath) {
                     try {
                         const len = signatureText.length;
-                        let fontSize = 47;
-                        if (len <= 10) fontSize = 47;
-                        else if (len <= 18) fontSize = 38;
-                        else if (len <= 26) fontSize = 28;
-                        else fontSize = 20;
+                        let fontSize = 40;
+                        if (len <= 10) fontSize = 40;
+                        else if (len <= 18) fontSize = 30;
+                        else if (len <= 26) fontSize = 22;
+                        else fontSize = 17;
 
-                        doc.font(herrFontPath)
+                        doc.font(qaskinFontPath)
                            .fontSize(fontSize)
                            .fillColor(bodyColor)
                            .text(signatureText, 551.89, sigY + 5, { width: 200, align: 'center' });
                         signatureDrawn = true;
                     } catch (fontErr) {
-                        console.warn('Failed to render loaded cursive font:', fontErr);
+                        console.warn('Failed to render loaded Qaskin font:', fontErr);
                     }
                 }
                 if (!signatureDrawn) {
