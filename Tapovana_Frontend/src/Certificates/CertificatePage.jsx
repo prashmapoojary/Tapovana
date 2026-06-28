@@ -25,10 +25,10 @@ const CertificatePage = () => {
 
   const getSignatureFontSize = (name) => {
     const len = (name || "").length;
-    if (len <= 10) return "3.6rem";
-    if (len <= 18) return "3.0rem";
-    if (len <= 26) return "2.3rem";
-    return "1.6rem";
+    if (len <= 10) return "2.6rem";
+    if (len <= 18) return "2rem";
+    if (len <= 26) return "1.5rem";
+    return "1.2rem";
   };
 
   useEffect(() => {
@@ -248,7 +248,7 @@ const CertificatePage = () => {
 
               {/* Right: Signature and Conductor Name */}
               <div className="cert-footer-col col-right">
-                <div 
+                <div
                   className="footer-value-text cursive-sig"
                   style={{ fontSize: getSignatureFontSize(certData.instructorName) }}
                 >
@@ -265,9 +265,9 @@ const CertificatePage = () => {
           <p className="validation-note">
             ✓ official tapovana verified certificate. secure and authentic.
           </p>
-          <button 
-            className="certificate-download-btn" 
-            onClick={handleDownload} 
+          <button
+            className="certificate-download-btn"
+            onClick={handleDownload}
             disabled={loadingDownload}
             style={{ opacity: loadingDownload ? 0.7 : 1 }}
           >
@@ -280,18 +280,18 @@ const CertificatePage = () => {
           <div className="toast-content">
             <span className="toast-text">{toast.message}</span>
             {toast.linkUrl && (
-              <a 
-                href={toast.linkUrl} 
-                target="_blank" 
-                rel="noreferrer" 
+              <a
+                href={toast.linkUrl}
+                target="_blank"
+                rel="noreferrer"
                 className="toast-open-link"
               >
                 click here to open
               </a>
             )}
           </div>
-          <button 
-            className="toast-close-btn" 
+          <button
+            className="toast-close-btn"
             onClick={() => setToast(prev => ({ ...prev, show: false }))}
           >
             ✕
