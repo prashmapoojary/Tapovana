@@ -809,7 +809,7 @@ export default function VedicLifePrograms() {
         setPhoneError("");
         setShowManualEnroll(false);
         await fetchPrograms();
-        setSelectedProgram(prev => ({ ...prev, enrolled: (prev.enrolled || 0) + 1 }));
+        setSelectedProgram(prev => prev ? ({ ...prev, enrolled: (prev.enrolled || 0) + 1 }) : null);
         await fetchAttendees(selectedProgram.id);
       } else {
         throw new Error(res.message || "Enrollment failed.");
@@ -832,7 +832,7 @@ export default function VedicLifePrograms() {
         triggerAlert("Attendee removed successfully!", true);
         setAttendees(res.attendees || []);
         await fetchPrograms();
-        setSelectedProgram(prev => ({ ...prev, enrolled: Math.max(0, (prev.enrolled || 0) - 1) }));
+        setSelectedProgram(prev => prev ? ({ ...prev, enrolled: Math.max(0, (prev.enrolled || 0) - 1) }) : null);
       } else {
         throw new Error(res.message || "Failed to delete attendee.");
       }

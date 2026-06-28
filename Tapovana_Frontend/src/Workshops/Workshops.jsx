@@ -10,6 +10,7 @@ import MediaPickerModal from "../components/MediaPickerModal";
 
 // ─── Live status checker ─────────────────────────────────────────────
 const getLiveStatus = (ws) => {
+  if (!ws) return "unknown";
   const statusLower = String(ws.status || "").toLowerCase();
   if (statusLower === "completed" || statusLower === "cancelled") return "completed";
   const now = new Date();
@@ -482,7 +483,7 @@ export default function Workshops() {
         setShowManualEnroll(false);
         fetchAttendees(selectedWs.id);
         fetchWorkshops();
-        setSelectedWs(prev => ({ ...prev, enrolled: (prev.enrolled || 0) + 1 }));
+        setSelectedWs(prev => prev ? ({ ...prev, enrolled: (prev.enrolled || 0) + 1 }) : null);
       } else {
         throw new Error(res.message || "Enrollment failed.");
       }
@@ -494,6 +495,7 @@ export default function Workshops() {
   };
 
   const handleMarkAttendance = async (attendeeId, status) => {
+    if (!selectedWs) return;
     const isCompleted = getLiveStatus(selectedWs) === "completed";
     if (!isCompleted && (status === "attended" || status === "absent")) {
       triggerAlert("Cannot mark attendance before the workshop is completed.", false);
@@ -533,7 +535,7 @@ export default function Workshops() {
         triggerAlert("Attendee deleted successfully.", true);
         setAttendees(res.attendees || []);
         fetchWorkshops();
-        setSelectedWs(prev => ({ ...prev, enrolled: Math.max(0, (prev.enrolled || 0) - 1) }));
+        setSelectedWs(prev => prev ? ({ ...prev, enrolled: Math.max(0, (prev.enrolled || 0) - 1) }) : null);
       } else {
         throw new Error(res.message || "Failed to delete attendee.");
       }
@@ -801,6 +803,7 @@ export default function Workshops() {
 
   // ─── Delete Workshop ───────────────────────────────────────────────────
   const handleDeleteWorkshop = () => {
+    if (!selectedWs) return;
     const liveStatus = selectedWs._liveStatus || getLiveStatus(selectedWs);
     if (liveStatus === "live" || liveStatus === "ongoing") {
       triggerAlert("Cannot delete a live/ongoing workshop.", false);
@@ -814,6 +817,7 @@ export default function Workshops() {
   };
 
   const confirmDeleteWorkshop = async () => {
+    if (!selectedWs) return;
     try {
       setShowDeleteConfirm(false);
       setEditSaving(true);
