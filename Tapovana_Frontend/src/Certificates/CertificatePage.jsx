@@ -25,10 +25,10 @@ const CertificatePage = () => {
 
   const getSignatureFontSize = (name) => {
     const len = (name || "").length;
-    if (len <= 10) return "1.8rem";
-    if (len <= 18) return "1.4rem";
-    if (len <= 26) return "1.1rem";
-    return "0.9rem";
+    if (len <= 10) return "2.2rem";
+    if (len <= 18) return "1.7rem";
+    if (len <= 26) return "1.3rem";
+    return "1.0rem";
   };
 
   useEffect(() => {

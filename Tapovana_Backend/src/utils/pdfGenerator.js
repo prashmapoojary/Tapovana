@@ -452,11 +452,11 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                 if (tanyaHatiFontPath) {
                     try {
                         const len = signatureText.length;
-                        let fontSize = 28;
-                        if (len <= 10) fontSize = 28;
-                        else if (len <= 18) fontSize = 21;
-                        else if (len <= 26) fontSize = 16;
-                        else fontSize = 12;
+                        let fontSize = 35;
+                        if (len <= 10) fontSize = 35;
+                        else if (len <= 18) fontSize = 27;
+                        else if (len <= 26) fontSize = 21;
+                        else fontSize = 16;
 
                         doc.font(tanyaHatiFontPath)
                            .fontSize(fontSize)

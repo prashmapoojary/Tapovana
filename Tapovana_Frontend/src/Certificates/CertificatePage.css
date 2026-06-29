@@ -209,15 +209,17 @@
 
 .cursive-sig {
   font-family: 'Tanya Hati', cursive;
-  line-height: 1.1;
+  line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: block;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   height: 55px;
   width: 100%;
   box-sizing: border-box;
-  padding-top: 10px; /* Shift text down closer to the line */
+  padding-bottom: 4px; /* Space between the signature baseline and the line */
 }
 
 /* Divider lines */
