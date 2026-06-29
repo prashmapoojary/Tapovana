@@ -44,6 +44,28 @@ const CertificatePage = () => {
     return import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
   };
 
+  const [sigSvgContent, setSigSvgContent] = useState("");
+
+  useEffect(() => {
+    if (certData.signatureImage && certData.signatureImage.endsWith(".svg")) {
+      const fetchSigSvg = async () => {
+        try {
+          const apiBase = getApiBase();
+          const response = await fetch(`${apiBase}${certData.signatureImage}`);
+          if (response.ok) {
+            const svgText = await response.text();
+            setSigSvgContent(svgText);
+          }
+        } catch (err) {
+          console.warn("Failed to fetch signature SVG content:", err);
+        }
+      };
+      fetchSigSvg();
+    } else {
+      setSigSvgContent("");
+    }
+  }, [certData.signatureImage]);
+
   useEffect(() => {
 
     if (certificateId) {
@@ -251,7 +273,12 @@ const CertificatePage = () => {
               {/* Right: Signature and Conductor Name */}
               <div className="cert-footer-col col-right">
                 <div className="footer-value-text">
-                  {certData.signatureImage ? (
+                  {sigSvgContent ? (
+                    <div
+                      className="instructor-sig-svg-container"
+                      dangerouslySetInnerHTML={{ __html: sigSvgContent }}
+                    />
+                  ) : certData.signatureImage ? (
                     <img
                       src={certData.signatureImage.startsWith("data:") ? certData.signatureImage : `${getApiBase()}${certData.signatureImage}`}
                       alt="Instructor Signature"
