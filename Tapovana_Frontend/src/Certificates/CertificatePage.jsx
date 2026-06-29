@@ -31,19 +31,20 @@ const CertificatePage = () => {
     return "1.0rem";
   };
 
+  const getApiBase = () => {
+    const hostname = window.location.hostname;
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      /^192\.168\./.test(hostname) ||
+      /^10\./.test(hostname)
+    ) {
+      return `http://${hostname}:5000`;
+    }
+    return import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
+  };
+
   useEffect(() => {
-    const getApiBase = () => {
-      const hostname = window.location.hostname;
-      if (
-        hostname === "localhost" ||
-        hostname === "127.0.0.1" ||
-        /^192\.168\./.test(hostname) ||
-        /^10\./.test(hostname)
-      ) {
-        return `http://${hostname}:5000`;
-      }
-      return import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
-    };
 
     if (certificateId) {
       const fetchCertificate = async () => {
