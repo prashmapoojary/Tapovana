@@ -83,20 +83,20 @@ function downloadAlexFont() {
     });
 }
 
-let cachedTanyaHatiFontPath = null;
+let cachedHathamaFontPath = null;
 
-function loadTanyaHatiFont() {
-    if (cachedTanyaHatiFontPath && fs.existsSync(cachedTanyaHatiFontPath)) {
-        return Promise.resolve(cachedTanyaHatiFontPath);
+function loadHathamaFont() {
+    if (cachedHathamaFontPath && fs.existsSync(cachedHathamaFontPath)) {
+        return Promise.resolve(cachedHathamaFontPath);
     }
     const fontDir = path.join(__dirname, '../assets');
-    const fontPath = path.join(fontDir, 'TanyaHati.ttf');
+    const fontPath = path.join(fontDir, 'Hathama.otf');
     
     if (fs.existsSync(fontPath)) {
-        cachedTanyaHatiFontPath = fontPath;
+        cachedHathamaFontPath = fontPath;
         return Promise.resolve(fontPath);
     } else {
-        console.warn(`[pdfGenerator] TanyaHati.ttf not found in ${fontDir}.`);
+        console.warn(`[pdfGenerator] Hathama.otf not found in ${fontDir}.`);
         return Promise.resolve(null);
     }
 }
@@ -240,10 +240,10 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
 
             // Ensure fonts are downloaded and ready
             let alexFontPath = null;
-            let tanyaHatiFontPath = null;
+            let hathamaFontPath = null;
             try {
                 alexFontPath = await downloadAlexFont();
-                tanyaHatiFontPath = await loadTanyaHatiFont();
+                hathamaFontPath = await loadHathamaFont();
             } catch (err) {
                 console.warn('Failed to check or load cursive fonts:', err);
             }
@@ -410,69 +410,33 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                .stroke();
             doc.restore();
 
-            // Signature Graphic placement (drawn above the line)
-            let signatureDrawn = false;
-            const sigWidth = 195;
-            const sigX = 551.89 + (200 - sigWidth) / 2;
             const sigY = lineY - 55;
 
-            if (signatureImage && typeof signatureImage === 'string') {
+            // Always render signature as dynamic text using the Hathama font
+            const signatureText = conductorName || 'Workshop Instructor';
+            if (hathamaFontPath) {
                 try {
-                    if (signatureImage.startsWith('data:image/')) {
-                        const matches = signatureImage.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
-                        if (matches && matches.length === 3) {
-                            const buffer = Buffer.from(matches[2], 'base64');
-                            doc.image(buffer, sigX, sigY, { width: sigWidth, height: 52 });
-                            signatureDrawn = true;
-                        }
-                    } else if (signatureImage.startsWith('/') || /^[a-zA-Z]:[\\/]/i.test(signatureImage)) {
-                        const resolvedPath = path.isAbsolute(signatureImage) 
-                            ? signatureImage 
-                            : path.join(__dirname, '../../', signatureImage);
-                        if (fs.existsSync(resolvedPath)) {
-                            doc.image(resolvedPath, sigX, sigY, { width: sigWidth, height: 52 });
-                            signatureDrawn = true;
-                        }
-                    } else {
-                        // Fallback checking in uploads directory
-                        const uploadsPath = path.join(__dirname, '../../uploads', signatureImage);
-                        if (fs.existsSync(uploadsPath)) {
-                            doc.image(uploadsPath, sigX, sigY, { width: sigWidth, height: 52 });
-                            signatureDrawn = true;
-                        }
-                    }
-                } catch (sigErr) {
-                    console.warn('Failed to draw signature image, falling back to cursive text:', sigErr);
+                    const len = signatureText.length;
+                    let fontSize = 38;
+                    if (len <= 10) fontSize = 38;
+                    else if (len <= 18) fontSize = 29;
+                    else if (len <= 26) fontSize = 22;
+                    else fontSize = 17;
+
+                    doc.font(hathamaFontPath)
+                       .fontSize(fontSize)
+                       .fillColor(bodyColor)
+                       .text(signatureText, 551.89, sigY + 5, { width: 200, align: 'center' });
+                    signatureDrawn = true;
+                } catch (fontErr) {
+                    console.warn('Failed to render loaded Hathama font:', fontErr);
                 }
             }
-
-            // Fallback cursive signature text if image not drawn
             if (!signatureDrawn) {
-                const signatureText = conductorName || 'Workshop Instructor';
-                if (tanyaHatiFontPath) {
-                    try {
-                        const len = signatureText.length;
-                        let fontSize = 35;
-                        if (len <= 10) fontSize = 35;
-                        else if (len <= 18) fontSize = 27;
-                        else if (len <= 26) fontSize = 21;
-                        else fontSize = 16;
-
-                        doc.font(tanyaHatiFontPath)
-                           .fontSize(fontSize)
-                           .fillColor(bodyColor)
-                           .text(signatureText, 551.89, sigY + 5, { width: 200, align: 'center' });
-                        signatureDrawn = true;
-                    } catch (fontErr) {
-                        console.warn('Failed to render loaded Tanya Hati font:', fontErr);
-                    }
-                }
-                if (!signatureDrawn) {
-                    doc.font('Times-BoldItalic')
-                       .fontSize(32)
-                       .fillColor(bodyColor)
-                       .text(signatureText, 551.89, sigY + 10, { width: 200, align: 'center' });
-                }
+                doc.font('Times-BoldItalic')
+                   .fontSize(32)
+                   .fillColor(bodyColor)
+                   .text(signatureText, 551.89, sigY + 10, { width: 200, align: 'center' });
             }
 
             doc.font('Times-Italic')

@@ -25,10 +25,10 @@ const CertificatePage = () => {
 
   const getSignatureFontSize = (name) => {
     const len = (name || "").length;
-    if (len <= 10) return "2.2rem";
-    if (len <= 18) return "1.7rem";
-    if (len <= 26) return "1.3rem";
-    return "1.0rem";
+    if (len <= 10) return "2.4rem";
+    if (len <= 18) return "1.8rem";
+    if (len <= 26) return "1.4rem";
+    return "1.1rem";
   };
 
   const getApiBase = () => {
@@ -43,28 +43,6 @@ const CertificatePage = () => {
     }
     return import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
   };
-
-  const [sigSvgContent, setSigSvgContent] = useState("");
-
-  useEffect(() => {
-    if (certData.signatureImage && certData.signatureImage.endsWith(".svg")) {
-      const fetchSigSvg = async () => {
-        try {
-          const apiBase = getApiBase();
-          const response = await fetch(`${apiBase}${certData.signatureImage}`);
-          if (response.ok) {
-            const svgText = await response.text();
-            setSigSvgContent(svgText);
-          }
-        } catch (err) {
-          console.warn("Failed to fetch signature SVG content:", err);
-        }
-      };
-      fetchSigSvg();
-    } else {
-      setSigSvgContent("");
-    }
-  }, [certData.signatureImage]);
 
   useEffect(() => {
 
@@ -273,25 +251,12 @@ const CertificatePage = () => {
               {/* Right: Signature and Conductor Name */}
               <div className="cert-footer-col col-right">
                 <div className="footer-value-text">
-                  {sigSvgContent ? (
-                    <div
-                      className="instructor-sig-svg-container"
-                      dangerouslySetInnerHTML={{ __html: sigSvgContent }}
-                    />
-                  ) : certData.signatureImage ? (
-                    <img
-                      src={certData.signatureImage.startsWith("data:") ? certData.signatureImage : `${getApiBase()}${certData.signatureImage}`}
-                      alt="Instructor Signature"
-                      className="instructor-sig-img"
-                    />
-                  ) : (
-                    <span
-                      className="cursive-sig"
-                      style={{ fontSize: getSignatureFontSize(certData.instructorName) }}
-                    >
-                      {certData.instructorName}
-                    </span>
-                  )}
+                  <span
+                    className="cursive-sig"
+                    style={{ fontSize: getSignatureFontSize(certData.instructorName) }}
+                  >
+                    {certData.instructorName}
+                  </span>
                 </div>
                 <div className="footer-value-divider"></div>
                 <div className="footer-label-text">Workshop Instructor</div>
