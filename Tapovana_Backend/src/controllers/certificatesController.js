@@ -261,11 +261,9 @@ const getPublicCertificateDetails = async (req, res) => {
     const { certificateId } = req.params;
     try {
         const certRes = await query(`
-            SELECT c.certificate_id, c.participant_name, c.workshop_name, c.completion_date, 
-                   w.instructor AS instructor_name, tm.signature_image
+            SELECT c.certificate_id, c.participant_name, c.workshop_name, c.completion_date, w.instructor AS instructor_name
             FROM certificates c
             JOIN workshops w ON w.id = c.workshop_id
-            LEFT JOIN team_members tm ON tm.id = w.instructor_id
             WHERE c.certificate_id = $1 OR c.id::text = $1 OR c.participant_id::text = $1
         `, [certificateId]);
 

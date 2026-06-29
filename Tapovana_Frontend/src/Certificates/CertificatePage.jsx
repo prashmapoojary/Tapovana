@@ -25,26 +25,25 @@ const CertificatePage = () => {
 
   const getSignatureFontSize = (name) => {
     const len = (name || "").length;
-    if (len <= 10) return "2.4rem";
-    if (len <= 18) return "1.8rem";
-    if (len <= 26) return "1.4rem";
-    return "1.1rem";
-  };
-
-  const getApiBase = () => {
-    const hostname = window.location.hostname;
-    if (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      /^192\.168\./.test(hostname) ||
-      /^10\./.test(hostname)
-    ) {
-      return `http://${hostname}:5000`;
-    }
-    return import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
+    if (len <= 10) return "1.2rem";
+    if (len <= 18) return "1rem";
+    if (len <= 26) return "0.8rem";
+    return "0.9rem";
   };
 
   useEffect(() => {
+    const getApiBase = () => {
+      const hostname = window.location.hostname;
+      if (
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        /^192\.168\./.test(hostname) ||
+        /^10\./.test(hostname)
+      ) {
+        return `http://${hostname}:5000`;
+      }
+      return import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
+    };
 
     if (certificateId) {
       const fetchCertificate = async () => {
@@ -78,8 +77,7 @@ const CertificatePage = () => {
               workshopTitle: cert.workshop_name,
               completionDate: formattedDate,
               instructorName: cert.instructor_name || "Workshop Instructor",
-              certificateId: cert.certificate_id,
-              signatureImage: cert.signature_image
+              certificateId: cert.certificate_id
             });
             return;
           } else {
@@ -250,13 +248,11 @@ const CertificatePage = () => {
 
               {/* Right: Signature and Conductor Name */}
               <div className="cert-footer-col col-right">
-                <div className="footer-value-text">
-                  <span
-                    className="cursive-sig"
-                    style={{ fontSize: getSignatureFontSize(certData.instructorName) }}
-                  >
-                    {certData.instructorName}
-                  </span>
+                <div
+                  className="footer-value-text cursive-sig"
+                  style={{ fontSize: getSignatureFontSize(certData.instructorName) }}
+                >
+                  {certData.instructorName}
                 </div>
                 <div className="footer-value-divider"></div>
                 <div className="footer-label-text">Workshop Instructor</div>

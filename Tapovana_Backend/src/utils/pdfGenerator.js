@@ -5,7 +5,6 @@ const https = require('https');
 
 let cachedLogoBuffer = null;
 let cachedFontPath = null;
-let cachedAlexFontPath = null;
 
 /**
  * Fetch local logo image buffer. Caches buffer in memory to keep subsequent generation calls fast.
@@ -84,20 +83,20 @@ function downloadAlexFont() {
     });
 }
 
-let cachedHathamaFontPath = null;
+let cachedQaskinFontPath = null;
 
-function loadHathamaFont() {
-    if (cachedHathamaFontPath && fs.existsSync(cachedHathamaFontPath)) {
-        return Promise.resolve(cachedHathamaFontPath);
+function loadQaskinFont() {
+    if (cachedQaskinFontPath && fs.existsSync(cachedQaskinFontPath)) {
+        return Promise.resolve(cachedQaskinFontPath);
     }
     const fontDir = path.join(__dirname, '../assets');
-    const fontPath = path.join(fontDir, 'Hathama.otf');
+    const fontPath = path.join(fontDir, 'Qaskin.ttf');
     
     if (fs.existsSync(fontPath)) {
-        cachedHathamaFontPath = fontPath;
+        cachedQaskinFontPath = fontPath;
         return Promise.resolve(fontPath);
     } else {
-        console.warn(`[pdfGenerator] Hathama.otf not found in ${fontDir}.`);
+        console.warn(`[pdfGenerator] Qaskin.ttf not found in ${fontDir}.`);
         return Promise.resolve(null);
     }
 }
@@ -241,10 +240,10 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
 
             // Ensure fonts are downloaded and ready
             let alexFontPath = null;
-            let hathamaFontPath = null;
+            let qaskinFontPath = null;
             try {
                 alexFontPath = await downloadAlexFont();
-                hathamaFontPath = await loadHathamaFont();
+                qaskinFontPath = await loadQaskinFont();
             } catch (err) {
                 console.warn('Failed to check or load cursive fonts:', err);
             }
@@ -411,34 +410,69 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                .stroke();
             doc.restore();
 
+            // Signature Graphic placement (drawn above the line)
+            let signatureDrawn = false;
+            const sigWidth = 195;
+            const sigX = 551.89 + (200 - sigWidth) / 2;
             const sigY = lineY - 55;
 
-            // Always render signature as dynamic text using the Hathama font
-            const signatureText = conductorName || 'Workshop Instructor';
-            let signatureDrawn = false;
-            if (hathamaFontPath) {
+            if (signatureImage && typeof signatureImage === 'string') {
                 try {
-                    const len = signatureText.length;
-                    let fontSize = 38;
-                    if (len <= 10) fontSize = 38;
-                    else if (len <= 18) fontSize = 29;
-                    else if (len <= 26) fontSize = 22;
-                    else fontSize = 17;
-
-                    doc.font(hathamaFontPath)
-                       .fontSize(fontSize)
-                       .fillColor(bodyColor)
-                       .text(signatureText, 551.89, sigY + 5, { width: 200, align: 'center' });
-                    signatureDrawn = true;
-                } catch (fontErr) {
-                    console.warn('Failed to render loaded Hathama font:', fontErr);
+                    if (signatureImage.startsWith('data:image/')) {
+                        const matches = signatureImage.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
+                        if (matches && matches.length === 3) {
+                            const buffer = Buffer.from(matches[2], 'base64');
+                            doc.image(buffer, sigX, sigY, { width: sigWidth, height: 52 });
+                            signatureDrawn = true;
+                        }
+                    } else if (signatureImage.startsWith('/') || /^[a-zA-Z]:[\\/]/i.test(signatureImage)) {
+                        const resolvedPath = path.isAbsolute(signatureImage) 
+                            ? signatureImage 
+                            : path.join(__dirname, '../../', signatureImage);
+                        if (fs.existsSync(resolvedPath)) {
+                            doc.image(resolvedPath, sigX, sigY, { width: sigWidth, height: 52 });
+                            signatureDrawn = true;
+                        }
+                    } else {
+                        // Fallback checking in uploads directory
+                        const uploadsPath = path.join(__dirname, '../../uploads', signatureImage);
+                        if (fs.existsSync(uploadsPath)) {
+                            doc.image(uploadsPath, sigX, sigY, { width: sigWidth, height: 52 });
+                            signatureDrawn = true;
+                        }
+                    }
+                } catch (sigErr) {
+                    console.warn('Failed to draw signature image, falling back to cursive text:', sigErr);
                 }
             }
+
+            // Fallback cursive signature text if image not drawn
             if (!signatureDrawn) {
-                doc.font('Times-BoldItalic')
-                   .fontSize(32)
-                   .fillColor(bodyColor)
-                   .text(signatureText, 551.89, sigY + 10, { width: 200, align: 'center' });
+                const signatureText = conductorName || 'Workshop Instructor';
+                if (qaskinFontPath) {
+                    try {
+                        const len = signatureText.length;
+                        let fontSize = 32;
+                        if (len <= 10) fontSize = 32;
+                        else if (len <= 18) fontSize = 24;
+                        else if (len <= 26) fontSize = 18;
+                        else fontSize = 14;
+
+                        doc.font(qaskinFontPath)
+                           .fontSize(fontSize)
+                           .fillColor(bodyColor)
+                           .text(signatureText, 551.89, sigY + 5, { width: 200, align: 'center' });
+                        signatureDrawn = true;
+                    } catch (fontErr) {
+                        console.warn('Failed to render loaded Qaskin font:', fontErr);
+                    }
+                }
+                if (!signatureDrawn) {
+                    doc.font('Times-BoldItalic')
+                       .fontSize(32)
+                       .fillColor(bodyColor)
+                       .text(signatureText, 551.89, sigY + 10, { width: 200, align: 'center' });
+                }
             }
 
             doc.font('Times-Italic')

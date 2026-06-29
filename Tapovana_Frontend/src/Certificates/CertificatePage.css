@@ -1,8 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Montserrat:wght@300;400;500;600;700&display=swap');
 
 @font-face {
-  font-family: 'Hathama';
-  src: url('../assets/fonts/Hathama.otf') format('opentype');
+  font-family: 'Qaskin';
+  src: url('../assets/fonts/Qaskin.ttf') format('truetype');
   font-display: swap;
 }
 
@@ -199,38 +199,25 @@
   color: #090705;
   text-align: center;
   margin-bottom: 6px;
-  height: 55px;
-  /* Increased to accommodate taller signature font sizes */
+  height: 55px; /* Increased to accommodate taller signature font sizes */
   display: flex;
-  align-items: flex-end;
-  /* Align bottom edge right above the divider line */
+  align-items: flex-end; /* Align bottom edge right above the divider line */
   justify-content: center;
   white-space: nowrap;
   box-sizing: border-box;
 }
 
 .cursive-sig {
-  font-family: 'Hathama', cursive;
-  line-height: 1;
+  font-family: 'Qaskin', cursive;
+  line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  display: block;
   height: 55px;
   width: 100%;
   box-sizing: border-box;
-  padding-bottom: 4px;
-  /* Space between the signature baseline and the line */
-}
-
-.instructor-sig-img {
-  max-height: 48px;
-  max-width: 100%;
-  object-fit: contain;
-  mix-blend-mode: multiply;
-  padding-bottom: 2px;
+  padding-top: 10px; /* Shift text down closer to the line */
 }
 
 /* Divider lines */
