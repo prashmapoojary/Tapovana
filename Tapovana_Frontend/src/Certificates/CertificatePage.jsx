@@ -25,9 +25,9 @@ const CertificatePage = () => {
 
   const getSignatureFontSize = (name) => {
     const len = (name || "").length;
-    if (len <= 10) return "1.6rem";
-    if (len <= 18) return "1.1rem";
-    if (len <= 26) return "1rem";
+    if (len <= 10) return "1.2rem";
+    if (len <= 18) return "1rem";
+    if (len <= 26) return "0.8rem";
     return "0.9rem";
   };
 

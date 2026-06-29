@@ -1,8 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Montserrat:wght@300;400;500;600;700&display=swap');
 
 @font-face {
-  font-family: 'Autography';
-  src: url('../assets/fonts/Autography.otf') format('opentype');
+  font-family: 'Qaskin';
+  src: url('../assets/fonts/Qaskin.ttf') format('truetype');
   font-display: swap;
 }
 
@@ -105,7 +105,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: 1.5rem; /* Increased margin-top to bring attendee name slightly down */
+  margin-top: 0.5rem;
   margin-bottom: 1.2rem;
 }
 
@@ -208,7 +208,7 @@
 }
 
 .cursive-sig {
-  font-family: 'Autography', cursive;
+  font-family: 'Qaskin', cursive;
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;

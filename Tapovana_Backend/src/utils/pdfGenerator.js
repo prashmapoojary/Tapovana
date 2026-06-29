@@ -83,20 +83,20 @@ function downloadAlexFont() {
     });
 }
 
-let cachedAutographyFontPath = null;
+let cachedQaskinFontPath = null;
 
-function loadAutographyFont() {
-    if (cachedAutographyFontPath && fs.existsSync(cachedAutographyFontPath)) {
-        return Promise.resolve(cachedAutographyFontPath);
+function loadQaskinFont() {
+    if (cachedQaskinFontPath && fs.existsSync(cachedQaskinFontPath)) {
+        return Promise.resolve(cachedQaskinFontPath);
     }
     const fontDir = path.join(__dirname, '../assets');
-    const fontPath = path.join(fontDir, 'Autography.otf');
+    const fontPath = path.join(fontDir, 'Qaskin.ttf');
     
     if (fs.existsSync(fontPath)) {
-        cachedAutographyFontPath = fontPath;
+        cachedQaskinFontPath = fontPath;
         return Promise.resolve(fontPath);
     } else {
-        console.warn(`[pdfGenerator] Autography.otf not found in ${fontDir}.`);
+        console.warn(`[pdfGenerator] Qaskin.ttf not found in ${fontDir}.`);
         return Promise.resolve(null);
     }
 }
@@ -240,10 +240,10 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
 
             // Ensure fonts are downloaded and ready
             let alexFontPath = null;
-            let autographyFontPath = null;
+            let qaskinFontPath = null;
             try {
                 alexFontPath = await downloadAlexFont();
-                autographyFontPath = await loadAutographyFont();
+                qaskinFontPath = await loadQaskinFont();
             } catch (err) {
                 console.warn('Failed to check or load cursive fonts:', err);
             }
@@ -302,7 +302,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                .text('This is to certify that', 50, certifyY, { width: width - 100, align: 'center' });
 
             // ── 8. ATTENDEE NAME (cursive, large) ───────────────────────────────
-            const nameY = certifyY + 52; // Shifted down to bring attendee name slightly down
+            const nameY = certifyY + 36;
             let nameDrawn = false;
             if (alexFontPath) {
                 try {
@@ -344,7 +344,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             }
 
             // ── 10. "has successfully completed" (italic serif) ─────────────────
-            const completedY = nameUnderlineY + 20; // Adjusted to keep it in the exact same position as before
+            const completedY = nameUnderlineY + 36;
             doc.font('Times-Italic')
                .fontSize(20)
                .fillColor(bodyColor)
@@ -449,7 +449,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             // Fallback cursive signature text if image not drawn
             if (!signatureDrawn) {
                 const signatureText = conductorName || 'Workshop Instructor';
-                if (autographyFontPath) {
+                if (qaskinFontPath) {
                     try {
                         const len = signatureText.length;
                         let fontSize = 32;
@@ -458,13 +458,13 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
                         else if (len <= 26) fontSize = 18;
                         else fontSize = 14;
 
-                        doc.font(autographyFontPath)
+                        doc.font(qaskinFontPath)
                            .fontSize(fontSize)
                            .fillColor(bodyColor)
                            .text(signatureText, 551.89, sigY + 5, { width: 200, align: 'center' });
                         signatureDrawn = true;
                     } catch (fontErr) {
-                        console.warn('Failed to render loaded Autography font:', fontErr);
+                        console.warn('Failed to render loaded Qaskin font:', fontErr);
                     }
                 }
                 if (!signatureDrawn) {
