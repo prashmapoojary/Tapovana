@@ -77,7 +77,8 @@ const CertificatePage = () => {
               workshopTitle: cert.workshop_name,
               completionDate: formattedDate,
               instructorName: cert.instructor_name || "Workshop Instructor",
-              certificateId: cert.certificate_id
+              certificateId: cert.certificate_id,
+              signatureImage: cert.signature_image
             });
             return;
           } else {
@@ -248,11 +249,21 @@ const CertificatePage = () => {
 
               {/* Right: Signature and Conductor Name */}
               <div className="cert-footer-col col-right">
-                <div
-                  className="footer-value-text cursive-sig"
-                  style={{ fontSize: getSignatureFontSize(certData.instructorName) }}
-                >
-                  {certData.instructorName}
+                <div className="footer-value-text">
+                  {certData.signatureImage ? (
+                    <img
+                      src={certData.signatureImage.startsWith("data:") ? certData.signatureImage : `${getApiBase()}${certData.signatureImage}`}
+                      alt="Instructor Signature"
+                      className="instructor-sig-img"
+                    />
+                  ) : (
+                    <span
+                      className="cursive-sig"
+                      style={{ fontSize: getSignatureFontSize(certData.instructorName) }}
+                    >
+                      {certData.instructorName}
+                    </span>
+                  )}
                 </div>
                 <div className="footer-value-divider"></div>
                 <div className="footer-label-text">Workshop Instructor</div>

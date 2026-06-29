@@ -222,6 +222,14 @@
   padding-bottom: 4px; /* Space between the signature baseline and the line */
 }
 
+.instructor-sig-img {
+  max-height: 48px;
+  max-width: 100%;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+  padding-bottom: 2px;
+}
+
 /* Divider lines */
 .footer-value-divider {
   width: 100%;
