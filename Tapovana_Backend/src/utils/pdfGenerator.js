@@ -83,20 +83,20 @@ function downloadAlexFont() {
     });
 }
 
-let cachedQaskinFontPath = null;
+let cachedTanyaHatiFontPath = null;
 
-function loadQaskinFont() {
-    if (cachedQaskinFontPath && fs.existsSync(cachedQaskinFontPath)) {
-        return Promise.resolve(cachedQaskinFontPath);
+function loadTanyaHatiFont() {
+    if (cachedTanyaHatiFontPath && fs.existsSync(cachedTanyaHatiFontPath)) {
+        return Promise.resolve(cachedTanyaHatiFontPath);
     }
     const fontDir = path.join(__dirname, '../assets');
-    const fontPath = path.join(fontDir, 'Qaskin.ttf');
+    const fontPath = path.join(fontDir, 'TanyaHati.ttf');
     
     if (fs.existsSync(fontPath)) {
-        cachedQaskinFontPath = fontPath;
+        cachedTanyaHatiFontPath = fontPath;
         return Promise.resolve(fontPath);
     } else {
-        console.warn(`[pdfGenerator] Qaskin.ttf not found in ${fontDir}.`);
+        console.warn(`[pdfGenerator] TanyaHati.ttf not found in ${fontDir}.`);
         return Promise.resolve(null);
     }
 }
@@ -240,10 +240,10 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
 
             // Ensure fonts are downloaded and ready
             let alexFontPath = null;
-            let qaskinFontPath = null;
+            let tanyaHatiFontPath = null;
             try {
                 alexFontPath = await downloadAlexFont();
-                qaskinFontPath = await loadQaskinFont();
+                tanyaHatiFontPath = await loadTanyaHatiFont();
             } catch (err) {
                 console.warn('Failed to check or load cursive fonts:', err);
             }
@@ -449,22 +449,22 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             // Fallback cursive signature text if image not drawn
             if (!signatureDrawn) {
                 const signatureText = conductorName || 'Workshop Instructor';
-                if (qaskinFontPath) {
+                if (tanyaHatiFontPath) {
                     try {
                         const len = signatureText.length;
-                        let fontSize = 32;
-                        if (len <= 10) fontSize = 32;
-                        else if (len <= 18) fontSize = 24;
-                        else if (len <= 26) fontSize = 18;
-                        else fontSize = 14;
+                        let fontSize = 28;
+                        if (len <= 10) fontSize = 28;
+                        else if (len <= 18) fontSize = 21;
+                        else if (len <= 26) fontSize = 16;
+                        else fontSize = 12;
 
-                        doc.font(qaskinFontPath)
+                        doc.font(tanyaHatiFontPath)
                            .fontSize(fontSize)
                            .fillColor(bodyColor)
                            .text(signatureText, 551.89, sigY + 5, { width: 200, align: 'center' });
                         signatureDrawn = true;
                     } catch (fontErr) {
-                        console.warn('Failed to render loaded Qaskin font:', fontErr);
+                        console.warn('Failed to render loaded Tanya Hati font:', fontErr);
                     }
                 }
                 if (!signatureDrawn) {
