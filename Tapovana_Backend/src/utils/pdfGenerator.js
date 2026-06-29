@@ -5,6 +5,7 @@ const https = require('https');
 
 let cachedLogoBuffer = null;
 let cachedFontPath = null;
+let cachedAlexFontPath = null;
 
 /**
  * Fetch local logo image buffer. Caches buffer in memory to keep subsequent generation calls fast.
@@ -414,6 +415,7 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
 
             // Always render signature as dynamic text using the Hathama font
             const signatureText = conductorName || 'Workshop Instructor';
+            let signatureDrawn = false;
             if (hathamaFontPath) {
                 try {
                     const len = signatureText.length;
