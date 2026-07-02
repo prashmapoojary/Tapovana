@@ -615,8 +615,20 @@ export default function VedicLifePrograms() {
   const [showManualEnroll, setShowManualEnroll] = useState(false);
   const [openActionMenu, setOpenActionMenu] = useState(null);
 
+  // Mobile registrations list state
+  const [mobileMembers, setMobileMembers] = useState([]);
+  const [mobileMembersLoading, setMobileMembersLoading] = useState(false);
+  const [mobileMembersError, setMobileMembersError] = useState("");
+  const [mobileSearch, setMobileSearch] = useState("");
+  const [mobileStatusFilter, setMobileStatusFilter] = useState("ALL");
+  const [mobilePaymentFilter, setMobilePaymentFilter] = useState("ALL");
+  const [openMobileActionMenu, setOpenMobileActionMenu] = useState(null);
+
   useEffect(() => {
-    const handleClickOutside = () => setOpenActionMenu(null);
+    const handleClickOutside = () => {
+      setOpenActionMenu(null);
+      setOpenMobileActionMenu(null);
+    };
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
@@ -707,6 +719,20 @@ export default function VedicLifePrograms() {
     });
   }, [attendees, attendeeSearch, attendeeStatusFilter, attendeePaymentFilter]);
 
+  const filteredMobileMembers = useMemo(() => {
+    return mobileMembers.filter(m => {
+      const matchSearch = !mobileSearch ||
+        (m.name || "").toLowerCase().includes(mobileSearch.toLowerCase()) ||
+        (m.email || "").toLowerCase().includes(mobileSearch.toLowerCase()) ||
+        (m.phone || "").toLowerCase().includes(mobileSearch.toLowerCase());
+      
+      const matchStatus = mobileStatusFilter === "ALL" || (m.status || "").toUpperCase() === mobileStatusFilter.toUpperCase();
+      const matchPayment = mobilePaymentFilter === "ALL" || (m.payment_status || "PENDING").toUpperCase() === mobilePaymentFilter.toUpperCase();
+
+      return matchSearch && matchStatus && matchPayment;
+    });
+  }, [mobileMembers, mobileSearch, mobileStatusFilter, mobilePaymentFilter]);
+
   const fetchAttendees = async (programId) => {
     try {
       setAttendeesLoading(true);
@@ -724,11 +750,83 @@ export default function VedicLifePrograms() {
     }
   };
 
+  const fetchMobileMembers = async (programId) => {
+    try {
+      setMobileMembersLoading(true);
+      setMobileMembersError("");
+      const res = await apiFetch(`/api/vedic-programs/${programId}/packages/members`);
+      if (res.success) {
+        setMobileMembers(res.members || []);
+      } else {
+        throw new Error(res.message || "Failed to load mobile registrations.");
+      }
+    } catch (err) {
+      setMobileMembersError(err.message || "Error loading mobile registrations.");
+    } finally {
+      setMobileMembersLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedProgram && activeDetailTab === "attendees") {
       fetchAttendees(selectedProgram.id);
     }
+    if (selectedProgram && activeDetailTab === "mobileMembers") {
+      fetchMobileMembers(selectedProgram.id);
+    }
   }, [selectedProgram?.id, activeDetailTab]);
+
+  const handleUpdateMobileMemberField = async (memberId, fieldName, value) => {
+    try {
+      const member = mobileMembers.find(m => m.id === memberId);
+      if (!member) return;
+
+      const payload = {
+        name: fieldName === 'name' ? value : member.name,
+        email: fieldName === 'email' ? value : member.email,
+        phone: fieldName === 'phone' ? value : member.phone,
+        status: fieldName === 'status' ? value : member.status,
+        accommodation_type: fieldName === 'accommodation_type' ? value : member.accommodation_type,
+        payment_status: fieldName === 'payment_status' ? value : member.payment_status,
+        checkin_date: fieldName === 'check_in_date' ? value : member.check_in_date,
+        checkout_date: fieldName === 'check_out_date' ? value : member.check_out_date
+      };
+
+      const res = await apiFetch(`/api/vedic-programs/packages/members/${memberId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload)
+      });
+      if (res.success) {
+        triggerAlert("Updated and synced successfully!", true);
+        fetchMobileMembers(selectedProgram.id);
+        fetchPrograms();
+      } else {
+        throw new Error(res.message || "Failed to update mobile member.");
+      }
+    } catch (err) {
+      triggerAlert(err.message || "Error updating mobile member.", false);
+    }
+  };
+
+  const handleDeleteMobileMember = async (memberId) => {
+    if (!window.confirm("Are you sure you want to delete this mobile registration? This will also remove the corresponding Vedic Life attendee and update the enrollment count if synced.")) {
+      return;
+    }
+    try {
+      const res = await apiFetch(`/api/vedic-programs/packages/members/${memberId}`, {
+        method: "DELETE"
+      });
+      if (res.success) {
+        triggerAlert("Mobile registration deleted successfully!", true);
+        fetchMobileMembers(selectedProgram.id);
+        fetchPrograms();
+      } else {
+        throw new Error(res.message || "Failed to delete mobile registration.");
+      }
+    } catch (err) {
+      triggerAlert(err.message || "Error deleting mobile registration.", false);
+    }
+  };
 
   const handleManualEnroll = async () => {
     setManualEnrollError("");
@@ -1162,6 +1260,24 @@ export default function VedicLifePrograms() {
               Attendees ({p.enrolled || 0})
             </button>
           )}
+          {isAdmin && (
+            <button 
+              onClick={() => setActiveDetailTab("mobileMembers")}
+              style={{ 
+                background: "none", 
+                border: "none", 
+                borderBottom: activeDetailTab === "mobileMembers" ? "3px solid #CDA751" : "3px solid transparent", 
+                padding: "10px 4px", 
+                fontSize: "14px", 
+                fontWeight: 600, 
+                color: activeDetailTab === "mobileMembers" ? "#0F172A" : "#64748B", 
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Mobile Registrations
+            </button>
+          )}
         </div>
 
         {activeDetailTab === "info" && (
@@ -1543,6 +1659,205 @@ export default function VedicLifePrograms() {
                                   ))}
                                   <div style={{ borderTop: "1px solid #e2e8f0", margin: "4px 0" }} />
                                   <div onClick={(e) => { e.stopPropagation(); setOpenActionMenu(null); handleDeleteAttendee(a.id); }}
+                                    style={{ padding: "8px 16px", cursor: "pointer", fontSize: "13px", color: "#e74c3c", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px" }}
+                                    onMouseEnter={e => e.currentTarget.style.background = "#fdf2f2"}
+                                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                                    Delete
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeDetailTab === "mobileMembers" && isAdmin && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Header controls for Mobile Members */}
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", flex: 1, minWidth: 300 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 12px", background: "white", flex: 1, minWidth: 180 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                  <input 
+                    type="text" 
+                    placeholder="Search mobile registration..." 
+                    value={mobileSearch} 
+                    onChange={e => setMobileSearch(e.target.value)} 
+                    style={{ border: "none", outline: "none", fontSize: 13, width: "100%", background: "transparent" }}
+                  />
+                </div>
+                <select 
+                  value={mobileStatusFilter} 
+                  onChange={e => setMobileStatusFilter(e.target.value)}
+                  style={{ 
+                    padding: "7px 12px", 
+                    borderRadius: 8, 
+                    border: "1px solid #e2e8f0", 
+                    fontSize: 13, 
+                    outline: "none", 
+                    background: "white",
+                    color: "#4a5568",
+                    cursor: "pointer"
+                  }}
+                >
+                  <option value="ALL">Status: All</option>
+                  <option value="REGISTERED">Registered</option>
+                  <option value="CONFIRMED">Confirmed</option>
+                  <option value="CHECKED_IN">Checked In</option>
+                  <option value="ATTENDED">Attended</option>
+                  <option value="ABSENT">Absent</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </select>
+                <select 
+                  value={mobilePaymentFilter} 
+                  onChange={e => setMobilePaymentFilter(e.target.value)}
+                  style={{ 
+                    padding: "7px 12px", 
+                    borderRadius: 8, 
+                    border: "1px solid #e2e8f0", 
+                    fontSize: 13, 
+                    outline: "none", 
+                    background: "white",
+                    color: "#4a5568",
+                    cursor: "pointer"
+                  }}
+                >
+                  <option value="ALL">Payment: All</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="PAID">Paid</option>
+                  <option value="PARTIALLY_PAID">Partially Paid</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Mobile Members Table */}
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, background: "white", overflowX: "auto" }}>
+              {mobileMembersLoading ? (
+                <div style={{ padding: 30, textAlign: "center", color: "#64748B" }}>Loading mobile registrations...</div>
+              ) : mobileMembersError ? (
+                <div style={{ padding: 30, textAlign: "center", color: "#e74c3c" }}>{mobileMembersError}</div>
+              ) : filteredMobileMembers.length === 0 ? (
+                <div style={{ padding: 40, textAlign: "center", color: "#64748B" }}>
+                  {mobileSearch ? "No mobile registrations match your search." : "No user-side registrations for this program yet."}
+                </div>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", minWidth: "900px" }}>
+                  <thead>
+                    <tr style={{ background: "#f8f9fb", borderBottom: "1px solid #e2e8f0" }}>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Name</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Email</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Phone</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Status</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Accommodation</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Payment Status</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Check-In</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Check-Out</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredMobileMembers.map(m => {
+                      return (
+                        <tr key={m.id} style={{ borderBottom: "1px solid #f1f3f7" }}>
+                          <td style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#2d3748" }}>
+                            <EditableText 
+                              value={m.name} 
+                              placeholder="Name" 
+                              onSave={val => handleUpdateMobileMemberField(m.id, 'name', val)} 
+                            />
+                          </td>
+                          <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>
+                            <EditableText 
+                              value={m.email} 
+                              placeholder="Email" 
+                              onSave={val => handleUpdateMobileMemberField(m.id, 'email', val)} 
+                            />
+                          </td>
+                          <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>
+                            <EditableText 
+                              value={m.phone} 
+                              placeholder="Phone" 
+                              onSave={val => handleUpdateMobileMemberField(m.id, 'phone', val)} 
+                            />
+                          </td>
+                          <td style={{ padding: "10px 16px" }}>
+                            {(() => {
+                              const styles = getAttendeeStatusStyles(m.status);
+                              return (
+                                <span style={{
+                                  padding: "4px 10px",
+                                  borderRadius: "12px",
+                                  fontSize: "11px",
+                                  fontWeight: "700",
+                                  background: styles.bg,
+                                  color: styles.color,
+                                  textTransform: "uppercase",
+                                  display: "inline-block"
+                                }}>
+                                  {(m.status || 'REGISTERED').replace('_', ' ')}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td style={{ padding: "6px 12px", width: "150px" }}>
+                            <EditableText 
+                              value={m.accommodation_type} 
+                              placeholder="Add Accommodation..."
+                              onSave={val => handleUpdateMobileMemberField(m.id, 'accommodation_type', val)} 
+                            />
+                          </td>
+                          <td style={{ padding: "6px 12px" }}>
+                            <EditablePaymentStatus 
+                              value={m.payment_status} 
+                              onSave={val => handleUpdateMobileMemberField(m.id, 'payment_status', val)} 
+                            />
+                          </td>
+                          <td style={{ padding: "6px 12px" }}>
+                            <EditableDate 
+                              value={m.check_in_date} 
+                              onSave={val => handleUpdateMobileMemberField(m.id, 'check_in_date', val)} 
+                            />
+                          </td>
+                          <td style={{ padding: "6px 12px" }}>
+                            <EditableDate 
+                              value={m.check_out_date} 
+                              onSave={val => handleUpdateMobileMemberField(m.id, 'check_out_date', val)} 
+                            />
+                          </td>
+                          <td style={{ position: "relative", padding: "10px 16px" }}>
+                            <div style={{ position: "relative", display: "inline-block" }}>
+                              <img src={ActionIcon} className="action-icon" alt="Actions" style={{ cursor: "pointer", width: "14px", height: "14px", opacity: 0.8 }}
+                                onClick={(e) => { e.stopPropagation(); setOpenMobileActionMenu(openMobileActionMenu === m.id ? null : m.id); }} />
+                              {openMobileActionMenu === m.id && (
+                                <div style={{ position: "absolute", right: 0, top: "100%", zIndex: 1000, background: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", minWidth: "150px", overflow: "hidden", textAlign: "left" }}>
+                                  {[
+                                    { label: "Registered", value: "REGISTERED" },
+                                    { label: "Confirmed", value: "CONFIRMED" },
+                                    { label: "Checked In", value: "CHECKED_IN" },
+                                    { label: "Attended", value: "ATTENDED" },
+                                    { label: "Absent", value: "ABSENT" },
+                                    { label: "Cancelled", value: "CANCELLED" }
+                                  ].map(opt => (
+                                    <div key={opt.value} onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenMobileActionMenu(null);
+                                      handleUpdateMobileMemberField(m.id, 'status', opt.value);
+                                    }}
+                                      style={{ padding: "8px 16px", cursor: "pointer", fontSize: "13px", color: (m.status || '').toUpperCase() === opt.value ? "#CDA751" : "#4a5568", fontWeight: (m.status || '').toUpperCase() === opt.value ? "700" : "500", display: "flex", alignItems: "center", gap: "8px" }}
+                                      onMouseEnter={e => e.currentTarget.style.background = "#fcf8ed"}
+                                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                                      {opt.label}
+                                    </div>
+                                  ))}
+                                  <div style={{ borderTop: "1px solid #e2e8f0", margin: "4px 0" }} />
+                                  <div onClick={(e) => { e.stopPropagation(); setOpenMobileActionMenu(null); handleDeleteMobileMember(m.id); }}
                                     style={{ padding: "8px 16px", cursor: "pointer", fontSize: "13px", color: "#e74c3c", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px" }}
                                     onMouseEnter={e => e.currentTarget.style.background = "#fdf2f2"}
                                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}>

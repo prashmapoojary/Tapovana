@@ -1578,15 +1578,330 @@ const sendVedicProgramReminders = async () => {
 
 // MOBILE ENDPOINT HOOK FOR VEDIC PACKAGES ENROLLMENT
 const registerAttendeeFromMobile = async (req, res) => {
-    const programId = req.body.program_id || req.body.package_id || req.body.id || req.body.vedic_program_id || req.body.workshop_id;
+    const programId = req.body.program_id || req.body.package_id || req.body.id || req.body.vedic_program_id || req.body.workshop_id || req.body.programId || req.body.packageId;
     if (!programId) {
         return res.status(400).json({ success: false, message: 'Program ID / Package ID is required.' });
     }
-    req.params.id = programId;
-    if (!req.body.source) {
-        req.body.source = 'mobile';
+
+    const userObj = req.body.user || req.body;
+    const name = userObj.name;
+    const email = userObj.email;
+    const phone = userObj.phone;
+
+    const accommodation_type = req.body.accommodationType || req.body.accommodation_type || null;
+    const payment_status = (req.body.paymentStatus || req.body.payment_status || 'PENDING').toUpperCase();
+    const checkin_date = req.body.checkInDate || req.body.checkin_date || null;
+    const checkout_date = req.body.checkOutDate || req.body.checkout_date || null;
+    const status = (req.body.status || 'REGISTERED').toUpperCase();
+
+    // Validation rules
+    const valErr = validateVedicAttendee({
+        name,
+        email,
+        phone,
+        status,
+        accommodation_type,
+        payment_status,
+        checkin_date,
+        checkout_date
+    }, true);
+
+    if (valErr) {
+        return res.status(400).json({ success: false, message: valErr });
     }
-    return registerAttendee(req, res);
+
+    try {
+        const progRes = await query('SELECT * FROM vedic_programs WHERE id = $1', [programId]);
+        if (!progRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Program/Package not found.' });
+        }
+        const program = progRes.rows[0];
+
+        const programStatus = program.status || getVedicProgramStatus(program.start_date, program.end_date);
+        if (programStatus !== 'Upcoming') {
+            return res.status(400).json({ success: false, message: 'Registration is only allowed for upcoming programs.' });
+        }
+
+        const attendeeCheck = await query('SELECT 1 FROM vedic_packages_members WHERE program_id = $1 AND email = $2', [programId, email.toLowerCase().trim()]);
+        if (attendeeCheck.rows.length) {
+            return res.status(400).json({ success: false, message: 'You are already registered for this program/package.' });
+        }
+
+        const result = await query(
+            "INSERT INTO vedic_packages_members (program_id, name, email, phone, status, accommodation_type, payment_status, check_in_date, check_out_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
+            [programId, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, status, accommodation_type, payment_status, checkin_date, checkout_date]
+        );
+
+        let assignedStaffStr = "None assigned";
+        try {
+            const staffList = [];
+            if (program.lead_consultant_id) {
+                const leadRes = await query("SELECT first_name, last_name, r.name as role_name FROM team_members tm JOIN roles r ON tm.role_id = r.id WHERE tm.id = $1", [program.lead_consultant_id]);
+                if (leadRes.rows.length) {
+                    const rName = leadRes.rows[0].role_name.toLowerCase() === 'doctor' ? 'Dr.' : 'Therapist';
+                    staffList.push(`${rName} ${leadRes.rows[0].first_name} ${leadRes.rows[0].last_name} (Lead Consultant)`);
+                }
+            }
+            const specsRes = await query(`
+                SELECT tm.first_name, tm.last_name, r.name as role_name 
+                FROM vedic_program_staff vps
+                JOIN team_members tm ON vps.staff_id = tm.id
+                JOIN roles r ON tm.role_id = r.id
+                WHERE vps.program_id = $1
+            `, [program.id]);
+            for (const row of specsRes.rows) {
+                const rName = row.role_name.toLowerCase() === 'doctor' ? 'Dr.' : 'Therapist';
+                staffList.push(`${rName} ${row.first_name} ${row.last_name} (Specialist)`);
+            }
+            if (staffList.length > 0) {
+                assignedStaffStr = staffList.join(", ");
+            }
+        } catch (staffErr) {
+            console.error('Failed to fetch assigned staff for registration email:', staffErr);
+        }
+
+        const { sendVedicRegistrationEmail, sendVedicAdminRegistrationNotification } = require('../services/emailService');
+        try {
+            await sendVedicRegistrationEmail({
+                to: email.toLowerCase().trim(),
+                userName: name.trim(),
+                programTitle: program.title,
+                startDate: program.start_date,
+                endDate: program.end_date,
+                time: program.time,
+                status: 'registered',
+                assignedStaff: assignedStaffStr
+            });
+        } catch (err) {
+            console.error('Failed to send registration confirmation email:', err);
+        }
+
+        try {
+            const adminEmail = process.env.ADMIN_EMAIL || 'prashmapoojary@gmail.com';
+            await sendVedicAdminRegistrationNotification({
+                to: adminEmail,
+                participantName: name.trim(),
+                participantEmail: email.toLowerCase().trim(),
+                participantPhone: phone ? phone.trim() : null,
+                programTitle: program.title
+            });
+        } catch (err) {
+            console.error('Failed to send admin notification email:', err);
+        }
+
+        const member = result.rows[0];
+        return res.status(201).json({
+            success: true,
+            status: 'success',
+            message: 'Successfully registered for the program/package.',
+            member: member,
+            member_id: member.id
+        });
+    } catch (err) {
+        console.error('registerAttendeeFromMobile error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// GET VEDIC PACKAGE MOBILE MEMBERS
+const getVedicPackageMembers = async (req, res) => {
+    const programId = req.params.id || req.query.program_id;
+    try {
+        let result;
+        if (programId) {
+            result = await query('SELECT * FROM vedic_packages_members WHERE program_id = $1 ORDER BY created_at DESC', [programId]);
+        } else {
+            result = await query('SELECT * FROM vedic_packages_members ORDER BY created_at DESC');
+        }
+        return res.json({
+            success: true,
+            status: 'success',
+            program_id: programId || null,
+            members: result.rows
+        });
+    } catch (err) {
+        console.error('getVedicPackageMembers error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// UPDATE VEDIC PACKAGE MOBILE MEMBER & SYNC WITH VEDIC_ATTENDEES
+const updateVedicPackageMember = async (req, res) => {
+    const memberId = req.params.id;
+    const { status, accommodationType, accommodation_type, paymentStatus, payment_status, checkInDate, checkin_date, checkOutDate, checkout_date, name, email, phone } = req.body;
+
+    const accommodationVal = accommodationType !== undefined ? accommodationType : accommodation_type;
+    const paymentVal = paymentStatus !== undefined ? paymentStatus : payment_status;
+    const checkinVal = checkInDate !== undefined ? checkInDate : checkin_date;
+    const checkoutVal = checkOutDate !== undefined ? checkOutDate : checkout_date;
+
+    const valErr = validateVedicAttendee({
+        name,
+        email,
+        phone,
+        status,
+        accommodation_type: accommodationVal,
+        payment_status: paymentVal,
+        checkin_date: checkinVal,
+        checkout_date: checkoutVal
+    }, false);
+
+    if (valErr) {
+        return res.status(400).json({ success: false, message: valErr });
+    }
+
+    try {
+        // Fetch current record
+        const memRes = await query('SELECT * FROM vedic_packages_members WHERE id = $1', [memberId]);
+        if (!memRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Mobile member record not found.' });
+        }
+        const current = memRes.rows[0];
+        const programId = current.program_id;
+
+        const finalName = name !== undefined ? name.trim() : current.name;
+        const finalEmail = email !== undefined ? email.toLowerCase().trim() : current.email;
+        const finalPhone = phone !== undefined ? phone.trim() : current.phone;
+        const finalStatus = status ? status.toUpperCase() : current.status;
+        const finalAccommodation = accommodationVal !== undefined ? accommodationVal : current.accommodation_type;
+        const finalPaymentStatus = paymentVal ? paymentVal.toUpperCase() : current.payment_status;
+        const finalCheckinDate = checkinVal !== undefined ? checkinVal : current.check_in_date;
+        const finalCheckoutDate = checkoutVal !== undefined ? checkoutVal : current.check_out_date;
+
+        // Update vedic_packages_members
+        const updateRes = await query(
+            `UPDATE vedic_packages_members 
+             SET name = $1, email = $2, phone = $3, status = $4, accommodation_type = $5, payment_status = $6, check_in_date = $7, check_out_date = $8, updated_at = NOW() 
+             WHERE id = $9 RETURNING *`,
+            [finalName, finalEmail, finalPhone, finalStatus, finalAccommodation, finalPaymentStatus, finalCheckinDate || null, finalCheckoutDate || null, memberId]
+        );
+        const updatedMember = updateRes.rows[0];
+
+        // Now sync to the main vedic_attendees table ("admin side vvedic life table")
+        let attendeeId = current.vedic_attendee_id;
+        
+        if (!attendeeId) {
+            // Check if there is already a matching record in vedic_attendees by program_id and email
+            const checkAtt = await query('SELECT id FROM vedic_attendees WHERE program_id = $1 AND email = $2', [programId, finalEmail]);
+            if (checkAtt.rows.length) {
+                attendeeId = checkAtt.rows[0].id;
+            }
+        }
+
+        if (attendeeId) {
+            // Update existing attendee
+            await query(
+                `UPDATE vedic_attendees
+                 SET name = $1, email = $2, phone = $3, status = $4, accommodation_type = $5, payment_status = $6, check_in_date = $7, check_out_date = $8, updated_at = NOW()
+                 WHERE id = $9`,
+                [finalName, finalEmail, finalPhone, finalStatus, finalAccommodation, finalPaymentStatus, finalCheckinDate || null, finalCheckoutDate || null, attendeeId]
+            );
+        } else {
+            // Insert a new attendee in vedic_attendees
+            const newAttRes = await query(
+                `INSERT INTO vedic_attendees 
+                 (program_id, name, email, phone, status, source, accommodation_type, payment_status, check_in_date, check_out_date) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+                [programId, finalName, finalEmail, finalPhone, finalStatus, 'mobile', finalAccommodation, finalPaymentStatus, finalCheckinDate || null, finalCheckoutDate || null]
+            );
+            attendeeId = newAttRes.rows[0].id;
+
+            // Increment the enrolled count of the program
+            await query('UPDATE vedic_programs SET enrolled = enrolled + 1 WHERE id = $1', [programId]);
+        }
+
+        // Make sure the link is stored in vedic_packages_members
+        if (attendeeId && attendeeId !== current.vedic_attendee_id) {
+            await query('UPDATE vedic_packages_members SET vedic_attendee_id = $1 WHERE id = $2', [attendeeId, memberId]);
+            updatedMember.vedic_attendee_id = attendeeId;
+        }
+
+        // Send email notification on status change, similar to updateVedicAttendeeAttendance
+        if (status && status.toUpperCase() !== current.status) {
+            try {
+                const progRes = await query('SELECT * FROM vedic_programs WHERE id = $1', [programId]);
+                if (progRes.rows.length) {
+                    const program = progRes.rows[0];
+                    const { sendVedicRegistrationEmail } = require('../services/emailService');
+                    
+                    // Fetch assigned staff text for email
+                    let assignedStaffStr = "None assigned";
+                    try {
+                        const staffList = [];
+                        if (program.lead_consultant_id) {
+                            const leadRes = await query("SELECT first_name, last_name, r.name as role_name FROM team_members tm JOIN roles r ON tm.role_id = r.id WHERE tm.id = $1", [program.lead_consultant_id]);
+                            if (leadRes.rows.length) {
+                                const rName = leadRes.rows[0].role_name.toLowerCase() === 'doctor' ? 'Dr.' : 'Therapist';
+                                staffList.push(`${rName} ${leadRes.rows[0].first_name} ${leadRes.rows[0].last_name} (Lead Consultant)`);
+                            }
+                        }
+                        const specsRes = await query(`
+                            SELECT tm.first_name, tm.last_name, r.name as role_name 
+                            FROM vedic_program_staff vps
+                            JOIN team_members tm ON vps.staff_id = tm.id
+                            JOIN roles r ON tm.role_id = r.id
+                            WHERE vps.program_id = $1
+                        `, [program.id]);
+                        for (const row of specsRes.rows) {
+                            const rName = row.role_name.toLowerCase() === 'doctor' ? 'Dr.' : 'Therapist';
+                            staffList.push(`${rName} ${row.first_name} ${row.last_name} (Specialist)`);
+                        }
+                        if (staffList.length > 0) {
+                            assignedStaffStr = staffList.join(", ");
+                        }
+                    } catch (staffErr) {
+                        console.error('Failed to fetch assigned staff for status change email:', staffErr);
+                    }
+
+                    await sendVedicRegistrationEmail({
+                        to: finalEmail,
+                        userName: finalName,
+                        programTitle: program.title,
+                        startDate: program.start_date,
+                        endDate: program.end_date,
+                        time: program.time,
+                        status: status.toLowerCase(),
+                        assignedStaff: assignedStaffStr
+                    });
+                }
+            } catch (emailErr) {
+                console.error('Failed to send status update email notification:', emailErr);
+            }
+        }
+
+        return res.json({ success: true, message: 'Member updated and synced successfully.', member: updatedMember });
+    } catch (err) {
+        console.error('updateVedicPackageMember error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// DELETE VEDIC PACKAGE MOBILE MEMBER
+const deleteVedicPackageMember = async (req, res) => {
+    const memberId = req.params.id;
+    try {
+        const memRes = await query('SELECT * FROM vedic_packages_members WHERE id = $1', [memberId]);
+        if (!memRes.rows.length) {
+            return res.status(404).json({ success: false, message: 'Member record not found.' });
+        }
+        const member = memRes.rows[0];
+        const attendeeId = member.vedic_attendee_id;
+        const programId = member.program_id;
+
+        // Delete from vedic_packages_members
+        await query('DELETE FROM vedic_packages_members WHERE id = $1', [memberId]);
+
+        // If also exists in vedic_attendees, delete and decrement enrolled
+        if (attendeeId) {
+            await query('DELETE FROM vedic_attendees WHERE id = $1', [attendeeId]);
+            await query('UPDATE vedic_programs SET enrolled = GREATEST(0, enrolled - 1) WHERE id = $1', [programId]);
+        }
+
+        return res.json({ success: true, message: 'Mobile registration deleted successfully.' });
+    } catch (err) {
+        console.error('deleteVedicPackageMember error:', err);
+        return res.status(500).json({ success: false, message: 'Server error.' });
+    }
 };
 
 // GET VEDIC PROGRAM IMAGE (Binary Stream)
@@ -1637,5 +1952,8 @@ module.exports = {
     autoUpdateVedicProgramStatuses,
     sendVedicProgramReminders,
     registerAttendeeFromMobile,
-    getVedicProgramImage
+    getVedicProgramImage,
+    getVedicPackageMembers,
+    updateVedicPackageMember,
+    deleteVedicPackageMember
 };

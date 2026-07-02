@@ -15,7 +15,10 @@ const {
     deleteVedicProgramAttendee,
     exportVedicProgramAttendees,
     deleteVedicProgram,
-    getVedicProgramImage
+    getVedicProgramImage,
+    getVedicPackageMembers,
+    updateVedicPackageMember,
+    deleteVedicPackageMember
 } = require('../controllers/vedicProgramsController');
 
 const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN')];
@@ -53,5 +56,11 @@ router.patch('/:id/attendees/:attendeeId/checkin', ...adminOnly, checkinAttendee
 router.patch('/:id/attendees/:attendeeId', ...adminOnly, updateVedicAttendeeAttendance);
 router.delete('/:id/attendees/:attendeeId', ...adminOnly, deleteVedicProgramAttendee);
 router.get('/:id/attendees/export', ...adminOnly, exportVedicProgramAttendees);
+
+// Mobile Registrations (Vedic Package Members)
+router.get('/packages/members', ...adminOnly, getVedicPackageMembers);
+router.get('/:id/packages/members', ...adminOnly, getVedicPackageMembers);
+router.patch('/packages/members/:id', ...adminOnly, updateVedicPackageMember);
+router.delete('/packages/members/:id', ...adminOnly, deleteVedicPackageMember);
 
 module.exports = router;
