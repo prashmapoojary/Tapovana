@@ -40,8 +40,8 @@ const checkStaffAllocationConflict = async ({
          WHERE staff_id = $1 
            AND status NOT IN ('Completed', 'completed', 'expired', 'cancelled', 'removed', 'Cancelled')
            AND (
-             ((type = 'vedic_program' OR type = 'vedic_package') AND start_date::date <= $2::date AND end_date::date >= $2::date)
-             OR (type != 'vedic_program' AND type != 'vedic_package' AND start_date::date = $2::date)
+             (type = 'vedic_program' AND start_date::date <= $2::date AND end_date::date >= $2::date)
+             OR (type != 'vedic_program' AND start_date::date = $2::date)
            )
            AND session_id != $3`,
         [staffId, proposedDate, String(sessionId || '')]
@@ -49,77 +49,84 @@ const checkStaffAllocationConflict = async ({
 
     const existingAllocations = allocationsRes.rows;
 
-    const serviceCount = existingAllocations.filter(a => a.type === 'service').length;
-    const workshopCount = existingAllocations.filter(a => a.type === 'workshop').length;
-    const vedicCount = existingAllocations.filter(a => a.type === 'vedic_program' || a.type === 'vedic_package').length;
-    const totalCount = existingAllocations.length;
+    const vedicAlloc = existingAllocations.find(a => a.type === 'vedic_program');
+    const serviceAllocations = existingAllocations.filter(a => a.type === 'service');
+    const workshopAllocations = existingAllocations.filter(a => a.type === 'workshop');
 
-    // ── Apply Allocation Rules ──
+    const serviceCount = serviceAllocations.length;
+    const workshopCount = workshopAllocations.length;
 
-    // Rule 1: A Vedic Program is already active on this date (multi-day) → block ALL other allocations
-    if (vedicCount > 0) {
+    // ── Rule 4: Vedic Life active check (Enforcement Priority 1) ──
+    if (vedicAlloc) {
+        const startStr = new Date(vedicAlloc.start_date).toISOString().split('T')[0];
+        const endStr = new Date(vedicAlloc.end_date).toISOString().split('T')[0];
         return {
             conflict: true,
-            message: 'Staff is fully committed to a Vedic Life Program on this date. No other allocations are allowed during the program duration.'
+            reasonCode: 'VEDIC_LIFE_ACTIVE',
+            message: `This staff member is currently assigned to an active Vedic Life package from ${startStr} to ${endStr}. They cannot be allocated to any service or workshop until this package ends.`
         };
     }
 
-    // Rule 2: Allocating a Vedic Program → no other services or workshops must be present
-    if (type === 'vedic_program' || type === 'vedic_package') {
+    if (type === 'vedic_program') {
         if (serviceCount > 0 || workshopCount > 0) {
             return {
                 conflict: true,
+                reasonCode: 'TIME_CONFLICT',
                 message: 'Cannot allocate a Vedic Life Program when the staff already has services or workshops assigned on overlapping dates.'
-            };
-        }
-        // Vedic program itself is allowed (will cover 7-8 days, blocking all else)
-    }
-    // Rule 3: Allocating a Workshop
-    else if (type === 'workshop') {
-        // Only 1 workshop allowed per day
-        if (workshopCount >= 1) {
-            return {
-                conflict: true,
-                message: 'Staff can only be allocated to 1 workshop per day.'
-            };
-        }
-        // If staff has 3 services on a given day → no workshop allowed
-        if (serviceCount >= 3) {
-            return {
-                conflict: true,
-                message: 'Staff already has 3 services allocated today. No workshop allowed.'
-            };
-        }
-        // If staff has 2 services → one workshop is possible, but timings must not overlap (timings check is done below)
-    }
-    // Rule 4: Allocating a Service
-    else if (type === 'service') {
-        // For one staff → maximum 3 services per day. If a 4th service is attempted -> block it.
-        if (serviceCount >= 3) {
-            return {
-                conflict: true,
-                message: 'Staff already allocated to 3 services today.'
-            };
-        }
-        // If staff has a workshop, they can have at most 2 services (since 3 services + workshop is not allowed)
-        if (workshopCount > 0 && serviceCount >= 2) {
-            return {
-                conflict: true,
-                message: 'Staff already has a workshop and 2 services allocated. Cannot allocate a 3rd service.'
             };
         }
     }
 
-    // ── Rule: Time-Slot Overlap checking ──
+    // ── Rule 2: Time conflict check (Enforcement Priority 2) ──
     for (const a of existingAllocations) {
         const existingStartMins = getMinsFromTime(a.booking_time);
         const existingEndMins = existingStartMins + (a.duration_minutes || 60);
         const overlap = (proposedStartMins < existingEndMins && proposedEndMins > existingStartMins);
         if (overlap) {
+            let existingType = 'service';
+            if (a.type === 'workshop') existingType = 'workshop';
+            if (a.type === 'vedic_program') existingType = 'Vedic Life package';
             return {
                 conflict: true,
-                message: 'Staff allocation failed due to scheduling conflict.'
+                reasonCode: 'TIME_CONFLICT',
+                message: `This staff member is already booked for another ${existingType} during this time slot on ${date}. Please choose a different time or staff member.`
             };
+        }
+    }
+
+    // ── Rule 1: Daily Service Cap check (Enforcement Priority 3) ──
+    if (serviceCount >= 3) {
+        return {
+            conflict: true,
+            reasonCode: 'DAILY_SERVICE_CAP_REACHED',
+            message: 'This staff member has already reached the maximum of 3 services for the selected day. No further service, workshop, or Vedic Life package can be assigned to them on this date.'
+        };
+    }
+
+    // ── Rule 3: Service + Workshop Combination Limit ──
+    if (type === 'service') {
+        if (serviceCount >= 2 && workshopCount >= 1) {
+            return {
+                conflict: true,
+                reasonCode: 'SERVICE_BLOCKED_BY_WORKSHOP',
+                message: 'This staff member already has 2 services and 1 workshop for this day, so a 3rd service cannot be added. Maximum daily capacity reached.'
+            };
+        }
+    } else if (type === 'workshop') {
+        if (workshopCount >= 1) {
+            if (serviceCount >= 2) {
+                return {
+                    conflict: true,
+                    reasonCode: 'WORKSHOP_LIMIT_REACHED',
+                    message: 'This staff member already has 2 services and 1 workshop allocated for this day. No additional workshop can be added.'
+                };
+            } else {
+                return {
+                    conflict: true,
+                    reasonCode: 'WORKSHOP_LIMIT_REACHED',
+                    message: 'This staff member is already allocated to a workshop on this day. No additional workshop can be added.'
+                };
+            }
         }
     }
 

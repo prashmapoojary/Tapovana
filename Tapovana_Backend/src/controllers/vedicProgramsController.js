@@ -344,7 +344,8 @@ const createVedicProgram = async (req, res) => {
                 if (conflictCheck.conflict) {
                     return res.status(400).json({
                         success: false,
-                        message: `Lead consultant allocation conflict on ${dateStr}.`
+                        message: conflictCheck.message || `Lead consultant allocation conflict on ${dateStr}.`,
+                        reasonCode: conflictCheck.reasonCode
                     });
                 }
             }
@@ -394,7 +395,8 @@ const createVedicProgram = async (req, res) => {
                 if (conflictCheck.conflict) {
                     return res.status(400).json({
                         success: false,
-                        message: `Specialist ${s.first_name} ${s.last_name} has conflict on ${dateStr}.`
+                        message: conflictCheck.message || `Specialist ${s.first_name} ${s.last_name} has conflict on ${dateStr}.`,
+                        reasonCode: conflictCheck.reasonCode
                     });
                 }
             }
@@ -571,7 +573,8 @@ const updateVedicProgram = async (req, res) => {
                 if (conflictCheck.conflict) {
                     return res.status(400).json({
                         success: false,
-                        message: `Lead consultant allocation conflict on ${dateStr}.`
+                        message: conflictCheck.message || `Lead consultant allocation conflict on ${dateStr}.`,
+                        reasonCode: conflictCheck.reasonCode
                     });
                 }
             }
@@ -624,7 +627,8 @@ const updateVedicProgram = async (req, res) => {
                     if (conflictCheck.conflict) {
                         return res.status(400).json({
                             success: false,
-                            message: `Specialist ${s.first_name} ${s.last_name} has conflict on ${dateStr}.`
+                            message: conflictCheck.message || `Specialist ${s.first_name} ${s.last_name} has conflict on ${dateStr}.`,
+                            reasonCode: conflictCheck.reasonCode
                         });
                     }
                 }
@@ -852,7 +856,8 @@ const updateVedicProgramStaff = async (req, res) => {
                 if (conflictCheck.conflict) {
                     return res.status(400).json({
                         success: false,
-                        message: `Staff allocation conflict for ${staff.first_name} ${staff.last_name} on ${dateStr}.`
+                        message: conflictCheck.message || `Staff allocation conflict for ${staff.first_name} ${staff.last_name} on ${dateStr}.`,
+                        reasonCode: conflictCheck.reasonCode
                     });
                 }
             }

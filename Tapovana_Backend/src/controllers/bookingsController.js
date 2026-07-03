@@ -321,7 +321,11 @@ const validateBookingTransitionAndAllocations = async (booking, newStatus, incom
                     sessionId: booking.id
                 });
                 if (conflictCheck.conflict) {
-                    return { valid: false, message: conflictCheck.message || 'Staff allocation failed due to daily limit or package conflict.' };
+                    return { 
+                        valid: false, 
+                        message: conflictCheck.message || 'Staff allocation failed due to daily limit or package conflict.',
+                        reasonCode: conflictCheck.reasonCode
+                    };
                 }
             }
         }
@@ -667,7 +671,7 @@ const updateBookingStatus = async (req, res) => {
         const validation = await validateBookingTransitionAndAllocations(booking, newStatus, incomingStaffIds);
         if (!validation.valid) {
             await logBookingAudit(booking.id, 'ERROR', incomingStaffIds && incomingStaffIds.length ? incomingStaffIds[0] : null, null, validation.message);
-            return res.status(400).json({ success: false, message: validation.message });
+            return res.status(400).json({ success: false, message: validation.message, reasonCode: validation.reasonCode });
         }
 
         const duration = validation.duration;
@@ -1114,7 +1118,7 @@ const sendBookingNotificationOnly = async (req, res) => {
         const validation = await validateBookingTransitionAndAllocations(booking, newStatus, incomingStaffIds);
         if (!validation.valid) {
             await logBookingAudit(booking.id, 'ERROR', incomingStaffIds && incomingStaffIds.length ? incomingStaffIds[0] : null, null, validation.message);
-            return res.status(400).json({ success: false, message: validation.message });
+            return res.status(400).json({ success: false, message: validation.message, reasonCode: validation.reasonCode });
         }
 
         // Fetch existing allocations for comparison

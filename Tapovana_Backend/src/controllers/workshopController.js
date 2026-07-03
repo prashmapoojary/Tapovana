@@ -505,7 +505,8 @@ const createWorkshop = async (req, res) => {
             if (conflictCheck.conflict) {
                 return res.status(400).json({
                     success: false,
-                    message: "Conflict: Staff already allocated at this time or daily limit exceeded."
+                    message: conflictCheck.message || "Conflict: Staff already allocated at this time or daily limit exceeded.",
+                    reasonCode: conflictCheck.reasonCode
                 });
             }
         }
@@ -794,7 +795,8 @@ const updateWorkshop = async (req, res) => {
                 if (conflictCheck.conflict) {
                     return res.status(400).json({
                         success: false,
-                        message: "Conflict: Staff already allocated at this time or daily limit exceeded."
+                        message: conflictCheck.message || "Conflict: Staff already allocated at this time or daily limit exceeded.",
+                        reasonCode: conflictCheck.reasonCode
                     });
                 }
             }
@@ -1018,7 +1020,8 @@ const updateWorkshopStaff = async (req, res) => {
             if (conflictCheck.conflict) {
                 return res.status(400).json({
                     success: false,
-                    message: "Conflict: Staff already allocated at this time or daily limit exceeded."
+                    message: conflictCheck.message || "Conflict: Staff already allocated at this time or daily limit exceeded.",
+                    reasonCode: conflictCheck.reasonCode
                 });
             }
         }
