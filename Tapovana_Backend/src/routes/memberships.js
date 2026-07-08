@@ -8,10 +8,16 @@ const {
     deleteMembership,
     getAllTiers,
     updateTier,
-    syncFromRender
+    syncFromRender,
+    getRemoteMobileMemberships,
+    getRemoteAdminMemberships
 } = require('../controllers/membershipController');
 
 const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN')];
+
+// ─── Remote Proxy Routes (solves CORS issues on frontend) ───────────
+router.get('/remote/mobile', getRemoteMobileMemberships);
+router.get('/remote/admin', getRemoteAdminMemberships);
 
 // ─── Public routes (no auth needed — for mobile app) ─────────────────
 router.get('/', getAllMemberships);

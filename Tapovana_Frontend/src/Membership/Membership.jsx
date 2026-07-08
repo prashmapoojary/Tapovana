@@ -166,10 +166,21 @@ export default function Membership() {
     const updateMembersState = (admin, mobile) => {
       const mergedMap = new Map();
       for (const m of mobile) {
-        mergedMap.set(m.email, m);
+        const key = (m.email && m.email !== "-") ? m.email.toLowerCase() : m.id;
+        mergedMap.set(key, m);
       }
       for (const m of admin) {
-        mergedMap.set(m.email, m);
+        const key = (m.email && m.email !== "-") ? m.email.toLowerCase() : m.id;
+        if (mergedMap.has(key)) {
+          const existingMobile = mergedMap.get(key);
+          mergedMap.set(key, {
+            ...m,
+            id: m.id,
+            source: "mobile"
+          });
+        } else {
+          mergedMap.set(key, m);
+        }
       }
       setMembers(Array.from(mergedMap.values()));
     };
@@ -203,43 +214,52 @@ export default function Membership() {
       }
     })();
 
-    // 2. Fetch from mobile app (Render API - could be slow due to cold start)
+    // 2. Fetch from mobile app (Render APIs through local proxy to solve CORS/Cold Start/404 issues)
     const mobilePromise = (async () => {
-      try {
-        const mobileRes = await fetch(RENDER_MEMBERSHIP_API);
-        const mobileData = await mobileRes.json();
-        if (mobileData.success && mobileData.memberships) {
-          mobileMembers = mobileData.memberships.map((m) => {
-            const tier = m.membership_name?.includes("DIAMOND") ? "PLATINUM"
-              : m.membership_name?.includes("GOLD") ? "GOLD"
-                : "SILVER";
+      const urls = [
+        { path: "/api/memberships/remote/admin", host: "https://tapovana.onrender.com", type: "admin" },
+        { path: "/api/memberships/remote/mobile", host: "https://tapoclg.onrender.com", type: "mobile" }
+      ];
+      let allMobileMembers = [];
+      for (const target of urls) {
+        try {
+          const mobileData = await apiFetch(target.path);
+          if (mobileData.success && mobileData.memberships) {
+            const host = target.host;
+            const mapped = mobileData.memberships.map((m) => {
+              const tier = m.membership_name?.includes("DIAMOND") ? "PLATINUM"
+                : m.membership_name?.includes("GOLD") ? "GOLD"
+                  : "SILVER";
 
-            let join = m.purchase_date ? new Date(m.purchase_date) : new Date();
-            let expiry = new Date(join);
-            expiry.setMonth(expiry.getMonth() + 1);
+              let join = m.purchase_date ? new Date(m.purchase_date) : new Date();
+              let expiry = new Date(join);
+              expiry.setMonth(expiry.getMonth() + 1);
 
-            return {
-              id: "mobile-" + (m.user_id || m.id || Math.random()),
-              name: m.customer_name || "Unknown",
-              email: m.customer_email || "-",
-              phone: m.phone || "-",
-              tier: tier,
-              joinDate: join.toISOString().split("T")[0],
-              expiryDate: expiry.toISOString().split("T")[0],
-              sessions: m.available_credits || 0,
-              totalSpent: 0,
-              status: "active",
-              profile_photo_url: m.profile_pic || null,
-              profilePhoto: m.profile_pic ? (m.profile_pic.startsWith("http") ? m.profile_pic : `https://tapovana.onrender.com${m.profile_pic.startsWith("/") ? "" : "/"}${m.profile_pic}`) : null,
-              source: "mobile"
-            };
-          });
-          // Merge in mobile data when it finishes loading
-          updateMembersState(adminMembers, mobileMembers);
+              return {
+                id: "mobile-" + target.type + "-" + (m.user_id || m.id || Math.random()),
+                name: m.customer_name || "Unknown",
+                email: m.customer_email || "-",
+                phone: m.phone || "-",
+                tier: tier,
+                joinDate: join.toISOString().split("T")[0],
+                expiryDate: expiry.toISOString().split("T")[0],
+                sessions: m.available_credits || 0,
+                totalSpent: 0,
+                status: "active",
+                profile_photo_url: m.profile_pic || null,
+                profilePhoto: m.profile_pic ? (m.profile_pic.startsWith("http") ? m.profile_pic : `${host}${m.profile_pic.startsWith("/") ? "" : "/"}${m.profile_pic}`) : null,
+                source: "mobile"
+              };
+            });
+            allMobileMembers = allMobileMembers.concat(mapped);
+          }
+        } catch (err) {
+          console.warn("Mobile API fetch failed for", target.path, err);
         }
-      } catch (err) {
-        console.warn("Mobile API fetch failed, using admin data only", err);
       }
+      mobileMembers = allMobileMembers;
+      // Merge in mobile data when it finishes loading
+      updateMembersState(adminMembers, mobileMembers);
     })();
 
     // Wait for both to settle to finalize
@@ -541,16 +561,13 @@ export default function Membership() {
 
   const handleDelete = async (e, memberId) => {
     const member = members.find(m => m.id === memberId);
-    if (!member || member.source !== "admin") {
-      triggerAlert("Mobile members are managed via sync only.");
-      return;
-    }
+    if (!member) return;
 
     const confirmed = await triggerConfirm("Permanently delete this record? This cannot be undone.");
     if (!confirmed) return;
 
     try {
-      await apiFetch(`/api/memberships/${memberId.replace("admin-", "")}`, {
+      await apiFetch(`/api/memberships/${memberId}`, {
         method: "DELETE"
       });
       setMembers(prev => prev.filter(m => m.id !== memberId));

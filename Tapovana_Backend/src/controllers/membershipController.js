@@ -11,6 +11,59 @@ const ensureUploadsDir = () => {
     }
 };
 
+// ─── Sync mobile memberships helper ───────────────────────────────────
+const syncMembershipsInternal = async () => {
+    const urls = [
+        'https://tapovana.onrender.com/api/memberships',
+        'https://tapoclg.onrender.com/api/membership'
+    ];
+    let totalSynced = 0;
+
+    for (const url of urls) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) continue;
+            const data = await response.json();
+            if (!data.success || !data.memberships) continue;
+
+            for (const m of data.memberships) {
+                const emailVal = m.customer_email || m.email;
+                if (!emailVal) continue;
+                const existing = await query('SELECT id FROM memberships WHERE LOWER(email) = LOWER($1)', [emailVal.trim()]);
+                
+                const tierMap = { 'SILVER PASS': 'SILVER', 'GOLD PASS': 'GOLD', 'DIAMOND PASS': 'PLATINUM' };
+                const rawTier = m.membership_name || m.tier || 'SILVER';
+                const mappedTier = tierMap[rawTier.toUpperCase()] || rawTier.toUpperCase();
+                
+                let joinVal = m.purchase_date || m.join_date || new Date().toISOString();
+                const expiry = new Date(joinVal);
+                expiry.setFullYear(expiry.getFullYear() + 1);
+                const expiryStr = expiry.toISOString().split('T')[0];
+
+                const nameVal = m.customer_name || m.name || 'Unknown';
+                const sessionsVal = m.available_credits !== undefined ? m.available_credits : (m.sessions || 0);
+                const picVal = m.profile_pic || m.profile_photo_url || null;
+
+                if (existing.rows.length) {
+                    await query(
+                        'UPDATE memberships SET name = $1, tier = $2, join_date = $3, expiry_date = $4, sessions = $5, profile_photo_url = $6, status = $7 WHERE LOWER(email) = LOWER($8)',
+                        [nameVal, mappedTier, joinVal, expiryStr, sessionsVal, picVal, 'active', emailVal.trim()]
+                    );
+                } else {
+                    await query(
+                        'INSERT INTO memberships (name, email, tier, join_date, expiry_date, sessions, total_spent, status, profile_photo_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+                        [nameVal, emailVal.trim(), mappedTier, joinVal, expiryStr, sessionsVal, 0, 'active', picVal]
+                    );
+                    totalSynced++;
+                }
+            }
+        } catch (err) {
+            console.error(`syncMembershipsInternal error for ${url}:`, err);
+        }
+    }
+    return totalSynced;
+};
+
 // ─── Helper: handle image ─────────────────────────────────────────────
 const handleProfileImage = (imageData) => {
     if (!imageData || typeof imageData !== 'string') return null;
@@ -32,6 +85,9 @@ const handleProfileImage = (imageData) => {
 // ─── GET all memberships ──────────────────────────────────────────────
 const getAllMemberships = async (req, res) => {
     try {
+        // Auto-sync mobile memberships first
+        await syncMembershipsInternal();
+
         const { tier, status, page = 1, limit = 50 } = req.query;
         const conditions = [];
         const values = [];
@@ -52,22 +108,32 @@ const getAllMemberships = async (req, res) => {
             [...values, parseInt(limit), offset]
         );
 
-        // Fetch remote memberships to get latest profile pictures
+        // Fetch remote memberships to get latest profile pictures from both urls
         let remoteMembers = [];
-        try {
-            const response = await fetch('https://tapovana.onrender.com/api/membership');
-            if (response.ok) {
-                const data = await response.json();
-                remoteMembers = data.success ? (data.memberships || []) : [];
+        const remoteUrls = [
+            'https://tapovana.onrender.com/api/memberships',
+            'https://tapoclg.onrender.com/api/membership'
+        ];
+        for (const url of remoteUrls) {
+            try {
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.memberships) {
+                        remoteMembers = remoteMembers.concat(data.memberships);
+                    }
+                }
+            } catch (fetchErr) {
+                console.error(`Failed to fetch memberships from ${url}:`, fetchErr);
             }
-        } catch (fetchErr) {
-            console.error('Failed to fetch memberships from mobile backend:', fetchErr);
         }
 
         const remoteMembersMap = new Map();
         for (const rm of remoteMembers) {
-            if (rm.customer_email) {
-                remoteMembersMap.set(rm.customer_email.toLowerCase(), rm.profile_pic);
+            const emailKey = rm.customer_email || rm.email;
+            const pic = rm.profile_pic || rm.profile_photo_url;
+            if (emailKey && pic) {
+                remoteMembersMap.set(emailKey.toLowerCase(), pic);
             }
         }
 
@@ -117,18 +183,28 @@ const getMembershipById = async (req, res) => {
         // Fetch remote memberships to get latest profile picture for this member
         let remotePic = null;
         if (row.email) {
-            try {
-                const response = await fetch('https://tapovana.onrender.com/api/membership');
-                if (response.ok) {
-                    const data = await response.json();
-                    const remoteMembers = data.success ? (data.memberships || []) : [];
-                    const match = remoteMembers.find(rm => rm.customer_email && rm.customer_email.toLowerCase() === row.email.toLowerCase());
-                    if (match) {
-                        remotePic = match.profile_pic;
+            const remoteUrls = [
+                'https://tapovana.onrender.com/api/memberships',
+                'https://tapoclg.onrender.com/api/membership'
+            ];
+            for (const url of remoteUrls) {
+                try {
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const data = await response.json();
+                        const remoteMembers = data.success ? (data.memberships || []) : [];
+                        const match = remoteMembers.find(rm => {
+                            const emailKey = rm.customer_email || rm.email;
+                            return emailKey && emailKey.toLowerCase() === row.email.toLowerCase();
+                        });
+                        if (match) {
+                            remotePic = match.profile_pic || match.profile_photo_url;
+                            break;
+                        }
                     }
+                } catch (fetchErr) {
+                    console.error(`Failed to fetch membership from ${url}:`, fetchErr);
                 }
-            } catch (fetchErr) {
-                console.error('Failed to fetch membership from mobile backend:', fetchErr);
             }
         }
         
@@ -235,10 +311,86 @@ const updateMembership = async (req, res) => {
 // ─── DELETE membership ────────────────────────────────────────────────
 const deleteMembership = async (req, res) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (isNaN(id)) return res.status(400).json({ success: false, message: 'Invalid membership ID.' });
-        const result = await query('DELETE FROM memberships WHERE id = $1 RETURNING id', [id]);
-        if (!result.rows.length) return res.status(404).json({ success: false, message: 'Membership not found.' });
+        const idStr = String(req.params.id).trim();
+        const cleanIdStr = idStr.replace(/^admin-/, '');
+        let id = parseInt(cleanIdStr, 10);
+        let result;
+        let emailVal = null;
+
+        if (isNaN(id)) {
+            // It's a remote string ID like "mobile-admin-6" or "mobile-6"
+            const remoteIdMatch = idStr.match(/\d+$/);
+            const remoteId = remoteIdMatch ? parseInt(remoteIdMatch[0], 10) : null;
+
+            if (remoteId) {
+                const remoteUrls = [
+                    'https://tapovana.onrender.com/api/memberships',
+                    'https://tapoclg.onrender.com/api/membership'
+                ];
+                for (const url of remoteUrls) {
+                    try {
+                        const response = await fetch(url);
+                        if (response.ok) {
+                            const data = await response.json();
+                            const remoteMembers = data.success ? (data.memberships || []) : [];
+                            const match = remoteMembers.find(rm => {
+                                const rid = rm.id || rm.user_id;
+                                return rid && parseInt(rid, 10) === remoteId;
+                            });
+                            if (match) {
+                                emailVal = match.customer_email || match.email;
+                                break;
+                            }
+                        }
+                    } catch (fetchErr) {
+                        console.error('Error fetching remote memberships in deleteMembership:', fetchErr);
+                    }
+                }
+            }
+
+            if (emailVal) {
+                result = await query('DELETE FROM memberships WHERE LOWER(email) = LOWER($1) RETURNING id', [emailVal.trim()]);
+            } else {
+                return res.status(400).json({ success: false, message: 'Invalid membership ID and no matching email found.' });
+            }
+        } else {
+            const memRes = await query('SELECT email FROM memberships WHERE id = $1', [id]);
+            emailVal = memRes.rows.length ? memRes.rows[0].email : null;
+            result = await query('DELETE FROM memberships WHERE id = $1 RETURNING id', [id]);
+        }
+
+        if (!result || !result.rows.length) {
+            return res.status(404).json({ success: false, message: 'Membership not found.' });
+        }
+
+        if (emailVal) {
+            const remoteUrls = [
+                'https://tapovana.onrender.com/api/memberships',
+                'https://tapoclg.onrender.com/api/membership'
+            ];
+            for (const url of remoteUrls) {
+                try {
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const data = await response.json();
+                        const remoteMembers = data.success ? (data.memberships || []) : [];
+                        const match = remoteMembers.find(rm => {
+                            const emailKey = rm.customer_email || rm.email;
+                            return emailKey && emailKey.toLowerCase() === emailVal.toLowerCase();
+                        });
+                        if (match) {
+                            const remoteId = match.id || match.user_id;
+                            if (remoteId) {
+                                await fetch(`${url}/${remoteId}`, { method: 'DELETE' }).catch(() => {});
+                            }
+                        }
+                    }
+                } catch (fetchErr) {
+                    console.error(`Failed to delete remote membership at ${url}:`, fetchErr);
+                }
+            }
+        }
+
         return res.json({ success: true, message: 'Membership deleted.' });
     } catch (err) {
         console.error('deleteMembership error:', err);
@@ -273,31 +425,40 @@ const updateTier = async (req, res) => {
 // ─── Sync from Render API ─────────────────────────────────────────────
 const syncFromRender = async (req, res) => {
     try {
-        const response = await fetch('https://tapovana.onrender.com/api/membership');
-        const data = await response.json();
-        if (!data.success || !data.memberships) return res.status(400).json({ success: false, message: 'Failed to fetch from Render API.' });
-
-        let synced = 0;
-        for (const m of data.memberships) {
-            const existing = await query('SELECT id FROM memberships WHERE email = $1', [m.customer_email || '']);
-            if (existing.rows.length) continue;
-
-            const tierMap = { 'SILVER PASS': 'SILVER', 'GOLD PASS': 'GOLD', 'DIAMOND PASS': 'PLATINUM' };
-            const mappedTier = tierMap[m.membership_name] || 'SILVER';
-            const expiry = new Date(m.purchase_date);
-            expiry.setFullYear(expiry.getFullYear() + 1);
-
-            await query(
-                'INSERT INTO memberships (name, email, tier, join_date, expiry_date, sessions, total_spent, status, profile_photo_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-                [m.customer_name, m.customer_email, mappedTier, m.purchase_date, expiry.toISOString().split('T')[0], m.available_credits || 0, 0, 'active', m.profile_pic]
-            );
-            synced++;
-        }
-        return res.json({ success: true, message: 'Sync complete.', synced: synced, total: data.memberships.length });
+        const synced = await syncMembershipsInternal();
+        return res.json({ success: true, message: 'Sync complete.', synced });
     } catch (err) {
         console.error('syncFromRender error:', err);
         return res.status(500).json({ success: false, message: 'Server error: ' + err.message });
     }
 };
 
-module.exports = { getAllMemberships, getMembershipById, createMembership, updateMembership, deleteMembership, getAllTiers, updateTier, syncFromRender };
+const getRemoteMobileMemberships = async (req, res) => {
+    try {
+        const response = await fetch('https://tapoclg.onrender.com/api/membership');
+        if (!response.ok) {
+            return res.status(response.status).json({ success: false, message: 'Failed to fetch remote mobile memberships.' });
+        }
+        const data = await response.json();
+        return res.json(data);
+    } catch (err) {
+        console.error('getRemoteMobileMemberships error:', err);
+        return res.status(500).json({ success: false, message: 'Server error fetching remote mobile memberships.' });
+    }
+};
+
+const getRemoteAdminMemberships = async (req, res) => {
+    try {
+        const response = await fetch('https://tapovana.onrender.com/api/memberships');
+        if (!response.ok) {
+            return res.status(response.status).json({ success: false, message: 'Failed to fetch remote admin memberships.' });
+        }
+        const data = await response.json();
+        return res.json(data);
+    } catch (err) {
+        console.error('getRemoteAdminMemberships error:', err);
+        return res.status(500).json({ success: false, message: 'Server error fetching remote admin memberships.' });
+    }
+};
+
+module.exports = { getAllMemberships, getMembershipById, createMembership, updateMembership, deleteMembership, getAllTiers, updateTier, syncFromRender, getRemoteMobileMemberships, getRemoteAdminMemberships };

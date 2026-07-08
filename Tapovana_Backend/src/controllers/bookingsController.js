@@ -9,6 +9,103 @@ const {
 const { checkStaffAllocationConflict, syncStaffMemberStatus } = require('../utils/conflictChecker');
 const https = require('https');
 
+// Helper: Apply Membership Discount automatically
+const applyMembershipDiscount = async (emailOrId, serviceName, currentAmountStr, userName = null) => {
+    const ident = emailOrId ? String(emailOrId).trim() : '';
+    const nameVal = userName ? String(userName).trim() : '';
+
+    if (!ident || !nameVal) return currentAmountStr;
+
+    try {
+        const memRes = await query(
+            `SELECT tier, status FROM memberships 
+             WHERE LOWER(email) = LOWER($1) AND LOWER(name) = LOWER($2) 
+               AND status = 'active' AND expiry_date >= CURRENT_DATE`,
+            [ident.toLowerCase(), nameVal.toLowerCase()]
+        );
+        
+        if (memRes.rows.length === 0) {
+            return currentAmountStr;
+        }
+
+        const membership = memRes.rows[0];
+        const tier = (membership.tier || 'SILVER').toUpperCase();
+        
+        let discountRate = 0;
+        let passLabel = '';
+        if (tier === 'SILVER') {
+            discountRate = 0.15;
+            passLabel = 'Silver Pass';
+        } else if (tier === 'GOLD') {
+            discountRate = 0.25;
+            passLabel = 'Gold Pass';
+        } else if (tier === 'PLATINUM') {
+            discountRate = 0.40;
+            passLabel = 'Diamond Pass';
+        } else {
+            return currentAmountStr;
+        }
+
+        // Determine base price
+        let basePrice = null;
+        if (serviceName) {
+            // 1. Try services table
+            const svcRes = await query(
+                "SELECT base_price FROM services WHERE LOWER(name) = LOWER($1)",
+                [serviceName.trim()]
+            );
+            if (svcRes.rows.length > 0 && svcRes.rows[0].base_price) {
+                basePrice = parseFloat(svcRes.rows[0].base_price);
+            }
+
+            // 2. Try workshops table if not found
+            if (!basePrice) {
+                const wsRes = await query(
+                    "SELECT price FROM workshops WHERE LOWER(title) = LOWER($1)",
+                    [serviceName.trim()]
+                );
+                if (wsRes.rows.length > 0 && wsRes.rows[0].price) {
+                    basePrice = parseFloat(wsRes.rows[0].price);
+                }
+            }
+
+            // 3. Try vedic_programs table if not found
+            if (!basePrice) {
+                const vpRes = await query(
+                    "SELECT price FROM vedic_programs WHERE LOWER(title) = LOWER($1)",
+                    [serviceName.trim()]
+                );
+                if (vpRes.rows.length > 0 && vpRes.rows[0].price) {
+                    basePrice = parseFloat(vpRes.rows[0].price);
+                }
+            }
+        }
+
+        // If not found in database, try parsing from incoming amount
+        if (!basePrice && currentAmountStr) {
+            if (currentAmountStr.includes('(')) {
+                return currentAmountStr;
+            }
+            const cleanStr = currentAmountStr.replace(/[^0-9.]/g, '');
+            if (cleanStr) {
+                basePrice = parseFloat(cleanStr);
+            }
+        }
+
+        if (!basePrice || isNaN(basePrice)) {
+            return currentAmountStr;
+        }
+
+        const discountedAmount = basePrice * (1 - discountRate);
+        const roundedAmount = Math.round(discountedAmount);
+
+        return `₹${roundedAmount} (${passLabel} discount applied)`;
+    } catch (err) {
+        console.error('[applyMembershipDiscount] Error:', err);
+        return currentAmountStr;
+    }
+};
+
 // Helper: Validate UUID
 const isValidUUID = (id) => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -175,12 +272,13 @@ const syncIncomingBookings = async () => {
                 const existing = await query("SELECT id FROM bookings WHERE id = $1", [rb.id]);
                 if (existing.rows.length === 0) {
                     const paymentStatus = 'PAID';
+                    const finalAmount = await applyMembershipDiscount(rb.user_email || rb.email, rb.service_name, rb.total_amount, rb.user_name);
                     await query(
                         'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (id) DO NOTHING',
                         [
                             rb.id, rb.user_name, rb.service_name,
                             rb.booking_date, rb.booking_time, null,
-                            rb.note, rb.total_amount, rb.pass_details,
+                            rb.note, finalAmount, rb.pass_details,
                             paymentStatus, 'PENDING', rb.created_at, rb.user_email || rb.email || null,
                             rb.profile_pic || null
                         ]
@@ -357,14 +455,16 @@ const createBooking = async (req, res) => {
 
         const paymentStatus = 'PAID';
         const status = 'PENDING';
+        const emailAddressForDiscount = user_email || email || null;
+        const finalAmount = await applyMembershipDiscount(emailAddressForDiscount, service_name, total_amount, user_name);
         
         const insertRes = await query(
             'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES (COALESCE($1, nextval(\'bookings_id_seq\')), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, $13) RETURNING *',
             [
                 bookingId, user_name, service_name,
                 booking_date, booking_time, null,
-                note || null, total_amount || null, pass_details || null,
-                paymentStatus, status, user_email || email || null,
+                note || null, finalAmount || null, pass_details || null,
+                paymentStatus, status, emailAddressForDiscount,
                 profile_pic || null
             ]
         );
@@ -523,12 +623,13 @@ const ensureBookingExistsLocally = async (bookingId) => {
             if (data.success && data.booking) {
                 const remoteBooking = data.booking;
                 const paymentStatus = 'PAID';
+                const finalAmount = await applyMembershipDiscount(remoteBooking.user_email || remoteBooking.email, remoteBooking.service_name, remoteBooking.total_amount, remoteBooking.user_name);
                 const insertResult = await query(
                     'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (id) DO NOTHING RETURNING *',
                     [
                         remoteBooking.id, remoteBooking.user_name, remoteBooking.service_name,
                         remoteBooking.booking_date, remoteBooking.booking_time, null,
-                        remoteBooking.note, remoteBooking.total_amount, remoteBooking.pass_details,
+                        remoteBooking.note, finalAmount, remoteBooking.pass_details,
                         paymentStatus, 'PENDING', remoteBooking.created_at, remoteBooking.user_email || remoteBooking.email || null,
                         remoteBooking.profile_pic || null
                     ]
@@ -552,12 +653,13 @@ const ensureBookingExistsLocally = async (bookingId) => {
             const remoteBooking = data.bookings.find(b => String(b.id) === String(bookingId));
             if (remoteBooking) {
                 const paymentStatus = 'PAID';
+                const finalAmount = await applyMembershipDiscount(remoteBooking.user_email || remoteBooking.email, remoteBooking.service_name, remoteBooking.total_amount, remoteBooking.user_name);
                 const insertResult = await query(
                     'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (id) DO NOTHING RETURNING *',
                     [
                         remoteBooking.id, remoteBooking.user_name, remoteBooking.service_name,
                         remoteBooking.booking_date, remoteBooking.booking_time, null,
-                        remoteBooking.note, remoteBooking.total_amount, remoteBooking.pass_details,
+                        remoteBooking.note, finalAmount, remoteBooking.pass_details,
                         paymentStatus, 'PENDING', remoteBooking.created_at, remoteBooking.user_email || remoteBooking.email || null,
                         remoteBooking.profile_pic || null
                     ]
@@ -1011,13 +1113,14 @@ const syncFromRender = async (req, res) => {
             if (existing.rows.length) continue;
 
             const paymentStatus = 'PAID';
+            const finalAmount = await applyMembershipDiscount(booking.user_email || booking.email, booking.service_name, booking.total_amount, booking.user_name);
 
             const insertResult = await query(
                 'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *',
                 [
                     booking.id, booking.user_name, booking.service_name,
                     booking.booking_date, booking.booking_time, null,
-                    booking.note, booking.total_amount, booking.pass_details,
+                    booking.note, finalAmount, booking.pass_details,
                     paymentStatus, 'PENDING', booking.created_at, booking.user_email || booking.email || null,
                     booking.profile_pic || null
                 ]

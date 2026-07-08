@@ -590,27 +590,27 @@ const getMyAssignments = async (req, res) => {
             // Fetch image based on type
             if (alloc.type === 'service' && isValidUUID(alloc.session_id)) {
                 try {
-                    const serviceResult = await query('SELECT image_url, image FROM services WHERE id = $1', [alloc.session_id]);
+                    const serviceResult = await query('SELECT image_url FROM services WHERE id = $1', [alloc.session_id]);
                     if (serviceResult.rows.length) {
-                        assignment.service_image_name = serviceResult.rows[0].image_url || serviceResult.rows[0].image;
+                        assignment.service_image_name = serviceResult.rows[0].image_url;
                     }
                 } catch (e) {
                     console.error('Error fetching service image:', e);
                 }
             } else if (alloc.type === 'workshop' && isValidUUID(alloc.session_id)) {
                 try {
-                    const workshopResult = await query('SELECT image_url, image, image_base64 FROM workshops WHERE id = $1', [alloc.session_id]);
+                    const workshopResult = await query('SELECT image_url FROM workshops WHERE id = $1', [alloc.session_id]);
                     if (workshopResult.rows.length) {
-                        assignment.workshop_image_name = workshopResult.rows[0].image_url || workshopResult.rows[0].image || workshopResult.rows[0].image_base64;
+                        assignment.workshop_image_name = workshopResult.rows[0].image_url;
                     }
                 } catch (e) {
                     console.error('Error fetching workshop image:', e);
                 }
             } else if (alloc.type === 'vedic_program' && isValidUUID(alloc.session_id)) {
                 try {
-                    const vedicResult = await query('SELECT image_url, image, image_base64 FROM vedic_programs WHERE id = $1', [alloc.session_id]);
+                    const vedicResult = await query('SELECT image_url FROM vedic_programs WHERE id = $1', [alloc.session_id]);
                     if (vedicResult.rows.length) {
-                        assignment.vediclife_image_name = vedicResult.rows[0].image_url || vedicResult.rows[0].image || vedicResult.rows[0].image_base64;
+                        assignment.vediclife_image_name = vedicResult.rows[0].image_url;
                     }
                 } catch (e) {
                     console.error('Error fetching vedic program image:', e);

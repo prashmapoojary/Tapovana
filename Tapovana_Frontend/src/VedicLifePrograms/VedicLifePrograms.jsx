@@ -623,6 +623,7 @@ export default function VedicLifePrograms() {
   const [mobileStatusFilter, setMobileStatusFilter] = useState("ALL");
   const [mobilePaymentFilter, setMobilePaymentFilter] = useState("ALL");
   const [openMobileActionMenu, setOpenMobileActionMenu] = useState(null);
+  const [memberships, setMemberships] = useState([]);
 
   useEffect(() => {
     const handleClickOutside = () => {
@@ -639,6 +640,33 @@ export default function VedicLifePrograms() {
 
   const currentUser = useMemo(() => getUser(), []);
   const isAdmin = !currentUser || currentUser.role === "SUPER_ADMIN" || currentUser.role === "CO_ADMIN";
+
+  // Fetch memberships for discount check
+  const fetchMemberships = async () => {
+    try {
+      const res = await apiFetch("/api/memberships?limit=1000");
+      if (res.success && res.memberships) {
+        setMemberships(res.memberships);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch memberships in Vedic Life:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchMemberships();
+    }
+  }, [isAdmin]);
+
+  const getAttendeeMembership = (name, email) => {
+    if (!memberships || memberships.length === 0) return null;
+    const match = memberships.find(m => 
+      email && m.email && m.email.toLowerCase() === email.toLowerCase() &&
+      name && m.name && m.name.toLowerCase() === name.toLowerCase()
+    );
+    return match && match.status === 'active' ? match.tier : null;
+  };
 
   // ─── Fetch instructors ──────────────────────────────────────────────────
   const fetchInstructors = async () => {
@@ -737,12 +765,53 @@ export default function VedicLifePrograms() {
     try {
       setAttendeesLoading(true);
       setAttendeesError("");
-      const res = await apiFetch(`/api/vedic-programs/${programId}/attendees`);
-      if (res.success) {
-        setAttendees(res.attendees || []);
-      } else {
-        throw new Error(res.message || "Failed to load attendees.");
+      
+      const [attendeesRes, mobileRes] = await Promise.all([
+        apiFetch(`/api/vedic-programs/${programId}/attendees`),
+        apiFetch(`/api/vedic-programs/${programId}/packages/members`).catch(() => ({ success: false }))
+      ]);
+
+      let localList = [];
+      let mobileList = [];
+
+      if (attendeesRes.success) {
+        localList = (attendeesRes.attendees || []).map(a => ({
+          ...a,
+          source: "local"
+        }));
       }
+
+      if (mobileRes.success) {
+        mobileList = (mobileRes.members || []).map(m => ({
+          ...m,
+          source: "mobile"
+        }));
+      }
+
+      // Merge and remove duplicates by email
+      const mergedMap = new Map();
+      
+      for (const item of mobileList) {
+        const key = (item.email && item.email !== "-") ? item.email.toLowerCase() : item.id;
+        mergedMap.set(key, item);
+      }
+      
+      for (const item of localList) {
+        const key = (item.email && item.email !== "-") ? item.email.toLowerCase() : item.id;
+        if (mergedMap.has(key)) {
+          const existing = mergedMap.get(key);
+          mergedMap.set(key, {
+            ...existing,
+            ...item,
+            id: existing.id || item.id,
+            source: existing.source || "mobile"
+          });
+        } else {
+          mergedMap.set(key, item);
+        }
+      }
+
+      setAttendees(Array.from(mergedMap.values()));
     } catch (err) {
       setAttendeesError(err.message || "Error loading attendees.");
     } finally {
@@ -923,16 +992,33 @@ export default function VedicLifePrograms() {
     const confirmed = await triggerConfirm("Are you sure you want to remove this attendee?");
     if (!confirmed) return;
     try {
-      const res = await apiFetch(`/api/vedic-programs/attendees/${attendeeId}`, {
-        method: "DELETE"
-      });
-      if (res.success) {
-        triggerAlert("Attendee removed successfully!", true);
-        setAttendees(res.attendees || []);
-        await fetchPrograms();
-        setSelectedProgram(prev => prev ? ({ ...prev, enrolled: Math.max(0, (prev.enrolled || 0) - 1) }) : null);
+      const att = attendees.find(a => a.id === attendeeId);
+      if (att && att.source === "mobile") {
+        const res = await apiFetch(`/api/vedic-programs/packages/members/${attendeeId}`, {
+          method: "DELETE"
+        });
+        if (res.success) {
+          triggerAlert("Attendee removed successfully!", true);
+          await fetchPrograms();
+          if (selectedProgram) {
+            setSelectedProgram(prev => prev ? ({ ...prev, enrolled: Math.max(0, (prev.enrolled || 0) - 1) }) : null);
+            await fetchAttendees(selectedProgram.id);
+          }
+        } else {
+          throw new Error(res.message || "Failed to delete mobile registration.");
+        }
       } else {
-        throw new Error(res.message || "Failed to delete attendee.");
+        const res = await apiFetch(`/api/vedic-programs/attendees/${attendeeId}`, {
+          method: "DELETE"
+        });
+        if (res.success) {
+          triggerAlert("Attendee removed successfully!", true);
+          setAttendees(res.attendees || []);
+          await fetchPrograms();
+          setSelectedProgram(prev => prev ? ({ ...prev, enrolled: Math.max(0, (prev.enrolled || 0) - 1) }) : null);
+        } else {
+          throw new Error(res.message || "Failed to delete attendee.");
+        }
       }
     } catch (err) {
       triggerAlert(err.message || "Error deleting attendee.", false);
@@ -941,21 +1027,49 @@ export default function VedicLifePrograms() {
 
   const handleUpdateAttendeeField = async (attendeeId, field, value) => {
     try {
-      const isStatus = field === 'status';
-      const endpoint = isStatus 
-        ? `/api/vedic-programs/attendees/${attendeeId}/status`
-        : `/api/vedic-programs/attendees/${attendeeId}`;
-      const res = await apiFetch(endpoint, {
-        method: "PATCH",
-        body: JSON.stringify({ [field]: value })
-      });
-      if (res.success) {
-        setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, ...res.attendee } : a));
-        if (selectedProgram) {
-          await fetchAttendees(selectedProgram.id);
+      const att = attendees.find(a => a.id === attendeeId);
+      if (!att) return;
+
+      if (att.source === "mobile") {
+        const payload = {
+          name: field === 'name' ? value : att.name,
+          email: field === 'email' ? value : att.email,
+          phone: field === 'phone' ? value : att.phone,
+          status: field === 'status' ? value : att.status,
+          accommodation_type: field === 'accommodation_type' ? value : att.accommodation_type || att.accommodation_type_str || null,
+          payment_status: field === 'payment_status' ? value : att.payment_status,
+          checkin_date: field === 'check_in_date' ? value : att.check_in_date,
+          checkout_date: field === 'check_out_date' ? value : att.check_out_date
+        };
+        const res = await apiFetch(`/api/vedic-programs/packages/members/${attendeeId}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload)
+        });
+        if (res.success) {
+          triggerAlert("Updated and synced successfully!", true);
+          if (selectedProgram) {
+            await fetchAttendees(selectedProgram.id);
+          }
+        } else {
+          throw new Error(res.message || "Failed to update mobile registration.");
         }
       } else {
-        throw new Error(res.message || "Failed to update attendee.");
+        const isStatus = field === 'status';
+        const endpoint = isStatus 
+          ? `/api/vedic-programs/attendees/${attendeeId}/status`
+          : `/api/vedic-programs/attendees/${attendeeId}`;
+        const res = await apiFetch(endpoint, {
+          method: "PATCH",
+          body: JSON.stringify({ [field]: value })
+        });
+        if (res.success) {
+          setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, ...res.attendee } : a));
+          if (selectedProgram) {
+            await fetchAttendees(selectedProgram.id);
+          }
+        } else {
+          throw new Error(res.message || "Failed to update attendee.");
+        }
       }
     } catch (err) {
       triggerAlert(err.message || "Error updating attendee details.", false);
@@ -968,17 +1082,24 @@ export default function VedicLifePrograms() {
 
   const handleCheckinAttendee = async (attendeeId) => {
     try {
-      const res = await apiFetch(`/api/vedic-programs/attendees/${attendeeId}/checkin`, {
-        method: "PATCH"
-      });
-      if (res.success) {
-        triggerAlert("Attendee checked in successfully!", true);
-        setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, status: "CHECKED_IN", checked_in_at: new Date().toISOString() } : a));
-        if (selectedProgram) {
-          await fetchAttendees(selectedProgram.id);
-        }
+      const att = attendees.find(a => a.id === attendeeId);
+      if (att && att.source === "mobile") {
+        const today = new Date().toISOString().split('T')[0];
+        await handleUpdateAttendeeField(attendeeId, 'status', 'CHECKED_IN');
+        await handleUpdateAttendeeField(attendeeId, 'check_in_date', today);
       } else {
-        throw new Error(res.message || "Failed to check in attendee.");
+        const res = await apiFetch(`/api/vedic-programs/attendees/${attendeeId}/checkin`, {
+          method: "PATCH"
+        });
+        if (res.success) {
+          triggerAlert("Attendee checked in successfully!", true);
+          setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, status: "CHECKED_IN", checked_in_at: new Date().toISOString() } : a));
+          if (selectedProgram) {
+            await fetchAttendees(selectedProgram.id);
+          }
+        } else {
+          throw new Error(res.message || "Failed to check in attendee.");
+        }
       }
     } catch (err) {
       triggerAlert(err.message || "Error checking in attendee.", false);
@@ -1257,25 +1378,7 @@ export default function VedicLifePrograms() {
                 transition: "all 0.2s"
               }}
             >
-              Attendees ({p.enrolled || 0})
-            </button>
-          )}
-          {isAdmin && (
-            <button 
-              onClick={() => setActiveDetailTab("mobileMembers")}
-              style={{ 
-                background: "none", 
-                border: "none", 
-                borderBottom: activeDetailTab === "mobileMembers" ? "3px solid #CDA751" : "3px solid transparent", 
-                padding: "10px 4px", 
-                fontSize: "14px", 
-                fontWeight: 600, 
-                color: activeDetailTab === "mobileMembers" ? "#0F172A" : "#64748B", 
-                cursor: "pointer",
-                transition: "all 0.2s"
-              }}
-            >
-              Mobile Registrations
+              Attendees ({attendees.length || 0})
             </button>
           )}
         </div>
@@ -1297,7 +1400,15 @@ export default function VedicLifePrograms() {
                 <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Start Date</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.startDate ? new Date(p.startDate).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" }) : "N/A"}</span></div>
                 <div><span style={{ fontSize: 12, color: "#a0aec0" }}>End Date</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.endDate ? new Date(p.endDate).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" }) : "N/A"}</span></div>
                 <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Duration</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.duration}</span></div>
-                <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Price</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>₹{(p.price || 0).toLocaleString("en-IN")}</span></div>
+                <div>
+                  <span style={{ fontSize: 12, color: "#a0aec0" }}>Price</span><br />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>₹{(p.price || 0).toLocaleString("en-IN")}</span>
+                  <div style={{ fontSize: "10px", color: "#64748B", marginTop: "4px", lineHeight: "1.3" }}>
+                    <div>Silver Pass: ₹{Math.round((p.price || 0) * 0.85)} (15% off)</div>
+                    <div>Gold Pass: ₹{Math.round((p.price || 0) * 0.75)} (25% off)</div>
+                    <div>Diamond Pass: ₹{Math.round((p.price || 0) * 0.60)} (40% off)</div>
+                  </div>
+                </div>
                 <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Capacity</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.enrolled || 0} / {p.capacity} enrolled</span></div>
                 <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Accommodation</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.accommodations || "Self-arranged"}</span></div>
                 <div><span style={{ fontSize: 12, color: "#a0aec0" }}>Services</span><br /><span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{p.services ? (Array.isArray(p.services) ? p.services.join(", ") : p.services) : "General Wellness"}</span></div>
@@ -1581,9 +1692,66 @@ export default function VedicLifePrograms() {
                       const statusStyles = getAttendeeStatusStyles(a.status);
                       return (
                         <tr key={a.id} style={{ borderBottom: "1px solid #f1f3f7" }}>
-                          <td style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#2d3748" }}>{a.name}</td>
-                          <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>{a.email}</td>
-                          <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>{a.phone || "-"}</td>
+                          <td style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#2d3748" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                              {a.source === "mobile" ? (
+                                <EditableText 
+                                  value={a.name} 
+                                  placeholder="Name" 
+                                  onSave={val => handleUpdateAttendeeField(a.id, 'name', val)} 
+                                />
+                              ) : (
+                                a.name
+                              )}
+                              {(() => {
+                                const tier = getAttendeeMembership(a.name, a.email);
+                                if (tier) {
+                                  const colors = {
+                                    SILVER: { bg: "#E2E8F0", color: "#475569", label: "Silver Pass (15% off)" },
+                                    GOLD: { bg: "#FEF3C7", color: "#D97706", label: "Gold Pass (25% off)" },
+                                    PLATINUM: { bg: "#F3E8FF", color: "#7E22CE", label: "Diamond Pass (40% off)" }
+                                  };
+                                  const cfg = colors[tier.toUpperCase()] || { bg: "#E2E8F0", color: "#475569", label: `${tier} Pass` };
+                                  return (
+                                    <span style={{
+                                      padding: "2px 6px",
+                                      borderRadius: "4px",
+                                      fontSize: "10px",
+                                      fontWeight: "700",
+                                      background: cfg.bg,
+                                      color: cfg.color,
+                                      textTransform: "uppercase"
+                                    }}>
+                                      {cfg.label}
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
+                          </td>
+                          <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>
+                            {a.source === "mobile" ? (
+                              <EditableText 
+                                value={a.email} 
+                                placeholder="Email" 
+                                onSave={val => handleUpdateAttendeeField(a.id, 'email', val)} 
+                              />
+                            ) : (
+                              a.email
+                            )}
+                          </td>
+                          <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>
+                            {a.source === "mobile" ? (
+                              <EditableText 
+                                value={a.phone} 
+                                placeholder="Phone" 
+                                onSave={val => handleUpdateAttendeeField(a.id, 'phone', val)} 
+                              />
+                            ) : (
+                              a.phone || "-"
+                            )}
+                          </td>
                           <td style={{ padding: "10px 16px" }}>
                             {(() => {
                               const styles = getAttendeeStatusStyles(a.status);
@@ -1678,204 +1846,7 @@ export default function VedicLifePrograms() {
           </div>
         )}
 
-        {activeDetailTab === "mobileMembers" && isAdmin && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* Header controls for Mobile Members */}
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", flex: 1, minWidth: 300 }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 12px", background: "white", flex: 1, minWidth: 180 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                  <input 
-                    type="text" 
-                    placeholder="Search mobile registration..." 
-                    value={mobileSearch} 
-                    onChange={e => setMobileSearch(e.target.value)} 
-                    style={{ border: "none", outline: "none", fontSize: 13, width: "100%", background: "transparent" }}
-                  />
-                </div>
-                <select 
-                  value={mobileStatusFilter} 
-                  onChange={e => setMobileStatusFilter(e.target.value)}
-                  style={{ 
-                    padding: "7px 12px", 
-                    borderRadius: 8, 
-                    border: "1px solid #e2e8f0", 
-                    fontSize: 13, 
-                    outline: "none", 
-                    background: "white",
-                    color: "#4a5568",
-                    cursor: "pointer"
-                  }}
-                >
-                  <option value="ALL">Status: All</option>
-                  <option value="REGISTERED">Registered</option>
-                  <option value="CONFIRMED">Confirmed</option>
-                  <option value="CHECKED_IN">Checked In</option>
-                  <option value="ATTENDED">Attended</option>
-                  <option value="ABSENT">Absent</option>
-                  <option value="CANCELLED">Cancelled</option>
-                </select>
-                <select 
-                  value={mobilePaymentFilter} 
-                  onChange={e => setMobilePaymentFilter(e.target.value)}
-                  style={{ 
-                    padding: "7px 12px", 
-                    borderRadius: 8, 
-                    border: "1px solid #e2e8f0", 
-                    fontSize: 13, 
-                    outline: "none", 
-                    background: "white",
-                    color: "#4a5568",
-                    cursor: "pointer"
-                  }}
-                >
-                  <option value="ALL">Payment: All</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="PAID">Paid</option>
-                  <option value="PARTIALLY_PAID">Partially Paid</option>
-                </select>
-              </div>
-            </div>
 
-            {/* Mobile Members Table */}
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, background: "white", overflowX: "auto" }}>
-              {mobileMembersLoading ? (
-                <div style={{ padding: 30, textAlign: "center", color: "#64748B" }}>Loading mobile registrations...</div>
-              ) : mobileMembersError ? (
-                <div style={{ padding: 30, textAlign: "center", color: "#e74c3c" }}>{mobileMembersError}</div>
-              ) : filteredMobileMembers.length === 0 ? (
-                <div style={{ padding: 40, textAlign: "center", color: "#64748B" }}>
-                  {mobileSearch ? "No mobile registrations match your search." : "No user-side registrations for this program yet."}
-                </div>
-              ) : (
-                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", minWidth: "900px" }}>
-                  <thead>
-                    <tr style={{ background: "#f8f9fb", borderBottom: "1px solid #e2e8f0" }}>
-                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Name</th>
-                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Email</th>
-                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Phone</th>
-                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Status</th>
-                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Accommodation</th>
-                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Payment Status</th>
-                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Check-In</th>
-                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Check-Out</th>
-                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredMobileMembers.map(m => {
-                      return (
-                        <tr key={m.id} style={{ borderBottom: "1px solid #f1f3f7" }}>
-                          <td style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#2d3748" }}>
-                            <EditableText 
-                              value={m.name} 
-                              placeholder="Name" 
-                              onSave={val => handleUpdateMobileMemberField(m.id, 'name', val)} 
-                            />
-                          </td>
-                          <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>
-                            <EditableText 
-                              value={m.email} 
-                              placeholder="Email" 
-                              onSave={val => handleUpdateMobileMemberField(m.id, 'email', val)} 
-                            />
-                          </td>
-                          <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>
-                            <EditableText 
-                              value={m.phone} 
-                              placeholder="Phone" 
-                              onSave={val => handleUpdateMobileMemberField(m.id, 'phone', val)} 
-                            />
-                          </td>
-                          <td style={{ padding: "10px 16px" }}>
-                            {(() => {
-                              const styles = getAttendeeStatusStyles(m.status);
-                              return (
-                                <span style={{
-                                  padding: "4px 10px",
-                                  borderRadius: "12px",
-                                  fontSize: "11px",
-                                  fontWeight: "700",
-                                  background: styles.bg,
-                                  color: styles.color,
-                                  textTransform: "uppercase",
-                                  display: "inline-block"
-                                }}>
-                                  {(m.status || 'REGISTERED').replace('_', ' ')}
-                                </span>
-                              );
-                            })()}
-                          </td>
-                          <td style={{ padding: "6px 12px", width: "150px" }}>
-                            <EditableText 
-                              value={m.accommodation_type} 
-                              placeholder="Add Accommodation..."
-                              onSave={val => handleUpdateMobileMemberField(m.id, 'accommodation_type', val)} 
-                            />
-                          </td>
-                          <td style={{ padding: "6px 12px" }}>
-                            <EditablePaymentStatus 
-                              value={m.payment_status} 
-                              onSave={val => handleUpdateMobileMemberField(m.id, 'payment_status', val)} 
-                            />
-                          </td>
-                          <td style={{ padding: "6px 12px" }}>
-                            <EditableDate 
-                              value={m.check_in_date} 
-                              onSave={val => handleUpdateMobileMemberField(m.id, 'check_in_date', val)} 
-                            />
-                          </td>
-                          <td style={{ padding: "6px 12px" }}>
-                            <EditableDate 
-                              value={m.check_out_date} 
-                              onSave={val => handleUpdateMobileMemberField(m.id, 'check_out_date', val)} 
-                            />
-                          </td>
-                          <td style={{ position: "relative", padding: "10px 16px" }}>
-                            <div style={{ position: "relative", display: "inline-block" }}>
-                              <img src={ActionIcon} className="action-icon" alt="Actions" style={{ cursor: "pointer", width: "14px", height: "14px", opacity: 0.8 }}
-                                onClick={(e) => { e.stopPropagation(); setOpenMobileActionMenu(openMobileActionMenu === m.id ? null : m.id); }} />
-                              {openMobileActionMenu === m.id && (
-                                <div style={{ position: "absolute", right: 0, top: "100%", zIndex: 1000, background: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", minWidth: "150px", overflow: "hidden", textAlign: "left" }}>
-                                  {[
-                                    { label: "Registered", value: "REGISTERED" },
-                                    { label: "Confirmed", value: "CONFIRMED" },
-                                    { label: "Checked In", value: "CHECKED_IN" },
-                                    { label: "Attended", value: "ATTENDED" },
-                                    { label: "Absent", value: "ABSENT" },
-                                    { label: "Cancelled", value: "CANCELLED" }
-                                  ].map(opt => (
-                                    <div key={opt.value} onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOpenMobileActionMenu(null);
-                                      handleUpdateMobileMemberField(m.id, 'status', opt.value);
-                                    }}
-                                      style={{ padding: "8px 16px", cursor: "pointer", fontSize: "13px", color: (m.status || '').toUpperCase() === opt.value ? "#CDA751" : "#4a5568", fontWeight: (m.status || '').toUpperCase() === opt.value ? "700" : "500", display: "flex", alignItems: "center", gap: "8px" }}
-                                      onMouseEnter={e => e.currentTarget.style.background = "#fcf8ed"}
-                                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                                      {opt.label}
-                                    </div>
-                                  ))}
-                                  <div style={{ borderTop: "1px solid #e2e8f0", margin: "4px 0" }} />
-                                  <div onClick={(e) => { e.stopPropagation(); setOpenMobileActionMenu(null); handleDeleteMobileMember(m.id); }}
-                                    style={{ padding: "8px 16px", cursor: "pointer", fontSize: "13px", color: "#e74c3c", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px" }}
-                                    onMouseEnter={e => e.currentTarget.style.background = "#fdf2f2"}
-                                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                                    Delete
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     );
   };

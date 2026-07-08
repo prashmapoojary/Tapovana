@@ -398,6 +398,32 @@ export default function Workshops() {
   const [attendeesLoading, setAttendeesLoading] = useState(false);
   const [attendeesError, setAttendeesError] = useState("");
   const [attendeeSearch, setAttendeeSearch] = useState("");
+  const [memberships, setMemberships] = useState([]);
+
+  // Fetch memberships for discount check
+  const fetchMemberships = async () => {
+    try {
+      const res = await apiFetch("/api/memberships?limit=1000");
+      if (res.success && res.memberships) {
+        setMemberships(res.memberships);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch memberships in Workshops:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchMemberships();
+  }, []);
+
+  const getAttendeeMembership = (name, email) => {
+    if (!memberships || memberships.length === 0) return null;
+    const match = memberships.find(m => 
+      email && m.email && m.email.toLowerCase() === email.toLowerCase() &&
+      name && m.name && m.name.toLowerCase() === name.toLowerCase()
+    );
+    return match && match.status === 'active' ? match.tier : null;
+  };
 
   const [showManualEnroll, setShowManualEnroll] = useState(false);
   const [manualEnrollForm, setManualEnrollForm] = useState({ name: "", email: "", phone: "" });
@@ -1242,6 +1268,11 @@ export default function Workshops() {
                   <span style={{ fontSize: 12, color: "#a0aec0" }}>Price</span>
                   <br />
                   <span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>Rs{(ws.price || 0).toLocaleString("en-IN")}</span>
+                  <div style={{ fontSize: "10px", color: "#64748B", marginTop: "4px", lineHeight: "1.3" }}>
+                    <div>Silver Pass: Rs{Math.round((ws.price || 0) * 0.85)} (15% off)</div>
+                    <div>Gold Pass: Rs{Math.round((ws.price || 0) * 0.75)} (25% off)</div>
+                    <div>Diamond Pass: Rs{Math.round((ws.price || 0) * 0.60)} (40% off)</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1387,7 +1418,36 @@ export default function Workshops() {
                   <tbody>
                     {filteredAttendees.map(a => (
                       <tr key={a.id} style={{ borderBottom: "1px solid #f1f3f7" }}>
-                        <td style={{ padding: "10px 16px", fontSize: "13px", fontWeight: 600, color: "#2d3748" }}>{a.name}</td>
+                        <td style={{ padding: "10px 16px", fontSize: "13px", fontWeight: 600, color: "#2d3748" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                            {a.name}
+                            {(() => {
+                              const tier = getAttendeeMembership(a.name, a.email);
+                              if (tier) {
+                                const colors = {
+                                  SILVER: { bg: "#E2E8F0", color: "#475569", label: "Silver Pass (15% off)" },
+                                  GOLD: { bg: "#FEF3C7", color: "#D97706", label: "Gold Pass (25% off)" },
+                                  PLATINUM: { bg: "#F3E8FF", color: "#7E22CE", label: "Diamond Pass (40% off)" }
+                                };
+                                const cfg = colors[tier.toUpperCase()] || { bg: "#E2E8F0", color: "#475569", label: `${tier} Pass` };
+                                return (
+                                  <span style={{
+                                    padding: "2px 6px",
+                                    borderRadius: "4px",
+                                    fontSize: "10px",
+                                    fontWeight: "700",
+                                    background: cfg.bg,
+                                    color: cfg.color,
+                                    textTransform: "uppercase"
+                                  }}>
+                                    {cfg.label}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        </td>
                         <td style={{ padding: "10px 16px", fontSize: "13px", color: "#4a5568" }}>{a.email}</td>
                         <td style={{ padding: "10px 16px", fontSize: "13px", color: "#4a5568" }}>{a.phone || "-"}</td>
                         <td style={{ padding: "10px 16px" }}>
