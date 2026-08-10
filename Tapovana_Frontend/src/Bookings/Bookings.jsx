@@ -114,36 +114,19 @@ function Bookings() {
   useEffect(() => {
     const fetchMemberships = async () => {
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4500);
-
-        const response = await fetch("https://tapovana.onrender.com/api/membership", {
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          const res = await response.json();
-          if (res && (res.success || Array.isArray(res))) {
-            const rawList = res.memberships || res.data || (Array.isArray(res) ? res : []);
-            const mappedMembers = rawList.map((m) => {
-              let profilePhoto = m.profile_photo_url || m.profile_pic || null;
-              if (profilePhoto && !profilePhoto.startsWith("http")) {
-                profilePhoto = `https://tapovana.onrender.com${profilePhoto.startsWith("/") ? "" : "/"}${profilePhoto}`;
-              }
-              return {
-                id: m.id || m.user_id,
-                name: m.name || m.customer_name,
-                email: m.email || m.customer_email,
-                profilePhoto: profilePhoto,
-                profile_photo_url: profilePhoto
-              };
-            });
-            setMemberships(mappedMembers);
-          }
+        const res = await apiFetch("/api/memberships");
+        if (res.success && res.memberships) {
+          const mappedMembers = res.memberships.map((m) => ({
+            id: m.id,
+            name: m.name,
+            email: m.email,
+            profilePhoto: m.profilePhoto || m.profile_photo_url || null,
+            profile_photo_url: m.profilePhoto || m.profile_photo_url || null
+          }));
+          setMemberships(mappedMembers);
         }
       } catch (err) {
-        console.error("Failed to fetch memberships:", err);
+        console.warn("Failed to fetch memberships for avatars:", err.message);
       }
     };
     fetchMemberships();
@@ -162,7 +145,7 @@ function Bookings() {
       try {
         if (bookings.length === 0) setLoading(true);
         setError(null);
-        let q = `/api/bookings?limit=50&page=${page}`;
+        let q = `/api/bookings?limit=100&page=${page}`;
         if (statusFilter) q += `&status=${statusFilter}`;
         if (dateFrom) q += `&date_from=${dateFrom}`;
         if (dateTo) q += `&date_to=${dateTo}`;

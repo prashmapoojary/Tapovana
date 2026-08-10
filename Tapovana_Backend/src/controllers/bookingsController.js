@@ -254,9 +254,9 @@ const logBookingAudit = async (bookingId, status, therapistId, therapistName, no
 };
 
 // Helper: Ingest/Sync bookings from the mobile app endpoint into the local DB
-const syncIncomingBookings = async () => {
+const syncIncomingBookings = async ({ noEmail = false } = {}) => {
     try {
-        const response = await fetch('https://tapovana.onrender.com/api/bookings?limit=100');
+        const response = await fetch('https://tapovana.onrender.com/api/bookings?limit=200', { signal: AbortSignal.timeout(8000) });
         if (response.ok) {
             const data = await response.json();
             const remoteBookings = data.success ? (data.bookings || []) : [];
@@ -269,37 +269,40 @@ const syncIncomingBookings = async () => {
                 const bookingId = String(rb.id);
                 if (deletedIds.has(bookingId)) continue;
                 
-                const existing = await query("SELECT id FROM bookings WHERE id = $1", [rb.id]);
+                const existing = await query("SELECT id, profile_pic FROM bookings WHERE id = $1", [rb.id]);
                 if (existing.rows.length === 0) {
                     const paymentStatus = 'PAID';
-                    const finalAmount = await applyMembershipDiscount(rb.user_email || rb.email, rb.service_name, rb.total_amount, rb.user_name);
+                    // Preserve existing status if provided by remote, otherwise PENDING
+                    const bookingStatus = rb.status || 'PENDING';
                     await query(
                         'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (id) DO NOTHING',
                         [
                             rb.id, rb.user_name, rb.service_name,
-                            rb.booking_date, rb.booking_time, null,
-                            rb.note, finalAmount, rb.pass_details,
-                            paymentStatus, 'PENDING', rb.created_at, rb.user_email || rb.email || null,
+                            rb.booking_date, rb.booking_time, rb.therapist_name || null,
+                            rb.note, rb.total_amount, rb.pass_details,
+                            paymentStatus, bookingStatus, rb.created_at, rb.user_email || rb.email || null,
                             rb.profile_pic || null
                         ]
                     );
                     
-                    // Trigger pending email notification if email exists
-                    let userEmail = rb.user_email || rb.email || null;
-                    if (userEmail) {
-                        await sendBookingStatusEmail({
-                            to: userEmail,
-                            firstName: rb.user_name || 'Customer',
-                            status: 'PENDING',
-                            details: {
-                                service: rb.service_name,
-                                date: rb.booking_date,
-                                time: rb.booking_time
-                            }
-                        }).catch(e => console.error("Error sending pending email during auto-sync:", e));
+                    // Skip email notifications during bulk sync
+                    if (!noEmail) {
+                        let userEmail = rb.user_email || rb.email || null;
+                        if (userEmail) {
+                            await sendBookingStatusEmail({
+                                to: userEmail,
+                                firstName: rb.user_name || 'Customer',
+                                status: bookingStatus,
+                                details: {
+                                    service: rb.service_name,
+                                    date: rb.booking_date,
+                                    time: rb.booking_time
+                                }
+                            }).catch(e => console.error("Error sending email during auto-sync:", e));
+                        }
                     }
                 } else {
-                    // Dynamically backfill profile_pic if present in remote but missing locally
+                    // Backfill profile_pic if missing
                     if (rb.profile_pic && !existing.rows[0].profile_pic) {
                         await query(
                             "UPDATE bookings SET profile_pic = $1 WHERE id = $2 AND profile_pic IS NULL",
@@ -310,7 +313,7 @@ const syncIncomingBookings = async () => {
             }
         }
     } catch (err) {
-        console.error('syncIncomingBookings background sync error:', err);
+        console.error('syncIncomingBookings error:', err.message);
     }
 };
 
@@ -499,10 +502,19 @@ const createBooking = async (req, res) => {
 // GET ALL BOOKINGS
 const getAllBookings = async (req, res) => {
     try {
-        const { status, date_from, date_to, page = 1, limit = 10 } = req.query;
+        const { status, date_from, date_to, page = 1, limit = 50 } = req.query;
 
-        // 1. Ingest new bookings in background (fire-and-forget, don't block response)
-        syncIncomingBookings().catch(e => console.error('Background sync error:', e));
+        // Check if local DB is empty — if so, await sync to populate it first
+        const countRes = await query('SELECT COUNT(*) FROM bookings');
+        const localCount = parseInt(countRes.rows[0].count);
+
+        if (localCount === 0) {
+            // Await sync on first load so bookings appear immediately
+            await syncIncomingBookings({ noEmail: true });
+        } else {
+            // Otherwise sync in background (non-blocking)
+            syncIncomingBookings({ noEmail: true }).catch(e => console.error('Background sync error:', e));
+        }
 
         // 2. Query bookings from local database ONLY
         let dbQuery = "SELECT * FROM bookings WHERE 1=1";
