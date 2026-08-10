@@ -256,62 +256,60 @@ const logBookingAudit = async (bookingId, status, therapistId, therapistName, no
 // Helper: Ingest/Sync bookings from the mobile app endpoint into the local DB
 const syncIncomingBookings = async ({ noEmail = false } = {}) => {
     try {
-        const response = await fetch('https://tapovana.onrender.com/api/bookings?limit=200', { signal: AbortSignal.timeout(8000) });
-        if (response.ok) {
-            const data = await response.json();
-            const remoteBookings = data.success ? (data.bookings || []) : [];
-            
-            // Get all deleted booking IDs
-            const deletedRes = await query("SELECT booking_id FROM deleted_booking_ids");
-            const deletedIds = new Set(deletedRes.rows.map(r => String(r.booking_id)));
-            
-            for (const rb of remoteBookings) {
-                const bookingId = String(rb.id);
-                if (deletedIds.has(bookingId)) continue;
-                
-                const existing = await query("SELECT id, profile_pic FROM bookings WHERE id = $1", [rb.id]);
-                if (existing.rows.length === 0) {
-                    const paymentStatus = 'PAID';
-                    // Preserve existing status if provided by remote, otherwise PENDING
-                    const bookingStatus = rb.status || 'PENDING';
-                    await query(
-                        'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (id) DO NOTHING',
-                        [
-                            rb.id, rb.user_name, rb.service_name,
-                            rb.booking_date, rb.booking_time, rb.therapist_name || null,
-                            rb.note, rb.total_amount, rb.pass_details,
-                            paymentStatus, bookingStatus, rb.created_at, rb.user_email || rb.email || null,
-                            rb.profile_pic || null
-                        ]
-                    );
-                    
-                    // Skip email notifications during bulk sync
-                    if (!noEmail) {
-                        let userEmail = rb.user_email || rb.email || null;
-                        if (userEmail) {
-                            await sendBookingStatusEmail({
-                                to: userEmail,
-                                firstName: rb.user_name || 'Customer',
-                                status: bookingStatus,
-                                details: {
-                                    service: rb.service_name,
-                                    date: rb.booking_date,
-                                    time: rb.booking_time
-                                }
-                            }).catch(e => console.error("Error sending email during auto-sync:", e));
-                        }
-                    }
-                } else {
-                    // Backfill profile_pic if missing
-                    if (rb.profile_pic && !existing.rows[0].profile_pic) {
-                        await query(
-                            "UPDATE bookings SET profile_pic = $1 WHERE id = $2 AND profile_pic IS NULL",
-                            [rb.profile_pic, rb.id]
-                        );
-                    }
-                }
+        // Bookings live on the MOBILE backend (tapoclg), not the admin render
+        const response = await fetch('https://tapoclg.onrender.com/api/bookings?limit=500', { signal: AbortSignal.timeout(15000) });
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const remoteBookings = data.success ? (data.bookings || []) : [];
+        if (remoteBookings.length === 0) return;
+
+        // Get all deleted booking IDs
+        const deletedRes = await query("SELECT booking_id FROM deleted_booking_ids");
+        const deletedIds = new Set(deletedRes.rows.map(r => String(r.booking_id)));
+
+        // Get all existing booking IDs in one shot
+        const existingRes = await query("SELECT id, profile_pic FROM bookings");
+        const existingMap = new Map(existingRes.rows.map(r => [String(r.id), r]));
+
+        const toInsert = [];
+        const picUpdates = [];
+
+        for (const rb of remoteBookings) {
+            const bookingId = String(rb.id);
+            if (deletedIds.has(bookingId)) continue;
+
+            const existing = existingMap.get(bookingId);
+            if (!existing) {
+                const bookingStatus = rb.status || 'PENDING';
+                const therapist = (rb.therapist_name === 'Not Assigned' || !rb.therapist_name) ? null : rb.therapist_name;
+                const userEmail = rb.user_email || rb.email || null;
+                toInsert.push([
+                    rb.id, rb.user_name, rb.service_name,
+                    rb.booking_date, rb.booking_time, therapist,
+                    rb.note, rb.total_amount, rb.pass_details,
+                    'PAID', bookingStatus, rb.created_at, userEmail,
+                    rb.profile_pic || null
+                ]);
+            } else if (rb.profile_pic && !existing.profile_pic) {
+                picUpdates.push([rb.profile_pic, rb.id]);
             }
         }
+
+        // Batch insert all new bookings at once
+        for (const vals of toInsert) {
+            await query(
+                'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT (id) DO NOTHING',
+                vals
+            );
+        }
+
+        // Batch update profile pics
+        for (const [pic, id] of picUpdates) {
+            await query("UPDATE bookings SET profile_pic = $1 WHERE id = $2 AND profile_pic IS NULL", [pic, id]);
+        }
+
+        console.log(`[syncIncomingBookings] synced ${toInsert.length} new bookings from mobile backend.`);
     } catch (err) {
         console.error('syncIncomingBookings error:', err.message);
     }
