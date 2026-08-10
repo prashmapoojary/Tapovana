@@ -49,11 +49,12 @@ export const AllocationProvider = ({ children }) => {
   }, []);
 
   const triggerConfirm = useCallback((message, imageUrl = null) => {
+    const validImageUrl = (typeof imageUrl === 'string' && (imageUrl.startsWith('http') || imageUrl.startsWith('data:') || imageUrl.startsWith('/'))) ? imageUrl : null;
     return new Promise((resolve) => {
       setConfirmState({
         visible: true,
         message,
-        imageUrl,
+        imageUrl: validImageUrl,
         resolve,
       });
     });
@@ -573,9 +574,20 @@ Tapovana Admin Team
           <div className="global-alert-modal">
             <div className="global-alert-icon-container">
               {confirmState.imageUrl ? (
-                <img src={confirmState.imageUrl} alt="" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
+                <img 
+                  src={confirmState.imageUrl} 
+                  alt="" 
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                  style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #E8E2D9' }} 
+                />
               ) : (
-                <div className="global-alert-warning-icon">?</div>
+                <div className="global-alert-warning-icon" style={{ background: "rgba(205, 167, 81, 0.12)", color: "#CDA751" }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#CDA751" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                </div>
               )}
             </div>
             <div className="global-alert-message">{confirmState.message}</div>
