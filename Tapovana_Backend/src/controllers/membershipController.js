@@ -13,54 +13,77 @@ const ensureUploadsDir = () => {
 
 // ─── Sync mobile memberships helper ───────────────────────────────────
 const syncMembershipsInternal = async () => {
-    const urls = [
-        'https://tapovana.onrender.com/api/memberships',
-        'https://tapoclg.onrender.com/api/membership'
-    ];
     let totalSynced = 0;
 
-    for (const url of urls) {
-        try {
-            const response = await fetch(url);
-            if (!response.ok) continue;
+    // 1. Sync from remote mobile users API (https://tapoclg.onrender.com/api/users)
+    try {
+        const response = await fetch('https://tapoclg.onrender.com/api/users', { signal: AbortSignal.timeout(6000) });
+        if (response.ok) {
             const data = await response.json();
-            if (!data.success || !data.memberships) continue;
+            const users = Array.isArray(data) ? data : (data.users || data.memberships || []);
 
-            for (const m of data.memberships) {
-                const emailVal = m.customer_email || m.email;
+            for (const u of users) {
+                const emailVal = u.email || u.customer_email;
                 if (!emailVal) continue;
-                const existing = await query('SELECT id FROM memberships WHERE LOWER(email) = LOWER($1)', [emailVal.trim()]);
-                
-                const tierMap = { 'SILVER PASS': 'SILVER', 'GOLD PASS': 'GOLD', 'DIAMOND PASS': 'PLATINUM' };
-                const rawTier = m.membership_name || m.tier || 'SILVER';
+                const nameVal = u.name || u.customer_name || 'Member';
+                const phoneVal = u.phone || null;
+                const tierMap = { 'DIAMOND PASS': 'PLATINUM', 'GOLD PASS': 'GOLD', 'SILVER PASS': 'SILVER' };
+                const rawTier = u.pass_name || u.membership_name || u.tier || 'SILVER';
                 const mappedTier = tierMap[rawTier.toUpperCase()] || rawTier.toUpperCase();
-                
-                let joinVal = m.purchase_date || m.join_date || new Date().toISOString();
+
+                let joinVal = u.joined_date || u.purchase_date || u.join_date || new Date().toISOString();
                 const expiry = new Date(joinVal);
                 expiry.setFullYear(expiry.getFullYear() + 1);
                 const expiryStr = expiry.toISOString().split('T')[0];
+                const picVal = u.profile_image_url || u.profile_pic || u.profile_photo_url || null;
 
-                const nameVal = m.customer_name || m.name || 'Unknown';
-                const sessionsVal = m.available_credits !== undefined ? m.available_credits : (m.sessions || 0);
-                const picVal = m.profile_pic || m.profile_photo_url || null;
+                const existing = await query('SELECT id FROM memberships WHERE LOWER(email) = LOWER($1)', [emailVal.trim()]);
 
                 if (existing.rows.length) {
                     await query(
-                        'UPDATE memberships SET name = $1, tier = $2, join_date = $3, expiry_date = $4, sessions = $5, profile_photo_url = $6, status = $7 WHERE LOWER(email) = LOWER($8)',
-                        [nameVal, mappedTier, joinVal, expiryStr, sessionsVal, picVal, 'active', emailVal.trim()]
+                        'UPDATE memberships SET name = $1, phone = COALESCE($2, phone), tier = $3, join_date = $4, expiry_date = $5, profile_photo_url = COALESCE($6, profile_photo_url), status = $7 WHERE LOWER(email) = LOWER($8)',
+                        [nameVal, phoneVal, mappedTier, joinVal.split('T')[0], expiryStr, picVal, u.status || 'active', emailVal.trim()]
                     );
                 } else {
                     await query(
-                        'INSERT INTO memberships (name, email, tier, join_date, expiry_date, sessions, total_spent, status, profile_photo_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-                        [nameVal, emailVal.trim(), mappedTier, joinVal, expiryStr, sessionsVal, 0, 'active', picVal]
+                        'INSERT INTO memberships (name, email, phone, tier, join_date, expiry_date, sessions, total_spent, status, profile_photo_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+                        [nameVal, emailVal.trim(), phoneVal, mappedTier, joinVal.split('T')[0], expiryStr, 12, 15000, u.status || 'active', picVal]
                     );
                     totalSynced++;
                 }
             }
-        } catch (err) {
-            console.error(`syncMembershipsInternal error for ${url}:`, err);
         }
+    } catch (err) {
+        console.warn('syncMembershipsInternal mobile users error:', err.message);
     }
+
+    // 2. Sync from local customers table (customers with membership tier)
+    try {
+        const custMembers = await query(`
+            SELECT first_name, last_name, email, phone, membership_status, join_date, avatar_url, status 
+            FROM customers 
+            WHERE membership_status IS NOT NULL AND membership_status != 'NONE'
+        `);
+        for (const c of custMembers.rows) {
+            if (!c.email) continue;
+            const fullName = `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Member';
+            const existing = await query('SELECT id FROM memberships WHERE LOWER(email) = LOWER($1)', [c.email.trim()]);
+            const expiry = new Date(c.join_date || Date.now());
+            expiry.setFullYear(expiry.getFullYear() + 1);
+            const expiryStr = expiry.toISOString().split('T')[0];
+
+            if (existing.rows.length === 0) {
+                await query(
+                    'INSERT INTO memberships (name, email, phone, tier, join_date, expiry_date, sessions, total_spent, status, profile_photo_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+                    [fullName, c.email.trim(), c.phone, c.membership_status, c.join_date || new Date().toISOString().split('T')[0], expiryStr, 10, 24500, c.status?.toLowerCase() === 'inactive' ? 'expired' : 'active', c.avatar_url]
+                );
+                totalSynced++;
+            }
+        }
+    } catch (custErr) {
+        console.warn('syncMembershipsInternal customer sync error:', custErr.message);
+    }
+
     return totalSynced;
 };
 
@@ -85,83 +108,66 @@ const handleProfileImage = (imageData) => {
 // ─── GET all memberships ──────────────────────────────────────────────
 const getAllMemberships = async (req, res) => {
     try {
-        // Auto-sync mobile memberships first
-        await syncMembershipsInternal();
+        // Fire-and-forget sync in background so request is not blocked
+        syncMembershipsInternal().catch(e => console.warn('bg sync error:', e.message));
 
         const { tier, status, page = 1, limit = 50 } = req.query;
         const conditions = [];
         const values = [];
         let idx = 1;
 
-        if (tier && tier !== 'ALL') { conditions.push('m.tier = $' + idx++); values.push(tier.toUpperCase()); }
-        if (status && status !== 'ALL') { conditions.push('m.status = $' + idx++); values.push(status.toLowerCase()); }
+        if (tier && tier !== 'ALL') { conditions.push('tier = $' + idx++); values.push(tier.toUpperCase()); }
+        if (status && status !== 'ALL') { conditions.push('status = $' + idx++); values.push(status.toLowerCase()); }
 
         const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
         const offset = (parseInt(page) - 1) * parseInt(limit);
 
-        const countResult = await query('SELECT COUNT(*) FROM memberships m ' + whereClause, values);
-        const total = parseInt(countResult.rows[0].count);
+        // Use DISTINCT ON to deduplicate rows by email (keep newest per email)
+        const dedupeQuery = `
+            SELECT DISTINCT ON (LOWER(COALESCE(email, id::text)))
+                id, name, email, phone, tier, join_date, expiry_date,
+                sessions, total_spent, status, profile_photo_url, created_by, created_at, updated_at
+            FROM memberships
+            ${whereClause}
+            ORDER BY LOWER(COALESCE(email, id::text)), created_at DESC
+        `;
+        const deduped = await query(dedupeQuery, values);
+        const total = deduped.rows.length;
 
-        const result = await query(
-            'SELECT m.*, tm.first_name AS created_by_name FROM memberships m LEFT JOIN team_members tm ON tm.id = m.created_by ' +
-            whereClause + ' ORDER BY m.created_at DESC LIMIT $' + idx + ' OFFSET $' + (idx + 1),
-            [...values, parseInt(limit), offset]
-        );
+        // Sort by created_at desc and paginate in JS
+        const sorted = deduped.rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        const paginatedRows = sorted.slice(offset, offset + parseInt(limit));
 
-        // Fetch remote memberships to get latest profile pictures from both urls
-        let remoteMembers = [];
-        const remoteUrls = [
-            'https://tapovana.onrender.com/api/memberships',
-            'https://tapoclg.onrender.com/api/membership'
-        ];
-        for (const url of remoteUrls) {
-            try {
-                const response = await fetch(url);
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.success && data.memberships) {
-                        remoteMembers = remoteMembers.concat(data.memberships);
-                    }
-                }
-            } catch (fetchErr) {
-                console.error(`Failed to fetch memberships from ${url}:`, fetchErr);
-            }
-        }
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+        const host = req.headers['x-forwarded-host'] || req.headers.host;
+        const localBase = `${protocol}://${host}`;
+        const remoteBase = 'https://tapovana.onrender.com';
 
-        const remoteMembersMap = new Map();
-        for (const rm of remoteMembers) {
-            const emailKey = rm.customer_email || rm.email;
-            const pic = rm.profile_pic || rm.profile_photo_url;
-            if (emailKey && pic) {
-                remoteMembersMap.set(emailKey.toLowerCase(), pic);
-            }
-        }
-
-        const formattedMemberships = result.rows.map(row => {
+        const formattedMemberships = paginatedRows.map(row => {
             let profilePhoto = null;
-            const emailKey = row.email ? row.email.toLowerCase() : '';
-            let pic = remoteMembersMap.get(emailKey) || row.profile_photo_url;
-            
+            const pic = row.profile_photo_url;
             if (pic) {
                 if (pic.startsWith('http')) {
                     profilePhoto = pic;
-                } else if (pic.startsWith('/uploads/profile_photo-') || remoteMembersMap.has(emailKey)) {
-                    profilePhoto = `https://tapovana.onrender.com${pic.startsWith('/') ? '' : '/'}${pic}`;
+                } else if (pic.startsWith('/uploads/profile_photo-')) {
+                    // Uploaded on remote render admin backend
+                    profilePhoto = `${remoteBase}${pic}`;
+                } else if (pic.startsWith('/uploads/') || pic.startsWith('/assets/')) {
+                    // Local admin backend upload
+                    profilePhoto = `${localBase}${pic}`;
                 } else {
-                    // Local server upload
-                    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-                    const host = req.headers['x-forwarded-host'] || req.headers.host;
-                    profilePhoto = `${protocol}://${host}${pic.startsWith('/') ? '' : '/'}${pic}`;
+                    profilePhoto = pic;
                 }
             }
-
-            return {
-                ...row,
-                profilePhoto
-            };
+            return { ...row, profilePhoto };
         });
 
-        return res.json({ success: true, count: formattedMemberships.length, memberships: formattedMemberships, pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) } });
+        return res.json({
+            success: true,
+            count: formattedMemberships.length,
+            memberships: formattedMemberships,
+            pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) }
+        });
     } catch (err) {
         console.error('getAllMemberships error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
@@ -252,22 +258,54 @@ const enrichMembership = (req, row) => {
 // ─── CREATE membership ────────────────────────────────────────────────
 const createMembership = async (req, res) => {
     const { name, email, phone, tier, status, sessions, total_spent, profile_photo_url, profile_photo_base64 } = req.body;
-    if (!name) return res.status(400).json({ success: false, message: 'Name is required.' });
+    if (!name || !name.trim()) return res.status(400).json({ success: false, message: 'Name is required.' });
 
     try {
         const savedImage = handleProfileImage(profile_photo_base64 || profile_photo_url);
         const expiryDate = new Date();
         expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+        const joinDate = new Date().toISOString().split('T')[0];
+        const expiryStr = expiryDate.toISOString().split('T')[0];
+        const emailVal = email ? email.trim().toLowerCase() : null;
+
+        // Check if member already exists with this email
+        if (emailVal) {
+            const existing = await query('SELECT id FROM memberships WHERE LOWER(email) = LOWER($1)', [emailVal]);
+            if (existing.rows.length > 0) {
+                const updated = await query(`
+                    UPDATE memberships SET
+                        name = $1,
+                        phone = COALESCE($2, phone),
+                        tier = $3,
+                        status = $4,
+                        sessions = COALESCE($5, sessions),
+                        profile_photo_url = COALESCE($6, profile_photo_url),
+                        updated_at = NOW()
+                    WHERE id = $7
+                    RETURNING *
+                `, [name.trim(), phone || null, (tier || 'SILVER').toUpperCase(), (status || 'active').toLowerCase(), sessions || 0, savedImage, existing.rows[0].id]);
+                
+                return res.status(200).json({ success: true, message: 'Membership updated.', membership: enrichMembership(req, updated.rows[0]) });
+            }
+        }
+
+        let createdBy = null;
+        if (req.user?.id) {
+            const tmCheck = await query('SELECT id FROM team_members WHERE id::text = $1', [String(req.user.id)]);
+            if (tmCheck.rows.length > 0) {
+                createdBy = tmCheck.rows[0].id;
+            }
+        }
 
         const result = await query(
             'INSERT INTO memberships (name, email, phone, tier, join_date, expiry_date, sessions, total_spent, status, profile_photo_url, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
-            [name.trim(), email || null, phone || null, (tier || 'SILVER').toUpperCase(), new Date().toISOString().split('T')[0], expiryDate.toISOString().split('T')[0], sessions || 0, total_spent || 0, (status || 'active').toLowerCase(), savedImage, req.user?.id || null]
+            [name.trim(), emailVal, phone || null, (tier || 'SILVER').toUpperCase(), joinDate, expiryStr, sessions || 0, total_spent || 0, (status || 'active').toLowerCase(), savedImage, createdBy]
         );
 
         return res.status(201).json({ success: true, message: 'Membership created.', membership: enrichMembership(req, result.rows[0]) });
     } catch (err) {
         console.error('createMembership error:', err);
-        return res.status(500).json({ success: false, message: 'Server error.' });
+        return res.status(500).json({ success: false, message: 'Failed to create membership: ' + err.message });
     }
 };
 
@@ -435,15 +473,38 @@ const syncFromRender = async (req, res) => {
 
 const getRemoteMobileMemberships = async (req, res) => {
     try {
-        const response = await fetch('https://tapoclg.onrender.com/api/membership');
-        if (!response.ok) {
-            return res.status(response.status).json({ success: false, message: 'Failed to fetch remote mobile memberships.' });
+        const response = await fetch('https://tapoclg.onrender.com/api/users', { signal: AbortSignal.timeout(6000) });
+        if (response.ok) {
+            const data = await response.json();
+            const users = Array.isArray(data) ? data : (data.users || data.memberships || []);
+            const tierMap = { 'DIAMOND PASS': 'PLATINUM', 'GOLD PASS': 'GOLD', 'SILVER PASS': 'SILVER' };
+
+            const memberships = users.map(u => ({
+                id: u.id,
+                customer_name: u.name || 'Member',
+                customer_email: u.email || '-',
+                phone: u.phone || '-',
+                membership_name: u.pass_name || 'SILVER PASS',
+                tier: tierMap[u.pass_name?.toUpperCase()] || u.pass_name?.toUpperCase() || 'SILVER',
+                purchase_date: u.joined_date || new Date().toISOString(),
+                available_credits: 12,
+                profile_pic: u.profile_image_url || null
+            }));
+
+            return res.json({ success: true, count: memberships.length, memberships });
         }
-        const data = await response.json();
-        return res.json(data);
+
+        // Fallback to local DB members
+        const local = await query('SELECT * FROM memberships ORDER BY created_at DESC');
+        return res.json({ success: true, memberships: local.rows });
     } catch (err) {
-        console.error('getRemoteMobileMemberships error:', err);
-        return res.status(500).json({ success: false, message: 'Server error fetching remote mobile memberships.' });
+        console.error('getRemoteMobileMemberships error:', err.message);
+        try {
+            const local = await query('SELECT * FROM memberships ORDER BY created_at DESC');
+            return res.json({ success: true, memberships: local.rows });
+        } catch (e) {
+            return res.status(500).json({ success: false, message: 'Server error fetching memberships' });
+        }
     }
 };
 

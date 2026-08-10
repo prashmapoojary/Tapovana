@@ -156,117 +156,32 @@ export default function Membership() {
     }
   }, []);
 
-  // ─── Fetch members from BOTH mobile (Render) AND admin backend ─────
+  // ─── Fetch members only from admin backend (auto-syncs mobile data) ──
   const fetchMembers = useCallback(async () => {
     setDataLoading(true);
-    let adminMembers = [];
-    let mobileMembers = [];
-
-    // Helper to merge and update members state
-    const updateMembersState = (admin, mobile) => {
-      const mergedMap = new Map();
-      for (const m of mobile) {
-        const key = (m.email && m.email !== "-") ? m.email.toLowerCase() : m.id;
-        mergedMap.set(key, m);
-      }
-      for (const m of admin) {
-        const key = (m.email && m.email !== "-") ? m.email.toLowerCase() : m.id;
-        if (mergedMap.has(key)) {
-          const existingMobile = mergedMap.get(key);
-          mergedMap.set(key, {
-            ...m,
-            id: m.id,
-            source: "mobile"
-          });
-        } else {
-          mergedMap.set(key, m);
-        }
-      }
-      setMembers(Array.from(mergedMap.values()));
-    };
-
-    // 1. Fetch from admin backend (usually instant)
-    const adminPromise = (async () => {
-      try {
-        const adminRes = await apiFetch("/api/memberships");
-        if (adminRes.success && adminRes.memberships) {
-          adminMembers = adminRes.memberships.map((m) => ({
-            id: "admin-" + m.id,
-            name: m.name || "Unknown",
-            email: m.email || "-",
-            phone: m.phone || "-",
-            tier: (m.tier || "SILVER").toUpperCase(),
-            joinDate: m.join_date || null,
-            expiryDate: m.expiry_date || null,
-            sessions: m.sessions || 0,
-            totalSpent: m.total_spent || 0,
-            status: m.status || "active",
-            profile_photo_url: m.profile_photo_url || null,
-            profilePhoto: m.profilePhoto || null,
-            source: "admin"
-          }));
-          // Render local data immediately
-          updateMembersState(adminMembers, mobileMembers);
-          setDataLoading(false); // Hide the main loading spinner
-        }
-      } catch (err) {
-        console.warn("Admin API fetch failed", err);
-      }
-    })();
-
-    // 2. Fetch from mobile app (Render APIs through local proxy to solve CORS/Cold Start/404 issues)
-    const mobilePromise = (async () => {
-      const urls = [
-        { path: "/api/memberships/remote/admin", host: "https://tapovana.onrender.com", type: "admin" },
-        { path: "/api/memberships/remote/mobile", host: "https://tapoclg.onrender.com", type: "mobile" }
-      ];
-      let allMobileMembers = [];
-      for (const target of urls) {
-        try {
-          const mobileData = await apiFetch(target.path);
-          if (mobileData.success && mobileData.memberships) {
-            const host = target.host;
-            const mapped = mobileData.memberships.map((m) => {
-              const tier = m.membership_name?.includes("DIAMOND") ? "PLATINUM"
-                : m.membership_name?.includes("GOLD") ? "GOLD"
-                  : "SILVER";
-
-              let join = m.purchase_date ? new Date(m.purchase_date) : new Date();
-              let expiry = new Date(join);
-              expiry.setMonth(expiry.getMonth() + 1);
-
-              return {
-                id: "mobile-" + target.type + "-" + (m.user_id || m.id || Math.random()),
-                name: m.customer_name || "Unknown",
-                email: m.customer_email || "-",
-                phone: m.phone || "-",
-                tier: tier,
-                joinDate: join.toISOString().split("T")[0],
-                expiryDate: expiry.toISOString().split("T")[0],
-                sessions: m.available_credits || 0,
-                totalSpent: 0,
-                status: "active",
-                profile_photo_url: m.profile_pic || null,
-                profilePhoto: m.profile_pic ? (m.profile_pic.startsWith("http") ? m.profile_pic : `${host}${m.profile_pic.startsWith("/") ? "" : "/"}${m.profile_pic}`) : null,
-                source: "mobile"
-              };
-            });
-            allMobileMembers = allMobileMembers.concat(mapped);
-          }
-        } catch (err) {
-          console.warn("Mobile API fetch failed for", target.path, err);
-        }
-      }
-      mobileMembers = allMobileMembers;
-      // Merge in mobile data when it finishes loading
-      updateMembersState(adminMembers, mobileMembers);
-    })();
-
-    // Wait for both to settle to finalize
     try {
-      await Promise.all([adminPromise, mobilePromise]);
+      const res = await apiFetch("/api/memberships");
+      if (res.success && res.memberships) {
+        const mapped = res.memberships.map((m) => ({
+          id: String(m.id),
+          dbId: m.id,
+          name: m.name || "-",
+          email: m.email || "-",
+          phone: m.phone || "-",
+          tier: (m.tier || "SILVER").toUpperCase(),
+          joinDate: m.join_date || null,
+          expiryDate: m.expiry_date || null,
+          sessions: m.sessions || 0,
+          totalSpent: Number(m.total_spent) || 0,
+          status: m.status || "active",
+          profile_photo_url: m.profile_photo_url || null,
+          profilePhoto: m.profilePhoto || m.profile_photo_url || null,
+          source: "admin"
+        }));
+        setMembers(mapped);
+      }
     } catch (err) {
-      console.warn("Error loading members:", err);
+      console.warn("fetchMembers failed:", err);
       triggerAlert("Failed to load members.");
     } finally {
       setDataLoading(false);
@@ -348,7 +263,7 @@ export default function Membership() {
     }
     try {
       setUpgradeSaving(true);
-      await apiFetch("/api/memberships/" + selectedMember.id.replace("admin-", ""), {
+      await apiFetch("/api/memberships/" + (selectedMember.dbId || selectedMember.id), {
         method: "PATCH",
         body: JSON.stringify({ tier: newTier }),
       });
@@ -423,7 +338,7 @@ export default function Membership() {
       } else throw new Error();
     } catch {
       setMembers(prev => [{
-        id: "admin-" + Date.now(),
+        id: String(Date.now()),
         name: enrollForm.name.trim(),
         email: emailLower,
         phone: enrollForm.phone.trim() || "-",
@@ -455,7 +370,7 @@ export default function Membership() {
     if (!confirmed) return;
     
     try {
-      await apiFetch(`/api/memberships/${memberId.replace("admin-", "")}`, {
+      await apiFetch(`/api/memberships/${member.dbId || memberId}`, {
         method: "PATCH",
         body: JSON.stringify({ status: "active" })
       });
@@ -480,7 +395,7 @@ export default function Membership() {
     if (!confirmed) return;
 
     try {
-      await apiFetch(`/api/memberships/${memberId.replace("admin-", "")}`, {
+      await apiFetch(`/api/memberships/${member.dbId || memberId}`, {
         method: "DELETE"
       });
       setMembers(prev => prev.filter(m => m.id !== memberId));
@@ -502,7 +417,7 @@ export default function Membership() {
     if (!confirmed) return;
 
     try {
-      await apiFetch(`/api/memberships/${memberId.replace("admin-", "")}`, {
+      await apiFetch(`/api/memberships/${member.dbId || memberId}`, {
         method: "PATCH",
         body: JSON.stringify({ status: "inactive" })
       });
@@ -530,7 +445,7 @@ export default function Membership() {
       const newExpiry = new Date(member.expiryDate);
       newExpiry.setFullYear(newExpiry.getFullYear() + 1);
       
-      await apiFetch(`/api/memberships/${memberId.replace("admin-", "")}`, {
+      await apiFetch(`/api/memberships/${member.dbId || memberId}`, {
         method: "PATCH",
         body: JSON.stringify({ 
           status: "active",

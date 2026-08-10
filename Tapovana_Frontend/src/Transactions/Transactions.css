@@ -54,65 +54,59 @@
   margin: 0;
 }
 
-/* Revenue ledger metrics overview cards - 5 columns, 14px border-radius matching membership */
+/* Revenue ledger metrics overview cards - Compact 5-column single row */
+.revenue-cards-grid,
 .revenue-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 16px;
-  margin-bottom: 28px;
-}
-
-@media (max-width: 1200px) {
-  .revenue-metrics-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 768px) {
-  .revenue-metrics-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 480px) {
-  .revenue-metrics-grid {
-    grid-template-columns: 1fr;
-  }
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+  width: 100%;
 }
 
 .revenue-metric-card {
-  background: white;
-  border: 2px solid #e2e8f0; /* matching membership cards */
-  border-radius: 14px;
-  padding: 12px 30px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  min-height: 118px;
+  justify-content: center;
+  min-height: 78px;
   box-sizing: border-box;
-  gap: 2px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.02);
-  transition: all 0.25s ease;
+  gap: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+  overflow: hidden;
 }
 
 .revenue-metric-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
   border-color: #CDA751;
 }
 
 .revenue-card-label {
-  font-size: 12px;
-  color: #7b8a9a;
-  font-weight: 500;
+  font-family: 'Manrope', sans-serif;
+  font-size: 11px;
+  color: #64748B;
+  font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 .revenue-card-value {
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 1;
-  margin: 2px 0;
-  color: #2d3748; /* uniform grey color */
+  font-family: 'Poppins', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+  color: #0F172A;
+  white-space: nowrap;
 }
 
 /* Table and ledger structures */
