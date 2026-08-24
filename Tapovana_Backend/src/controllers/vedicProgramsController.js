@@ -138,6 +138,8 @@ const autoUpdateVedicProgramStatuses = async () => {
 
             await query('DELETE FROM allocations WHERE id LIKE $1', [prefix + '%']);
 
+            const allocStatus = (calculatedStatus === 'Completed' || calculatedStatus === 'Cancelled') ? 'expired' : 'active';
+
             if (p.lead_consultant_id) {
                 staffToSync.add(p.lead_consultant_id);
                 const allocId = `${prefix}lead-${p.lead_consultant_id}`;
@@ -150,7 +152,7 @@ const autoUpdateVedicProgramStatuses = async () => {
                         start_date = EXCLUDED.start_date,
                         end_date = EXCLUDED.end_date,
                         status = EXCLUDED.status`,
-                    [allocId, p.lead_consultant_id, 'vedic_program', p.title.trim(), String(p.id), p.start_date, p.end_date, 1440, calculatedStatus]
+                    [allocId, p.lead_consultant_id, 'vedic_program', p.title.trim(), String(p.id), p.start_date, p.end_date, 1440, allocStatus]
                 );
             }
 
@@ -167,7 +169,7 @@ const autoUpdateVedicProgramStatuses = async () => {
                         start_date = EXCLUDED.start_date,
                         end_date = EXCLUDED.end_date,
                         status = EXCLUDED.status`,
-                    [allocId, row.staff_id, 'vedic_program', p.title.trim(), String(p.id), p.start_date, p.end_date, 1440, calculatedStatus]
+                    [allocId, row.staff_id, 'vedic_program', p.title.trim(), String(p.id), p.start_date, p.end_date, 1440, allocStatus]
                 );
             }
         }

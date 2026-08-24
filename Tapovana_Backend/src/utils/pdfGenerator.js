@@ -5,6 +5,7 @@ const https = require('https');
 
 let cachedLogoBuffer = null;
 let cachedFontPath = null;
+let cachedAlexFontPath = null;
 
 /**
  * Fetch local logo image buffer. Caches buffer in memory to keep subsequent generation calls fast.
@@ -220,6 +221,18 @@ function drawFlourish(doc, cx, y, halfWidth) {
  * @returns {Promise<Buffer>} - Resolves with a PDF buffer.
  */
 function generateCertificatePDF(participantName, workshopTitle, completionDate, conductorName, signatureImage, certificateId) {
+    if (typeof participantName === 'object' && participantName !== null) {
+        const opts = participantName;
+        participantName = opts.participantName || opts.attendeeName || opts.attendee_name || opts.name || 'Participant';
+        workshopTitle = opts.workshopTitle || opts.workshop_title || opts.title || 'Workshop';
+        completionDate = opts.completionDate || opts.completion_date || opts.date;
+        conductorName = opts.conductorName || opts.conductor_name;
+        signatureImage = opts.signatureImage || opts.signature_image;
+        certificateId = opts.certificateId || opts.certificate_id;
+    }
+    participantName = (participantName || 'Participant').toString();
+    workshopTitle = (workshopTitle || 'Workshop').toString();
+
     return new Promise(async (resolve, reject) => {
         try {
             // A4 page dimensions in points (landscape)
