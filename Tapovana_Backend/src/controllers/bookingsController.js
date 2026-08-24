@@ -272,8 +272,8 @@ const syncIncomingBookings = async ({ noEmail = false } = {}) => {
                 const existing = await query("SELECT id, profile_pic FROM bookings WHERE id = $1", [rb.id]);
                 if (existing.rows.length === 0) {
                     const paymentStatus = 'PAID';
-                    // Preserve existing status if provided by remote, otherwise PENDING
-                    const bookingStatus = rb.status || 'PENDING';
+                    // Initial status for all incoming mobile bookings is always PENDING until admin updates it
+                    const bookingStatus = 'PENDING';
                     await query(
                         'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (id) DO NOTHING',
                         [
