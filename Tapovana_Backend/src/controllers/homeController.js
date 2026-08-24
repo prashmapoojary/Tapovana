@@ -193,14 +193,12 @@ exports.getAnalyticsDashboard = async (req, res) => {
         FROM bookings
         WHERE booking_date >= '${startIso}' AND booking_date <= '${endIso}';
 
-        SELECT w.date, a.status, w.title, w.price
-        FROM attendees a
-        JOIN workshops w ON a.workshop_id = w.id
+        SELECT w.date, w.status, w.title, w.price
+        FROM workshops w
         WHERE w.date >= '${startIso}' AND w.date <= '${endIso}';
 
-        SELECT vp.start_date, va.status, vp.title, vp.price
-        FROM vedic_attendees va
-        JOIN vedic_programs vp ON va.program_id = vp.id
+        SELECT vp.start_date, vp.status, vp.title, vp.price
+        FROM vedic_programs vp
         WHERE vp.start_date >= '${startIso}' AND vp.start_date <= '${endIso}';
 
         SELECT created_at, amount, status
