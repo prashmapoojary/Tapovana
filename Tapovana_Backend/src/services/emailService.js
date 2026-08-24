@@ -47,8 +47,7 @@ const emailWrapper = (content) => `
           <td align="center" style="padding:32px 40px 24px;">
             <img src="cid:tapovana_logo" alt="Tapovana" width="180" style="display:block;margin:0 auto;" />
           </td>
-        </tr>`
-,StartLine:16,TargetContent:
+        </tr>
         <tr><td style="padding:0 40px 40px;">${content}</td></tr>
         <tr>
           <td align="center" style="padding:24px 40px;border-top:1px solid #2a2a2a;color:#666;font-size:12px;">
