@@ -243,7 +243,8 @@ const syncWorkshopAllocations = async (workshopId) => {
 
         const isCancelled = workshop.status === 'Cancelled' || workshop.status === 'cancelled';
         if (!isCancelled) {
-            const allocationStatus = workshop.status;
+            const isFinished = workshop.status === 'Completed' || workshop.status === 'completed';
+            const allocationStatus = isFinished ? 'expired' : 'active';
             const staffIds = workshop.assigned_staff_ids || [];
             const validStaffIds = staffIds.filter(id => isValidUUID(id));
 

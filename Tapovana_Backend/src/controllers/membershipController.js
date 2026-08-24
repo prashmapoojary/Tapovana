@@ -176,8 +176,8 @@ const getAllMemberships = async (req, res) => {
         const sorted = deduped.rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         const paginatedRows = sorted.slice(offset, offset + parseInt(limit));
 
-        const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-        const host = req.headers['x-forwarded-host'] || req.headers.host;
+        const protocol = (req && req.headers && req.headers['x-forwarded-proto']) || (req && req.protocol) || 'https';
+        const host = (req && req.headers && (req.headers['x-forwarded-host'] || req.headers.host)) || (req && typeof req.get === 'function' ? req.get('host') : null) || 'tapovana.onrender.com';
         const localBase = `${protocol}://${host}`;
         const remoteBase = 'https://tapovana.onrender.com';
 
