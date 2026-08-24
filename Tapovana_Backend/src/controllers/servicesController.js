@@ -222,6 +222,9 @@ const getAllServices = async (req, res) => {
 
 // GET SINGLE SERVICE
 const getServiceById = async (req, res) => {
+    if (!isValidUUID(req.params.id)) {
+        return res.status(404).json({ success: false, message: 'Service not found.' });
+    }
     try {
         const result = await query(
             'SELECT s.*, tm.first_name AS created_by_first_name, tm.last_name AS created_by_last_name ' +
@@ -300,6 +303,10 @@ const createService = async (req, res) => {
 const updateService = async (req, res) => {
     const { name, category, subcategory, description, base_price, duration_minutes, benefits, required_certification, experience_level, tools, image_url, status, assigned_staff_ids } = req.body;
 
+    if (!isValidUUID(req.params.id)) {
+        return res.status(404).json({ success: false, message: 'Service not found.' });
+    }
+
     try {
         const existingResult = await query('SELECT * FROM services WHERE id = $1', [req.params.id]);
         if (!existingResult.rows.length) {
@@ -328,11 +335,15 @@ const updateService = async (req, res) => {
         if (experience_level !== undefined) { fields.push('experience_level = $' + idx++); values.push(experience_level || null); }
         if (tools !== undefined) { fields.push('tools = $' + idx++); values.push(tools || null); }
         if (savedImageUrl !== undefined) { fields.push('image_url = $' + idx++); values.push(savedImageUrl); }
-        if (status !== undefined) { fields.push('status = $' + idx++); values.push(status?.toUpperCase() || null); }
 
-        // Auto-activate DRAFT on update
         let isPublishingDraft = false;
-        if (existingService.status === 'DRAFT' && (status === 'ACTIVE' || status === undefined)) {
+        if (status !== undefined) {
+            fields.push('status = $' + idx++);
+            values.push(status?.toUpperCase() || null);
+            if (existingService.status === 'DRAFT' && status?.toUpperCase() === 'ACTIVE') {
+                isPublishingDraft = true;
+            }
+        } else if (existingService.status === 'DRAFT') {
             fields.push('status = $' + idx++);
             values.push('ACTIVE');
             isPublishingDraft = true;
