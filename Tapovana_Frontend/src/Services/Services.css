@@ -69,58 +69,24 @@
 /* Filters & Controls Section */
 .filters-section {
   position: relative;
-  z-index: 10;
+  z-index: 100;
   margin-bottom: 16px;
-  overflow: visible !important;
-  /* Allow dropdowns to overflow downwards */
 }
 
 .filters-inner {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  min-height: 48px;
-  padding: 0 16px;
-  position: relative;
-
-  /* Horizontal scroll logic */
-  overflow-x: auto;
-  overflow-y: hidden;
-  /* We hide Y to prevent vertical scrolling of the tall padding */
-  padding-bottom: 300px;
-  margin-bottom: -300px;
-
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-  min-width: 100%;
-  pointer-events: none;
-  /* Allow clicks to pass through the invisible tall area */
-}
-
-.filters-inner::-webkit-scrollbar {
-  display: none;
-}
-
-/* The visual bar background and border */
-.filters-inner::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 48px;
+  gap: 16px;
+  padding: 8px 16px;
   background: #FFFFFF;
-  border: 1px solid rgba(205, 167, 81, 0.15);
-  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.04);
-  border-radius: 10px;
-  z-index: -1;
-  pointer-events: auto;
+  border: 1px solid rgba(205, 167, 81, 0.25);
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.04);
+  border-radius: 12px;
+  flex-wrap: wrap;
 }
 
-.filters-inner>div {
-  pointer-events: auto;
-  /* Re-enable clicks for the content */
-  height: 48px;
+.filters-inner > div {
   display: flex;
   align-items: center;
 }
