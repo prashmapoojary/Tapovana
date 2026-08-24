@@ -15,6 +15,21 @@ const ensureUploadsDir = () => {
 const syncMembershipsInternal = async () => {
     let totalSynced = 0;
 
+    let deletedSet = new Set();
+    try {
+        await query(`
+            CREATE TABLE IF NOT EXISTS deleted_memberships (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        const delRes = await query('SELECT LOWER(email) AS email FROM deleted_memberships');
+        deletedSet = new Set(delRes.rows.map(r => r.email));
+    } catch (e) {
+        console.warn('deleted_memberships check error:', e.message);
+    }
+
     // 1. Sync from remote mobile membership API (https://tapoclg.onrender.com/api/membership)
     try {
         const response = await fetch('https://tapoclg.onrender.com/api/membership', { signal: AbortSignal.timeout(6000) });
@@ -23,7 +38,7 @@ const syncMembershipsInternal = async () => {
             const remoteMemberships = Array.isArray(data) ? data : (data.memberships || []);
             for (const m of remoteMemberships) {
                 const emailVal = m.customer_email || m.email;
-                if (!emailVal) continue;
+                if (!emailVal || deletedSet.has(emailVal.trim().toLowerCase())) continue;
                 const nameVal = m.customer_name || m.name || 'Member';
                 const tierMap = { 'DIAMOND PASS': 'PLATINUM', 'GOLD PASS': 'GOLD', 'SILVER PASS': 'SILVER' };
                 const rawTier = m.membership_name || m.tier || 'SILVER';
@@ -62,7 +77,7 @@ const syncMembershipsInternal = async () => {
 
             for (const u of users) {
                 const emailVal = u.email || u.customer_email;
-                if (!emailVal) continue;
+                if (!emailVal || deletedSet.has(emailVal.trim().toLowerCase())) continue;
                 const nameVal = u.name || u.customer_name || 'Member';
                 const phoneVal = u.phone || null;
                 const tierMap = { 'DIAMOND PASS': 'PLATINUM', 'GOLD PASS': 'GOLD', 'SILVER PASS': 'SILVER' };
@@ -103,7 +118,7 @@ const syncMembershipsInternal = async () => {
             WHERE membership_status IS NOT NULL AND membership_status != 'NONE'
         `);
         for (const c of custMembers.rows) {
-            if (!c.email) continue;
+            if (!c.email || deletedSet.has(c.email.trim().toLowerCase())) continue;
             const fullName = `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Member';
             const existing = await query('SELECT id FROM memberships WHERE LOWER(email) = LOWER($1)', [c.email.trim()]);
             const expiry = new Date(c.join_date || Date.now());
@@ -156,6 +171,7 @@ const getAllMemberships = async (req, res) => {
 
         if (tier && tier !== 'ALL') { conditions.push('tier = $' + idx++); values.push(tier.toUpperCase()); }
         if (status && status !== 'ALL') { conditions.push('status = $' + idx++); values.push(status.toLowerCase()); }
+        conditions.push('LOWER(email) NOT IN (SELECT LOWER(email) FROM deleted_memberships)');
 
         const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
         const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -436,10 +452,31 @@ const deleteMembership = async (req, res) => {
         }
 
         if (!result || !result.rows.length) {
+            // Even if local record wasn't found by id, if emailVal is known, insert to deleted_memberships
+            if (emailVal) {
+                await query(`
+                    CREATE TABLE IF NOT EXISTS deleted_memberships (
+                        id SERIAL PRIMARY KEY,
+                        email VARCHAR(255) UNIQUE NOT NULL,
+                        deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                `);
+                await query(`INSERT INTO deleted_memberships (email) VALUES (LOWER($1)) ON CONFLICT (email) DO NOTHING`, [emailVal.trim()]);
+                return res.json({ success: true, message: 'Membership deleted.' });
+            }
             return res.status(404).json({ success: false, message: 'Membership not found.' });
         }
 
         if (emailVal) {
+            await query(`
+                CREATE TABLE IF NOT EXISTS deleted_memberships (
+                    id SERIAL PRIMARY KEY,
+                    email VARCHAR(255) UNIQUE NOT NULL,
+                    deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+            await query(`INSERT INTO deleted_memberships (email) VALUES (LOWER($1)) ON CONFLICT (email) DO NOTHING`, [emailVal.trim()]);
+
             const remoteUrls = [
                 'https://tapovana.onrender.com/api/memberships',
                 'https://tapoclg.onrender.com/api/membership'
