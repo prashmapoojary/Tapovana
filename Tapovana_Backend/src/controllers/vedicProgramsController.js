@@ -1178,17 +1178,71 @@ const enrollUserInVedicProgram = async (req, res) => {
     }
 };
 
+// Helper: Sync mobile Vedic Life members into DB
+const syncMobileVedicMembers = async (programId = null) => {
+    try {
+        const response = await fetch('https://tapoclg.onrender.com/api/vedic-packages/members', { signal: AbortSignal.timeout(8000) });
+        if (response.ok) {
+            const data = await response.json();
+            const remoteMembers = data.success ? (data.members || []) : [];
+            for (const m of remoteMembers) {
+                const email = m.email ? m.email.toLowerCase().trim() : null;
+                const name = m.user_name || m.name || 'Vedic Participant';
+                if (!email) continue;
+
+                let targetProgId = (programId && !isNaN(parseInt(programId))) ? parseInt(programId) : null;
+                if (!targetProgId) {
+                    const progRes = await query("SELECT id FROM vedic_programs ORDER BY created_at ASC LIMIT 1");
+                    if (progRes.rows.length) targetProgId = progRes.rows[0].id;
+                }
+                if (!targetProgId) continue;
+
+                const existing = await query("SELECT id FROM vedic_attendees WHERE program_id = $1 AND LOWER(email) = LOWER($2)", [targetProgId, email]);
+                if (existing.rows.length === 0) {
+                    await query(
+                        `INSERT INTO vedic_attendees (program_id, name, email, phone, status, accommodation_type, payment_status, check_in_date, check_out_date) 
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT DO NOTHING`,
+                        [
+                            targetProgId,
+                            name,
+                            email,
+                            m.phone || '9876543210',
+                            'CONFIRMED',
+                            m.membership_name || 'Standard',
+                            'PAID',
+                            m.join_date ? m.join_date.split('T')[0] : new Date().toISOString().split('T')[0],
+                            null
+                        ]
+                    );
+                    await query('UPDATE vedic_programs SET enrolled = enrolled + 1 WHERE id = $1', [targetProgId]);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('syncMobileVedicMembers error:', err.message);
+    }
+};
+
 // GET VEDIC PROGRAM ATTENDEES (Admin Endpoint)
 const getVedicProgramAttendees = async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await query('SELECT * FROM vedic_attendees WHERE program_id = $1 ORDER BY created_at DESC', [id]);
-        return res.json({
-            success: true,
-            status: 'success',
-            program_id: id,
-            attendees: result.rows
-        });
+        let progId = (!isNaN(parseInt(id))) ? parseInt(id) : null;
+        if (!progId) {
+            const progRes = await query("SELECT id FROM vedic_programs ORDER BY created_at ASC LIMIT 1");
+            if (progRes.rows.length) progId = progRes.rows[0].id;
+        }
+        if (progId) {
+            await syncMobileVedicMembers(progId);
+            const result = await query('SELECT * FROM vedic_attendees WHERE program_id = $1 ORDER BY created_at DESC', [progId]);
+            return res.json({
+                success: true,
+                status: 'success',
+                program_id: id,
+                attendees: result.rows
+            });
+        }
+        return res.json({ success: true, status: 'success', program_id: id, attendees: [] });
     } catch (err) {
         console.error('getVedicProgramAttendees error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });

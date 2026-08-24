@@ -67,7 +67,7 @@ const syncTransactionsFromRemote = async () => {
 
       txCount++;
       const transactionId = `TXN-${10000 + txCount}`;
-      const bookingId = `BK-${1000 + txCount}`;
+      const bookingId = null;
 
       // Resolve Amount
       let amt = parseFloat(t.amount);

@@ -1,10 +1,10 @@
 const { query } = require('../config/db');
-const { 
-    sendBookingStatusEmail, 
-    sendBookingAllocationEmail, 
+const {
+    sendBookingStatusEmail,
+    sendBookingAllocationEmail,
     sendBookingRemovalEmail,
     sendStaffCancellationEmail,
-    sendStaffCompletionEmail 
+    sendStaffCompletionEmail
 } = require('../services/emailService');
 const { checkStaffAllocationConflict, syncStaffMemberStatus } = require('../utils/conflictChecker');
 const https = require('https');
@@ -23,14 +23,14 @@ const applyMembershipDiscount = async (emailOrId, serviceName, currentAmountStr,
                AND status = 'active' AND expiry_date >= CURRENT_DATE`,
             [ident.toLowerCase(), nameVal.toLowerCase()]
         );
-        
+
         if (memRes.rows.length === 0) {
             return currentAmountStr;
         }
 
         const membership = memRes.rows[0];
         const tier = (membership.tier || 'SILVER').toUpperCase();
-        
+
         let discountRate = 0;
         let passLabel = '';
         if (tier === 'SILVER') {
@@ -122,7 +122,7 @@ const getPexelsFallbackImage = async (queryStr) => {
     }
     const pexelsKey = process.env.PEXELS_KEY || process.env.PEXELS_API_KEY || 'ayDlUYgPQDoXz7uZVuztXRKsNILvAitgDiUnKrWR1nwk0VBu2NbLE4v9';
     if (!pexelsKey) return null;
-    
+
     const image = await new Promise((resolve) => {
         const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(cleanQuery)}&per_page=1`;
         const req = https.get(url, {
@@ -146,7 +146,7 @@ const getPexelsFallbackImage = async (queryStr) => {
         });
         req.on('error', () => resolve(null));
     });
-    
+
     if (image) {
         pexelsCache.set(cleanQuery, image);
     }
@@ -165,7 +165,7 @@ const getFullImageUrl = (req, imageUrl) => {
 
 const enrichBookingObject = async (req, booking) => {
     if (!booking) return null;
-    
+
     let profilePhoto = null;
     if (booking.profile_pic) {
         if (booking.profile_pic.startsWith('http')) {
@@ -174,7 +174,7 @@ const enrichBookingObject = async (req, booking) => {
             profilePhoto = `https://tapovana.onrender.com${booking.profile_pic.startsWith('/') ? '' : '/'}${booking.profile_pic}`;
         }
     }
-    
+
     let serviceImage = null;
     if (booking.service_name) {
         try {
@@ -188,7 +188,7 @@ const enrichBookingObject = async (req, booking) => {
             console.error('Error fetching service image for booking:', err);
         }
     }
-    
+
     return {
         ...booking,
         profilePhoto,
@@ -260,15 +260,15 @@ const syncIncomingBookings = async ({ noEmail = false } = {}) => {
         if (response.ok) {
             const data = await response.json();
             const remoteBookings = data.success ? (data.bookings || []) : [];
-            
+
             // Get all deleted booking IDs
             const deletedRes = await query("SELECT booking_id FROM deleted_booking_ids");
             const deletedIds = new Set(deletedRes.rows.map(r => String(r.booking_id)));
-            
+
             for (const rb of remoteBookings) {
                 const bookingId = String(rb.id);
                 if (deletedIds.has(bookingId)) continue;
-                
+
                 const existing = await query("SELECT id, profile_pic FROM bookings WHERE id = $1", [rb.id]);
                 if (existing.rows.length === 0) {
                     const paymentStatus = 'PAID';
@@ -284,7 +284,7 @@ const syncIncomingBookings = async ({ noEmail = false } = {}) => {
                             rb.profile_pic || null
                         ]
                     );
-                    
+
                     // Skip email notifications during bulk sync
                     if (!noEmail) {
                         let userEmail = rb.user_email || rb.email || null;
@@ -422,8 +422,8 @@ const validateBookingTransitionAndAllocations = async (booking, newStatus, incom
                     sessionId: booking.id
                 });
                 if (conflictCheck.conflict) {
-                    return { 
-                        valid: false, 
+                    return {
+                        valid: false,
                         message: conflictCheck.message || 'Staff allocation failed due to daily limit or package conflict.',
                         reasonCode: conflictCheck.reasonCode
                     };
@@ -442,7 +442,7 @@ const createBooking = async (req, res) => {
         if (!user_name || !service_name) {
             return res.status(400).json({ success: false, message: 'user_name and service_name are required.' });
         }
-        
+
         // Check if deleted
         const bookingId = id ? parseInt(id) : null;
         if (bookingId) {
@@ -460,7 +460,7 @@ const createBooking = async (req, res) => {
         const status = 'PENDING';
         const emailAddressForDiscount = user_email || email || null;
         const finalAmount = await applyMembershipDiscount(emailAddressForDiscount, service_name, total_amount, user_name);
-        
+
         const insertRes = await query(
             'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES (COALESCE($1, nextval(\'bookings_id_seq\')), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, $13) RETURNING *',
             [
@@ -471,9 +471,9 @@ const createBooking = async (req, res) => {
                 profile_pic || null
             ]
         );
-        
+
         const newBooking = insertRes.rows[0];
-        
+
         // Trigger audit trail log
         await logBookingAudit(newBooking.id, newBooking.status, null, null, 'New booking created from mobile endpoint.');
 
@@ -862,7 +862,7 @@ const updateBookingStatus = async (req, res) => {
 
             // Sync each staff's availability_status
             for (const staffId of [...incomingStaffIds, ...allocDiff.removedIds]) {
-                await syncStaffMemberStatus(staffId).catch(() => {});
+                await syncStaffMemberStatus(staffId).catch(() => { });
             }
 
         } else if (newStatus === 'CANCELLED') {
@@ -871,13 +871,13 @@ const updateBookingStatus = async (req, res) => {
                 `SELECT staff_id FROM allocations WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
                 [String(booking.id), `bk-alloc-${booking.id}-%`]
             );
-            
+
             // Delete allocations entirely (Allocation removed)
             await query(
                 `DELETE FROM allocations WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
                 [String(booking.id), `bk-alloc-${booking.id}-%`]
             );
-            
+
             finalStaffId = null;
             finalStaffName = null;
 
@@ -887,7 +887,7 @@ const updateBookingStatus = async (req, res) => {
                 uniqueStaffIds.add(booking.therapist_id);
             }
             for (const staffId of uniqueStaffIds) {
-                await syncStaffMemberStatus(staffId).catch(() => {});
+                await syncStaffMemberStatus(staffId).catch(() => { });
             }
 
             // Notify staff of cancellation
@@ -912,7 +912,7 @@ const updateBookingStatus = async (req, res) => {
                 `UPDATE allocations SET status = 'expired' WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
                 [String(booking.id), `bk-alloc-${booking.id}-%`]
             );
-            
+
             // Fetch completed staff
             const completedAllocRows = await query(
                 `SELECT staff_id FROM allocations WHERE session_id = $1 AND type = 'service' AND id LIKE $2`,
@@ -922,9 +922,9 @@ const updateBookingStatus = async (req, res) => {
             if (booking.therapist_id) {
                 uniqueStaffIds.add(booking.therapist_id);
             }
-            
+
             for (const staffId of uniqueStaffIds) {
-                await syncStaffMemberStatus(staffId).catch(() => {});
+                await syncStaffMemberStatus(staffId).catch(() => { });
             }
 
             // Send completion email to staff
@@ -1139,7 +1139,7 @@ const syncFromRender = async (req, res) => {
             );
 
             synced++;
-            
+
             // Try to find user email and send Pending notification
             const newBooking = insertResult.rows[0];
             let userEmail = newBooking.user_email || booking.user_email || booking.email || null;
@@ -1185,7 +1185,7 @@ const deleteBooking = async (req, res) => {
         // Update their availability status in team_members
         for (const row of staffToSyncRes.rows) {
             if (row.staff_id) {
-                await syncStaffMemberStatus(row.staff_id).catch(() => {});
+                await syncStaffMemberStatus(row.staff_id).catch(() => { });
             }
         }
 

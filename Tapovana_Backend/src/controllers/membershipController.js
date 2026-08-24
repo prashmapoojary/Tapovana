@@ -15,7 +15,45 @@ const ensureUploadsDir = () => {
 const syncMembershipsInternal = async () => {
     let totalSynced = 0;
 
-    // 1. Sync from remote mobile users API (https://tapoclg.onrender.com/api/users)
+    // 1. Sync from remote mobile membership API (https://tapoclg.onrender.com/api/membership)
+    try {
+        const response = await fetch('https://tapoclg.onrender.com/api/membership', { signal: AbortSignal.timeout(6000) });
+        if (response.ok) {
+            const data = await response.json();
+            const remoteMemberships = Array.isArray(data) ? data : (data.memberships || []);
+            for (const m of remoteMemberships) {
+                const emailVal = m.customer_email || m.email;
+                if (!emailVal) continue;
+                const nameVal = m.customer_name || m.name || 'Member';
+                const tierMap = { 'DIAMOND PASS': 'PLATINUM', 'GOLD PASS': 'GOLD', 'SILVER PASS': 'SILVER' };
+                const rawTier = m.membership_name || m.tier || 'SILVER';
+                const mappedTier = tierMap[rawTier.toUpperCase()] || rawTier.toUpperCase();
+                let joinVal = m.purchase_date || m.join_date || new Date().toISOString();
+                const expiry = new Date(joinVal);
+                expiry.setFullYear(expiry.getFullYear() + 1);
+                const expiryStr = expiry.toISOString().split('T')[0];
+                const picVal = m.profile_pic || m.profile_photo_url || null;
+
+                const existing = await query('SELECT id FROM memberships WHERE LOWER(email) = LOWER($1)', [emailVal.trim()]);
+                if (existing.rows.length) {
+                    await query(
+                        'UPDATE memberships SET name = $1, tier = $2, join_date = $3, expiry_date = $4, profile_photo_url = COALESCE($5, profile_photo_url) WHERE LOWER(email) = LOWER($6)',
+                        [nameVal, mappedTier, joinVal.split('T')[0], expiryStr, picVal, emailVal.trim()]
+                    );
+                } else {
+                    await query(
+                        'INSERT INTO memberships (name, email, tier, join_date, expiry_date, sessions, total_spent, status, profile_photo_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+                        [nameVal, emailVal.trim(), mappedTier, joinVal.split('T')[0], expiryStr, m.available_credits || 10, 15000, 'active', picVal]
+                    );
+                    totalSynced++;
+                }
+            }
+        }
+    } catch (err) {
+        console.warn('syncMembershipsInternal remote membership error:', err.message);
+    }
+
+    // 2. Sync from remote mobile users API (https://tapoclg.onrender.com/api/users)
     try {
         const response = await fetch('https://tapoclg.onrender.com/api/users', { signal: AbortSignal.timeout(6000) });
         if (response.ok) {

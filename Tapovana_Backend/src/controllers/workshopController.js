@@ -1177,10 +1177,45 @@ const enrollUserInWorkshop = async (req, res) => {
     }
 };
 
+// Helper: Sync mobile workshop enrollments into DB
+const syncMobileWorkshopEnrollments = async (workshopId = null) => {
+    try {
+        const response = await fetch('https://tapoclg.onrender.com/api/workshops/enroll', { signal: AbortSignal.timeout(8000) });
+        if (response.ok) {
+            const data = await response.json();
+            const remoteEnrollments = data.success ? (data.enrollments || []) : [];
+            for (const re of remoteEnrollments) {
+                const email = re.email ? re.email.toLowerCase().trim() : null;
+                const name = re.username || re.name || 'Enrolled Participant';
+                if (!email) continue;
+
+                let targetWsId = (workshopId && isValidUUID(workshopId)) ? workshopId : null;
+                if (!targetWsId) {
+                    const wsRes = await query("SELECT id FROM workshops ORDER BY created_at ASC LIMIT 1");
+                    if (wsRes.rows.length) targetWsId = wsRes.rows[0].id;
+                }
+                if (!targetWsId) continue;
+
+                const existing = await query("SELECT id FROM attendees WHERE workshop_id = $1 AND LOWER(email) = LOWER($2)", [targetWsId, email]);
+                if (existing.rows.length === 0) {
+                    await query(
+                        'INSERT INTO attendees (workshop_id, name, email, phone, source, certificate_eligible) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING',
+                        [targetWsId, name, email, re.phone || null, 'mobile', true]
+                    );
+                    await query('UPDATE workshops SET enrolled = enrolled + 1 WHERE id = $1', [targetWsId]);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('syncMobileWorkshopEnrollments error:', err.message);
+    }
+};
+
 // GET WORKSHOP ATTENDEES (Admin Endpoint)
 const getWorkshopAttendees = async (req, res) => {
     const { id } = req.params;
     try {
+        await syncMobileWorkshopEnrollments(id);
         const result = await query('SELECT * FROM attendees WHERE workshop_id = $1 ORDER BY created_at DESC', [id]);
         return res.json({
             success: true,
