@@ -103,7 +103,7 @@ function Services() {
   const fetchServices = async () => {
     try {
       if (services.length === 0) setLoading(true);
-      const data = await apiFetch('/api/services');
+      const data = await apiFetch('/api/services?limit=100');
       let backendServices = [];
       if (data.success) {
         backendServices = data.services || [];
