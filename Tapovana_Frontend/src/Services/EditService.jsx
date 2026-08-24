@@ -326,7 +326,8 @@ function EditService({ service, onBack }) {
                 required_certification: selectedCerts,
                 experience_level: experienceLevel,
                 assigned_staff_ids: assignedStaff,
-                image_url: firstImage
+                image_url: firstImage,
+                status: 'ACTIVE'
             };
 
             const isDraft = typeof service.id === 'string' && service.id.startsWith('draft_');

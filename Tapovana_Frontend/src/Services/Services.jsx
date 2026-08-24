@@ -108,8 +108,7 @@ function Services() {
       if (data.success) {
         backendServices = data.services || [];
       }
-      const drafts = JSON.parse(localStorage.getItem('tapovana_service_drafts') || '[]');
-      setServices([...drafts, ...backendServices]);
+      setServices(backendServices);
     } catch (err) {
       setError(err.message);
     } finally {

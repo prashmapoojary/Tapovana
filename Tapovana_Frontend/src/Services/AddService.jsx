@@ -230,7 +230,6 @@ function AddService({ onBack }) {
         .map(([name]) => name)
         .join('\n');
 
-      // ★ The image is sent as base64 in image_url — backend handles saving it to disk
       const firstImage = galleryImages.length > 0 ? galleryImages[0] : null;
 
       const body = {
@@ -245,18 +244,9 @@ function AddService({ onBack }) {
         required_certification: selectedCerts,
         experience_level: experienceLevel,
         assigned_staff_ids: assignedStaff,
-        image_url: firstImage, // ← backend handles both base64 and URL
+        image_url: firstImage,
         status: statusOverride
       };
-
-      if (statusOverride === 'DRAFT') {
-        const drafts = JSON.parse(localStorage.getItem('tapovana_service_drafts') || '[]');
-        drafts.push({ ...body, id: 'draft_' + Date.now(), status: 'DRAFT' });
-        localStorage.setItem('tapovana_service_drafts', JSON.stringify(drafts));
-        triggerAlert("Service saved as Draft", true);
-        onBack();
-        return;
-      }
 
       const data = await apiFetch('/api/services', {
         method: 'POST',
@@ -266,11 +256,13 @@ function AddService({ onBack }) {
       console.log('Create service response:', data);
 
       if (data.success) {
-        triggerAlert("Service created successfully", true);
+        triggerAlert(statusOverride === 'DRAFT' ? "Service saved as Draft successfully" : "Service created successfully", true);
         onBack();
+      } else {
+        throw new Error(data.message || "Failed to save service");
       }
     } catch (err) {
-      triggerAlert("Error creating service: " + err.message);
+      triggerAlert("Error saving service: " + err.message);
     } finally {
       setIsSaving(false);
       setIsDrafting(false);
