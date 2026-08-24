@@ -77,18 +77,26 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   padding: 8px 16px;
   background: #FFFFFF;
   border: 1px solid rgba(205, 167, 81, 0.25);
   box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.04);
   border-radius: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.filters-inner::-webkit-scrollbar {
+  display: none;
 }
 
 .filters-inner > div {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .tabs-group {
