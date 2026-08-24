@@ -133,7 +133,8 @@ const Layout = () => {
     }
 
     if (user.profile_photo_source === "upload" && photoUrl) {
-      return `${API_BASE}${photoUrl}`;
+      const cleanPath = photoUrl.startsWith("/") ? photoUrl : `/${photoUrl}`;
+      return `${API_BASE}${cleanPath}`;
     } else if (user.profile_photo_source === "local" && photoUrl) {
       return `/avatars/${photoUrl}`;
     } else if (user.avatar_url) {
@@ -141,9 +142,9 @@ const Layout = () => {
       if (avUrl && /^[A-Za-z]:[/\\]/i.test(avUrl)) {
         avUrl = "/uploads/" + avUrl.replace(/\\/g, '/').split('/').pop();
       }
-      return avUrl.startsWith("http") || avUrl.startsWith("/")
-        ? avUrl
-        : `${API_BASE}${avUrl}`;
+      if (avUrl.startsWith("http")) return avUrl;
+      const cleanPath = avUrl.startsWith("/") ? avUrl : `/${avUrl}`;
+      return `${API_BASE}${cleanPath}`;
     }
     return DefaultAvatar;
   }, [user]);

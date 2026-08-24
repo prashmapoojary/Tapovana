@@ -136,7 +136,7 @@ function Customers() {
     const url = String(customer.avatar_url).trim();
     if (!url) return null;
     if (url.startsWith("/")) {
-      return `https://tapoclg.onrender.com${url}`;
+      return `${API_BASE}${url}`;
     }
     return url;
   };

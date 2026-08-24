@@ -46,11 +46,12 @@ const EditMemberDrawer = ({ user, onClose }) => {
         if (avUrl && /^[A-Za-z]:[/\\]/i.test(avUrl)) {
           avUrl = "/uploads/" + avUrl.replace(/\\/g, '/').split('/').pop();
         }
-        setPhotoPreview(
-          avUrl.startsWith("http") || avUrl.startsWith("/")
-            ? avUrl
-            : `${API_BASE}${avUrl}`
-        );
+        if (avUrl.startsWith("http")) {
+          setPhotoPreview(avUrl);
+        } else {
+          const cleanPath = avUrl.startsWith("/") ? avUrl : `/${avUrl}`;
+          setPhotoPreview(`${API_BASE}${cleanPath}`);
+        }
       } else {
         setPhotoPreview(null);
       }
@@ -161,7 +162,12 @@ function Team() {
       if (avUrl && /^[A-Za-z]:[/\\]/i.test(avUrl)) {
         avUrl = "/uploads/" + avUrl.replace(/\\/g, '/').split('/').pop();
       }
-      avatarSrc = avUrl.startsWith("http") || avUrl.startsWith("/") ? avUrl : `${API_BASE}${avUrl}`;
+      if (avUrl.startsWith("http")) {
+        avatarSrc = avUrl;
+      } else {
+        const cleanPath = avUrl.startsWith("/") ? avUrl : `/${avUrl}`;
+        avatarSrc = `${API_BASE}${cleanPath}`;
+      }
     }
     return avatarSrc;
   };

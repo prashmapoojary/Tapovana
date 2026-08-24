@@ -14,19 +14,26 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// In development, redirect all outgoing emails to SMTP_USER so the developer receives them on their Gmail
-/*
-if (process.env.NODE_ENV === "development") {
-  const originalSendMail = transporter.sendMail.bind(transporter);
-  transporter.sendMail = function (mailOptions, callback) {
-    if (mailOptions && mailOptions.to) {
-      console.log(`[DEV EMAIL REDIRECT] Original recipient: ${mailOptions.to}. Redirecting to: ${process.env.SMTP_USER}`);
-      mailOptions.to = process.env.SMTP_USER;
+const path = require("path");
+const fs = require("fs");
+
+const originalSendMail = transporter.sendMail.bind(transporter);
+transporter.sendMail = function (mailOptions, callback) {
+  if (mailOptions && typeof mailOptions.html === "string" && mailOptions.html.includes("cid:tapovana_logo")) {
+    const logoFile = path.join(__dirname, "../../assets/logo.png");
+    if (fs.existsSync(logoFile)) {
+      mailOptions.attachments = mailOptions.attachments || [];
+      if (!mailOptions.attachments.some(a => a.cid === "tapovana_logo")) {
+        mailOptions.attachments.push({
+          filename: "logo.png",
+          path: logoFile,
+          cid: "tapovana_logo"
+        });
+      }
     }
-    return originalSendMail(mailOptions, callback);
-  };
-}
-*/
+  }
+  return originalSendMail(mailOptions, callback);
+};
 
 const emailWrapper = (content) => `
 <!DOCTYPE html>
@@ -38,9 +45,10 @@ const emailWrapper = (content) => `
       <table width="560" cellpadding="0" cellspacing="0" style="background:#111111;border-radius:12px;overflow:hidden;border:1px solid #2a2a2a;">
         <tr>
           <td align="center" style="padding:32px 40px 24px;">
-            <img src="https://i.postimg.cc/5X7w5TCQ/logo.png" alt="Tapovana" width="180" style="display:block;margin:0 auto;" />
+            <img src="cid:tapovana_logo" alt="Tapovana" width="180" style="display:block;margin:0 auto;" />
           </td>
-        </tr>
+        </tr>`
+,StartLine:16,TargetContent:
         <tr><td style="padding:0 40px 40px;">${content}</td></tr>
         <tr>
           <td align="center" style="padding:24px 40px;border-top:1px solid #2a2a2a;color:#666;font-size:12px;">

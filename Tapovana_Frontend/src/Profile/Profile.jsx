@@ -84,11 +84,12 @@ function Profile() {
         if (avUrl && /^[A-Za-z]:[/\\]/i.test(avUrl)) {
           avUrl = "/uploads/" + avUrl.replace(/\\/g, '/').split('/').pop();
         }
-        setPhotoPreview(
-          avUrl.startsWith("http") || avUrl.startsWith("/")
-            ? avUrl
-            : `${API_BASE}${avUrl}`
-        );
+        if (avUrl.startsWith("http")) {
+          setPhotoPreview(avUrl);
+        } else {
+          const cleanPath = avUrl.startsWith("/") ? avUrl : `/${avUrl}`;
+          setPhotoPreview(`${API_BASE}${cleanPath}`);
+        }
       } else {
         setPhotoPreview(null);
       }
