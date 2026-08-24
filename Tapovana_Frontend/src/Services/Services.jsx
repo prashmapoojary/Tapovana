@@ -390,20 +390,22 @@ function Services() {
                              setOpenActionMenu(openActionMenu === service.id ? null : service.id);
                            }}
                          />
-                         {openActionMenu === service.id && (
-                           <div style={{
-                             position: "absolute",
-                             right: 0,
-                             top: "100%",
-                             zIndex: 1000,
-                             background: "#fff",
-                             border: "1px solid #e2e8f0",
-                             borderRadius: "8px",
-                             boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                             minWidth: "140px",
-                             overflow: "hidden",
-                             textAlign: "left"
-                           }}>
+                         {openActionMenu === service.id && (() => {
+                            const isNearBottom = idx >= paginatedServices.length - 2 || paginatedServices.length <= 3;
+                            return (
+                              <div style={{
+                                position: "absolute",
+                                right: 0,
+                                ...(isNearBottom ? { bottom: "100%", marginBottom: "4px" } : { top: "100%", marginTop: "4px" }),
+                                zIndex: 9999,
+                                background: "#fff",
+                                border: "1px solid #e2e8f0",
+                                borderRadius: "8px",
+                                boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
+                                minWidth: "140px",
+                                overflow: "hidden",
+                                textAlign: "left"
+                              }}>
                              <div
                                onClick={(e) => {
                                  e.stopPropagation();
@@ -444,8 +446,9 @@ function Services() {
                              >
                                Delete
                              </div>
-                           </div>
-                         )}
+                             </div>
+                            );
+                          })()}
                        </div>
                      </td>
                   </tr>

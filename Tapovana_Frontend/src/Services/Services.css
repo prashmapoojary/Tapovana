@@ -283,7 +283,7 @@
   border: 1px solid rgba(205, 167, 81, 0.1);
   box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .services-table {
