@@ -260,7 +260,6 @@ function Services() {
                 </button>
               ))}
             </div>
-            <div className="filter-divider"></div>
             <div className="controls-group">
               <div className="category-dropdown" ref={categoryRef} onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
                 <FilterIcon />

@@ -133,11 +133,7 @@
 }
 
 .filter-divider {
-  width: 1px;
-  height: 24px;
-  background: rgba(205, 167, 81, 0.15);
-  margin: 0 12px;
-  flex-shrink: 0;
+  display: none;
 }
 
 .controls-group {
