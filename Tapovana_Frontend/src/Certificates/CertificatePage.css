@@ -208,16 +208,19 @@
 }
 
 .cursive-sig {
-  font-family: 'Qaskin', cursive;
-  line-height: 1.1;
+  font-family: 'Alex Brush', cursive;
+  line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: block;
-  height: 55px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 50px;
   width: 100%;
   box-sizing: border-box;
-  padding-top: 10px; /* Shift text down closer to the line */
+  padding-bottom: 4px;
+  color: #17110e;
 }
 
 /* Divider lines */

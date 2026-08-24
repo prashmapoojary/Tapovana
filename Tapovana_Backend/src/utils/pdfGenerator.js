@@ -462,29 +462,30 @@ function generateCertificatePDF(participantName, workshopTitle, completionDate, 
             // Fallback cursive signature text if image not drawn
             if (!signatureDrawn) {
                 const signatureText = conductorName || 'Workshop Instructor';
-                if (qaskinFontPath) {
+                const fontToUse = alexFontPath || qaskinFontPath;
+                if (fontToUse) {
                     try {
                         const len = signatureText.length;
-                        let fontSize = 32;
-                        if (len <= 10) fontSize = 32;
-                        else if (len <= 18) fontSize = 24;
+                        let fontSize = 24;
+                        if (len <= 10) fontSize = 26;
+                        else if (len <= 18) fontSize = 22;
                         else if (len <= 26) fontSize = 18;
-                        else fontSize = 14;
+                        else fontSize = 15;
 
-                        doc.font(qaskinFontPath)
+                        doc.font(fontToUse)
                            .fontSize(fontSize)
                            .fillColor(bodyColor)
-                           .text(signatureText, 551.89, sigY + 5, { width: 200, align: 'center' });
+                           .text(signatureText, 551.89, sigY + 15, { width: 200, align: 'center' });
                         signatureDrawn = true;
                     } catch (fontErr) {
-                        console.warn('Failed to render loaded Qaskin font:', fontErr);
+                        console.warn('Failed to render loaded cursive font:', fontErr);
                     }
                 }
                 if (!signatureDrawn) {
                     doc.font('Times-BoldItalic')
-                       .fontSize(32)
+                       .fontSize(22)
                        .fillColor(bodyColor)
-                       .text(signatureText, 551.89, sigY + 10, { width: 200, align: 'center' });
+                       .text(signatureText, 551.89, sigY + 18, { width: 200, align: 'center' });
                 }
             }
 
