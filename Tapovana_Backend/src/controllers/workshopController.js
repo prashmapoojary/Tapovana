@@ -1459,11 +1459,17 @@ const updateAttendeeAttendance = async (req, res) => {
                 });
             }
         } else {
-            // After completion: status change must be one-way (cannot revert Attended or Absent back to Enrolled)
-            if ((currentAttendeeStatus === 'attended' || currentAttendeeStatus === 'absent') && status === 'enrolled') {
+            // After completion: Once marked Attended, Absent option is no longer available
+            if (currentAttendeeStatus === 'attended' && (status === 'absent' || status === 'enrolled')) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Cannot revert attendee status back to Enrolled after they have been marked as Attended or Absent.'
+                    message: 'Once an attendee is marked Attended, their status cannot be changed to Absent or Enrolled.'
+                });
+            }
+            if (currentAttendeeStatus === 'absent' && status === 'enrolled') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cannot revert attendee status back to Enrolled after they have been marked as Absent.'
                 });
             }
         }

@@ -1521,7 +1521,9 @@ export default function Workshops() {
                             >
                               <option value="enrolled" disabled={a.status === "attended" || a.status === "absent"}>Enrolled</option>
                               <option value="attended" disabled={getLiveStatus(selectedWs) !== "completed"}>Attended</option>
-                              <option value="absent" disabled={getLiveStatus(selectedWs) !== "completed"}>Absent</option>
+                              {a.status !== "attended" && (
+                                <option value="absent" disabled={getLiveStatus(selectedWs) !== "completed" || a.status === "attended"}>Absent</option>
+                              )}
                               <option value="delete">Delete Attendee</option>
                             </select>
                           </td>
