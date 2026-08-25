@@ -15,7 +15,7 @@ function normalizeCategory(category) {
     return 'services'; // fallback
 }
 
-// 1. Search Pexels Stock Media
+// 1. Search Unsplash / Pexels Stock Media
 const searchPexels = async (req, res) => {
     try {
         const queryStr = (req.query.query || 'wellness').trim().toLowerCase();
@@ -31,12 +31,45 @@ const searchPexels = async (req, res) => {
             });
         }
 
+        const unsplashKey = process.env.UNSPLASH_ACCESS_KEY || process.env.UNSPLASH_KEY;
         const pexelsKey = process.env.PEXELS_KEY || process.env.PEXELS_API_KEY;
+
+        // Try Unsplash API first if configured
+        if (type === 'image' && unsplashKey) {
+            const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(queryStr)}&per_page=30&client_id=${unsplashKey}`;
+            https.get(url, { timeout: 6000 }, (apiRes) => {
+                let data = '';
+                apiRes.on('data', chunk => data += chunk);
+                apiRes.on('end', () => {
+                    try {
+                        const result = JSON.parse(data);
+                        const images = (result.results || []).map(img => ({
+                            id: img.id,
+                            url: img.urls.regular || img.urls.full,
+                            thumbnail_url: img.urls.small || img.urls.thumb,
+                            description: img.alt_description || img.description || 'Unsplash Photo',
+                            author: img.user?.name || 'Unsplash Photographer',
+                            source: 'unsplash',
+                            type: 'image'
+                        }));
+                        return res.json({ success: true, images });
+                    } catch (err) {
+                        console.error('Unsplash parsing error:', err);
+                    }
+                });
+            }).on('error', err => console.error('Unsplash connection error:', err));
+        }
+
         if (!pexelsKey) {
-            return res.status(500).json({
-                success: false,
-                message: 'Pexels API key is not configured on the server.'
-            });
+            // Unsplash Curated Fallback Images
+            const unsplashFallback = [
+                { id: 'u1', url: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=300&q=80', description: 'Ayurveda Herbal Wellness', author: 'Unsplash', source: 'unsplash', type: 'image' },
+                { id: 'u2', url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=300&q=80', description: 'Yoga & Meditation', author: 'Unsplash', source: 'unsplash', type: 'image' },
+                { id: 'u3', url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=300&q=80', description: 'Ayurvedic Treatment & Spa', author: 'Unsplash', source: 'unsplash', type: 'image' },
+                { id: 'u4', url: 'https://images.unsplash.com/photo-1512290900673-8a39529b4703?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1512290900673-8a39529b4703?auto=format&fit=crop&w=300&q=80', description: 'Healthy Herbal Tea & Spices', author: 'Unsplash', source: 'unsplash', type: 'image' },
+                { id: 'u5', url: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=300&q=80', description: 'Healthy Organic Nutrition', author: 'Unsplash', source: 'unsplash', type: 'image' }
+            ];
+            return res.json({ success: true, images: unsplashFallback });
         }
 
         let url = '';

@@ -887,7 +887,7 @@ export default function Blogs({ mode }) {
                 <label style={{ fontSize: "14px", fontWeight: "700", color: "#1a202c", margin: 0 }}>Featured Image Thumbnail * (Required for publishing)</label>
                 <button type="button" className="blog-seo-toggle" style={{ margin: 0, fontSize: "12px", border: "1px solid #cda751", padding: "4px 10px", borderRadius: "6px" }}
                   onClick={(e) => { e.stopPropagation(); setMediaModalOpen(true); }}>
-                  📷 Choose from Pexels
+                  📷 Choose from Unsplash
                 </button>
               </div>
               <div
@@ -969,7 +969,7 @@ export default function Blogs({ mode }) {
             setMediaModalOpen(false);
           }}
           allowVideos={false}
-          title="Select Pexels Image"
+          title="Select Unsplash Image"
           page_type="blogs"
           category={editBlogData?.category || 'Ayurveda'}
           subcategory="All"
