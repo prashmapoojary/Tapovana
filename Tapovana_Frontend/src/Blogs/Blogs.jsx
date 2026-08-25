@@ -216,7 +216,9 @@ export default function Blogs({ mode }) {
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [activeTab, setActiveTab] = useState(() => {
     const status = searchParams.get("status");
-    if (status === "pending" && isAdmin) return "pending";
+    if (status === "pending") return "pending";
+    if (status === "draft") return "draft";
+    if (status === "rejected") return "rejected";
     if (status === "published") return "published";
     if (status === "archived") return "archived";
     return isStaff ? "my_blogs" : "published";
@@ -225,67 +227,12 @@ export default function Blogs({ mode }) {
   // Sync activeTab with status search param when it changes
   useEffect(() => {
     const status = searchParams.get("status");
-    if (status === "pending" && isAdmin) setActiveTab("pending");
+    if (status === "pending") setActiveTab("pending");
+    else if (status === "draft") setActiveTab("draft");
+    else if (status === "rejected") setActiveTab("rejected");
     else if (status === "published") setActiveTab("published");
     else if (status === "archived") setActiveTab("archived");
-  }, [searchParams, isAdmin]);
-  const [editingBlogId, setEditingBlogId] = useState(null);
-  const [editBlogData, setEditBlogData] = useState({
-    title: "", category: "AYURVEDA", summary: "", content_html: "",
-    featured_image: "", tags: "", seo_title: "", seo_description: "", seo_keywords: "",
-    author_name: "", author_role: "", read_time: ""
-  });
-  const [rejectionModal, setRejectionModal] = useState({ isOpen: false, blogId: null, reason: "" });
-  const [showSeo, setShowSeo] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const [commentText, setCommentText] = useState("");
-  const [savingBlog, setSavingBlog] = useState(false);
-  const fileInputRef = useRef(null);
-
-
-  // Handle initializing edit/create based on URL / mode prop
-  useEffect(() => {
-    if (mode === "create") {
-      if (!isStaff) {
-        navigate("/dashboard/blogs");
-        return;
-      }
-      setEditingBlogId(null);
-      setEditBlogData({
-        title: "", category: "AYURVEDA", summary: "", content_html: "",
-        featured_image: "", tags: "", seo_title: "", seo_description: "", seo_keywords: "",
-        author_name: `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim(),
-        author_role: currentUser?.role?.toUpperCase() === "DOCTOR" ? "Doctor" : currentUser?.role?.toUpperCase() === "THERAPIST" ? "Therapist" : "",
-        read_time: "3 min read"
-      });
-    }
-  }, [mode, isStaff, navigate, currentUser]);
-
-  useEffect(() => {
-    if (mode === "edit" && detailBlog) {
-      if (detailBlog.status !== "draft" && detailBlog.status !== "rejected") {
-        triggerAlert("You can only edit Draft or Rejected blogs.");
-        navigate("/dashboard/blogs");
-        return;
-      }
-      setEditingBlogId(detailBlog.id);
-      setEditBlogData({
-        title: detailBlog.title || "",
-        category: detailBlog.category || "AYURVEDA",
-        summary: detailBlog.summary || "",
-        content_html: detailBlog.content_html || "",
-        featured_image: detailBlog.featured_image || "",
-        tags: Array.isArray(detailBlog.tags) ? detailBlog.tags.join(", ") : (detailBlog.tags || ""),
-        seo_title: detailBlog.seo_title || "",
-        seo_description: detailBlog.seo_description || "",
-        seo_keywords: detailBlog.seo_keywords || "",
-        author_name: detailBlog.author?.name || `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim(),
-        author_role: detailBlog.author?.role || (currentUser?.role?.toUpperCase() === "DOCTOR" ? "Doctor" : currentUser?.role?.toUpperCase() === "THERAPIST" ? "Therapist" : ""),
-        read_time: detailBlog.read_time || "3 min read"
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, detailBlog]);
+  }, [searchParams]);
 
   // ─── Fetch blogs list ──────────────────────────────────────────────
   const fetchBlogs = useCallback(async () => {
@@ -295,12 +242,8 @@ export default function Blogs({ mode }) {
       if (categoryFilter !== "ALL") params.set("category", categoryFilter);
       if (search) params.set("search", search);
 
-      if (isAdmin) {
-        if (activeTab === "pending") params.set("status", "pending");
-        else if (activeTab === "published") params.set("status", "published");
-        else if (activeTab === "archived") params.set("status", "archived");
-      } else if (isStaff && activeTab === "my_blogs") {
-        params.set("status", "my_blogs");
+      if (activeTab && activeTab !== "other_blogs") {
+        params.set("status", activeTab);
       }
 
       const data = await apiFetch(`/api/blogs?${params.toString()}`);
@@ -311,7 +254,7 @@ export default function Blogs({ mode }) {
     } finally {
       setLoading(false);
     }
-  }, [categoryFilter, search, activeTab, isAdmin, isStaff]);
+  }, [categoryFilter, search, activeTab]);
 
   useEffect(() => {
     if (!id && !mode) fetchBlogs();
@@ -347,6 +290,11 @@ export default function Blogs({ mode }) {
         if (blog.author?.id === myUserId) return false;
         if (blog.status !== "published") return false;
       }
+      if (activeTab === "draft" && blog.status !== "draft") return false;
+      if (activeTab === "pending" && blog.status !== "pending") return false;
+      if (activeTab === "published" && blog.status !== "published") return false;
+      if (activeTab === "rejected" && blog.status !== "rejected") return false;
+      if (activeTab === "archived" && blog.status !== "archived") return false;
       return true;
     });
   }, [blogs, activeTab, currentUser, isStaff]);
