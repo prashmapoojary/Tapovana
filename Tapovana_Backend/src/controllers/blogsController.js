@@ -323,13 +323,17 @@ const getBlogById = async (req, res) => {
         }
 
         // Get comments
-        const commentsResult = await query(`
-            SELECT bc.*, tm.first_name, tm.last_name
-            FROM blog_comments bc
-            LEFT JOIN team_members tm ON tm.id = bc.user_id
-            WHERE bc.blog_id = $1
-            ORDER BY bc.created_at DESC
-        `, [id]);
+        let commentsResult = { rows: [] };
+        try {
+            commentsResult = await query(`
+                SELECT bc.*
+                FROM blog_comments bc
+                WHERE bc.blog_id = $1
+                ORDER BY bc.created_at DESC
+            `, [id]);
+        } catch (err) {
+            console.warn('[BlogComments] Warning fetching comments:', err.message);
+        }
 
         // Get tags
         const tagsResult = await query('SELECT tag FROM blog_tags WHERE blog_id = $1', [id]);
