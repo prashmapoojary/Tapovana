@@ -301,7 +301,7 @@ export default function Blogs({ mode }) {
       if (categoryFilter !== "ALL") params.set("category", categoryFilter);
       if (search) params.set("search", search);
 
-      if (activeTab && activeTab !== "other_blogs") {
+      if (activeTab) {
         params.set("status", activeTab);
       }
 
@@ -347,8 +347,14 @@ export default function Blogs({ mode }) {
     return blogs.filter((blog) => {
       if (isStaff && activeTab === "other_blogs") {
         const myUserId = currentUser?.user_id || currentUser?.id;
-        if (blog.author?.id === myUserId) return false;
-        if (blog.status !== "published") return false;
+        const myEmail = currentUser?.email?.toLowerCase();
+        
+        // Exclude own blogs by ID or email
+        if (myUserId && (blog.created_by === myUserId || blog.author?.id === myUserId)) return false;
+        if (myEmail && (blog.author_email?.toLowerCase() === myEmail || blog.author?.email?.toLowerCase() === myEmail)) return false;
+
+        // ONLY published blogs from other contributors
+        return blog.status === "published";
       }
       if (activeTab === "draft" && blog.status !== "draft") return false;
       if (activeTab === "pending" && blog.status !== "pending") return false;

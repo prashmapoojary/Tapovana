@@ -155,7 +155,7 @@ const getAllBlogs = async (req, res) => {
             } else if (status === 'archived') {
                 where.push(`b.status = 'archived'`);
             } else if (status === 'other_blogs') {
-                where.push(`(b.created_by != $${paramIdx} AND (tm.email IS NULL OR LOWER(tm.email) != LOWER($${paramIdx + 1}))) AND b.status = 'published'`);
+                where.push(`(b.created_by IS NULL OR b.created_by != $${paramIdx}) AND (tm.email IS NULL OR LOWER(tm.email) != LOWER($${paramIdx + 1})) AND b.status = 'published'`);
                 params.push(userId, userEmail);
                 paramIdx += 2;
             } else {
