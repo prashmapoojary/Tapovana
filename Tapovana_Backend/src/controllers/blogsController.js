@@ -123,31 +123,34 @@ const getAllBlogs = async (req, res) => {
                 where.push(`(b.created_by = $${paramIdx} OR (tm.email IS NOT NULL AND LOWER(tm.email) = LOWER($${paramIdx + 1})))`);
                 params.push(userId, userEmail);
                 paramIdx += 2;
-            } else if (status === 'draft' || status === 'rejected') {
-                where.push(`(b.created_by = $${paramIdx} OR (tm.email IS NOT NULL AND LOWER(tm.email) = LOWER($${paramIdx + 1}))) AND b.status = $${paramIdx + 2}`);
-                params.push(userId, userEmail, status);
-                paramIdx += 3;
-            } else if (status === 'pending') {
+            } else if (status === 'draft') {
+                where.push(`(b.created_by = $${paramIdx} OR (tm.email IS NOT NULL AND LOWER(tm.email) = LOWER($${paramIdx + 1}))) AND b.status = 'draft'`);
+                params.push(userId, userEmail);
+                paramIdx += 2;
+            } else if (status === 'rejected') {
                 if (isAdmin) {
-                    where.push(`b.status = $${paramIdx++}`);
-                    params.push('pending');
+                    where.push(`b.status = 'rejected'`);
                 } else {
-                    where.push(`(b.created_by = $${paramIdx} OR (tm.email IS NOT NULL AND LOWER(tm.email) = LOWER($${paramIdx + 1}))) AND b.status = $${paramIdx + 2}`);
-                    params.push(userId, userEmail, 'pending');
-                    paramIdx += 3;
+                    where.push(`(b.created_by = $${paramIdx} OR (tm.email IS NOT NULL AND LOWER(tm.email) = LOWER($${paramIdx + 1}))) AND b.status = 'rejected'`);
+                    params.push(userId, userEmail);
+                    paramIdx += 2;
+                }
+            } else if (status === 'pending' || status === 'pending_review') {
+                if (isAdmin) {
+                    where.push(`b.status IN ('pending', 'pending_review')`);
+                } else {
+                    where.push(`(b.created_by = $${paramIdx} OR (tm.email IS NOT NULL AND LOWER(tm.email) = LOWER($${paramIdx + 1}))) AND b.status IN ('pending', 'pending_review')`);
+                    params.push(userId, userEmail);
+                    paramIdx += 2;
                 }
             } else if (status === 'published') {
-                where.push(`b.status = $${paramIdx++}`);
-                params.push('published');
+                where.push(`b.status = 'published'`);
             } else if (status === 'archived') {
-                if (isAdmin) {
-                    where.push(`b.status = $${paramIdx++}`);
-                    params.push('archived');
-                } else {
-                    where.push(`(b.created_by = $${paramIdx} OR (tm.email IS NOT NULL AND LOWER(tm.email) = LOWER($${paramIdx + 1}))) AND b.status = $${paramIdx + 2}`);
-                    params.push(userId, userEmail, 'archived');
-                    paramIdx += 3;
-                }
+                where.push(`b.status = 'archived'`);
+            } else if (status === 'other_blogs') {
+                where.push(`(b.created_by != $${paramIdx} AND (tm.email IS NULL OR LOWER(tm.email) != LOWER($${paramIdx + 1}))) AND b.status = 'published'`);
+                params.push(userId, userEmail);
+                paramIdx += 2;
             } else {
                 // Default: Admin sees all, Staff sees (their own OR published from others)
                 if (!isAdmin && (isStaff || req.user)) {
@@ -179,7 +182,12 @@ const getAllBlogs = async (req, res) => {
 
         const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
 
-        const countResult = await query(`SELECT COUNT(*) FROM blogs b ${whereClause}`, params);
+        const countResult = await query(`
+            SELECT COUNT(*) 
+            FROM blogs b 
+            LEFT JOIN team_members tm ON tm.id = b.created_by
+            ${whereClause}
+        `, params);
         const total = parseInt(countResult.rows[0].count, 10);
 
         const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);

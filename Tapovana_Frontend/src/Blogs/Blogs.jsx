@@ -290,10 +290,13 @@ export default function Blogs({ mode }) {
     }
   }, [mode, detailBlog]);
 
+  const [error, setError] = useState(null);
+
   // ─── Fetch blogs list ──────────────────────────────────────────────
   const fetchBlogs = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const params = new URLSearchParams();
       if (categoryFilter !== "ALL") params.set("category", categoryFilter);
       if (search) params.set("search", search);
@@ -306,6 +309,7 @@ export default function Blogs({ mode }) {
       setBlogs(data.blogs || []);
     } catch (err) {
       console.error("Failed to fetch blogs:", err);
+      setError(err.message || "Unable to load blogs. Please try again.");
       setBlogs([]);
     } finally {
       setLoading(false);
@@ -1039,7 +1043,6 @@ export default function Blogs({ mode }) {
           {[
             { id: "published", label: "Published" },
             { id: "pending", label: "Pending Review" },
-            { id: "draft", label: "Drafts" },
             { id: "archived", label: "Archived" }
           ].map(tab => (
             <button
@@ -1100,10 +1103,20 @@ export default function Blogs({ mode }) {
 
       {/* Blog Grid */}
       {loading ? (
-        <div className="blog-loading"><div className="blog-spinner" /></div>
+        <div className="blog-loading">
+          <div className="blog-spinner" />
+          <p style={{ marginTop: "12px", color: "#718096" }}>Loading blogs...</p>
+        </div>
+      ) : error ? (
+        <div className="blog-error" style={{ textAlign: "center", padding: "40px", background: "#fff5f5", border: "1px solid #feb2b2", borderRadius: "8px", margin: "20px 0" }}>
+          <p style={{ color: "#c53030", fontSize: "16px", fontWeight: "bold", marginBottom: "12px" }}>{error}</p>
+          <button onClick={fetchBlogs} style={{ background: "#cda751", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}>
+            Retry
+          </button>
+        </div>
       ) : filteredBlogs.length === 0 ? (
-        <div className="blog-empty">
-          <p style={{ fontSize: "16px", color: "#718096" }}>No blogs found.</p>
+        <div className="blog-empty" style={{ textAlign: "center", padding: "40px 20px" }}>
+          <p style={{ fontSize: "16px", color: "#718096" }}>No blogs found in this section.</p>
         </div>
       ) : (
         <div className="blog-grid">
