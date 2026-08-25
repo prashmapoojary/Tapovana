@@ -129,7 +129,7 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
             <div className="blog-card-actions" style={{ display: "flex", gap: "6px", width: "100%", marginTop: "2px", flexWrap: "wrap" }}>
               <button onClick={() => onEdit(blog)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "6px 10px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Edit</button>
               {onSubmitForReview && (
-                <button onClick={() => onSubmitForReview(blog.id)} style={{ background: "#2b6cb0", color: "#fff", border: "none", padding: "6px 10px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Submit</button>
+                <button onClick={() => onSubmitForReview(blog.id)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "6px 10px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Submit</button>
               )}
               <button onClick={() => onDelete(blog.id)} style={{ background: "transparent", color: "#e53e3e", border: "1px solid #e53e3e", padding: "5px 9px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Delete</button>
             </div>
