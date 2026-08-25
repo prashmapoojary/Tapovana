@@ -652,16 +652,16 @@ export default function Blogs({ mode }) {
             </div>
           </div>
 
-          {/* Action Buttons for Admins only (no staff edit/delete here) */}
+          {/* Action Buttons for Admins only */}
           {isAdmin && (
             <div className="blog-admin-decision-actions" style={{ display: "flex", gap: "16px", marginTop: "8px", paddingTop: "16px", borderTop: "1px solid #edf2f7", flexWrap: "wrap" }}>
-              {detailBlog.status === "pending" && (
+              {(detailBlog.status === "pending" || detailBlog.status === "draft" || detailBlog.status === "rejected") && (
                 <>
                   <button 
                     className="blog-btn-accept" 
                     onClick={() => handleApprove(detailBlog.id)}
                   >
-                    Accept
+                    Accept & Publish
                   </button>
                   <button 
                     className="blog-btn-reject" 

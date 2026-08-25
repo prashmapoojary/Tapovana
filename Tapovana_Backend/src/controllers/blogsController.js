@@ -691,13 +691,13 @@ const approveBlog = async (req, res) => {
         }
 
         const blog = existing.rows[0];
-        if (blog.status !== 'pending') {
-            return res.status(400).json({ success: false, message: `Cannot approve a blog with status '${blog.status}'.` });
+        if (blog.status === 'published') {
+            return res.status(400).json({ success: false, message: 'Blog is already published.' });
         }
 
         await query(`
             UPDATE blogs SET status = 'published', approved_by = $1, approved_at = NOW(),
-                             published_at = NOW(), rejection_reason = NULL, updated_at = NOW()
+                             published_at = COALESCE(published_at, NOW()), rejection_reason = NULL, updated_at = NOW()
             WHERE id = $2
         `, [userId, id]);
         await logBlogAudit(id, 'published', userId);
@@ -742,8 +742,8 @@ const rejectBlog = async (req, res) => {
         }
 
         const blog = existing.rows[0];
-        if (blog.status !== 'pending') {
-            return res.status(400).json({ success: false, message: `Cannot reject a blog with status '${blog.status}'.` });
+        if (blog.status === 'rejected') {
+            return res.status(400).json({ success: false, message: 'Blog is already rejected.' });
         }
 
         await query("UPDATE blogs SET status = 'rejected', rejection_reason = $1, updated_at = NOW() WHERE id = $2", [reason.trim(), id]);
