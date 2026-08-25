@@ -947,13 +947,13 @@
   display: flex;
   align-items: center;
   gap: 14px;
+  width: 100%;
 }
 
-/* Search box: fixed width so it stays small */
+/* Search box: flex to fill available space */
 .cust-team-filters .search-box {
-  flex: 0 0 auto;
-  width: 250px;
-  min-width: unset;
+  flex: 1 1 220px;
+  min-width: 180px;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
 }

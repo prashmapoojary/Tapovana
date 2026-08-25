@@ -528,104 +528,138 @@ exports.getCustomerBookings = async (req, res) => {
     const customerEmail = cust?.email || "";
     const firstName = cust?.first_name || customerName;
 
-    // 2. Query local DB bookings table
+    // ──────────────────────────────────────────────
+    // 2. SERVICE & BOOKING HISTORY (from bookings)
+    // ──────────────────────────────────────────────
     let bookingsList = [];
     try {
       const localBookings = await query(`
-        SELECT id, service_name, therapist_name, booking_date, booking_time, status, total_amount
+        SELECT id, service_name, therapist_name, booking_date, booking_time, status,
+               total_amount, original_price, membership_tier, discount_amount, final_price
         FROM bookings
-        WHERE user_name ILIKE $1 OR (user_email IS NOT NULL AND user_email = $2)
+        WHERE user_name ILIKE $1 OR (user_email IS NOT NULL AND LOWER(user_email) = LOWER($2))
         ORDER BY booking_date DESC
       `, [`%${firstName}%`, customerEmail]);
 
-      if (localBookings.rows.length > 0) {
-        bookingsList = localBookings.rows.map(b => ({
-          id: b.id,
-          service: b.service_name && b.service_name !== 'N/A' ? b.service_name : 'Ayurvedic Wellness Therapy',
-          staff: b.therapist_name && b.therapist_name !== 'Not Assigned' ? b.therapist_name : 'Dr. Deepika Mohan',
-          date: `${b.booking_date ? new Date(b.booking_date).toISOString().split('T')[0] : '2026-06-15'} ${b.booking_time || '10:30 AM'}`,
-          status: (b.status || 'COMPLETED').toUpperCase(),
-          amount: b.total_amount || '₹1,500'
-        }));
-      }
+      bookingsList = localBookings.rows.map(b => ({
+        id: b.id,
+        service: b.service_name || 'N/A',
+        staff: b.therapist_name || 'Not Assigned',
+        date: `${b.booking_date ? new Date(b.booking_date).toISOString().split('T')[0] : '-'} ${b.booking_time || ''}`.trim(),
+        status: (b.status || 'pending').toUpperCase(),
+        amount: b.total_amount || null,
+        original_price: b.original_price || null,
+        membership_tier: b.membership_tier || 'Standard',
+        discount_amount: b.discount_amount || null,
+        final_price: b.final_price || null
+      }));
     } catch (dbErr) {
-      console.warn("[CustomerController] Local bookings query error:", dbErr.message);
+      console.warn("[CustomerController] Bookings query error:", dbErr.message);
     }
 
-    // 3. If none in local DB, fetch from remote mobile bookings endpoint
-    if (bookingsList.length === 0) {
-      try {
-        const remoteRes = await globalThis.fetch("https://tapoclg.onrender.com/api/bookings", { signal: AbortSignal.timeout(6000) });
-        if (remoteRes.ok) {
-          const rData = await remoteRes.json();
-          const rBookings = Array.isArray(rData) ? rData : (rData && Array.isArray(rData.bookings) ? rData.bookings : []);
-          
-          // Match by name or email
-          const matched = rBookings.filter(b => {
-            const bName = (b.user_name || "").toLowerCase();
-            const bEmail = (b.email || "").toLowerCase();
-            return (
-              (firstName && bName.includes(firstName.toLowerCase())) ||
-              (customerEmail && bEmail === customerEmail.toLowerCase())
-            );
-          });
+    // ──────────────────────────────────────────────
+    // 3. WORKSHOP HISTORY (from attendees + workshops)
+    // ──────────────────────────────────────────────
+    let workshopHistory = [];
+    try {
+      const wsRes = await query(`
+        SELECT a.id, w.title AS workshop_title, w.date AS workshop_date, w.time AS workshop_time,
+               a.status, a.original_price, a.membership_tier, a.discount_amount, a.final_price
+        FROM attendees a
+        JOIN workshops w ON a.workshop_id = w.id
+        WHERE a.name ILIKE $1 OR (a.email IS NOT NULL AND LOWER(a.email) = LOWER($2))
+        ORDER BY w.date DESC
+      `, [`%${firstName}%`, customerEmail]);
 
-          if (matched.length > 0) {
-            bookingsList = matched.map(b => ({
-              id: b.id,
-              service: b.service_name && b.service_name !== 'N/A' ? b.service_name : 'Abhyanga Wellness Session',
-              staff: b.therapist_name && b.therapist_name !== 'Not Assigned' ? b.therapist_name : 'Dr. Aravind Swamy',
-              date: `${b.booking_date ? new Date(b.booking_date).toISOString().split('T')[0] : '2026-06-15'} ${b.booking_time || '10:30 AM'}`,
-              status: (b.status || 'COMPLETED').toUpperCase(),
-              amount: b.total_amount || '₹1,200'
-            }));
-          }
-        }
-      } catch (rErr) {
-        console.warn("[CustomerController] Remote bookings fetch failed:", rErr.message);
+      workshopHistory = wsRes.rows.map(r => ({
+        id: r.id,
+        workshop_title: r.workshop_title || 'N/A',
+        date: `${r.workshop_date ? new Date(r.workshop_date).toISOString().split('T')[0] : '-'} ${r.workshop_time || ''}`.trim(),
+        status: (r.status || 'enrolled').toUpperCase(),
+        original_price: r.original_price || null,
+        membership_tier: r.membership_tier || 'Standard',
+        discount_amount: r.discount_amount || null,
+        final_price: r.final_price || null
+      }));
+    } catch (wsErr) {
+      console.warn("[CustomerController] Workshop history query error:", wsErr.message);
+    }
+
+    // ──────────────────────────────────────────────
+    // 4. VEDIC LIFE HISTORY (from vedic_attendees + vedic_programs)
+    // ──────────────────────────────────────────────
+    let vedicHistory = [];
+    try {
+      const vpRes = await query(`
+        SELECT va.id, vp.title AS program_title, vp.start_date, vp.end_date,
+               va.status, va.payment_status, va.accommodation_type,
+               va.original_price, va.membership_tier, va.discount_amount, va.final_price
+        FROM vedic_attendees va
+        JOIN vedic_programs vp ON va.program_id = vp.id
+        WHERE va.name ILIKE $1 OR (va.email IS NOT NULL AND LOWER(va.email) = LOWER($2))
+        ORDER BY vp.start_date DESC
+      `, [`%${firstName}%`, customerEmail]);
+
+      vedicHistory = vpRes.rows.map(r => ({
+        id: r.id,
+        program_title: r.program_title || 'N/A',
+        date: r.start_date ? `${new Date(r.start_date).toISOString().split('T')[0]} → ${r.end_date ? new Date(r.end_date).toISOString().split('T')[0] : ''}` : '-',
+        status: (r.status || 'REGISTERED').toUpperCase(),
+        payment_status: (r.payment_status || 'PENDING').toUpperCase(),
+        accommodation_type: r.accommodation_type || '-',
+        original_price: r.original_price || null,
+        membership_tier: r.membership_tier || 'Standard',
+        discount_amount: r.discount_amount || null,
+        final_price: r.final_price || null
+      }));
+    } catch (vpErr) {
+      console.warn("[CustomerController] Vedic history query error:", vpErr.message);
+    }
+
+    // ──────────────────────────────────────────────
+    // 5. MEMBERSHIP & BENEFITS (from memberships + membership_tiers)
+    // ──────────────────────────────────────────────
+    let membershipInfo = null;
+    try {
+      const memRes = await query(`
+        SELECT m.id, m.name, m.email, m.tier, m.status, m.join_date, m.expiry_date,
+               m.sessions, m.total_spent,
+               mt.discount_percentage, mt.benefits
+        FROM memberships m
+        LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
+        WHERE LOWER(m.email) = LOWER($1) OR m.name ILIKE $2
+        LIMIT 1
+      `, [customerEmail, `%${firstName}%`]);
+
+      if (memRes.rows.length > 0) {
+        const m = memRes.rows[0];
+        membershipInfo = {
+          tier: m.tier || 'Standard',
+          status: m.status || 'active',
+          join_date: m.join_date ? new Date(m.join_date).toISOString().split('T')[0] : null,
+          expiry_date: m.expiry_date ? new Date(m.expiry_date).toISOString().split('T')[0] : null,
+          sessions: m.sessions || 0,
+          total_spent: Number(m.total_spent) || 0,
+          discount_percentage: Number(m.discount_percentage) || 0,
+          benefits: m.benefits || []
+        };
       }
-    }
-
-    // 4. If still none (e.g. guest or new user), provide realistic formatted wellness sessions
-    if (bookingsList.length === 0) {
-      const tier = cust?.membership_status || 'GOLD';
-      bookingsList = [
-        {
-          id: 101,
-          service: tier === 'PLATINUM' ? "Panchakarma Consultation" : "Abhyanga Full Body Massage",
-          staff: "Dr. Aravind Swamy",
-          date: "2026-06-15 10:00 AM",
-          status: "COMPLETED",
-          amount: "₹2,500"
-        },
-        {
-          id: 102,
-          service: tier === 'PLATINUM' ? "Kaya Kalpa Udvarthanam" : "Shirodhara Therapy Session",
-          staff: "Therapist Ramesh K.",
-          date: "2026-06-22 02:30 PM",
-          status: "COMPLETED",
-          amount: "₹3,500"
-        },
-        {
-          id: 103,
-          service: "Ayurvedic Diet & Yoga Consultation",
-          staff: "Dr. Deepika Mohan",
-          date: "2026-06-28 09:00 AM",
-          status: "UPCOMING",
-          amount: "₹1,200"
-        }
-      ];
+    } catch (memErr) {
+      console.warn("[CustomerController] Membership query error:", memErr.message);
     }
 
     res.json({
       success: true,
       customer_id: id,
       customer_name: customerName,
-      bookings: bookingsList
+      bookings: bookingsList,
+      workshop_history: workshopHistory,
+      vedic_history: vedicHistory,
+      membership: membershipInfo
     });
   } catch (error) {
-    console.error("[CustomerController] Error getting customer bookings:", error);
-    res.status(500).json({ success: false, message: "Failed to load customer bookings" });
+    console.error("[CustomerController] Error getting customer history:", error);
+    res.status(500).json({ success: false, message: "Failed to load customer history" });
   }
 };
 

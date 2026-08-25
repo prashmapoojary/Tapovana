@@ -108,6 +108,9 @@ function Customers() {
   // View Drawer State
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerBookings, setCustomerBookings] = useState([]);
+  const [workshopHistory, setWorkshopHistory] = useState([]);
+  const [vedicHistory, setVedicHistory] = useState([]);
+  const [membershipData, setMembershipData] = useState(null);
   const [bookingsLoading, setBookingsLoading] = useState(false);
 
   // Edit Drawer State
@@ -186,27 +189,24 @@ function Customers() {
 
   useEffect(() => { loadCustomers(); }, []);
 
-  // ─── Open View Drawer & Load Bookings ───
+  // ─── Open View Drawer & Load Full History ───
   const openViewDrawer = async (customer) => {
     setSelectedCustomer(customer);
     setBookingsLoading(true);
     setCustomerBookings([]);
+    setWorkshopHistory([]);
+    setVedicHistory([]);
+    setMembershipData(null);
     try {
       const res = await apiFetch(`/api/customers/${customer.id || customer.customer_id}/bookings`);
-      if (res && res.success && Array.isArray(res.bookings)) {
-        setCustomerBookings(res.bookings);
-      } else {
-        setCustomerBookings([
-          { service: "Abhyanga Full Body Massage", staff: "Dr. Aravind Swamy", date: "2026-06-15 10:00 AM", status: "COMPLETED" },
-          { service: "Shirodhara Therapy Session", staff: "Therapist Ramesh K.", date: "2026-06-22 02:30 PM", status: "COMPLETED" },
-          { service: "Ayurvedic Diet Consultation", staff: "Dr. Deepika Mohan", date: "2026-06-28 09:00 AM", status: "UPCOMING" }
-        ]);
+      if (res && res.success) {
+        setCustomerBookings(Array.isArray(res.bookings) ? res.bookings : []);
+        setWorkshopHistory(Array.isArray(res.workshop_history) ? res.workshop_history : []);
+        setVedicHistory(Array.isArray(res.vedic_history) ? res.vedic_history : []);
+        setMembershipData(res.membership || null);
       }
     } catch (err) {
-      console.warn("Error fetching customer bookings:", err);
-      setCustomerBookings([
-        { service: "Abhyanga Therapy", staff: "Dr. Aravind Swamy", date: "2026-06-15 10:00 AM", status: "COMPLETED" }
-      ]);
+      console.warn("Error fetching customer history:", err);
     } finally {
       setBookingsLoading(false);
     }
@@ -420,24 +420,13 @@ function Customers() {
 
       {/* ── 1. VIEW CUSTOMER DRAWER ── */}
       {selectedCustomer && (() => {
-        const renewalDate = selectedCustomer.join_date 
-          ? new Date(new Date(selectedCustomer.join_date).setFullYear(new Date(selectedCustomer.join_date).getFullYear() + 1)).toISOString().split('T')[0]
-          : "2027-06-15";
-        
-        const discounts = {
-          PLATINUM: "20% off all Therapist sessions, 15% off Doctor consults",
-          GOLD: "15% off all Therapist sessions, 10% off Doctor consults",
-          SILVER: "10% off all Therapist sessions, 5% off Doctor consults",
-          NONE: "No active membership discounts"
-        }[selectedCustomer.membership_status || "NONE"];
-
         const statusClass = (selectedCustomer.status || "ACTIVE").toLowerCase();
         const avatarUrl = getCustomerAvatarUrl(selectedCustomer);
         
         return (
           <>
             <div className="drawer-overlay open" onClick={() => setSelectedCustomer(null)} style={{ zIndex: 9999 }} />
-            <div className="drawer-panel open" onClick={(e) => e.stopPropagation()} style={{ zIndex: 10000, width: "500px", maxWidth: "100%", overflowY: "auto" }}>
+            <div className="drawer-panel open" onClick={(e) => e.stopPropagation()} style={{ zIndex: 10000, width: "720px", maxWidth: "100%", overflowY: "auto" }}>
               <div className="drawer-header">
                 <div>
                   <div className="drawer-title" style={{ fontSize: "17px", fontWeight: "700", color: "#0F172A" }}>
@@ -504,50 +493,231 @@ function Customers() {
                             <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Service Type</th>
                             <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Staff Assigned</th>
                             <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Date/Time</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Tier</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Original</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Discount</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Final</th>
                             <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Status</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {customerBookings.map((b, i) => (
-                            <tr key={i} style={{ borderBottom: "1px solid #edf2f7" }}>
-                              <td style={{ padding: "8px 10px", fontWeight: "600", color: "#2d3748" }}>{b.service}</td>
-                              <td style={{ padding: "8px 10px", color: "#4a5568" }}>{b.staff}</td>
-                              <td style={{ padding: "8px 10px", color: "#718096" }}>{b.date}</td>
-                              <td style={{ padding: "8px 10px" }}>
-                                <span className={`status-tag-gold ${(b.status || "COMPLETED").toLowerCase()}`}>
-                                  {b.status || "COMPLETED"}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
+                          {customerBookings.map((b, i) => {
+                            const tierU = (b.membership_tier || "Standard").toUpperCase();
+                            let tBg = "#E2E8F0", tCol = "#475569";
+                            if (tierU.includes("GOLD")) { tBg = "#FEF3C7"; tCol = "#D97706"; }
+                            else if (tierU.includes("PLATINUM") || tierU.includes("DIAMOND")) { tBg = "#F3E8FF"; tCol = "#7E22CE"; }
+                            else if (tierU.includes("SILVER")) { tBg = "#E0F2FE"; tCol = "#0284C7"; }
+                            return (
+                              <tr key={i} style={{ borderBottom: "1px solid #edf2f7" }}>
+                                <td style={{ padding: "8px 10px", fontWeight: "600", color: "#2d3748" }}>{b.service}</td>
+                                <td style={{ padding: "8px 10px", color: "#4a5568" }}>{b.staff}</td>
+                                <td style={{ padding: "8px 10px", color: "#718096" }}>{b.date}</td>
+                                <td style={{ padding: "8px 10px" }}>
+                                  <span style={{ padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: "700", background: tBg, color: tCol, textTransform: "uppercase" }}>
+                                    {b.membership_tier || "Standard"}
+                                  </span>
+                                </td>
+                                <td style={{ padding: "8px 10px", color: "#2d3748", fontWeight: 500 }}>{b.original_price || "-"}</td>
+                                <td style={{ padding: "8px 10px", color: "#0284c7", fontWeight: 600 }}>{b.discount_amount || "₹0"}</td>
+                                <td style={{ padding: "8px 10px", color: "#16a34a", fontWeight: 700 }}>{b.final_price || "-"}</td>
+                                <td style={{ padding: "8px 10px" }}>
+                                  <span className={`status-tag-gold ${(b.status || "PENDING").toLowerCase()}`}>
+                                    {b.status || "PENDING"}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
                   )}
                 </div>
 
-                {/* 3. Membership & Benefits Section */}
+                {/* 3. Workshop History Section */}
                 <div className="cust-drawer-section">
                   <div className="section-label-container" style={{ marginTop: "24px" }}>
                     <div className="section-badge">03</div>
+                    <div className="section-title">Workshop History</div>
+                  </div>
+                  
+                  {bookingsLoading ? (
+                    <div style={{ padding: "20px", textAlign: "center", color: "#7b8a9a", fontSize: "13px" }}>
+                      Loading workshop history...
+                    </div>
+                  ) : workshopHistory.length === 0 ? (
+                    <div style={{ padding: "16px", background: "#F8FAFC", borderRadius: "8px", color: "#64748B", fontSize: "13px", textAlign: "center" }}>
+                      No workshop enrollments found for this customer.
+                    </div>
+                  ) : (
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px" }}>
+                        <thead>
+                          <tr style={{ background: "rgba(205,167,81,0.06)", borderBottom: "1px solid #E8E2D9" }}>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Workshop Name</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Date/Time</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Tier</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Original</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Discount</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Final</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {workshopHistory.map((w, i) => {
+                            const tierU = (w.membership_tier || "Standard").toUpperCase();
+                            let tBg = "#E2E8F0", tCol = "#475569";
+                            if (tierU.includes("GOLD")) { tBg = "#FEF3C7"; tCol = "#D97706"; }
+                            else if (tierU.includes("PLATINUM") || tierU.includes("DIAMOND")) { tBg = "#F3E8FF"; tCol = "#7E22CE"; }
+                            else if (tierU.includes("SILVER")) { tBg = "#E0F2FE"; tCol = "#0284C7"; }
+                            return (
+                              <tr key={i} style={{ borderBottom: "1px solid #edf2f7" }}>
+                                <td style={{ padding: "8px 10px", fontWeight: "600", color: "#2d3748" }}>{w.workshop_title}</td>
+                                <td style={{ padding: "8px 10px", color: "#718096" }}>{w.date}</td>
+                                <td style={{ padding: "8px 10px" }}>
+                                  <span style={{ padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: "700", background: tBg, color: tCol, textTransform: "uppercase" }}>
+                                    {w.membership_tier || "Standard"}
+                                  </span>
+                                </td>
+                                <td style={{ padding: "8px 10px", color: "#2d3748", fontWeight: 500 }}>{w.original_price || "-"}</td>
+                                <td style={{ padding: "8px 10px", color: "#0284c7", fontWeight: 600 }}>{w.discount_amount || "₹0"}</td>
+                                <td style={{ padding: "8px 10px", color: "#16a34a", fontWeight: 700 }}>{w.final_price || "-"}</td>
+                                <td style={{ padding: "8px 10px" }}>
+                                  <span className={`status-tag-gold ${(w.status || "ENROLLED").toLowerCase()}`}>
+                                    {w.status || "ENROLLED"}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Vedic Life History Section */}
+                <div className="cust-drawer-section">
+                  <div className="section-label-container" style={{ marginTop: "24px" }}>
+                    <div className="section-badge">04</div>
+                    <div className="section-title">Vedic Life History</div>
+                  </div>
+                  
+                  {bookingsLoading ? (
+                    <div style={{ padding: "20px", textAlign: "center", color: "#7b8a9a", fontSize: "13px" }}>
+                      Loading Vedic Life history...
+                    </div>
+                  ) : vedicHistory.length === 0 ? (
+                    <div style={{ padding: "16px", background: "#F8FAFC", borderRadius: "8px", color: "#64748B", fontSize: "13px", textAlign: "center" }}>
+                      No Vedic Life program enrollments found for this customer.
+                    </div>
+                  ) : (
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px" }}>
+                        <thead>
+                          <tr style={{ background: "rgba(205,167,81,0.06)", borderBottom: "1px solid #E8E2D9" }}>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Program</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Dates</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Tier</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Original</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Discount</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Final</th>
+                            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: "700", color: "#1a202c" }}>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {vedicHistory.map((v, i) => {
+                            const tierU = (v.membership_tier || "Standard").toUpperCase();
+                            let tBg = "#E2E8F0", tCol = "#475569";
+                            if (tierU.includes("GOLD")) { tBg = "#FEF3C7"; tCol = "#D97706"; }
+                            else if (tierU.includes("PLATINUM") || tierU.includes("DIAMOND")) { tBg = "#F3E8FF"; tCol = "#7E22CE"; }
+                            else if (tierU.includes("SILVER")) { tBg = "#E0F2FE"; tCol = "#0284C7"; }
+                            return (
+                              <tr key={i} style={{ borderBottom: "1px solid #edf2f7" }}>
+                                <td style={{ padding: "8px 10px", fontWeight: "600", color: "#2d3748" }}>{v.program_title}</td>
+                                <td style={{ padding: "8px 10px", color: "#718096" }}>{v.date}</td>
+                                <td style={{ padding: "8px 10px" }}>
+                                  <span style={{ padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: "700", background: tBg, color: tCol, textTransform: "uppercase" }}>
+                                    {v.membership_tier || "Standard"}
+                                  </span>
+                                </td>
+                                <td style={{ padding: "8px 10px", color: "#2d3748", fontWeight: 500 }}>{v.original_price || "-"}</td>
+                                <td style={{ padding: "8px 10px", color: "#0284c7", fontWeight: 600 }}>{v.discount_amount || "₹0"}</td>
+                                <td style={{ padding: "8px 10px", color: "#16a34a", fontWeight: 700 }}>{v.final_price || "-"}</td>
+                                <td style={{ padding: "8px 10px" }}>
+                                  <span className={`status-tag-gold ${(v.status || "REGISTERED").toLowerCase()}`}>
+                                    {v.status || "REGISTERED"}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* 5. Membership & Benefits Section */}
+                <div className="cust-drawer-section">
+                  <div className="section-label-container" style={{ marginTop: "24px" }}>
+                    <div className="section-badge">05</div>
                     <div className="section-title">Membership & Benefits</div>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "13px", color: "#4a5568" }}>
-                    <div>
-                      <strong>Plan Type:</strong> {selectedCustomer.membership_status === "NONE" ? "Regular Guest" : `${selectedCustomer.membership_status} Plan`}
+                  {bookingsLoading ? (
+                    <div style={{ padding: "20px", textAlign: "center", color: "#7b8a9a", fontSize: "13px" }}>Loading membership data...</div>
+                  ) : !membershipData ? (
+                    <div style={{ padding: "16px", background: "#F8FAFC", borderRadius: "8px", color: "#64748B", fontSize: "13px", textAlign: "center" }}>
+                      No active membership found for this customer.
                     </div>
-                    <div>
-                      <strong>Renewal Date:</strong> {renewalDate}
-                    </div>
-                    <div style={{ gridColumn: "1 / -1" }}>
-                      <strong>Active Discounts:</strong> <span style={{ fontStyle: "italic", color: "#4a5568" }}>{discounts}</span>
-                    </div>
-                    {selectedCustomer.admin_notes && (
-                      <div style={{ gridColumn: "1 / -1", marginTop: "4px" }}>
-                        <strong>Admin Notes:</strong> <span style={{ color: "#718096" }}>{selectedCustomer.admin_notes}</span>
+                  ) : (
+                    <div style={{ background: "#F8FAFC", borderRadius: "10px", padding: "16px", border: "1px solid #E8E2D9" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+                        {(() => {
+                          const tierU = (membershipData.tier || "Standard").toUpperCase();
+                          let tBg = "#E2E8F0", tCol = "#475569";
+                          if (tierU.includes("GOLD")) { tBg = "#FEF3C7"; tCol = "#D97706"; }
+                          else if (tierU.includes("PLATINUM") || tierU.includes("DIAMOND")) { tBg = "#F3E8FF"; tCol = "#7E22CE"; }
+                          else if (tierU.includes("SILVER")) { tBg = "#E0F2FE"; tCol = "#0284C7"; }
+                          return (
+                            <span style={{ padding: "4px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", background: tBg, color: tCol, textTransform: "uppercase" }}>
+                              {membershipData.tier} Plan
+                            </span>
+                          );
+                        })()}
+                        <span style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", background: membershipData.status === "active" ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)", color: membershipData.status === "active" ? "#16a34a" : "#dc2626", textTransform: "uppercase" }}>
+                          {membershipData.status}
+                        </span>
                       </div>
-                    )}
-                  </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "13px", color: "#4a5568" }}>
+                        <div><strong>Join Date:</strong> {membershipData.join_date || "-"}</div>
+                        <div><strong>Expiry Date:</strong> {membershipData.expiry_date || "-"}</div>
+                        <div><strong>Sessions:</strong> {membershipData.sessions}</div>
+                        <div><strong>Total Spent:</strong> ₹{Number(membershipData.total_spent || 0).toLocaleString("en-IN")}</div>
+                        <div style={{ gridColumn: "1 / -1" }}>
+                          <strong>Discount Rate:</strong>{" "}
+                          <span style={{ color: "#CDA751", fontWeight: 700 }}>
+                            {membershipData.discount_percentage > 0 ? `${membershipData.discount_percentage}% off on all services` : "No active discounts"}
+                          </span>
+                        </div>
+                        {Array.isArray(membershipData.benefits) && membershipData.benefits.length > 0 && (
+                          <div style={{ gridColumn: "1 / -1", marginTop: "4px" }}>
+                            <strong>Benefits:</strong>
+                            <ul style={{ margin: "6px 0 0 16px", padding: 0, listStyle: "disc", color: "#4a5568", fontSize: "12.5px" }}>
+                              {membershipData.benefits.map((benefit, i) => (
+                                <li key={i} style={{ marginBottom: "3px" }}>{benefit}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {selectedCustomer.admin_notes && (
+                    <div style={{ marginTop: "12px", fontSize: "13px", color: "#4a5568" }}>
+                      <strong>Admin Notes:</strong> <span style={{ color: "#718096" }}>{selectedCustomer.admin_notes}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
