@@ -1134,10 +1134,23 @@ const enrollUserInWorkshop = async (req, res) => {
             return res.status(400).json({ success: false, message: 'User is already enrolled in this workshop.' });
         }
 
-        // Insert enrollment first
+        const { getMemberTierAndDiscount } = require('./membershipController');
+        const { tier, discountPercentage } = await getMemberTierAndDiscount(email.toLowerCase().trim(), name.trim());
+
+        const wsPriceRaw = workshop.price || 2000;
+        const origNum = typeof wsPriceRaw === 'number' ? wsPriceRaw : (parseFloat(String(wsPriceRaw).replace(/[^0-9.]/g, '')) || 2000);
+        const discountNum = Math.round((origNum * discountPercentage) / 100);
+        const finalNum = Math.max(0, origNum - discountNum);
+
+        const origStr = `₹${origNum.toLocaleString('en-IN')}`;
+        const tierStr = tier || 'Standard';
+        const discStr = discountNum > 0 ? `₹${discountNum.toLocaleString('en-IN')} (${discountPercentage}%)` : `₹0 (0%)`;
+        const finalStr = `₹${finalNum.toLocaleString('en-IN')}`;
+
+        // Insert enrollment with calculated membership discount
         const result = await query(
-            'INSERT INTO attendees (workshop_id, name, email, phone, source, certificate_eligible) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [workshopId, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, source, certificate_eligible]
+            'INSERT INTO attendees (workshop_id, name, email, phone, source, certificate_eligible, original_price, membership_tier, discount_amount, final_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+            [workshopId, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, source, certificate_eligible, origStr, tierStr, discStr, finalStr]
         );
 
         // Send confirmation notification/email synchronously AFTER database insert but before final response

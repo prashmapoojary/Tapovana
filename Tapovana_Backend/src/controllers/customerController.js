@@ -543,161 +543,7 @@ exports.getCustomerBookings = async (req, res) => {
     const phoneClean = cust?.phone ? String(cust.phone).replace(/\D/g, "") : "";
     const custId = cust?.customer_id || cust?.id || "";
 
-    // ──────────────────────────────────────────────
-    // 2. SERVICE & BOOKING HISTORY (from bookings)
-    // Priority: Email -> Name -> Phone -> Customer ID
-    // ──────────────────────────────────────────────
-    let bookingsList = [];
-    try {
-      let bRes = { rows: [] };
-      if (customerEmail) {
-        bRes = await query(`
-          SELECT id, service_name, therapist_name, booking_date, booking_time, status,
-                 total_amount, original_price, membership_tier, discount_amount, final_price
-          FROM bookings
-          WHERE LOWER(user_email) = $1
-          ORDER BY booking_date DESC
-        `, [customerEmail]);
-      }
-      if (bRes.rows.length === 0 && fullName) {
-        bRes = await query(`
-          SELECT id, service_name, therapist_name, booking_date, booking_time, status,
-                 total_amount, original_price, membership_tier, discount_amount, final_price
-          FROM bookings
-          WHERE LOWER(user_name) = LOWER($1)
-          ORDER BY booking_date DESC
-        `, [fullName]);
-      }
-
-      bookingsList = bRes.rows.map(b => ({
-        id: b.id,
-        service: b.service_name || 'N/A',
-        staff: b.therapist_name || 'Not Assigned',
-        date: `${b.booking_date ? new Date(b.booking_date).toISOString().split('T')[0] : '-'} ${b.booking_time || ''}`.trim(),
-        status: (b.status || 'pending').toUpperCase(),
-        amount: b.total_amount || null,
-        original_price: b.original_price || null,
-        membership_tier: b.membership_tier || 'Standard',
-        discount_amount: b.discount_amount || null,
-        final_price: b.final_price || null
-      }));
-    } catch (dbErr) {
-      console.warn("[CustomerController] Bookings query error:", dbErr.message);
-    }
-
-    // ──────────────────────────────────────────────
-    // 3. WORKSHOP HISTORY (from attendees + workshops)
-    // Priority: Email -> Name -> Phone
-    // ──────────────────────────────────────────────
-    let workshopHistory = [];
-    try {
-      let wsRes = { rows: [] };
-      if (customerEmail) {
-        wsRes = await query(`
-          SELECT a.id, w.title AS workshop_title, w.date AS workshop_date, w.time AS workshop_time,
-                 a.status, a.original_price, a.membership_tier, a.discount_amount, a.final_price
-          FROM attendees a
-          JOIN workshops w ON a.workshop_id = w.id
-          WHERE LOWER(a.email) = $1
-          ORDER BY w.date DESC
-        `, [customerEmail]);
-      }
-      if (wsRes.rows.length === 0 && fullName) {
-        wsRes = await query(`
-          SELECT a.id, w.title AS workshop_title, w.date AS workshop_date, w.time AS workshop_time,
-                 a.status, a.original_price, a.membership_tier, a.discount_amount, a.final_price
-          FROM attendees a
-          JOIN workshops w ON a.workshop_id = w.id
-          WHERE LOWER(a.name) = LOWER($1)
-          ORDER BY w.date DESC
-        `, [fullName]);
-      }
-      if (wsRes.rows.length === 0 && phoneClean) {
-        wsRes = await query(`
-          SELECT a.id, w.title AS workshop_title, w.date AS workshop_date, w.time AS workshop_time,
-                 a.status, a.original_price, a.membership_tier, a.discount_amount, a.final_price
-          FROM attendees a
-          JOIN workshops w ON a.workshop_id = w.id
-          WHERE REGEXP_REPLACE(a.phone, '\\D', '', 'g') = $1
-          ORDER BY w.date DESC
-        `, [phoneClean]);
-      }
-
-      workshopHistory = wsRes.rows.map(r => ({
-        id: r.id,
-        workshop_title: r.workshop_title || 'N/A',
-        date: `${r.workshop_date ? new Date(r.workshop_date).toISOString().split('T')[0] : '-'} ${r.workshop_time || ''}`.trim(),
-        status: (r.status || 'enrolled').toUpperCase(),
-        original_price: r.original_price || null,
-        membership_tier: r.membership_tier || 'Standard',
-        discount_amount: r.discount_amount || null,
-        final_price: r.final_price || null
-      }));
-    } catch (wsErr) {
-      console.warn("[CustomerController] Workshop history query error:", wsErr.message);
-    }
-
-    // ──────────────────────────────────────────────
-    // 4. VEDIC LIFE HISTORY (from vedic_attendees + vedic_programs)
-    // Priority: Email -> Name -> Phone
-    // ──────────────────────────────────────────────
-    let vedicHistory = [];
-    try {
-      let vpRes = { rows: [] };
-      if (customerEmail) {
-        vpRes = await query(`
-          SELECT va.id, vp.title AS program_title, vp.start_date, vp.end_date,
-                 va.status, va.payment_status, va.accommodation_type,
-                 va.original_price, va.membership_tier, va.discount_amount, va.final_price
-          FROM vedic_attendees va
-          JOIN vedic_programs vp ON va.program_id = vp.id
-          WHERE LOWER(va.email) = $1
-          ORDER BY vp.start_date DESC
-        `, [customerEmail]);
-      }
-      if (vpRes.rows.length === 0 && fullName) {
-        vpRes = await query(`
-          SELECT va.id, vp.title AS program_title, vp.start_date, vp.end_date,
-                 va.status, va.payment_status, va.accommodation_type,
-                 va.original_price, va.membership_tier, va.discount_amount, va.final_price
-          FROM vedic_attendees va
-          JOIN vedic_programs vp ON va.program_id = vp.id
-          WHERE LOWER(va.name) = LOWER($1)
-          ORDER BY vp.start_date DESC
-        `, [fullName]);
-      }
-      if (vpRes.rows.length === 0 && phoneClean) {
-        vpRes = await query(`
-          SELECT va.id, vp.title AS program_title, vp.start_date, vp.end_date,
-                 va.status, va.payment_status, va.accommodation_type,
-                 va.original_price, va.membership_tier, va.discount_amount, va.final_price
-          FROM vedic_attendees va
-          JOIN vedic_programs vp ON va.program_id = vp.id
-          WHERE REGEXP_REPLACE(va.phone, '\\D', '', 'g') = $1
-          ORDER BY vp.start_date DESC
-        `, [phoneClean]);
-      }
-
-      vedicHistory = vpRes.rows.map(r => ({
-        id: r.id,
-        program_title: r.program_title || 'N/A',
-        date: r.start_date ? `${new Date(r.start_date).toISOString().split('T')[0]} → ${r.end_date ? new Date(r.end_date).toISOString().split('T')[0] : ''}` : '-',
-        status: (r.status || 'REGISTERED').toUpperCase(),
-        payment_status: (r.payment_status || 'PENDING').toUpperCase(),
-        accommodation_type: r.accommodation_type || '-',
-        original_price: r.original_price || null,
-        membership_tier: r.membership_tier || 'Standard',
-        discount_amount: r.discount_amount || null,
-        final_price: r.final_price || null
-      }));
-    } catch (vpErr) {
-      console.warn("[CustomerController] Vedic history query error:", vpErr.message);
-    }
-
-    // ──────────────────────────────────────────────
-    // 5. MEMBERSHIP & BENEFITS (from memberships + membership_tiers)
-    // Priority: Email -> Name -> Phone
-    // ──────────────────────────────────────────────
+    // 2. MEMBERSHIP & BENEFITS RESOLUTION (Email -> Name -> Phone)
     let membershipInfo = null;
     try {
       let memRes = { rows: [] };
@@ -738,18 +584,246 @@ exports.getCustomerBookings = async (req, res) => {
       if (memRes.rows.length > 0) {
         const m = memRes.rows[0];
         membershipInfo = {
-          tier: m.tier || 'Standard',
+          tier: m.tier ? m.tier.toUpperCase() : 'Standard',
           status: m.status || 'active',
           join_date: m.join_date ? new Date(m.join_date).toISOString().split('T')[0] : null,
           expiry_date: m.expiry_date ? new Date(m.expiry_date).toISOString().split('T')[0] : null,
           sessions: m.sessions || 0,
           total_spent: Number(m.total_spent) || 0,
-          discount_percentage: Number(m.discount_percentage) || 0,
+          discount_percentage: m.discount_percentage !== null && m.discount_percentage !== undefined ? Number(m.discount_percentage) : (
+            { 'SILVER': 15, 'GOLD': 25, 'PLATINUM': 40, 'DIAMOND': 40 }[m.tier ? m.tier.toUpperCase() : ''] || 0
+          ),
           benefits: m.benefits || []
         };
       }
     } catch (memErr) {
       console.warn("[CustomerController] Membership query error:", memErr.message);
+    }
+
+    // Active Tier and Discount Percentage
+    const activeTier = membershipInfo?.tier || 'Standard';
+    const activeDiscountPct = membershipInfo?.discount_percentage || 0;
+
+    // Helper to extract clean numeric price
+    const parsePrice = (rawVal, defaultPrice) => {
+      if (rawVal === null || rawVal === undefined) return defaultPrice;
+      if (typeof rawVal === 'number' && rawVal > 0) return rawVal;
+      const cleaned = String(rawVal).replace(/[^0-9.]/g, '');
+      const num = parseFloat(cleaned);
+      return (num && !isNaN(num) && num > 0) ? num : defaultPrice;
+    };
+
+    // ──────────────────────────────────────────────
+    // 3. SERVICE & BOOKING HISTORY (from bookings)
+    // Priority: Email -> Name -> Phone -> Customer ID
+    // ──────────────────────────────────────────────
+    let bookingsList = [];
+    try {
+      let bRes = { rows: [] };
+      if (customerEmail) {
+        bRes = await query(`
+          SELECT b.id, b.service_name, b.therapist_name, b.booking_date, b.booking_time, b.status,
+                 b.total_amount, b.original_price, b.membership_tier, b.discount_amount, b.final_price,
+                 s.price AS service_price
+          FROM bookings b
+          LEFT JOIN services s ON LOWER(b.service_name) = LOWER(s.name)
+          WHERE LOWER(b.user_email) = $1
+          ORDER BY b.booking_date DESC
+        `, [customerEmail]);
+      }
+      if (bRes.rows.length === 0 && fullName) {
+        bRes = await query(`
+          SELECT b.id, b.service_name, b.therapist_name, b.booking_date, b.booking_time, b.status,
+                 b.total_amount, b.original_price, b.membership_tier, b.discount_amount, b.final_price,
+                 s.price AS service_price
+          FROM bookings b
+          LEFT JOIN services s ON LOWER(b.service_name) = LOWER(s.name)
+          WHERE LOWER(b.user_name) = LOWER($1)
+          ORDER BY b.booking_date DESC
+        `, [fullName]);
+      }
+
+      bookingsList = await Promise.all(bRes.rows.map(async b => {
+        const origNum = parsePrice(b.original_price || b.total_amount || b.service_price, 1800);
+        const discNum = Math.round((origNum * activeDiscountPct) / 100);
+        const finNum = Math.max(0, origNum - discNum);
+
+        const origStr = `₹${origNum.toLocaleString('en-IN')}`;
+        const tierStr = activeTier;
+        const discStr = discNum > 0 ? `₹${discNum.toLocaleString('en-IN')} (${activeDiscountPct}%)` : `₹0 (0%)`;
+        const finStr = `₹${finNum.toLocaleString('en-IN')}`;
+
+        // Persist computed values to database
+        await query(
+          `UPDATE bookings SET original_price = $1, membership_tier = $2, discount_amount = $3, final_price = $4, total_amount = $5 WHERE id = $6`,
+          [origStr, tierStr, discStr, finStr, finNum, b.id]
+        ).catch(e => console.warn('[CustomerController] Update booking pricing error:', e.message));
+
+        return {
+          id: b.id,
+          service: b.service_name || 'N/A',
+          staff: b.therapist_name || 'Not Assigned',
+          date: `${b.booking_date ? new Date(b.booking_date).toISOString().split('T')[0] : '-'} ${b.booking_time || ''}`.trim(),
+          status: (b.status || 'pending').toUpperCase(),
+          amount: finNum,
+          original_price: origStr,
+          membership_tier: tierStr,
+          discount_amount: discStr,
+          final_price: finStr
+        };
+      }));
+    } catch (dbErr) {
+      console.warn("[CustomerController] Bookings query error:", dbErr.message);
+    }
+
+    // ──────────────────────────────────────────────
+    // 4. WORKSHOP HISTORY (from attendees + workshops)
+    // Priority: Email -> Name -> Phone
+    // ──────────────────────────────────────────────
+    let workshopHistory = [];
+    try {
+      let wsRes = { rows: [] };
+      if (customerEmail) {
+        wsRes = await query(`
+          SELECT a.id, w.title AS workshop_title, w.date AS workshop_date, w.time AS workshop_time,
+                 a.status, a.original_price, a.membership_tier, a.discount_amount, a.final_price,
+                 w.price AS workshop_price
+          FROM attendees a
+          JOIN workshops w ON a.workshop_id = w.id
+          WHERE LOWER(a.email) = $1
+          ORDER BY w.date DESC
+        `, [customerEmail]);
+      }
+      if (wsRes.rows.length === 0 && fullName) {
+        wsRes = await query(`
+          SELECT a.id, w.title AS workshop_title, w.date AS workshop_date, w.time AS workshop_time,
+                 a.status, a.original_price, a.membership_tier, a.discount_amount, a.final_price,
+                 w.price AS workshop_price
+          FROM attendees a
+          JOIN workshops w ON a.workshop_id = w.id
+          WHERE LOWER(a.name) = LOWER($1)
+          ORDER BY w.date DESC
+        `, [fullName]);
+      }
+      if (wsRes.rows.length === 0 && phoneClean) {
+        wsRes = await query(`
+          SELECT a.id, w.title AS workshop_title, w.date AS workshop_date, w.time AS workshop_time,
+                 a.status, a.original_price, a.membership_tier, a.discount_amount, a.final_price,
+                 w.price AS workshop_price
+          FROM attendees a
+          JOIN workshops w ON a.workshop_id = w.id
+          WHERE REGEXP_REPLACE(a.phone, '\\D', '', 'g') = $1
+          ORDER BY w.date DESC
+        `, [phoneClean]);
+      }
+
+      workshopHistory = await Promise.all(wsRes.rows.map(async r => {
+        const origNum = parsePrice(r.original_price || r.workshop_price, 2000);
+        const discNum = Math.round((origNum * activeDiscountPct) / 100);
+        const finNum = Math.max(0, origNum - discNum);
+
+        const origStr = `₹${origNum.toLocaleString('en-IN')}`;
+        const tierStr = activeTier;
+        const discStr = discNum > 0 ? `₹${discNum.toLocaleString('en-IN')} (${activeDiscountPct}%)` : `₹0 (0%)`;
+        const finStr = `₹${finNum.toLocaleString('en-IN')}`;
+
+        // Persist computed values to database
+        await query(
+          `UPDATE attendees SET original_price = $1, membership_tier = $2, discount_amount = $3, final_price = $4 WHERE id = $5`,
+          [origStr, tierStr, discStr, finStr, r.id]
+        ).catch(e => console.warn('[CustomerController] Update attendee pricing error:', e.message));
+
+        return {
+          id: r.id,
+          workshop_title: r.workshop_title || 'N/A',
+          date: `${r.workshop_date ? new Date(r.workshop_date).toISOString().split('T')[0] : '-'} ${r.workshop_time || ''}`.trim(),
+          status: (r.status || 'enrolled').toUpperCase(),
+          original_price: origStr,
+          membership_tier: tierStr,
+          discount_amount: discStr,
+          final_price: finStr
+        };
+      }));
+    } catch (wsErr) {
+      console.warn("[CustomerController] Workshop history query error:", wsErr.message);
+    }
+
+    // ──────────────────────────────────────────────
+    // 5. VEDIC LIFE HISTORY (from vedic_attendees + vedic_programs)
+    // Priority: Email -> Name -> Phone
+    // ──────────────────────────────────────────────
+    let vedicHistory = [];
+    try {
+      let vpRes = { rows: [] };
+      if (customerEmail) {
+        vpRes = await query(`
+          SELECT va.id, vp.title AS program_title, vp.start_date, vp.end_date,
+                 va.status, va.payment_status, va.accommodation_type,
+                 va.original_price, va.membership_tier, va.discount_amount, va.final_price,
+                 vp.price AS program_price
+          FROM vedic_attendees va
+          JOIN vedic_programs vp ON va.program_id = vp.id
+          WHERE LOWER(va.email) = $1
+          ORDER BY vp.start_date DESC
+        `, [customerEmail]);
+      }
+      if (vpRes.rows.length === 0 && fullName) {
+        vpRes = await query(`
+          SELECT va.id, vp.title AS program_title, vp.start_date, vp.end_date,
+                 va.status, va.payment_status, va.accommodation_type,
+                 va.original_price, va.membership_tier, va.discount_amount, va.final_price,
+                 vp.price AS program_price
+          FROM vedic_attendees va
+          JOIN vedic_programs vp ON va.program_id = vp.id
+          WHERE LOWER(va.name) = LOWER($1)
+          ORDER BY vp.start_date DESC
+        `, [fullName]);
+      }
+      if (vpRes.rows.length === 0 && phoneClean) {
+        vpRes = await query(`
+          SELECT va.id, vp.title AS program_title, vp.start_date, vp.end_date,
+                 va.status, va.payment_status, va.accommodation_type,
+                 va.original_price, va.membership_tier, va.discount_amount, va.final_price,
+                 vp.price AS program_price
+          FROM vedic_attendees va
+          JOIN vedic_programs vp ON va.program_id = vp.id
+          WHERE REGEXP_REPLACE(va.phone, '\\D', '', 'g') = $1
+          ORDER BY vp.start_date DESC
+        `, [phoneClean]);
+      }
+
+      vedicHistory = await Promise.all(vpRes.rows.map(async r => {
+        const defaultPrice = (r.program_title && r.program_title.toLowerCase().includes('7-day')) ? 3000 : 5000;
+        const origNum = parsePrice(r.original_price || r.program_price, defaultPrice);
+        const discNum = Math.round((origNum * activeDiscountPct) / 100);
+        const finNum = Math.max(0, origNum - discNum);
+
+        const origStr = `₹${origNum.toLocaleString('en-IN')}`;
+        const tierStr = activeTier;
+        const discStr = discNum > 0 ? `₹${discNum.toLocaleString('en-IN')} (${activeDiscountPct}%)` : `₹0 (0%)`;
+        const finStr = `₹${finNum.toLocaleString('en-IN')}`;
+
+        // Persist computed values to database
+        await query(
+          `UPDATE vedic_attendees SET original_price = $1, membership_tier = $2, discount_amount = $3, final_price = $4 WHERE id = $5`,
+          [origStr, tierStr, discStr, finStr, r.id]
+        ).catch(e => console.warn('[CustomerController] Update vedic attendee pricing error:', e.message));
+
+        return {
+          id: r.id,
+          program_title: r.program_title || 'N/A',
+          date: r.start_date ? `${new Date(r.start_date).toISOString().split('T')[0]} → ${r.end_date ? new Date(r.end_date).toISOString().split('T')[0] : ''}` : '-',
+          status: (r.status || 'REGISTERED').toUpperCase(),
+          payment_status: (r.payment_status || 'PENDING').toUpperCase(),
+          accommodation_type: r.accommodation_type || '-',
+          original_price: origStr,
+          membership_tier: tierStr,
+          discount_amount: discStr,
+          final_price: finStr
+        };
+      }));
+    } catch (vpErr) {
+      console.warn("[CustomerController] Vedic history query error:", vpErr.message);
     }
 
     res.json({

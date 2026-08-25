@@ -633,25 +633,41 @@ const getMemberTierAndDiscount = async (email = null, name = null) => {
     let tier = 'Standard';
     let discountPercentage = 0;
 
-    if (!email || !name || !String(email).trim() || !String(name).trim()) {
+    if (!email && !name) {
         return { tier: 'Standard', discountPercentage: 0, isMatch: false };
     }
 
     try {
-        const emailStr = String(email).trim().toLowerCase();
-        const nameStr = String(name).trim().toLowerCase();
+        const emailStr = email ? String(email).trim().toLowerCase() : '';
+        const nameStr = name ? String(name).trim().toLowerCase() : '';
 
-        // Strict match: BOTH email AND name must match
-        const memRes = await query(
-            `SELECT m.tier, m.status, mt.discount_percentage
-             FROM memberships m
-             LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
-             WHERE LOWER(m.email) = $1 
-               AND (LOWER(m.name) = $2 OR LOWER(m.name) LIKE $3 OR $2 LIKE '%' || LOWER(m.name) || '%')
-               AND (m.status IS NULL OR LOWER(m.status) = 'active')
-             LIMIT 1`,
-            [emailStr, nameStr, `%${nameStr}%`]
-        );
+        let memRes = { rows: [] };
+
+        // 1. Try by Email
+        if (emailStr) {
+            memRes = await query(
+                `SELECT m.tier, m.status, mt.discount_percentage
+                 FROM memberships m
+                 LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
+                 WHERE LOWER(m.email) = $1 
+                   AND (m.status IS NULL OR LOWER(m.status) = 'active')
+                 LIMIT 1`,
+                [emailStr]
+            );
+        }
+
+        // 2. Try by Name if email yields no result
+        if (memRes.rows.length === 0 && nameStr) {
+            memRes = await query(
+                `SELECT m.tier, m.status, mt.discount_percentage
+                 FROM memberships m
+                 LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
+                 WHERE LOWER(m.name) = $1 
+                   AND (m.status IS NULL OR LOWER(m.status) = 'active')
+                 LIMIT 1`,
+                [nameStr]
+            );
+        }
 
         if (memRes.rows.length && memRes.rows[0].tier) {
             const m = memRes.rows[0];
@@ -659,7 +675,7 @@ const getMemberTierAndDiscount = async (email = null, name = null) => {
             if (m.discount_percentage !== null && m.discount_percentage !== undefined) {
                 discountPercentage = parseFloat(m.discount_percentage) || 0;
             } else {
-                const defaultDiscounts = { 'SILVER': 15, 'GOLD': 25, 'PLATINUM': 40 };
+                const defaultDiscounts = { 'SILVER': 15, 'GOLD': 25, 'PLATINUM': 40, 'DIAMOND': 40 };
                 discountPercentage = defaultDiscounts[tier] || 0;
             }
             return { tier, discountPercentage, isMatch: true };

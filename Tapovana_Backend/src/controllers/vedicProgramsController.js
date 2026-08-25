@@ -972,9 +972,22 @@ const registerAttendee = async (req, res) => {
             return res.status(400).json({ success: false, message: 'You are already registered for this program.' });
         }
 
+        const { getMemberTierAndDiscount } = require('./membershipController');
+        const { tier, discountPercentage } = await getMemberTierAndDiscount(email.toLowerCase().trim(), name.trim());
+
+        const vpPriceRaw = program.price || (program.title && program.title.toLowerCase().includes('7-day') ? 3000 : 5000);
+        const origNum = typeof vpPriceRaw === 'number' ? vpPriceRaw : (parseFloat(String(vpPriceRaw).replace(/[^0-9.]/g, '')) || 5000);
+        const discountNum = Math.round((origNum * discountPercentage) / 100);
+        const finalNum = Math.max(0, origNum - discountNum);
+
+        const origStr = `₹${origNum.toLocaleString('en-IN')}`;
+        const tierStr = tier || 'Standard';
+        const discStr = discountNum > 0 ? `₹${discountNum.toLocaleString('en-IN')} (${discountPercentage}%)` : `₹0 (0%)`;
+        const finalStr = `₹${finalNum.toLocaleString('en-IN')}`;
+
         const result = await query(
-            "INSERT INTO vedic_attendees (program_id, name, email, phone, status, source, accommodation_type, payment_status, check_in_date, check_out_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *",
-            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, status, source, accommodation_type, payment_status, checkin_date, checkout_date]
+            "INSERT INTO vedic_attendees (program_id, name, email, phone, status, source, accommodation_type, payment_status, check_in_date, check_out_date, original_price, membership_tier, discount_amount, final_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *",
+            [id, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, status, source, accommodation_type, payment_status, checkin_date, checkout_date, origStr, tierStr, discStr, finalStr]
         );
 
         await query('UPDATE vedic_programs SET enrolled = enrolled + 1 WHERE id = $1', [id]);
