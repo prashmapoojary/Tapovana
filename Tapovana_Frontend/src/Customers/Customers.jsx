@@ -10,6 +10,20 @@ import ActionIcon from "../assets/Button.svg";
 
 import { getApiBase } from "../utils/config";
 
+const API_BASE = (() => {
+  if (typeof window === "undefined") return "https://tapovana.onrender.com";
+  const hostname = window.location.hostname;
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    /^192\.168\./.test(hostname) ||
+    /^10\./.test(hostname)
+  ) {
+    return `http://${hostname}:5000`;
+  }
+  return import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
+})();
+
 const DUMMY_CUSTOMERS = [
   { id: "1", customer_id: "CUST-001", first_name: "Karthik", last_name: "Rao", email: "karthikrao608@gmail.com", phone: "+91 98765 43210", status: "ACTIVE", membership_status: "SILVER", total_bookings: 12, total_spent: 24500, join_date: "2026-06-08", last_activity: "2026-06-08", admin_notes: "Mobile App Registered User", avatar_url: "/uploads/unsplash_106.jpg" },
   { id: "2", customer_id: "CUST-002", first_name: "Karthik", last_name: "User", email: "h59896411@gmail.com", phone: "+91 87654 32109", status: "ACTIVE", membership_status: "PLATINUM", total_bookings: 2, total_spent: 3500, join_date: "2026-06-08", last_activity: "2026-06-08", admin_notes: "Mobile App Registered User", avatar_url: "/uploads/unsplash_108.jpg" },
@@ -198,7 +212,8 @@ function Customers() {
     setVedicHistory([]);
     setMembershipData(null);
     try {
-      const res = await apiFetch(`/api/customers/${customer.id || customer.customer_id}/bookings`);
+      const lookupKey = customer.email || customer.id || customer.customer_id;
+      const res = await apiFetch(`/api/customers/${encodeURIComponent(lookupKey)}/bookings`);
       if (res && res.success) {
         setCustomerBookings(Array.isArray(res.bookings) ? res.bookings : []);
         setWorkshopHistory(Array.isArray(res.workshop_history) ? res.workshop_history : []);
@@ -426,7 +441,7 @@ function Customers() {
         return (
           <>
             <div className="drawer-overlay open" onClick={() => setSelectedCustomer(null)} style={{ zIndex: 9999 }} />
-            <div className="drawer-panel open" onClick={(e) => e.stopPropagation()} style={{ zIndex: 10000, width: "720px", maxWidth: "100%", overflowY: "auto" }}>
+            <div className="drawer-panel open" onClick={(e) => e.stopPropagation()} style={{ zIndex: 10000, width: "500px", maxWidth: "100%", overflowY: "auto" }}>
               <div className="drawer-header">
                 <div>
                   <div className="drawer-title" style={{ fontSize: "17px", fontWeight: "700", color: "#0F172A" }}>

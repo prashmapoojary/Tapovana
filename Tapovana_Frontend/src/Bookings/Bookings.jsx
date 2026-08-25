@@ -818,8 +818,8 @@ function Bookings() {
       </section>
 
       {/* ── Table Section ── */}
-      <section className="bk-table-card">
-        <div className="bk-table-scroll">
+      <section className="bookings-table-card">
+        <div className="bookings-table-scroll">
           <table className="bookings-table">
             <thead>
               <tr>

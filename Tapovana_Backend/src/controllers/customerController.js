@@ -516,20 +516,34 @@ exports.getCustomerBookings = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 1. Fetch customer details from DB
-    const custRes = await query(`
-      SELECT * FROM customers 
-      WHERE id::text = $1 OR customer_id = $1
-      LIMIT 1
-    `, [id]);
+    // 1. Fetch customer details from DB: Email first, ID / customer_id as second option
+    let cust = null;
+    if (id && typeof id === 'string' && id.includes('@')) {
+      const custRes = await query(`
+        SELECT * FROM customers 
+        WHERE LOWER(email) = LOWER($1)
+        LIMIT 1
+      `, [id.trim()]);
+      cust = custRes.rows[0];
+    }
 
-    const cust = custRes.rows[0];
-    const customerName = cust ? `${cust.first_name} ${cust.last_name}`.trim() : id;
-    const customerEmail = cust?.email || "";
-    const firstName = cust?.first_name || customerName;
+    if (!cust) {
+      const custRes = await query(`
+        SELECT * FROM customers 
+        WHERE id::text = $1 OR customer_id = $1 OR LOWER(email) = LOWER($1)
+        LIMIT 1
+      `, [id]);
+      cust = custRes.rows[0];
+    }
+
+    const customerEmail = cust?.email || (id && id.includes('@') ? id.trim() : "");
+    const firstName = cust?.first_name || "";
+    const lastName = cust?.last_name || "";
+    const fullName = cust ? `${firstName} ${lastName}`.trim() : (customerEmail || id);
 
     // ──────────────────────────────────────────────
     // 2. SERVICE & BOOKING HISTORY (from bookings)
+    // Primary: Email. Secondary: Name / Customer ID.
     // ──────────────────────────────────────────────
     let bookingsList = [];
     try {
@@ -537,9 +551,10 @@ exports.getCustomerBookings = async (req, res) => {
         SELECT id, service_name, therapist_name, booking_date, booking_time, status,
                total_amount, original_price, membership_tier, discount_amount, final_price
         FROM bookings
-        WHERE user_name ILIKE $1 OR (user_email IS NOT NULL AND LOWER(user_email) = LOWER($2))
+        WHERE (user_email IS NOT NULL AND LOWER(user_email) = LOWER($1))
+           OR (user_name ILIKE $2 AND $2 != '%%')
         ORDER BY booking_date DESC
-      `, [`%${firstName}%`, customerEmail]);
+      `, [customerEmail, firstName ? `%${firstName}%` : `%${fullName}%`]);
 
       bookingsList = localBookings.rows.map(b => ({
         id: b.id,
@@ -559,6 +574,7 @@ exports.getCustomerBookings = async (req, res) => {
 
     // ──────────────────────────────────────────────
     // 3. WORKSHOP HISTORY (from attendees + workshops)
+    // Primary: Email. Secondary: Name.
     // ──────────────────────────────────────────────
     let workshopHistory = [];
     try {
@@ -567,9 +583,10 @@ exports.getCustomerBookings = async (req, res) => {
                a.status, a.original_price, a.membership_tier, a.discount_amount, a.final_price
         FROM attendees a
         JOIN workshops w ON a.workshop_id = w.id
-        WHERE a.name ILIKE $1 OR (a.email IS NOT NULL AND LOWER(a.email) = LOWER($2))
+        WHERE (a.email IS NOT NULL AND LOWER(a.email) = LOWER($1))
+           OR (a.name ILIKE $2 AND $2 != '%%')
         ORDER BY w.date DESC
-      `, [`%${firstName}%`, customerEmail]);
+      `, [customerEmail, firstName ? `%${firstName}%` : `%${fullName}%`]);
 
       workshopHistory = wsRes.rows.map(r => ({
         id: r.id,
@@ -587,6 +604,7 @@ exports.getCustomerBookings = async (req, res) => {
 
     // ──────────────────────────────────────────────
     // 4. VEDIC LIFE HISTORY (from vedic_attendees + vedic_programs)
+    // Primary: Email. Secondary: Name.
     // ──────────────────────────────────────────────
     let vedicHistory = [];
     try {
@@ -596,9 +614,10 @@ exports.getCustomerBookings = async (req, res) => {
                va.original_price, va.membership_tier, va.discount_amount, va.final_price
         FROM vedic_attendees va
         JOIN vedic_programs vp ON va.program_id = vp.id
-        WHERE va.name ILIKE $1 OR (va.email IS NOT NULL AND LOWER(va.email) = LOWER($2))
+        WHERE (va.email IS NOT NULL AND LOWER(va.email) = LOWER($1))
+           OR (va.name ILIKE $2 AND $2 != '%%')
         ORDER BY vp.start_date DESC
-      `, [`%${firstName}%`, customerEmail]);
+      `, [customerEmail, firstName ? `%${firstName}%` : `%${fullName}%`]);
 
       vedicHistory = vpRes.rows.map(r => ({
         id: r.id,
@@ -618,6 +637,7 @@ exports.getCustomerBookings = async (req, res) => {
 
     // ──────────────────────────────────────────────
     // 5. MEMBERSHIP & BENEFITS (from memberships + membership_tiers)
+    // Primary: Email. Secondary: Name.
     // ──────────────────────────────────────────────
     let membershipInfo = null;
     try {
@@ -627,9 +647,10 @@ exports.getCustomerBookings = async (req, res) => {
                mt.discount_percentage, mt.benefits
         FROM memberships m
         LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
-        WHERE LOWER(m.email) = LOWER($1) OR m.name ILIKE $2
+        WHERE (m.email IS NOT NULL AND LOWER(m.email) = LOWER($1))
+           OR (m.name ILIKE $2 AND $2 != '%%')
         LIMIT 1
-      `, [customerEmail, `%${firstName}%`]);
+      `, [customerEmail, firstName ? `%${firstName}%` : `%${fullName}%`]);
 
       if (memRes.rows.length > 0) {
         const m = memRes.rows[0];
