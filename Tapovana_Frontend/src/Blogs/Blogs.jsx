@@ -562,7 +562,7 @@ export default function Blogs({ mode }) {
         }
 
         setEditingBlogId(null);
-        navigate("/dashboard/blogs");
+        navigate(`/dashboard/blogs?status=${targetStatus}`);
         await triggerAlert("Blog updated successfully.", true);
       } else {
         payload.status = targetStatus;
@@ -572,7 +572,7 @@ export default function Blogs({ mode }) {
         });
         const msg = targetStatus === "draft" ? "Draft saved successfully." : "Blog created and submitted for review.";
         setEditingBlogId(null);
-        navigate("/dashboard/blogs");
+        navigate(`/dashboard/blogs?status=${targetStatus}`);
         await triggerAlert(msg, true);
       }
     } catch (err) {
@@ -1069,7 +1069,10 @@ export default function Blogs({ mode }) {
             <button
               key={tab.id}
               className={`blog-tab-btn ${activeTab === tab.id ? "active" : ""}`}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setSearchParams({ status: tab.id });
+              }}
             >
               {tab.label}
             </button>
