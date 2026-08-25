@@ -276,7 +276,7 @@ export default function Blogs({ mode }) {
       setEditBlogData({
         title: detailBlog.title || "",
         category: detailBlog.category || "AYURVEDA",
-        summary: detailBlog.summary || "",
+        summary: detailBlog.summary || detailBlog.subtitle || "",
         content_html: detailBlog.content_html || "",
         featured_image: detailBlog.featured_image || "",
         tags: Array.isArray(detailBlog.tags) ? detailBlog.tags.join(", ") : (detailBlog.tags || ""),
@@ -288,7 +288,7 @@ export default function Blogs({ mode }) {
         read_time: detailBlog.read_time || "3 min read"
       });
     }
-  }, [mode, detailBlog]);
+  }, [mode, detailBlog, currentUser, navigate]);
 
   const [error, setError] = useState(null);
 
@@ -431,6 +431,21 @@ export default function Blogs({ mode }) {
   };
 
   const handleEdit = (blog) => {
+    setEditingBlogId(blog.id);
+    setEditBlogData({
+      title: blog.title || "",
+      category: blog.category || "AYURVEDA",
+      summary: blog.summary || blog.subtitle || "",
+      content_html: blog.content_html || "",
+      featured_image: blog.featured_image || "",
+      tags: Array.isArray(blog.tags) ? blog.tags.join(", ") : (blog.tags || ""),
+      seo_title: blog.seo_title || "",
+      seo_description: blog.seo_description || "",
+      seo_keywords: blog.seo_keywords || "",
+      author_name: blog.author?.name || `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim(),
+      author_role: blog.author?.role || (currentUser?.role?.toUpperCase() === "DOCTOR" ? "Doctor" : currentUser?.role?.toUpperCase() === "THERAPIST" ? "Therapist" : ""),
+      read_time: blog.read_time || "3 min read"
+    });
     navigate(`/dashboard/blogs/${blog.id}/edit`);
   };
 
@@ -536,6 +551,7 @@ export default function Blogs({ mode }) {
         title: editBlogData.title,
         category: editBlogData.category,
         summary: editBlogData.summary,
+        subtitle: editBlogData.summary,
         content_html: editBlogData.content_html,
         featured_image: editBlogData.featured_image,
         tags: editBlogData.tags ? editBlogData.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
@@ -567,7 +583,7 @@ export default function Blogs({ mode }) {
 
         setEditingBlogId(null);
         navigate(`/dashboard/blogs?status=${targetStatus}`);
-        await triggerAlert("Blog updated successfully.", true);
+        await triggerAlert(targetStatus === "draft" ? "Draft saved successfully." : "Blog updated and submitted for review.", true);
       } else {
         payload.status = targetStatus;
         await apiFetch("/api/blogs", {
