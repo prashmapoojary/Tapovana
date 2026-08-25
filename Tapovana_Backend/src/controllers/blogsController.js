@@ -12,7 +12,7 @@ const ensureUploadsDir = () => {
     }
 };
 
-// ── Ensure blog_audit_log table & status_change column exist ────────────
+// ── Ensure blog_audit_log table & blogs columns exist ────────────────
 query(`
     CREATE TABLE IF NOT EXISTS blog_audit_log (
         id SERIAL PRIMARY KEY,
@@ -22,8 +22,10 @@ query(`
         changed_by UUID REFERENCES team_members(id) ON DELETE SET NULL
     );
     ALTER TABLE blog_audit_log ADD COLUMN IF NOT EXISTS status_change VARCHAR(100);
-`).then(() => console.log('✅ blog_audit_log table & status_change column verified'))
-  .catch(err => console.error('Failed to verify blog_audit_log table:', err));
+    ALTER TABLE blogs ADD COLUMN IF NOT EXISTS subtitle TEXT;
+    ALTER TABLE blogs ADD COLUMN IF NOT EXISTS read_time VARCHAR(50);
+`).then(() => console.log('✅ blog_audit_log & blogs columns verified'))
+  .catch(err => console.error('Failed to verify blog columns:', err));
 
 // Helper: Safely insert blog audit log without throwing
 const logBlogAudit = async (blogId, statusChange, userId) => {
@@ -228,6 +230,7 @@ const getAllBlogs = async (req, res) => {
             title: b.title,
             slug: b.slug,
             summary: b.summary,
+            subtitle: b.subtitle || null,
             category: b.category,
             featured_image: b.featured_image,
             status: b.status,
@@ -240,7 +243,7 @@ const getAllBlogs = async (req, res) => {
             scheduled_publish_at: b.scheduled_publish_at,
             created_at: b.created_at,
             updated_at: b.updated_at,
-            read_time: getReadTime(b.content_html),
+            read_time: b.read_time || getReadTime(b.content_html),
             tags: tagsMap[b.id] || [],
             user_liked: !!userLikes[b.id],
             user_bookmarked: !!userBookmarks[b.id],
@@ -340,6 +343,7 @@ const getBlogById = async (req, res) => {
             content_html: b.content_html,
             content_json: b.content_json,
             summary: b.summary,
+            subtitle: b.subtitle || null,
             category: b.category,
             featured_image: b.featured_image,
             status: b.status,
@@ -353,7 +357,7 @@ const getBlogById = async (req, res) => {
             approved_at: b.approved_at,
             created_at: b.created_at,
             updated_at: b.updated_at,
-            read_time: getReadTime(b.content_html),
+            read_time: b.read_time || getReadTime(b.content_html),
             seo_title: b.seo_title,
             seo_description: b.seo_description,
             seo_keywords: b.seo_keywords,
@@ -402,13 +406,18 @@ const createBlog = async (req, res) => {
     try {
         const userId = req.user.id;
         const {
-            title, category = 'AYURVEDA', summary, content_html = '', content_json,
+            title, category = 'AYURVEDA', summary, subtitle, read_time, content_html = '', content_json,
             featured_image, tags, seo_title, seo_description, seo_keywords,
             status = 'draft', scheduled_publish_at
         } = req.body;
 
-        if (!title || !title.trim()) {
-            return res.status(400).json({ success: false, message: 'Title is required.' });
+        if (!title || title.trim().length < 3) {
+            return res.status(400).json({ success: false, message: 'Title must be at least 3 characters long.' });
+        }
+
+        const cleanText = content_html.replace(/<[^>]*>/g, '').trim();
+        if (status === 'pending' && cleanText.length < 50) {
+            return res.status(400).json({ success: false, message: 'Blog description/content must be at least 50 characters before submitting for review.' });
         }
 
         const slug = await ensureUniqueSlug(generateSlug(title));
@@ -416,13 +425,13 @@ const createBlog = async (req, res) => {
         const finalStatus = status === 'scheduled' && scheduled_publish_at ? 'scheduled' : status;
 
         const result = await query(`
-            INSERT INTO blogs (title, slug, content_html, content_json, summary, category, featured_image,
+            INSERT INTO blogs (title, slug, content_html, content_json, summary, subtitle, read_time, category, featured_image,
                                status, created_by, seo_title, seo_description, seo_keywords, scheduled_publish_at,
                                published_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             RETURNING id
         `, [
-            title.trim(), slug, content_html, content_json || null, summary || null,
+            title.trim(), slug, content_html, content_json || null, summary || null, subtitle || null, read_time || null,
             category, savedImage, finalStatus, userId,
             seo_title || null, seo_description || null, seo_keywords || null,
             scheduled_publish_at || null,
@@ -515,7 +524,7 @@ const updateBlog = async (req, res) => {
         }
 
         const {
-            title, category, summary, content_html, content_json,
+            title, category, summary, subtitle, read_time, content_html, content_json,
             featured_image, tags, seo_title, seo_description, seo_keywords,
             status, scheduled_publish_at
         } = req.body;
@@ -528,6 +537,8 @@ const updateBlog = async (req, res) => {
         if (title !== undefined) { updates.push(`title = $${paramIdx++}`); params.push(title.trim()); }
         if (category !== undefined) { updates.push(`category = $${paramIdx++}`); params.push(category); }
         if (summary !== undefined) { updates.push(`summary = $${paramIdx++}`); params.push(summary); }
+        if (subtitle !== undefined) { updates.push(`subtitle = $${paramIdx++}`); params.push(subtitle); }
+        if (read_time !== undefined) { updates.push(`read_time = $${paramIdx++}`); params.push(read_time); }
         if (content_html !== undefined) { updates.push(`content_html = $${paramIdx++}`); params.push(content_html); }
         if (content_json !== undefined) { updates.push(`content_json = $${paramIdx++}`); params.push(content_json); }
         if (seo_title !== undefined) { updates.push(`seo_title = $${paramIdx++}`); params.push(seo_title); }

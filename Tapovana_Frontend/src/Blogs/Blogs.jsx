@@ -519,10 +519,10 @@ export default function Blogs({ mode }) {
       await triggerAlert("Featured image is required for publishing.");
       return;
     }
-    // 7. Description validation: Required, min length 500 chars only for pending
+    // 7. Description validation: Required, min length 50 chars for pending
     const textOnly = (editBlogData.content_html || "").replace(/<[^>]*>/g, '').trim();
-    if (targetStatus === "pending" && textOnly.length < 500) {
-      await triggerAlert("Content must be at least 500 characters.");
+    if (targetStatus === "pending" && textOnly.length < 50) {
+      await triggerAlert("Content must be at least 50 characters before submitting for review.");
       return;
     }
 
@@ -951,7 +951,7 @@ export default function Blogs({ mode }) {
                 className="blog-editor-save blog-editor-submit"
                 disabled={savingBlog}
               >
-                Send for Approval
+                Submit for Review
               </button>
             </div>
           </div>
