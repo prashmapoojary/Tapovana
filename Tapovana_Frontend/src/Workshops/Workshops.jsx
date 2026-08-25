@@ -1329,7 +1329,42 @@ export default function Workshops() {
                   style={{ padding: "8px 16px", fontSize: "13px", background: "#CDA751", borderColor: "#CDA751", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", color: "white" }}
                 >
                   Export CSV
-                </but                        const cleaned = e.target.value.replace(/\D/g, "");
+                </button>
+              </div>
+            </div>
+
+            {/* Manual Enroll Form Panel */}
+            {showManualEnroll && (
+              <div style={{ background: "#f8f9fb", border: "1px solid rgba(205,167,81,0.2)", borderRadius: "8px", padding: "16px", animation: "wsFadeIn 0.2s ease" }}>
+                <h4 style={{ margin: "0 0 12px 0", fontSize: "14px", fontWeight: 700, color: "#2d3748" }}>Enroll User Manually</h4>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <label style={{ fontSize: "11px", fontWeight: 600, color: "#404854" }}>Full Name *</label>
+                    <input 
+                      type="text" 
+                      value={manualEnrollForm.name} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, name: e.target.value }))}
+                      placeholder="e.g. John Doe"
+                      style={{ padding: "7px 10px", borderRadius: "4px", border: "1px solid #e2e8f0", fontSize: "13px", outline: "none", background: "white", width: "100%", boxSizing: "border-box" }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <label style={{ fontSize: "11px", fontWeight: 600, color: "#404854" }}>Email *</label>
+                    <input 
+                      type="email" 
+                      value={manualEnrollForm.email} 
+                      onChange={e => setManualEnrollForm(p => ({ ...p, email: e.target.value }))}
+                      placeholder="e.g. john@example.com"
+                      style={{ padding: "7px 10px", borderRadius: "4px", border: "1px solid #e2e8f0", fontSize: "13px", outline: "none", background: "white", width: "100%", boxSizing: "border-box" }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <label style={{ fontSize: "11px", fontWeight: 600, color: "#404854" }}>Phone (Optional)</label>
+                    <input 
+                      type="tel" 
+                      value={manualEnrollForm.phone} 
+                      onChange={e => {
+                        const cleaned = e.target.value.replace(/\D/g, "");
                         setManualEnrollForm(p => ({ ...p, phone: cleaned }));
                         if (cleaned.length > 0 && cleaned.length !== 10) {
                           setPhoneError("Phone number must be exactly 10 digits");
@@ -1375,12 +1410,12 @@ export default function Workshops() {
                     <tr style={{ background: "#f8f9fb", borderBottom: "1px solid #e2e8f0" }}>
                       <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Name</th>
                       <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Email</th>
-                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight 700, color: "#64748B", textTransform: "uppercase" }}>Original Price</th>
-                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight 700, color: "#64748B", textTransform: "uppercase" }}>Membership Tier</th>
-                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight 700, color: "#64748B", textTransform: "uppercase" }}>Discount</th>
-                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight 700, color: "#64748B", textTransform: "uppercase" }}>Final Price</th>
-                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight 700, color: "#64748B", textTransform: "uppercase" }}>Status</th>
-                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight 700, color: "#64748B", textTransform: "uppercase" }}>Actions</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Original Price</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Membership Tier</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Discount</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Final Price</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Status</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -8,6 +8,7 @@ const {
     deleteMembership,
     getAllTiers,
     updateTier,
+    verifyCustomerMembership,
     syncFromRender,
     getRemoteMobileMemberships,
     getRemoteAdminMemberships
@@ -28,6 +29,10 @@ const adminAuth = [authenticate, allowAdminRoles];
 // ─── Remote Proxy Routes (solves CORS issues on frontend) ───────────
 router.get('/remote/mobile', getRemoteMobileMemberships);
 router.get('/remote/admin', getRemoteAdminMemberships);
+
+// ─── Verification Route (Public / Admin helper) ─────────────────────
+router.get('/verify', verifyCustomerMembership);
+router.post('/verify', verifyCustomerMembership);
 
 // ─── Public routes (no auth needed — for mobile app & listing) ───────
 router.get('/', getAllMemberships);

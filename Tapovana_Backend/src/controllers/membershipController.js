@@ -547,43 +547,128 @@ const updateTier = async (req, res) => {
     }
 };
 
-// ─── Helper: Resolve member's tier and discount percentage ────────────
-const getMemberTierAndDiscount = async (email = null, name = null) => {
-    let tier = 'NONE';
-    let discountPercentage = 0;
+// ─── VERIFY Customer Membership by Name + Email ───────────────────────────
+const verifyCustomerMembership = async (req, res) => {
+    const { name, email } = req.query.name ? req.query : (req.body || {});
+
+    const emailStr = email ? String(email).trim().toLowerCase() : '';
+    const nameStr = name ? String(name).trim().toLowerCase() : '';
+
+    if (!emailStr || !nameStr) {
+        return res.json({
+            success: true,
+            matched: false,
+            tier: 'Standard',
+            discount_percentage: 0,
+            message: 'Both customer name and email are required to verify membership.'
+        });
+    }
 
     try {
-        if (email && typeof email === 'string' && email.trim()) {
-            const memRes = await query('SELECT tier FROM memberships WHERE LOWER(email) = LOWER($1) AND (status IS NULL OR LOWER(status) = \'active\') LIMIT 1', [email.trim()]);
-            if (memRes.rows.length && memRes.rows[0].tier) {
-                tier = memRes.rows[0].tier.toUpperCase();
+        // Strict match: BOTH email AND name must match
+        const memRes = await query(
+            `SELECT m.id, m.name, m.email, m.tier, m.status, mt.discount_percentage
+             FROM memberships m
+             LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
+             WHERE LOWER(m.email) = $1 
+               AND (LOWER(m.name) = $2 OR LOWER(m.name) LIKE $3 OR $2 LIKE '%' || LOWER(m.name) || '%')
+               AND (m.status IS NULL OR LOWER(m.status) = 'active')
+             LIMIT 1`,
+            [emailStr, nameStr, `%${nameStr}%`]
+        );
+
+        if (memRes.rows.length > 0) {
+            const m = memRes.rows[0];
+            const tier = (m.tier || 'Standard').toUpperCase();
+            let discountPct = 0;
+            if (m.discount_percentage !== null && m.discount_percentage !== undefined) {
+                discountPct = parseFloat(m.discount_percentage) || 0;
             } else {
-                const custRes = await query('SELECT membership_status FROM customers WHERE LOWER(email) = LOWER($1) LIMIT 1', [email.trim()]);
-                if (custRes.rows.length && custRes.rows[0].membership_status) {
-                    tier = custRes.rows[0].membership_status.toUpperCase();
-                }
+                const defaultDiscounts = { 'SILVER': 15, 'GOLD': 25, 'PLATINUM': 40 };
+                discountPct = defaultDiscounts[tier] || 0;
             }
-        } else if (name && typeof name === 'string' && name.trim()) {
-            const memRes = await query('SELECT tier FROM memberships WHERE LOWER(name) LIKE LOWER($1) AND (status IS NULL OR LOWER(status) = \'active\') LIMIT 1', [`%${name.trim()}%`]);
-            if (memRes.rows.length && memRes.rows[0].tier) {
-                tier = memRes.rows[0].tier.toUpperCase();
-            }
+            return res.json({
+                success: true,
+                matched: true,
+                isMismatch: false,
+                tier: tier,
+                discount_percentage: discountPct,
+                membership: m,
+                message: `Active ${tier} membership confirmed.`
+            });
         }
 
-        if (tier !== 'NONE' && tier !== 'STANDARD' && tier !== '-') {
-            const tierRes = await query('SELECT discount_percentage FROM membership_tiers WHERE UPPER(name) = UPPER($1) LIMIT 1', [tier]);
-            if (tierRes.rows.length && tierRes.rows[0].discount_percentage !== undefined && tierRes.rows[0].discount_percentage !== null) {
-                discountPercentage = parseFloat(tierRes.rows[0].discount_percentage) || 0;
+        // Check if email exists with a DIFFERENT name OR name exists with a DIFFERENT email
+        const emailCheck = await query('SELECT name FROM memberships WHERE LOWER(email) = $1 LIMIT 1', [emailStr]);
+        const nameCheck = await query('SELECT email FROM memberships WHERE LOWER(name) = $1 OR LOWER(name) LIKE $2 LIMIT 1', [nameStr, `%${nameStr}%`]);
+
+        if (emailCheck.rows.length > 0 || nameCheck.rows.length > 0) {
+            return res.json({
+                success: true,
+                matched: false,
+                isMismatch: true,
+                tier: 'Standard',
+                discount_percentage: 0,
+                warning: 'Membership mismatch: The entered customer name and email do not match the membership record. Please verify the customer details.',
+                message: 'Membership mismatch: The entered customer name and email do not match the membership record. Please verify the customer details.'
+            });
+        }
+
+        return res.json({
+            success: true,
+            matched: false,
+            isMismatch: false,
+            tier: 'Standard',
+            discount_percentage: 0,
+            message: 'No membership record found for this customer.'
+        });
+    } catch (err) {
+        console.error('verifyCustomerMembership error:', err);
+        return res.status(500).json({ success: false, message: 'Server error verifying membership.' });
+    }
+};
+
+// ─── Helper: Resolve member's tier and discount percentage ────────────
+const getMemberTierAndDiscount = async (email = null, name = null) => {
+    let tier = 'Standard';
+    let discountPercentage = 0;
+
+    if (!email || !name || !String(email).trim() || !String(name).trim()) {
+        return { tier: 'Standard', discountPercentage: 0, isMatch: false };
+    }
+
+    try {
+        const emailStr = String(email).trim().toLowerCase();
+        const nameStr = String(name).trim().toLowerCase();
+
+        // Strict match: BOTH email AND name must match
+        const memRes = await query(
+            `SELECT m.tier, m.status, mt.discount_percentage
+             FROM memberships m
+             LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
+             WHERE LOWER(m.email) = $1 
+               AND (LOWER(m.name) = $2 OR LOWER(m.name) LIKE $3 OR $2 LIKE '%' || LOWER(m.name) || '%')
+               AND (m.status IS NULL OR LOWER(m.status) = 'active')
+             LIMIT 1`,
+            [emailStr, nameStr, `%${nameStr}%`]
+        );
+
+        if (memRes.rows.length && memRes.rows[0].tier) {
+            const m = memRes.rows[0];
+            tier = m.tier.toUpperCase();
+            if (m.discount_percentage !== null && m.discount_percentage !== undefined) {
+                discountPercentage = parseFloat(m.discount_percentage) || 0;
             } else {
                 const defaultDiscounts = { 'SILVER': 15, 'GOLD': 25, 'PLATINUM': 40 };
                 discountPercentage = defaultDiscounts[tier] || 0;
             }
+            return { tier, discountPercentage, isMatch: true };
         }
     } catch (err) {
         console.warn('getMemberTierAndDiscount error:', err.message);
     }
 
-    return { tier: tier === 'NONE' || !tier ? 'Standard' : tier, discountPercentage };
+    return { tier: 'Standard', discountPercentage: 0, isMatch: false };
 };
 
 // ─── Sync from Render API ─────────────────────────────────────────────
@@ -651,5 +736,5 @@ const getRemoteAdminMemberships = async (req, res) => {
 module.exports = { 
     getAllMemberships, getMembershipById, createMembership, updateMembership, 
     deleteMembership, getAllTiers, updateTier, getMemberTierAndDiscount, 
-    syncFromRender, getRemoteMobileMemberships, getRemoteAdminMemberships 
+    verifyCustomerMembership, syncFromRender, getRemoteMobileMemberships, getRemoteAdminMemberships 
 };

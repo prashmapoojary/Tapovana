@@ -816,7 +816,12 @@ function Bookings() {
           </div>
         </div>
       </section>
-                            <thead>
+
+      {/* ── Table Section ── */}
+      <section className="bk-table-card">
+        <div className="bk-table-scroll">
+          <table className="bookings-table">
+            <thead>
               <tr>
                 <th>ID</th>
                 <th>CUSTOMER</th>

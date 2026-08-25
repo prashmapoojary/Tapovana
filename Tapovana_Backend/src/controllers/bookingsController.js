@@ -18,10 +18,13 @@ const applyMembershipDiscount = async (emailOrId, serviceName, currentAmountStr,
 
     try {
         const memRes = await query(
-            `SELECT tier, status FROM memberships 
-             WHERE LOWER(email) = LOWER($1) AND LOWER(name) = LOWER($2) 
-               AND status = 'active' AND expiry_date >= CURRENT_DATE`,
-            [ident.toLowerCase(), nameVal.toLowerCase()]
+            `SELECT m.tier, m.status, mt.discount_percentage
+             FROM memberships m
+             LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
+             WHERE LOWER(m.email) = LOWER($1) 
+               AND (LOWER(m.name) = LOWER($2) OR LOWER(m.name) LIKE $3 OR $2 LIKE '%' || LOWER(m.name) || '%')
+               AND (m.status IS NULL OR LOWER(m.status) = 'active')`,
+            [ident.toLowerCase(), nameVal.toLowerCase(), `%${nameVal.toLowerCase()}%`]
         );
 
         if (memRes.rows.length === 0) {
@@ -32,17 +35,15 @@ const applyMembershipDiscount = async (emailOrId, serviceName, currentAmountStr,
         const tier = (membership.tier || 'SILVER').toUpperCase();
 
         let discountRate = 0;
-        let passLabel = '';
-        if (tier === 'SILVER') {
-            discountRate = 0.15;
-            passLabel = 'Silver Pass';
-        } else if (tier === 'GOLD') {
-            discountRate = 0.25;
-            passLabel = 'Gold Pass';
-        } else if (tier === 'PLATINUM') {
-            discountRate = 0.40;
-            passLabel = 'Diamond Pass';
+        if (membership.discount_percentage !== null && membership.discount_percentage !== undefined) {
+            discountRate = (parseFloat(membership.discount_percentage) || 0) / 100;
         } else {
+            const defaultDiscounts = { 'SILVER': 0.15, 'GOLD': 0.25, 'PLATINUM': 0.40 };
+            discountRate = defaultDiscounts[tier] || 0;
+        }
+
+        const passLabel = `${tier.charAt(0) + tier.slice(1).toLowerCase()} Tier`;
+        if (discountRate <= 0) {
             return currentAmountStr;
         }
 
