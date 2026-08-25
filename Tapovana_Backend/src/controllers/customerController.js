@@ -516,7 +516,7 @@ exports.getCustomerBookings = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 1. Fetch customer details from DB: Email first, ID / customer_id as second option
+    // 1. Fetch customer details from DB: Email first, ID / customer_id / phone as fallback options
     let cust = null;
     if (id && typeof id === 'string' && id.includes('@')) {
       const custRes = await query(`
@@ -530,33 +530,46 @@ exports.getCustomerBookings = async (req, res) => {
     if (!cust) {
       const custRes = await query(`
         SELECT * FROM customers 
-        WHERE id::text = $1 OR customer_id = $1 OR LOWER(email) = LOWER($1)
+        WHERE id::text = $1 OR customer_id = $1 OR LOWER(email) = LOWER($1) OR phone = $1
         LIMIT 1
       `, [id]);
       cust = custRes.rows[0];
     }
 
-    const customerEmail = cust?.email || (id && id.includes('@') ? id.trim() : "");
-    const firstName = cust?.first_name || "";
-    const lastName = cust?.last_name || "";
-    const fullName = cust ? `${firstName} ${lastName}`.trim() : (customerEmail || id);
+    const customerEmail = cust?.email ? String(cust.email).trim().toLowerCase() : (id && id.includes('@') ? id.trim().toLowerCase() : "");
+    const firstName = cust?.first_name ? String(cust.first_name).trim() : "";
+    const lastName = cust?.last_name ? String(cust.last_name).trim() : "";
+    const fullName = `${firstName} ${lastName}`.trim();
+    const phoneClean = cust?.phone ? String(cust.phone).replace(/\D/g, "") : "";
+    const custId = cust?.customer_id || cust?.id || "";
 
     // ──────────────────────────────────────────────
     // 2. SERVICE & BOOKING HISTORY (from bookings)
-    // Primary: Email. Secondary: Name / Customer ID.
+    // Priority: Email -> Name -> Phone -> Customer ID
     // ──────────────────────────────────────────────
     let bookingsList = [];
     try {
-      const localBookings = await query(`
-        SELECT id, service_name, therapist_name, booking_date, booking_time, status,
-               total_amount, original_price, membership_tier, discount_amount, final_price
-        FROM bookings
-        WHERE (user_email IS NOT NULL AND LOWER(user_email) = LOWER($1))
-           OR (user_name ILIKE $2 AND $2 != '%%')
-        ORDER BY booking_date DESC
-      `, [customerEmail, firstName ? `%${firstName}%` : `%${fullName}%`]);
+      let bRes = { rows: [] };
+      if (customerEmail) {
+        bRes = await query(`
+          SELECT id, service_name, therapist_name, booking_date, booking_time, status,
+                 total_amount, original_price, membership_tier, discount_amount, final_price
+          FROM bookings
+          WHERE LOWER(user_email) = $1
+          ORDER BY booking_date DESC
+        `, [customerEmail]);
+      }
+      if (bRes.rows.length === 0 && fullName) {
+        bRes = await query(`
+          SELECT id, service_name, therapist_name, booking_date, booking_time, status,
+                 total_amount, original_price, membership_tier, discount_amount, final_price
+          FROM bookings
+          WHERE LOWER(user_name) = LOWER($1)
+          ORDER BY booking_date DESC
+        `, [fullName]);
+      }
 
-      bookingsList = localBookings.rows.map(b => ({
+      bookingsList = bRes.rows.map(b => ({
         id: b.id,
         service: b.service_name || 'N/A',
         staff: b.therapist_name || 'Not Assigned',
@@ -574,19 +587,41 @@ exports.getCustomerBookings = async (req, res) => {
 
     // ──────────────────────────────────────────────
     // 3. WORKSHOP HISTORY (from attendees + workshops)
-    // Primary: Email. Secondary: Name.
+    // Priority: Email -> Name -> Phone
     // ──────────────────────────────────────────────
     let workshopHistory = [];
     try {
-      const wsRes = await query(`
-        SELECT a.id, w.title AS workshop_title, w.date AS workshop_date, w.time AS workshop_time,
-               a.status, a.original_price, a.membership_tier, a.discount_amount, a.final_price
-        FROM attendees a
-        JOIN workshops w ON a.workshop_id = w.id
-        WHERE (a.email IS NOT NULL AND LOWER(a.email) = LOWER($1))
-           OR (a.name ILIKE $2 AND $2 != '%%')
-        ORDER BY w.date DESC
-      `, [customerEmail, firstName ? `%${firstName}%` : `%${fullName}%`]);
+      let wsRes = { rows: [] };
+      if (customerEmail) {
+        wsRes = await query(`
+          SELECT a.id, w.title AS workshop_title, w.date AS workshop_date, w.time AS workshop_time,
+                 a.status, a.original_price, a.membership_tier, a.discount_amount, a.final_price
+          FROM attendees a
+          JOIN workshops w ON a.workshop_id = w.id
+          WHERE LOWER(a.email) = $1
+          ORDER BY w.date DESC
+        `, [customerEmail]);
+      }
+      if (wsRes.rows.length === 0 && fullName) {
+        wsRes = await query(`
+          SELECT a.id, w.title AS workshop_title, w.date AS workshop_date, w.time AS workshop_time,
+                 a.status, a.original_price, a.membership_tier, a.discount_amount, a.final_price
+          FROM attendees a
+          JOIN workshops w ON a.workshop_id = w.id
+          WHERE LOWER(a.name) = LOWER($1)
+          ORDER BY w.date DESC
+        `, [fullName]);
+      }
+      if (wsRes.rows.length === 0 && phoneClean) {
+        wsRes = await query(`
+          SELECT a.id, w.title AS workshop_title, w.date AS workshop_date, w.time AS workshop_time,
+                 a.status, a.original_price, a.membership_tier, a.discount_amount, a.final_price
+          FROM attendees a
+          JOIN workshops w ON a.workshop_id = w.id
+          WHERE REGEXP_REPLACE(a.phone, '\\D', '', 'g') = $1
+          ORDER BY w.date DESC
+        `, [phoneClean]);
+      }
 
       workshopHistory = wsRes.rows.map(r => ({
         id: r.id,
@@ -604,20 +639,44 @@ exports.getCustomerBookings = async (req, res) => {
 
     // ──────────────────────────────────────────────
     // 4. VEDIC LIFE HISTORY (from vedic_attendees + vedic_programs)
-    // Primary: Email. Secondary: Name.
+    // Priority: Email -> Name -> Phone
     // ──────────────────────────────────────────────
     let vedicHistory = [];
     try {
-      const vpRes = await query(`
-        SELECT va.id, vp.title AS program_title, vp.start_date, vp.end_date,
-               va.status, va.payment_status, va.accommodation_type,
-               va.original_price, va.membership_tier, va.discount_amount, va.final_price
-        FROM vedic_attendees va
-        JOIN vedic_programs vp ON va.program_id = vp.id
-        WHERE (va.email IS NOT NULL AND LOWER(va.email) = LOWER($1))
-           OR (va.name ILIKE $2 AND $2 != '%%')
-        ORDER BY vp.start_date DESC
-      `, [customerEmail, firstName ? `%${firstName}%` : `%${fullName}%`]);
+      let vpRes = { rows: [] };
+      if (customerEmail) {
+        vpRes = await query(`
+          SELECT va.id, vp.title AS program_title, vp.start_date, vp.end_date,
+                 va.status, va.payment_status, va.accommodation_type,
+                 va.original_price, va.membership_tier, va.discount_amount, va.final_price
+          FROM vedic_attendees va
+          JOIN vedic_programs vp ON va.program_id = vp.id
+          WHERE LOWER(va.email) = $1
+          ORDER BY vp.start_date DESC
+        `, [customerEmail]);
+      }
+      if (vpRes.rows.length === 0 && fullName) {
+        vpRes = await query(`
+          SELECT va.id, vp.title AS program_title, vp.start_date, vp.end_date,
+                 va.status, va.payment_status, va.accommodation_type,
+                 va.original_price, va.membership_tier, va.discount_amount, va.final_price
+          FROM vedic_attendees va
+          JOIN vedic_programs vp ON va.program_id = vp.id
+          WHERE LOWER(va.name) = LOWER($1)
+          ORDER BY vp.start_date DESC
+        `, [fullName]);
+      }
+      if (vpRes.rows.length === 0 && phoneClean) {
+        vpRes = await query(`
+          SELECT va.id, vp.title AS program_title, vp.start_date, vp.end_date,
+                 va.status, va.payment_status, va.accommodation_type,
+                 va.original_price, va.membership_tier, va.discount_amount, va.final_price
+          FROM vedic_attendees va
+          JOIN vedic_programs vp ON va.program_id = vp.id
+          WHERE REGEXP_REPLACE(va.phone, '\\D', '', 'g') = $1
+          ORDER BY vp.start_date DESC
+        `, [phoneClean]);
+      }
 
       vedicHistory = vpRes.rows.map(r => ({
         id: r.id,
@@ -637,20 +696,44 @@ exports.getCustomerBookings = async (req, res) => {
 
     // ──────────────────────────────────────────────
     // 5. MEMBERSHIP & BENEFITS (from memberships + membership_tiers)
-    // Primary: Email. Secondary: Name.
+    // Priority: Email -> Name -> Phone
     // ──────────────────────────────────────────────
     let membershipInfo = null;
     try {
-      const memRes = await query(`
-        SELECT m.id, m.name, m.email, m.tier, m.status, m.join_date, m.expiry_date,
-               m.sessions, m.total_spent,
-               mt.discount_percentage, mt.benefits
-        FROM memberships m
-        LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
-        WHERE (m.email IS NOT NULL AND LOWER(m.email) = LOWER($1))
-           OR (m.name ILIKE $2 AND $2 != '%%')
-        LIMIT 1
-      `, [customerEmail, firstName ? `%${firstName}%` : `%${fullName}%`]);
+      let memRes = { rows: [] };
+      if (customerEmail) {
+        memRes = await query(`
+          SELECT m.id, m.name, m.email, m.tier, m.status, m.join_date, m.expiry_date,
+                 m.sessions, m.total_spent,
+                 mt.discount_percentage, mt.benefits
+          FROM memberships m
+          LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
+          WHERE LOWER(m.email) = $1
+          LIMIT 1
+        `, [customerEmail]);
+      }
+      if (memRes.rows.length === 0 && fullName) {
+        memRes = await query(`
+          SELECT m.id, m.name, m.email, m.tier, m.status, m.join_date, m.expiry_date,
+                 m.sessions, m.total_spent,
+                 mt.discount_percentage, mt.benefits
+          FROM memberships m
+          LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
+          WHERE LOWER(m.name) = LOWER($1)
+          LIMIT 1
+        `, [fullName]);
+      }
+      if (memRes.rows.length === 0 && phoneClean) {
+        memRes = await query(`
+          SELECT m.id, m.name, m.email, m.tier, m.status, m.join_date, m.expiry_date,
+                 m.sessions, m.total_spent,
+                 mt.discount_percentage, mt.benefits
+          FROM memberships m
+          LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
+          WHERE REGEXP_REPLACE(m.phone, '\\D', '', 'g') = $1
+          LIMIT 1
+        `, [phoneClean]);
+      }
 
       if (memRes.rows.length > 0) {
         const m = memRes.rows[0];
@@ -671,8 +754,8 @@ exports.getCustomerBookings = async (req, res) => {
 
     res.json({
       success: true,
-      customer_id: id,
-      customer_name: customerName,
+      customer_id: custId || id,
+      customer_name: fullName || id,
       bookings: bookingsList,
       workshop_history: workshopHistory,
       vedic_history: vedicHistory,
