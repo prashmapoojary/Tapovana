@@ -27,11 +27,11 @@ const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN')];
 router.get('/public/specialists', getPublicSpecialists);
 router.get('/public/users', getPublicTeam);
 
-// ── Frontend routes MUST come before /:id routes ──────────────────────────────
+// Frontend routes MUST come before /:id routes
 router.patch('/profile', authenticate, updateSelfProfile);
 // Allocation-status sync — any authenticated user (DOCTOR/THERAPIST need this)
 router.patch('/users/:id/allocation', authenticate, updateAllocationStatus);
-router.get('/users', ...adminOnly, getTeamFrontend);
+router.get('/users', authenticate, getTeamFrontend);
 router.post('/users', ...adminOnly, addTeamMemberFrontend);
 router.patch('/users/:id', ...adminOnly, updateTeamMemberFrontend);
 router.patch('/users/:id/status', ...adminOnly, toggleStatusFrontend);

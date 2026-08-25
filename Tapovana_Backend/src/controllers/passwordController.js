@@ -103,7 +103,7 @@ const verifyPasswordResetOtpAndSetPassword = async (req, res) => {
         if (!otpValid) {
             await client.query("UPDATE otp_verification SET attempts = attempts + 1 WHERE id = $1", [otpRow.id]);
             await client.query("COMMIT");
-            return res.status(401).json({ success: false, message: "Invalid OTP." });
+            return res.status(400).json({ success: false, message: "Invalid or expired verification code." });
         }
 
         const newHash = await bcrypt.hash(password, 12);

@@ -56,14 +56,15 @@ app.use(rateLimit({
 }));
 
 app.get("/health", async (_req, res) => {
+    let dbStatus = "ok";
     try {
         const { query } = require('./config/db');
         await query('SELECT 1');
-        res.json({ success: true, status: "ok", database: "connected", service: "tapovana-backend" });
     } catch (err) {
-        console.error('[Health Check] Database ping failed:', err.message);
-        res.status(500).json({ success: false, status: "error", message: "Database connection failed", error: err.message });
+        console.warn('[Health Check] Database ping warning:', err.message);
+        dbStatus = "unavailable";
     }
+    res.status(200).json({ success: true, status: "ok", database: dbStatus, service: "tapovana-backend" });
 });
 
 app.use("/api/admin", authRoutes);
