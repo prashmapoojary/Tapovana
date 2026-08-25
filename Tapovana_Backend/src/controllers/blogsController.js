@@ -12,7 +12,12 @@ const ensureUploadsDir = () => {
     }
 };
 
-// ── Ensure blog_audit_log table, blog_likes & blogs columns exist ────────────────
+const isValidUUID = (id) => {
+    if (!id || typeof id !== 'string') return false;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+};
+
+// ── Ensure blog_audit_log table, blog_likes, blog_views & blogs columns exist ────────────────
 query(`
     CREATE TABLE IF NOT EXISTS blog_audit_log (
         id SERIAL PRIMARY KEY,
@@ -25,7 +30,8 @@ query(`
     ALTER TABLE blogs ADD COLUMN IF NOT EXISTS subtitle TEXT;
     ALTER TABLE blogs ADD COLUMN IF NOT EXISTS read_time VARCHAR(50);
     ALTER TABLE blog_likes ADD COLUMN IF NOT EXISTS user_id UUID;
-`).then(() => console.log('✅ blog_audit_log, blog_likes & blogs columns verified'))
+    ALTER TABLE blog_views ADD COLUMN IF NOT EXISTS user_id UUID;
+`).then(() => console.log('✅ blog_audit_log, blog_likes, blog_views & blogs columns verified'))
   .catch(err => console.error('Failed to verify blog columns:', err));
 
 // Helper: Safely insert blog audit log without throwing
@@ -883,18 +889,18 @@ const trackBlogView = async (req, res) => {
         const { id } = req.params;
         const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.connection?.remoteAddress || 'unknown';
         const userIdRaw = req.user?.id || null;
-        const userId = (userIdRaw && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userIdRaw)) ? userIdRaw : null;
+        const userId = isValidUUID(userIdRaw) ? userIdRaw : null;
 
         // Check for duplicate view in last 24 hours
         const duplicate = await query(`
             SELECT id FROM blog_views
             WHERE blog_id = $1 AND (ip_address = $2 OR ($3::uuid IS NOT NULL AND user_id = $3))
-              AND created_at > NOW() - INTERVAL '24 hours'
+              AND viewed_at > NOW() - INTERVAL '24 hours'
             LIMIT 1
         `, [id, ip, userId]);
 
         if (duplicate.rows.length === 0) {
-            await query('INSERT INTO blog_views (blog_id, ip_address, user_id) VALUES ($1, $2, $3)', [id, ip, userId]);
+            await query('INSERT INTO blog_views (blog_id, ip_address, user_id, viewed_at) VALUES ($1, $2, $3, NOW())', [id, ip, userId]);
             await query('UPDATE blogs SET view_count = view_count + 1 WHERE id = $1', [id]);
         }
 
