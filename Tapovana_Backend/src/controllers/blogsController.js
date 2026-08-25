@@ -293,8 +293,12 @@ const getBlogById = async (req, res) => {
 
         const b = result.rows[0];
 
-        // Access check: public can only see published
-        if (!isAdmin && b.created_by !== userId && b.status !== 'published') {
+        // Access check: Admin & Staff can view non-published blogs, or author by email/id
+        const userEmail = req.user?.email || '';
+        const isAuthor = b.created_by === userId || (b.author_email && b.author_email.toLowerCase() === userEmail.toLowerCase());
+        const isStaffOrAdmin = isAdmin || role === 'DOCTOR' || role === 'THERAPIST' || role === 'STAFF';
+
+        if (!isStaffOrAdmin && !isAuthor && b.status !== 'published') {
             return res.status(403).json({ success: false, message: 'Access denied.' });
         }
 
@@ -495,9 +499,14 @@ const updateBlog = async (req, res) => {
 
         const blog = existing.rows[0];
 
-        // Check ownership
+        // Check ownership (by ID or Email)
+        const userEmail = req.user?.email || '';
         if (!isAdmin && blog.created_by !== userId) {
-            return res.status(403).json({ success: false, message: 'You can only edit your own blogs.' });
+            const authorRes = await query('SELECT email FROM team_members WHERE id = $1', [blog.created_by]);
+            const authorEmail = authorRes.rows[0]?.email || '';
+            if (!authorEmail || authorEmail.toLowerCase() !== userEmail.toLowerCase()) {
+                return res.status(403).json({ success: false, message: 'You can only edit your own blogs.' });
+            }
         }
 
         // Check status: non-admins can only edit Draft or Rejected blogs
@@ -606,6 +615,7 @@ const deleteBlog = async (req, res) => {
         const userId = req.user.id;
         const role = req.user.role?.toUpperCase() || '';
         const isAdmin = role === 'SUPER_ADMIN' || role === 'CO_ADMIN';
+        const userEmail = req.user?.email || '';
 
         const existing = await query('SELECT created_by FROM blogs WHERE id = $1', [id]);
         if (existing.rows.length === 0) {
@@ -613,7 +623,11 @@ const deleteBlog = async (req, res) => {
         }
 
         if (!isAdmin && existing.rows[0].created_by !== userId) {
-            return res.status(403).json({ success: false, message: 'You can only delete your own blogs.' });
+            const authorRes = await query('SELECT email FROM team_members WHERE id = $1', [existing.rows[0].created_by]);
+            const authorEmail = authorRes.rows[0]?.email || '';
+            if (!authorEmail || authorEmail.toLowerCase() !== userEmail.toLowerCase()) {
+                return res.status(403).json({ success: false, message: 'You can only delete your own blogs.' });
+            }
         }
 
         await query('DELETE FROM blogs WHERE id = $1', [id]);
@@ -631,6 +645,9 @@ const submitBlog = async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.user.id;
+        const role = req.user.role?.toUpperCase() || '';
+        const isAdmin = role === 'SUPER_ADMIN' || role === 'CO_ADMIN';
+        const userEmail = req.user?.email || '';
 
         const existing = await query('SELECT * FROM blogs WHERE id = $1', [id]);
         if (existing.rows.length === 0) {
@@ -638,8 +655,12 @@ const submitBlog = async (req, res) => {
         }
 
         const blog = existing.rows[0];
-        if (blog.created_by !== userId) {
-            return res.status(403).json({ success: false, message: 'You can only submit your own blogs.' });
+        if (!isAdmin && blog.created_by !== userId) {
+            const authorRes = await query('SELECT email FROM team_members WHERE id = $1', [blog.created_by]);
+            const authorEmail = authorRes.rows[0]?.email || '';
+            if (!authorEmail || authorEmail.toLowerCase() !== userEmail.toLowerCase()) {
+                return res.status(403).json({ success: false, message: 'You can only submit your own blogs.' });
+            }
         }
 
         if (!['draft', 'rejected'].includes(blog.status)) {
