@@ -234,6 +234,62 @@ export default function Blogs({ mode }) {
     else if (status === "archived") setActiveTab("archived");
   }, [searchParams]);
 
+  const [editingBlogId, setEditingBlogId] = useState(null);
+  const [editBlogData, setEditBlogData] = useState({
+    title: "", category: "AYURVEDA", summary: "", content_html: "",
+    featured_image: "", tags: "", seo_title: "", seo_description: "", seo_keywords: "",
+    author_name: "", author_role: "", read_time: ""
+  });
+  const [rejectionModal, setRejectionModal] = useState({ isOpen: false, blogId: null, reason: "" });
+  const [showSeo, setShowSeo] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [savingBlog, setSavingBlog] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // Handle initializing edit/create based on URL / mode prop
+  useEffect(() => {
+    if (mode === "create") {
+      if (!isStaff) {
+        navigate("/dashboard/blogs");
+        return;
+      }
+      setEditingBlogId(null);
+      setEditBlogData({
+        title: "", category: "AYURVEDA", summary: "", content_html: "",
+        featured_image: "", tags: "", seo_title: "", seo_description: "", seo_keywords: "",
+        author_name: `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim(),
+        author_role: currentUser?.role?.toUpperCase() === "DOCTOR" ? "Doctor" : currentUser?.role?.toUpperCase() === "THERAPIST" ? "Therapist" : "",
+        read_time: "3 min read"
+      });
+    }
+  }, [mode, isStaff, navigate, currentUser]);
+
+  useEffect(() => {
+    if (mode === "edit" && detailBlog) {
+      if (detailBlog.status !== "draft" && detailBlog.status !== "rejected") {
+        triggerAlert("You can only edit Draft or Rejected blogs.");
+        navigate("/dashboard/blogs");
+        return;
+      }
+      setEditingBlogId(detailBlog.id);
+      setEditBlogData({
+        title: detailBlog.title || "",
+        category: detailBlog.category || "AYURVEDA",
+        summary: detailBlog.summary || "",
+        content_html: detailBlog.content_html || "",
+        featured_image: detailBlog.featured_image || "",
+        tags: Array.isArray(detailBlog.tags) ? detailBlog.tags.join(", ") : (detailBlog.tags || ""),
+        seo_title: detailBlog.seo_title || "",
+        seo_description: detailBlog.seo_description || "",
+        seo_keywords: detailBlog.seo_keywords || "",
+        author_name: detailBlog.author?.name || `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim(),
+        author_role: detailBlog.author?.role || (currentUser?.role?.toUpperCase() === "DOCTOR" ? "Doctor" : currentUser?.role?.toUpperCase() === "THERAPIST" ? "Therapist" : ""),
+        read_time: detailBlog.read_time || "3 min read"
+      });
+    }
+  }, [mode, detailBlog]);
+
   // ─── Fetch blogs list ──────────────────────────────────────────────
   const fetchBlogs = useCallback(async () => {
     try {
