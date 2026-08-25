@@ -816,31 +816,18 @@ function Bookings() {
           </div>
         </div>
       </section>
-
-      {/* ── Error ── */}
-      {error && (
-        <div className="bk-error-banner">
-          <span>{error}</span>
-          <button className="bk-retry-btn" onClick={() => setPage(1)}>Retry</button>
-        </div>
-      )}
-
-      {/* ── Table ── */}
-      <section className="bookings-table-card">
-        <div className="bookings-table-scroll">
-          <table className="bookings-table">
-            <thead>
+                            <thead>
               <tr>
                 <th>ID</th>
                 <th>CUSTOMER</th>
                 <th>EMAIL</th>
                 <th>SERVICE</th>
                 <th>ASSIGNED STAFF</th>
-                <th>ROLE</th>
-                <th>DATE</th>
-                <th>TIME</th>
-                <th>AMOUNT</th>
-                <th>MEMBERSHIP</th>
+                <th>DATE & TIME</th>
+                <th>ORIGINAL PRICE</th>
+                <th>MEMBERSHIP TIER</th>
+                <th>DISCOUNT</th>
+                <th>FINAL PRICE</th>
                 <th>STATUS</th>
                 <th>ACTIONS</th>
               </tr>
@@ -853,6 +840,13 @@ function Bookings() {
               ) : (
                 filtered.map((b) => {
                   const staffInfo = getStaffDisplay(b.therapist_name);
+                  const tierUpper = (b.membership_tier || 'Standard').toUpperCase();
+
+                  let tierClass = "bk-pass-regular";
+                  if (tierUpper.includes("GOLD")) tierClass = "bk-pass-gold";
+                  else if (tierUpper.includes("PLATINUM") || tierUpper.includes("DIAMOND")) tierClass = "bk-pass-diamond";
+                  else if (tierUpper.includes("SILVER")) tierClass = "bk-pass-silver";
+
                   return (
                     <tr
                       key={b.id}
@@ -892,53 +886,24 @@ function Bookings() {
                         )}
                       </td>
                       <td>
-                        {staffInfo ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            {(b.therapist_name || '').split(',').map((name, i) => {
-                              const info = getStaffDisplay(name.trim());
-                              return (
-                                <span key={i} style={{ color: '#64748b', fontWeight: 500, fontSize: '13px' }}>
-                                  {info?.role === "DOCTOR" ? "Doctor" : "Therapist"}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <span style={{ color: '#cbd5e1', fontSize: '13px' }}>-</span>
-                        )}
+                        <div>{formatDate(b.booking_date)}</div>
+                        <div className="bk-cell-time" style={{ fontSize: '12px', color: '#64748b' }}>{b.booking_time}</div>
+                      </td>
+                      <td style={{ fontWeight: 500 }}>
+                        {b.original_price || "₹2,500"}
                       </td>
                       <td>
-                        {formatDate(b.booking_date)}
+                        <span className={`bk-pass-badge ${tierClass}`}>
+                          {b.membership_tier || "Standard"}
+                        </span>
+                      </td>
+                      <td style={{ color: '#0284c7', fontWeight: 600 }}>
+                        {b.discount_amount || "₹0 (0%)"}
                       </td>
                       <td>
-                        <div className="bk-cell-time">{b.booking_time}</div>
-                      </td>
-                      <td>
-                        {(() => {
-                          const amountStr = b.total_amount || "₹0";
-                          const match = amountStr.match(/^(.*?)\s*\((.*?)\)$/);
-                          const amount = match ? match[1] : amountStr;
-                          return <strong>{amount}</strong>;
-                        })()}
-                      </td>
-                      <td>
-                        {(() => {
-                          const amountStr = b.total_amount || "₹0";
-                          const match = amountStr.match(/^(.*?)\s*\((.*?)\)$/);
-                          const pass = match ? match[2] : b.pass_details;
-                          if (!pass) return <span style={{ color: '#64748b', fontSize: '13px', fontWeight: 'bold' }}>Regular</span>;
-                          const lower = pass.toLowerCase();
-                          let displayPass = "Regular";
-                          if (lower.includes("gold")) { displayPass = "Gold Pass"; }
-                          else if (lower.includes("diamond")) { displayPass = "Diamond Pass"; }
-                          else if (lower.includes("silver")) { displayPass = "Silver Pass"; }
-
-                          return (
-                            <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 'bold' }}>
-                              {displayPass}
-                            </span>
-                          );
-                        })()}
+                        <strong style={{ color: '#16a34a', fontSize: '14px' }}>
+                          {b.final_price || b.total_amount || "₹2,500"}
+                        </strong>
                       </td>
                       <td>
                         <span className={"bk-status-badge " + (b.status || "PENDING").toLowerCase()}>

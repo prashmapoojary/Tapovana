@@ -1201,9 +1201,25 @@ const syncMobileVedicMembers = async (programId = null) => {
 
                 const existing = await query("SELECT id FROM vedic_attendees WHERE program_id = $1 AND LOWER(email) = LOWER($2)", [targetProgId, email]);
                 if (existing.rows.length === 0) {
+                    let progPrice = 14000;
+                    const progRes = await query('SELECT price FROM vedic_programs WHERE id = $1', [targetProgId]);
+                    if (progRes.rows.length && progRes.rows[0].price) {
+                        progPrice = parseFloat(String(progRes.rows[0].price).replace(/[^0-9.]/g, '')) || 14000;
+                    }
+                    const { getMemberTierAndDiscount } = require('./membershipController');
+                    const { tier, discountPercentage } = await getMemberTierAndDiscount(email, name);
+
+                    const origNum = progPrice;
+                    const discountNum = Math.round((origNum * discountPercentage) / 100);
+                    const finalNum = Math.max(0, origNum - discountNum);
+
+                    const origStr = `₹${origNum.toLocaleString('en-IN')}`;
+                    const discStr = discountNum > 0 ? `₹${discountNum.toLocaleString('en-IN')} (${discountPercentage}%)` : `₹0 (0%)`;
+                    const finalStr = `₹${finalNum.toLocaleString('en-IN')}`;
+
                     await query(
-                        `INSERT INTO vedic_attendees (program_id, name, email, phone, status, accommodation_type, payment_status, check_in_date, check_out_date) 
-                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT DO NOTHING`,
+                        `INSERT INTO vedic_attendees (program_id, name, email, phone, status, accommodation_type, payment_status, check_in_date, check_out_date, original_price, membership_tier, discount_amount, final_price) 
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ON CONFLICT DO NOTHING`,
                         [
                             targetProgId,
                             name,
@@ -1213,7 +1229,8 @@ const syncMobileVedicMembers = async (programId = null) => {
                             m.membership_name || 'Standard',
                             'PAID',
                             m.join_date ? m.join_date.split('T')[0] : new Date().toISOString().split('T')[0],
-                            null
+                            null,
+                            origStr, tier || 'Standard', discStr, finalStr
                         ]
                     );
                     await query('UPDATE vedic_programs SET enrolled = enrolled + 1 WHERE id = $1', [targetProgId]);
@@ -1236,12 +1253,58 @@ const getVedicProgramAttendees = async (req, res) => {
         }
         if (progId) {
             await syncMobileVedicMembers(progId);
+            let progPrice = 14000;
+            const progRes = await query('SELECT price FROM vedic_programs WHERE id = $1', [progId]);
+            if (progRes.rows.length && progRes.rows[0].price) {
+                progPrice = parseFloat(String(progRes.rows[0].price).replace(/[^0-9.]/g, '')) || 14000;
+            }
+
             const result = await query('SELECT * FROM vedic_attendees WHERE program_id = $1 ORDER BY created_at DESC', [progId]);
+            const { getMemberTierAndDiscount } = require('./membershipController');
+
+            const enrichedAttendees = await Promise.all(result.rows.map(async (att) => {
+                let tier = att.membership_tier;
+                let discountPct = 0;
+                if (!tier || tier === 'Standard' || tier === 'NONE' || tier === 'N/A') {
+                    const resolved = await getMemberTierAndDiscount(att.email, att.name);
+                    tier = resolved.tier;
+                    discountPct = resolved.discountPercentage;
+                } else {
+                    const tierRes = await query('SELECT discount_percentage FROM membership_tiers WHERE UPPER(name) = UPPER($1) LIMIT 1', [tier]);
+                    if (tierRes.rows.length && tierRes.rows[0].discount_percentage !== undefined) {
+                        discountPct = parseFloat(tierRes.rows[0].discount_percentage) || 0;
+                    } else {
+                        const defaultDiscounts = { 'SILVER': 15, 'GOLD': 25, 'PLATINUM': 40 };
+                        discountPct = defaultDiscounts[tier.toUpperCase()] || 0;
+                    }
+                }
+
+                let origNum = progPrice;
+                if (att.original_price) {
+                    origNum = parseFloat(String(att.original_price).replace(/[^0-9.]/g, '')) || progPrice;
+                }
+
+                const discountNum = Math.round((origNum * discountPct) / 100);
+                const finalNum = Math.max(0, origNum - discountNum);
+
+                const origStr = `₹${origNum.toLocaleString('en-IN')}`;
+                const discStr = discountNum > 0 ? `₹${discountNum.toLocaleString('en-IN')} (${discountPct}%)` : `₹0 (0%)`;
+                const finalStr = `₹${finalNum.toLocaleString('en-IN')}`;
+
+                return {
+                    ...att,
+                    original_price: att.original_price || origStr,
+                    membership_tier: tier || 'Standard',
+                    discount_amount: att.discount_amount || discStr,
+                    final_price: att.final_price || finalStr
+                };
+            }));
+
             return res.json({
                 success: true,
                 status: 'success',
                 program_id: id,
-                attendees: result.rows
+                attendees: enrichedAttendees
             });
         }
         return res.json({ success: true, status: 'success', program_id: id, attendees: [] });

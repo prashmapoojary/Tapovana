@@ -565,8 +565,67 @@ const getAllBookings = async (req, res) => {
             }
         }
 
+// Helper: Compute pricing breakdown (Original Price, Tier, Discount, Final Price)
+const computeBookingPricingBreakdown = async (b) => {
+    try {
+        const { getMemberTierAndDiscount } = require('./membershipController');
+        const email = b.user_email || b.email || null;
+        const name = b.user_name || null;
+        
+        let tier = b.membership_tier;
+        let discountPct = 0;
+
+        if (!tier || tier === 'Standard' || tier === 'NONE' || tier === 'N/A') {
+            const resolved = await getMemberTierAndDiscount(email, name);
+            tier = resolved.tier;
+            discountPct = resolved.discountPercentage;
+        } else {
+            const tierRes = await query('SELECT discount_percentage FROM membership_tiers WHERE UPPER(name) = UPPER($1) LIMIT 1', [tier]);
+            if (tierRes.rows.length && tierRes.rows[0].discount_percentage !== undefined) {
+                discountPct = parseFloat(tierRes.rows[0].discount_percentage) || 0;
+            } else {
+                const defaultDiscounts = { 'SILVER': 15, 'GOLD': 25, 'PLATINUM': 40 };
+                discountPct = defaultDiscounts[tier.toUpperCase()] || 0;
+            }
+        }
+
+        let origNum = 0;
+        if (b.original_price) {
+            origNum = parseFloat(String(b.original_price).replace(/[^0-9.]/g, '')) || 0;
+        }
+        if (!origNum && b.service_name) {
+            const svcRes = await query("SELECT base_price FROM services WHERE LOWER(name) = LOWER($1) LIMIT 1", [b.service_name.trim()]);
+            if (svcRes.rows.length && svcRes.rows[0].base_price) {
+                origNum = parseFloat(svcRes.rows[0].base_price) || 0;
+            }
+        }
+        if (!origNum && b.total_amount) {
+            origNum = parseFloat(String(b.total_amount).replace(/[^0-9.]/g, '')) || 0;
+        }
+        if (!origNum) origNum = 2500;
+
+        const discountNum = Math.round((origNum * discountPct) / 100);
+        const finalNum = Math.max(0, origNum - discountNum);
+
+        const original_price = `₹${origNum.toLocaleString('en-IN')}`;
+        const membership_tier = tier || 'Standard';
+        const discount_amount = discountNum > 0 ? `₹${discountNum.toLocaleString('en-IN')} (${discountPct}%)` : `₹0 (0%)`;
+        const final_price = `₹${finalNum.toLocaleString('en-IN')}`;
+
+        return { original_price, membership_tier, discount_amount, final_price };
+    } catch (e) {
+        console.warn('computeBookingPricingBreakdown error:', e.message);
+        return {
+            original_price: b.original_price || b.total_amount || '₹2,500',
+            membership_tier: b.membership_tier || 'Standard',
+            discount_amount: b.discount_amount || '₹0 (0%)',
+            final_price: b.final_price || b.total_amount || '₹2,500'
+        };
+    }
+};
+
         // Enrich bookings in-memory (no per-booking DB calls)
-        const enrichedBookings = paginatedBookings.map(booking => {
+        const enrichedBookings = await Promise.all(paginatedBookings.map(async (booking) => {
             let profilePhoto = null;
             if (booking.profile_pic) {
                 profilePhoto = booking.profile_pic.startsWith('http')
@@ -575,12 +634,20 @@ const getAllBookings = async (req, res) => {
             }
             const lowerName = booking.service_name ? booking.service_name.trim().toLowerCase() : '';
             const serviceImage = serviceImageMap[lowerName] || null;
+
+            const pricing = await computeBookingPricingBreakdown(booking);
+
             return {
                 ...booking,
+                original_price: booking.original_price || pricing.original_price,
+                membership_tier: booking.membership_tier || pricing.membership_tier,
+                discount_amount: booking.discount_amount || pricing.discount_amount,
+                final_price: booking.final_price || pricing.final_price,
+                total_amount: booking.total_amount || pricing.final_price,
                 profilePhoto,
                 serviceImage: serviceImage ? getFullImageUrl(req, serviceImage) : null
             };
-        });
+        }));
 
         return res.json({
             success: true,

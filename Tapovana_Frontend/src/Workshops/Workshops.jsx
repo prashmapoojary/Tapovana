@@ -1329,42 +1329,7 @@ export default function Workshops() {
                   style={{ padding: "8px 16px", fontSize: "13px", background: "#CDA751", borderColor: "#CDA751", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", color: "white" }}
                 >
                   Export CSV
-                </button>
-              </div>
-            </div>
-
-            {/* Manual Enroll Form Panel */}
-            {showManualEnroll && (
-              <div style={{ background: "#f8f9fb", border: "1px solid rgba(205,167,81,0.2)", borderRadius: "8px", padding: "16px", animation: "wsFadeIn 0.2s ease" }}>
-                <h4 style={{ margin: "0 0 12px 0", fontSize: "14px", fontWeight: 700, color: "#2d3748" }}>Enroll User Manually</h4>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "12px" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    <label style={{ fontSize: "11px", fontWeight: 600, color: "#404854" }}>Full Name *</label>
-                    <input 
-                      type="text" 
-                      value={manualEnrollForm.name} 
-                      onChange={e => setManualEnrollForm(p => ({ ...p, name: e.target.value }))}
-                      placeholder="e.g. John Doe"
-                      style={{ padding: "7px 10px", borderRadius: "4px", border: "1px solid #e2e8f0", fontSize: "13px", outline: "none", background: "white", width: "100%", boxSizing: "border-box" }}
-                    />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    <label style={{ fontSize: "11px", fontWeight: 600, color: "#404854" }}>Email *</label>
-                    <input 
-                      type="email" 
-                      value={manualEnrollForm.email} 
-                      onChange={e => setManualEnrollForm(p => ({ ...p, email: e.target.value }))}
-                      placeholder="e.g. john@example.com"
-                      style={{ padding: "7px 10px", borderRadius: "4px", border: "1px solid #e2e8f0", fontSize: "13px", outline: "none", background: "white", width: "100%", boxSizing: "border-box" }}
-                    />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    <label style={{ fontSize: "11px", fontWeight: 600, color: "#404854" }}>Phone (Optional)</label>
-                    <input 
-                      type="tel" 
-                      value={manualEnrollForm.phone} 
-                      onChange={e => {
-                        const cleaned = e.target.value.replace(/\D/g, "");
+                </but                        const cleaned = e.target.value.replace(/\D/g, "");
                         setManualEnrollForm(p => ({ ...p, phone: cleaned }));
                         if (cleaned.length > 0 && cleaned.length !== 10) {
                           setPhoneError("Phone number must be exactly 10 digits");
@@ -1410,79 +1375,85 @@ export default function Workshops() {
                     <tr style={{ background: "#f8f9fb", borderBottom: "1px solid #e2e8f0" }}>
                       <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Name</th>
                       <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Email</th>
-                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Phone</th>
-                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Status</th>
-                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Actions</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight 700, color: "#64748B", textTransform: "uppercase" }}>Original Price</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight 700, color: "#64748B", textTransform: "uppercase" }}>Membership Tier</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight 700, color: "#64748B", textTransform: "uppercase" }}>Discount</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight 700, color: "#64748B", textTransform: "uppercase" }}>Final Price</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight 700, color: "#64748B", textTransform: "uppercase" }}>Status</th>
+                      <th style={{ padding: "10px 16px", fontSize: "11px", fontWeight 700, color: "#64748B", textTransform: "uppercase" }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredAttendees.map(a => (
-                      <tr key={a.id} style={{ borderBottom: "1px solid #f1f3f7" }}>
-                        <td style={{ padding: "10px 16px", fontSize: "13px", fontWeight: 600, color: "#2d3748" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    {filteredAttendees.map(a => {
+                      const tierUpper = (a.membership_tier || 'Standard').toUpperCase();
+                      let tierBg = "#E2E8F0";
+                      let tierColor = "#475569";
+                      if (tierUpper.includes("GOLD")) { tierBg = "#FEF3C7"; tierColor = "#D97706"; }
+                      else if (tierUpper.includes("PLATINUM") || tierUpper.includes("DIAMOND")) { tierBg = "#F3E8FF"; tierColor = "#7E22CE"; }
+                      else if (tierUpper.includes("SILVER")) { tierBg = "#E0F2FE"; tierColor = "#0284C7"; }
+
+                      return (
+                        <tr key={a.id} style={{ borderBottom: "1px solid #f1f3f7" }}>
+                          <td style={{ padding: "10px 16px", fontSize: "13px", fontWeight: 600, color: "#2d3748" }}>
                             {a.name}
-                            {(() => {
-                              const tier = getAttendeeMembership(a.name, a.email);
-                              if (tier) {
-                                const colors = {
-                                  SILVER: { bg: "#E2E8F0", color: "#475569", label: "Silver Pass (15% off)" },
-                                  GOLD: { bg: "#FEF3C7", color: "#D97706", label: "Gold Pass (25% off)" },
-                                  PLATINUM: { bg: "#F3E8FF", color: "#7E22CE", label: "Diamond Pass (40% off)" }
-                                };
-                                const cfg = colors[tier.toUpperCase()] || { bg: "#E2E8F0", color: "#475569", label: `${tier} Pass` };
-                                return (
-                                  <span style={{
-                                    padding: "2px 6px",
-                                    borderRadius: "4px",
-                                    fontSize: "10px",
-                                    fontWeight: "700",
-                                    background: cfg.bg,
-                                    color: cfg.color,
-                                    textTransform: "uppercase"
-                                  }}>
-                                    {cfg.label}
-                                  </span>
-                                );
-                              }
-                              return null;
-                            })()}
-                          </div>
-                        </td>
-                        <td style={{ padding: "10px 16px", fontSize: "13px", color: "#4a5568" }}>{a.email}</td>
-                        <td style={{ padding: "10px 16px", fontSize: "13px", color: "#4a5568" }}>{a.phone || "-"}</td>
-                        <td style={{ padding: "10px 16px" }}>
-                          <span style={{ 
-                            fontSize: "11px", 
-                            fontWeight: 700, 
-                            padding: "3px 8px", 
-                            borderRadius: "12px",
-                            textTransform: "uppercase",
-                            background: a.status === "attended" ? "rgba(34,197,94,0.12)" : a.status === "absent" ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)",
-                            color: a.status === "attended" ? "#16a34a" : a.status === "absent" ? "#dc2626" : "#d97706"
-                          }}>
-                            {a.status}
-                          </span>
-                        </td>
-                        <td style={{ padding: "10px 16px" }}>
-                          <select 
-                            value={a.status} 
-                            onChange={e => {
-                              if (e.target.value === "delete") {
-                                  handleDeleteAttendee(a.id);
-                              } else {
-                                  handleMarkAttendance(a.id, e.target.value);
-                              }
-                            }}
-                            style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "12px", outline: "none", cursor: "pointer", background: "white" }}
-                          >
-                            <option value="enrolled" disabled={a.status === "attended" || a.status === "absent"}>Enrolled</option>
-                            <option value="attended" disabled={getLiveStatus(selectedWs) !== "completed"}>Attended</option>
-                            <option value="absent" disabled={getLiveStatus(selectedWs) !== "completed"}>Absent</option>
-                            <option value="delete">Delete Attendee</option>
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td style={{ padding: "10px 16px", fontSize: "13px", color: "#4a5568" }}>{a.email}</td>
+                          <td style={{ padding: "10px 16px", fontSize: "13px", color: "#2d3748", fontWeight: 500 }}>
+                            {a.original_price || "₹2,000"}
+                          </td>
+                          <td style={{ padding: "10px 16px" }}>
+                            <span style={{
+                              padding: "3px 8px",
+                              borderRadius: "4px",
+                              fontSize: "11px",
+                              fontWeight: "700",
+                              background: tierBg,
+                              color: tierColor,
+                              textTransform: "uppercase"
+                            }}>
+                              {a.membership_tier || "Standard"}
+                            </span>
+                          </td>
+                          <td style={{ padding: "10px 16px", fontSize: "13px", color: "#0284c7", fontWeight: 600 }}>
+                            {a.discount_amount || "₹0 (0%)"}
+                          </td>
+                          <td style={{ padding: "10px 16px", fontSize: "13px", color: "#16a34a", fontWeight: 700 }}>
+                            {a.final_price || "₹2,000"}
+                          </td>
+                          <td style={{ padding: "10px 16px" }}>
+                            <span style={{ 
+                              fontSize: "11px", 
+                              fontWeight: 700, 
+                              padding: "3px 8px", 
+                              borderRadius: "12px",
+                              textTransform: "uppercase",
+                              background: a.status === "attended" ? "rgba(34,197,94,0.12)" : a.status === "absent" ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)",
+                              color: a.status === "attended" ? "#16a34a" : a.status === "absent" ? "#dc2626" : "#d97706"
+                            }}>
+                              {a.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: "10px 16px" }}>
+                            <select 
+                              value={a.status} 
+                              onChange={e => {
+                                if (e.target.value === "delete") {
+                                    handleDeleteAttendee(a.id);
+                                } else {
+                                    handleMarkAttendance(a.id, e.target.value);
+                                }
+                              }}
+                              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "12px", outline: "none", cursor: "pointer", background: "white" }}
+                            >
+                              <option value="enrolled" disabled={a.status === "attended" || a.status === "absent"}>Enrolled</option>
+                              <option value="attended" disabled={getLiveStatus(selectedWs) !== "completed"}>Attended</option>
+                              <option value="absent" disabled={getLiveStatus(selectedWs) !== "completed"}>Absent</option>
+                              <option value="delete">Delete Attendee</option>
+                            </select>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}

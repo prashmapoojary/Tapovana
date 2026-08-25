@@ -1199,9 +1199,25 @@ const syncMobileWorkshopEnrollments = async (workshopId = null) => {
 
                 const existing = await query("SELECT id FROM attendees WHERE workshop_id = $1 AND LOWER(email) = LOWER($2)", [targetWsId, email]);
                 if (existing.rows.length === 0) {
+                    let wsPrice = 2000;
+                    const wsRes = await query('SELECT price FROM workshops WHERE id = $1', [targetWsId]);
+                    if (wsRes.rows.length && wsRes.rows[0].price) {
+                        wsPrice = parseFloat(String(wsRes.rows[0].price).replace(/[^0-9.]/g, '')) || 2000;
+                    }
+                    const { getMemberTierAndDiscount } = require('./membershipController');
+                    const { tier, discountPercentage } = await getMemberTierAndDiscount(email, name);
+
+                    const origNum = wsPrice;
+                    const discountNum = Math.round((origNum * discountPercentage) / 100);
+                    const finalNum = Math.max(0, origNum - discountNum);
+
+                    const origStr = `₹${origNum.toLocaleString('en-IN')}`;
+                    const discStr = discountNum > 0 ? `₹${discountNum.toLocaleString('en-IN')} (${discountPercentage}%)` : `₹0 (0%)`;
+                    const finalStr = `₹${finalNum.toLocaleString('en-IN')}`;
+
                     await query(
-                        'INSERT INTO attendees (workshop_id, name, email, phone, source, certificate_eligible) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING',
-                        [targetWsId, name, email, re.phone || null, 'mobile', true]
+                        'INSERT INTO attendees (workshop_id, name, email, phone, source, certificate_eligible, original_price, membership_tier, discount_amount, final_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT DO NOTHING',
+                        [targetWsId, name, email, re.phone || null, 'mobile', true, origStr, tier || 'Standard', discStr, finalStr]
                     );
                     await query('UPDATE workshops SET enrolled = enrolled + 1 WHERE id = $1', [targetWsId]);
                 }
@@ -1217,12 +1233,59 @@ const getWorkshopAttendees = async (req, res) => {
     const { id } = req.params;
     try {
         await syncMobileWorkshopEnrollments(id);
+        
+        let wsPrice = 2000;
+        const wsRes = await query('SELECT price FROM workshops WHERE id = $1', [id]);
+        if (wsRes.rows.length && wsRes.rows[0].price) {
+            wsPrice = parseFloat(String(wsRes.rows[0].price).replace(/[^0-9.]/g, '')) || 2000;
+        }
+
         const result = await query('SELECT * FROM attendees WHERE workshop_id = $1 ORDER BY created_at DESC', [id]);
+        const { getMemberTierAndDiscount } = require('./membershipController');
+
+        const enrichedAttendees = await Promise.all(result.rows.map(async (att) => {
+            let tier = att.membership_tier;
+            let discountPct = 0;
+            if (!tier || tier === 'Standard' || tier === 'NONE' || tier === 'N/A') {
+                const resolved = await getMemberTierAndDiscount(att.email, att.name);
+                tier = resolved.tier;
+                discountPct = resolved.discountPercentage;
+            } else {
+                const tierRes = await query('SELECT discount_percentage FROM membership_tiers WHERE UPPER(name) = UPPER($1) LIMIT 1', [tier]);
+                if (tierRes.rows.length && tierRes.rows[0].discount_percentage !== undefined) {
+                    discountPct = parseFloat(tierRes.rows[0].discount_percentage) || 0;
+                } else {
+                    const defaultDiscounts = { 'SILVER': 15, 'GOLD': 25, 'PLATINUM': 40 };
+                    discountPct = defaultDiscounts[tier.toUpperCase()] || 0;
+                }
+            }
+
+            let origNum = wsPrice;
+            if (att.original_price) {
+                origNum = parseFloat(String(att.original_price).replace(/[^0-9.]/g, '')) || wsPrice;
+            }
+
+            const discountNum = Math.round((origNum * discountPct) / 100);
+            const finalNum = Math.max(0, origNum - discountNum);
+
+            const origStr = `₹${origNum.toLocaleString('en-IN')}`;
+            const discStr = discountNum > 0 ? `₹${discountNum.toLocaleString('en-IN')} (${discountPct}%)` : `₹0 (0%)`;
+            const finalStr = `₹${finalNum.toLocaleString('en-IN')}`;
+
+            return {
+                ...att,
+                original_price: att.original_price || origStr,
+                membership_tier: tier || 'Standard',
+                discount_amount: att.discount_amount || discStr,
+                final_price: att.final_price || finalStr
+            };
+        }));
+
         return res.json({
             success: true,
             status: 'success',
             workshop_id: id,
-            attendees: result.rows
+            attendees: enrichedAttendees
         });
     } catch (err) {
         console.error('getWorkshopAttendees error:', err);

@@ -524,15 +524,66 @@ const getAllTiers = async (req, res) => {
 
 // ─── UPDATE tier ──────────────────────────────────────────────────────
 const updateTier = async (req, res) => {
-    const { price, benefits } = req.body;
+    const { price, benefits, discount_percentage, discountPercentage } = req.body;
+    const disc = discount_percentage !== undefined ? discount_percentage : discountPercentage;
     try {
-        const result = await query('UPDATE membership_tiers SET price = $1, benefits = $2 WHERE name = $3 RETURNING *', [price || 0, JSON.stringify(benefits || []), req.params.name.toUpperCase()]);
+        let result;
+        if (disc !== undefined && disc !== null) {
+            result = await query(
+                'UPDATE membership_tiers SET price = $1, benefits = $2, discount_percentage = $3, updated_at = NOW() WHERE UPPER(name) = $4 RETURNING *',
+                [price || 0, JSON.stringify(benefits || []), Number(disc) || 0, req.params.name.toUpperCase()]
+            );
+        } else {
+            result = await query(
+                'UPDATE membership_tiers SET price = $1, benefits = $2, updated_at = NOW() WHERE UPPER(name) = $3 RETURNING *',
+                [price || 0, JSON.stringify(benefits || []), req.params.name.toUpperCase()]
+            );
+        }
         if (!result.rows.length) return res.status(404).json({ success: false, message: 'Tier not found.' });
         return res.json({ success: true, message: 'Tier updated.', tier: result.rows[0] });
     } catch (err) {
         console.error('updateTier error:', err);
         return res.status(500).json({ success: false, message: 'Server error.' });
     }
+};
+
+// ─── Helper: Resolve member's tier and discount percentage ────────────
+const getMemberTierAndDiscount = async (email = null, name = null) => {
+    let tier = 'NONE';
+    let discountPercentage = 0;
+
+    try {
+        if (email && typeof email === 'string' && email.trim()) {
+            const memRes = await query('SELECT tier FROM memberships WHERE LOWER(email) = LOWER($1) AND (status IS NULL OR LOWER(status) = \'active\') LIMIT 1', [email.trim()]);
+            if (memRes.rows.length && memRes.rows[0].tier) {
+                tier = memRes.rows[0].tier.toUpperCase();
+            } else {
+                const custRes = await query('SELECT membership_status FROM customers WHERE LOWER(email) = LOWER($1) LIMIT 1', [email.trim()]);
+                if (custRes.rows.length && custRes.rows[0].membership_status) {
+                    tier = custRes.rows[0].membership_status.toUpperCase();
+                }
+            }
+        } else if (name && typeof name === 'string' && name.trim()) {
+            const memRes = await query('SELECT tier FROM memberships WHERE LOWER(name) LIKE LOWER($1) AND (status IS NULL OR LOWER(status) = \'active\') LIMIT 1', [`%${name.trim()}%`]);
+            if (memRes.rows.length && memRes.rows[0].tier) {
+                tier = memRes.rows[0].tier.toUpperCase();
+            }
+        }
+
+        if (tier !== 'NONE' && tier !== 'STANDARD' && tier !== '-') {
+            const tierRes = await query('SELECT discount_percentage FROM membership_tiers WHERE UPPER(name) = UPPER($1) LIMIT 1', [tier]);
+            if (tierRes.rows.length && tierRes.rows[0].discount_percentage !== undefined && tierRes.rows[0].discount_percentage !== null) {
+                discountPercentage = parseFloat(tierRes.rows[0].discount_percentage) || 0;
+            } else {
+                const defaultDiscounts = { 'SILVER': 15, 'GOLD': 25, 'PLATINUM': 40 };
+                discountPercentage = defaultDiscounts[tier] || 0;
+            }
+        }
+    } catch (err) {
+        console.warn('getMemberTierAndDiscount error:', err.message);
+    }
+
+    return { tier: tier === 'NONE' || !tier ? 'Standard' : tier, discountPercentage };
 };
 
 // ─── Sync from Render API ─────────────────────────────────────────────
@@ -597,4 +648,8 @@ const getRemoteAdminMemberships = async (req, res) => {
     }
 };
 
-module.exports = { getAllMemberships, getMembershipById, createMembership, updateMembership, deleteMembership, getAllTiers, updateTier, syncFromRender, getRemoteMobileMemberships, getRemoteAdminMemberships };
+module.exports = { 
+    getAllMemberships, getMembershipById, createMembership, updateMembership, 
+    deleteMembership, getAllTiers, updateTier, getMemberTierAndDiscount, 
+    syncFromRender, getRemoteMobileMemberships, getRemoteAdminMemberships 
+};

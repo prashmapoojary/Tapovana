@@ -1673,62 +1673,43 @@ export default function VedicLifePrograms() {
                   {attendeeSearch ? "No attendees match your search." : "No users enrolled in this program yet."}
                 </div>
               ) : (
-                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", minWidth: "900px" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", minWidth: "1000px" }}>
                   <thead>
                     <tr style={{ background: "#f8f9fb", borderBottom: "1px solid #e2e8f0" }}>
                       <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Name</th>
                       <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Email</th>
-                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Phone</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Original Price</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Membership Tier</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Discount</th>
+                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Final Price</th>
                       <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Status</th>
                       <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Accommodation</th>
                       <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Payment Status</th>
-                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Check-In</th>
-                      <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Check-Out</th>
                       <th style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredAttendees.map(a => {
                       const statusStyles = getAttendeeStatusStyles(a.status);
+                      const tierUpper = (a.membership_tier || 'Standard').toUpperCase();
+                      let tierBg = "#E2E8F0";
+                      let tierColor = "#475569";
+                      if (tierUpper.includes("GOLD")) { tierBg = "#FEF3C7"; tierColor = "#D97706"; }
+                      else if (tierUpper.includes("PLATINUM") || tierUpper.includes("DIAMOND")) { tierBg = "#F3E8FF"; tierColor = "#7E22CE"; }
+                      else if (tierUpper.includes("SILVER")) { tierBg = "#E0F2FE"; tierColor = "#0284C7"; }
+
                       return (
                         <tr key={a.id} style={{ borderBottom: "1px solid #f1f3f7" }}>
                           <td style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#2d3748" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                              {a.source === "mobile" ? (
-                                <EditableText 
-                                  value={a.name} 
-                                  placeholder="Name" 
-                                  onSave={val => handleUpdateAttendeeField(a.id, 'name', val)} 
-                                />
-                              ) : (
-                                a.name
-                              )}
-                              {(() => {
-                                const tier = getAttendeeMembership(a.name, a.email);
-                                if (tier) {
-                                  const colors = {
-                                    SILVER: { bg: "#E2E8F0", color: "#475569", label: "Silver Pass (15% off)" },
-                                    GOLD: { bg: "#FEF3C7", color: "#D97706", label: "Gold Pass (25% off)" },
-                                    PLATINUM: { bg: "#F3E8FF", color: "#7E22CE", label: "Diamond Pass (40% off)" }
-                                  };
-                                  const cfg = colors[tier.toUpperCase()] || { bg: "#E2E8F0", color: "#475569", label: `${tier} Pass` };
-                                  return (
-                                    <span style={{
-                                      padding: "2px 6px",
-                                      borderRadius: "4px",
-                                      fontSize: "10px",
-                                      fontWeight: "700",
-                                      background: cfg.bg,
-                                      color: cfg.color,
-                                      textTransform: "uppercase"
-                                    }}>
-                                      {cfg.label}
-                                    </span>
-                                  );
-                                }
-                                return null;
-                              })()}
-                            </div>
+                            {a.source === "mobile" ? (
+                              <EditableText 
+                                value={a.name} 
+                                placeholder="Name" 
+                                onSave={val => handleUpdateAttendeeField(a.id, 'name', val)} 
+                              />
+                            ) : (
+                              a.name
+                            )}
                           </td>
                           <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>
                             {a.source === "mobile" ? (
@@ -1741,17 +1722,29 @@ export default function VedicLifePrograms() {
                               a.email
                             )}
                           </td>
-                          <td style={{ padding: "10px 16px", fontSize: 13, color: "#4a5568" }}>
-                            {a.source === "mobile" ? (
-                              <EditableText 
-                                value={a.phone} 
-                                placeholder="Phone" 
-                                onSave={val => handleUpdateAttendeeField(a.id, 'phone', val)} 
-                              />
-                            ) : (
-                              a.phone || "-"
-                            )}
+                          <td style={{ padding: "10px 16px", fontSize: 13, color: "#2d3748", fontWeight: 500 }}>
+                            {a.original_price || "₹14,000"}
                           </td>
+                          <td style={{ padding: "10px 16px" }}>
+                            <span style={{
+                              padding: "3px 8px",
+                              borderRadius: "4px",
+                              fontSize: "11px",
+                              fontWeight: "700",
+                              background: tierBg,
+                              color: tierColor,
+                              textTransform: "uppercase"
+                            }}>
+                              {a.membership_tier || "Standard"}
+                            </span>
+                          </td>
+                          <td style={{ padding: "10px 16px", fontSize: 13, color: "#0284c7", fontWeight: 600 }}>
+                            {a.discount_amount || "₹0 (0%)"}
+                          </td>
+                          <td style={{ padding: "10px 16px", fontSize: 13, color: "#16a34a", fontWeight: 700 }}>
+                            {a.final_price || "₹14,000"}
+                          </td>
+
                           <td style={{ padding: "10px 16px" }}>
                             {(() => {
                               const styles = getAttendeeStatusStyles(a.status);
