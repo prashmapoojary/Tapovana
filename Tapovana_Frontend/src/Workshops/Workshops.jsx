@@ -7,6 +7,7 @@ import { getImageUrl } from "../utils/image";
 import { useAllocations } from "../utils/AllocationContext";
 import AnimatedNumber from "../utils/AnimatedNumber";
 import MediaPickerModal from "../components/MediaPickerModal";
+import { formatDateForInput, formatTimeForInput } from "../utils/dateFormatters";
 
 // ─── Live status checker ─────────────────────────────────────────────
 const getLiveStatus = (ws) => {
@@ -758,8 +759,8 @@ export default function Workshops() {
       category: selectedWs.category || "Yoga",
       instructor_id: selectedWs.instructor_id || "",
       instructor_name: selectedWs.instructor_name || selectedWs.instructor || "",
-      date: selectedWs.date || "",
-      time: selectedWs.time || "",
+      date: formatDateForInput(selectedWs.date),
+      time: formatTimeForInput(selectedWs.time),
       duration: selectedWs.duration || 60,
       capacity: selectedWs.capacity || 20,
       price: selectedWs.price || "",

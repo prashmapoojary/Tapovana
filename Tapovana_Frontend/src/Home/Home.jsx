@@ -19,52 +19,7 @@ const SERVICE_LOOKUP = {
   "SVC-005": { name: "Yoga Class", category: "Wellness", price: 800, duration: 60 }
 };
 
-// Realistic dummy data shown when the backend API is unavailable
-const DUMMY_DASHBOARD_DATA = {
-  success: true,
-  stats: {
-    today_bookings: 23,
-    today_revenue: 47500,
-    active_customers: 284,
-    pending_bookings: 7
-  },
-  trends: {
-    bookings_last_7_days: [18, 22, 15, 28, 31, 19, 23],
-    revenue_last_7_days: [32000, 41500, 28000, 52000, 61000, 38500, 47500]
-  },
-  membership_breakdown: {
-    NONE: 142,
-    SILVER: 86,
-    GOLD: 41,
-    PLATINUM: 15
-  },
-  service_demand: {
-    "SVC-001": 87,
-    "SVC-002": 64,
-    "SVC-003": 53,
-    "SVC-004": 48,
-    "SVC-005": 39
-  },
-  service_demand_services: {
-    "SVC-001": { count: 87, name: "Deep Tissue Massage", category: "Body Care", price: 2500 },
-    "SVC-002": { count: 64, name: "Facial Treatment", category: "Skin Care", price: 2000 },
-    "SVC-003": { count: 53, name: "Hair Spa", category: "Hair Care", price: 1800 },
-    "SVC-004": { count: 48, name: "Meditation Session", category: "Wellness", price: 500 },
-    "SVC-005": { count: 39, name: "Yoga Class", category: "Wellness", price: 800 }
-  },
-  service_demand_workshops: {
-    "WS-001": { count: 42, name: "Yoga Basics", category: "Yoga", price: 1500 },
-    "WS-002": { count: 35, name: "Nutrition 101", category: "Nutrition", price: 1200 },
-    "WS-003": { count: 28, name: "Meditation Masters", category: "Meditation", price: 1000 },
-    "WS-004": { count: 21, name: "Mindfulness Retreat", category: "Mindfulness", price: 2000 }
-  },
-  service_demand_vedic: {
-    "VL-001": { count: 55, name: "Ayurveda Healing", category: "Ayurveda", price: 3500 },
-    "VL-002": { count: 47, name: "Healthy Lifestyle", category: "Healthy Lifestyle", price: 3000 },
-    "VL-003": { count: 39, name: "Yoga Sadhana", category: "Yoga", price: 2800 },
-    "VL-004": { count: 32, name: "Panchakarma Detox", category: "Ayurveda", price: 5000 }
-  }
-};
+
 
 function ConflictRow({ conflict, getSuggestions, onReassignSuccess, triggerAlert }) {
   const [suggestions, setSuggestions] = useState([]);
@@ -323,36 +278,42 @@ function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [dateFilter, setDateFilter] = useState("today");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
+  const [dateFilter, setDateFilter] = useState(() => {
+    return localStorage.getItem("tapovana_home_date_filter") || "today";
+  });
+  const [customFrom, setCustomFrom] = useState(() => {
+    return localStorage.getItem("tapovana_home_custom_from") || "";
+  });
+  const [customTo, setCustomTo] = useState(() => {
+    return localStorage.getItem("tapovana_home_custom_to") || "";
+  });
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [activeDemandTab, setActiveDemandTab] = useState("overall");
+
+  useEffect(() => {
+    localStorage.setItem("tapovana_home_date_filter", dateFilter);
+  }, [dateFilter]);
+
+  useEffect(() => {
+    if (customFrom) {
+      localStorage.setItem("tapovana_home_custom_from", customFrom);
+    } else {
+      localStorage.removeItem("tapovana_home_custom_from");
+    }
+  }, [customFrom]);
+
+  useEffect(() => {
+    if (customTo) {
+      localStorage.setItem("tapovana_home_custom_to", customTo);
+    } else {
+      localStorage.removeItem("tapovana_home_custom_to");
+    }
+  }, [customTo]);
 
   // States for interactive SVG charts tooltips
   const [bookingHoverIdx, setBookingHoverIdx] = useState(null);
   const [revenueHoverIdx, setRevenueHoverIdx] = useState(null);
   const [donutHoverTier, setDonutHoverTier] = useState(null);
-
-  // Date filter-specific dummy data sets
-  const FILTER_DATA = {
-    today: {
-      stats: { today_bookings: 23, today_revenue: 47500, active_customers: 284, pending_bookings: 7 },
-      trends: { bookings_last_7_days: [18, 22, 15, 28, 31, 19, 23], revenue_last_7_days: [32000, 41500, 28000, 52000, 61000, 38500, 47500] }
-    },
-    week: {
-      stats: { today_bookings: 148, today_revenue: 312000, active_customers: 284, pending_bookings: 21 },
-      trends: { bookings_last_7_days: [18, 22, 15, 28, 31, 19, 23], revenue_last_7_days: [32000, 41500, 28000, 52000, 61000, 38500, 47500] }
-    },
-    month: {
-      stats: { today_bookings: 612, today_revenue: 1285000, active_customers: 284, pending_bookings: 34 },
-      trends: { bookings_last_7_days: [74, 88, 91, 70, 102, 96, 91], revenue_last_7_days: [148000, 175000, 182000, 140000, 205000, 192000, 243000] }
-    },
-    custom: {
-      stats: { today_bookings: 95, today_revenue: 198500, active_customers: 284, pending_bookings: 12 },
-      trends: { bookings_last_7_days: [12, 18, 10, 22, 16, 9, 8], revenue_last_7_days: [24000, 36000, 20000, 44000, 32000, 18000, 24500] }
-    }
-  };
 
   const fetchDashboardData = async (isManual = false) => {
     try {
@@ -373,8 +334,8 @@ function Home() {
         throw new Error(dashboardRes.message || "Failed to load dashboard");
       }
     } catch (err) {
-      console.error(err);
-      setData(DUMMY_DASHBOARD_DATA);
+      console.error("Dashboard fetch error:", err);
+      setError("Unable to load live dashboard data");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -415,19 +376,19 @@ function Home() {
     });
   }, []);
 
-  // Stats from analytics endpoint
-  const stats = data?.stats || FILTER_DATA[dateFilter]?.stats || FILTER_DATA.today.stats;
+  // Real stats from database analytics endpoint
+  const stats = data?.stats || { today_bookings: 0, today_revenue: 0, active_customers: 0, pending_bookings: 0 };
   
-  // Trends from analytics endpoint or fallback
-  const bookingTrend = data?.trends?.bookings_last_7_days || FILTER_DATA[dateFilter]?.trends?.bookings_last_7_days || FILTER_DATA.today.trends.bookings_last_7_days;
-  const revenueTrend = data?.trends?.revenue_last_7_days || FILTER_DATA[dateFilter]?.trends?.revenue_last_7_days || FILTER_DATA.today.trends.revenue_last_7_days;
+  // Real trends from database analytics endpoint
+  const bookingTrend = data?.trends?.bookings_last_7_days || [0, 0, 0, 0, 0, 0, 0];
+  const revenueTrend = data?.trends?.revenue_last_7_days || [0, 0, 0, 0, 0, 0, 0];
   const daysOfWeek = data?.trends?.daysOfWeek || ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   const STAT_LABELS = {
-    today:  { bookings: "Today's Bookings",  revenue: "Today's Revenue" },
-    week:   { bookings: "This Week's Bookings", revenue: "This Week's Revenue" },
-    month:  { bookings: "This Month's Bookings", revenue: "This Month's Revenue" },
-    custom: { bookings: "Period Bookings",    revenue: "Period Revenue" }
+    today:  { bookings: "Today's Bookings",  revenue: "Today's Revenue", customers: "Today's Active Customers" },
+    week:   { bookings: "This Week's Bookings", revenue: "This Week's Revenue", customers: "This Week's Active Customers" },
+    month:  { bookings: "This Month's Bookings", revenue: "This Month's Revenue", customers: "This Month's Active Customers" },
+    custom: { bookings: "Period Bookings",    revenue: "Period Revenue", customers: "Period Active Customers" }
   };
   const statLabel = STAT_LABELS[dateFilter] || STAT_LABELS.today;
 
@@ -783,7 +744,7 @@ function Home() {
 
         <div className="stat-card customers">
           <div className="stat-card-header">
-            <span className="stat-card-title">Active Customers</span>
+            <span className="stat-card-title">{statLabel.customers}</span>
             <div className="stat-card-icon">
               <img src={CustomersIcon} alt="" style={{ width: "20px", height: "20px" }} />
             </div>

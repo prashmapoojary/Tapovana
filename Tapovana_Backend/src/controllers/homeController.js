@@ -89,6 +89,42 @@ exports.getHomeSummary = async (req, res) => {
   }
 };
 
+function parseFlexibleDate(dateStr, isEnd = false) {
+  if (!dateStr) return null;
+  const str = String(dateStr).trim();
+
+  let year, month, day;
+  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (dmyMatch) {
+    day = parseInt(dmyMatch[1], 10);
+    month = parseInt(dmyMatch[2], 10) - 1;
+    year = parseInt(dmyMatch[3], 10);
+  } else {
+    const ymdMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+    if (ymdMatch) {
+      year = parseInt(ymdMatch[1], 10);
+      month = parseInt(ymdMatch[2], 10) - 1;
+      day = parseInt(ymdMatch[3], 10);
+    }
+  }
+
+  if (year !== undefined && month !== undefined && day !== undefined) {
+    const date = new Date(year, month, day);
+    if (isEnd) {
+      date.setHours(23, 59, 59, 999);
+    } else {
+      date.setHours(0, 0, 0, 0);
+    }
+    return date;
+  }
+
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return null;
+  if (isEnd) d.setHours(23, 59, 59, 999);
+  else d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 exports.getAnalyticsDashboard = async (req, res) => {
   try {
     const { filter = 'today', from, to } = req.query;
@@ -103,7 +139,9 @@ exports.getAnalyticsDashboard = async (req, res) => {
       endDate.setHours(23, 59, 59, 999);
     } else if (filter === 'week') {
       startDate = new Date(today);
-      startDate.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
+      const day = today.getDay();
+      const diffToMon = today.getDate() - day + (day === 0 ? -6 : 1);
+      startDate.setDate(diffToMon);
       startDate.setHours(0, 0, 0, 0);
       endDate = new Date(startDate);
       endDate.setDate(startDate.getDate() + 6);
@@ -112,27 +150,75 @@ exports.getAnalyticsDashboard = async (req, res) => {
       startDate = new Date(today.getFullYear(), today.getMonth(), 1);
       endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
     } else if (filter === 'custom' && from && to) {
-      startDate = new Date(from);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(to);
-      endDate.setHours(23, 59, 59, 999);
+      const parsedFrom = parseFlexibleDate(from, false);
+      const parsedTo = parseFlexibleDate(to, true);
+      if (parsedFrom && parsedTo) {
+        startDate = parsedFrom;
+        endDate = parsedTo;
+      } else {
+        startDate = new Date(today);
+        endDate = new Date(today);
+        endDate.setHours(23, 59, 59, 999);
+      }
     } else {
-      // Default to today
       startDate = new Date(today);
       endDate = new Date(today);
       endDate.setHours(23, 59, 59, 999);
     }
 
-    const safeQuery = async (sql, params = []) => {
-      try {
-        return await query(sql, params);
-      } catch (e) {
-        console.warn(`[HomeController] Safe query failed:`, e.message);
-        return { rows: [] };
-      }
-    };
+    const startIso = startDate.toISOString();
+    const endIso = endDate.toISOString();
 
-    // Calculate slots (exactly 7 intervals based on the active filter)
+    // 1. Card Metrics
+    // Bookings count during period
+    const bookingsCntRes = await query(
+      `SELECT COUNT(*) AS cnt 
+       FROM bookings 
+       WHERE booking_date >= $1 AND booking_date <= $2 AND status NOT IN ('CANCELLED')`,
+      [startIso, endIso]
+    );
+    const today_bookings = parseInt(bookingsCntRes.rows[0]?.cnt || 0, 10);
+
+    // Period Revenue: SUM of realized transaction amounts from transactions table
+    const txnRevRes = await query(
+      `SELECT COALESCE(SUM(amount), 0) AS rev 
+       FROM transactions 
+       WHERE created_at >= $1 AND created_at <= $2 
+         AND UPPER(COALESCE(status, 'COMPLETED')) IN ('COMPLETED', 'PAID')`,
+      [startIso, endIso]
+    );
+    const today_revenue = parseFloat(txnRevRes.rows[0]?.rev || 0);
+
+    // Active customers during selected period (unique customers with transactions or bookings)
+    const activeCustRes = await query(
+      `SELECT COUNT(DISTINCT cust_id) AS cnt FROM (
+         SELECT customer_id::text AS cust_id 
+         FROM transactions 
+         WHERE created_at >= $1 AND created_at <= $2 AND customer_id IS NOT NULL
+         UNION
+         SELECT customer_name AS cust_id 
+         FROM transactions 
+         WHERE created_at >= $1 AND created_at <= $2 AND customer_id IS NULL AND customer_name IS NOT NULL AND customer_name != ''
+         UNION
+         SELECT user_name AS cust_id 
+         FROM bookings 
+         WHERE booking_date >= $1 AND booking_date <= $2 AND user_name IS NOT NULL AND user_name != ''
+       ) active_users`,
+      [startIso, endIso]
+    );
+    const active_customers = parseInt(activeCustRes.rows[0]?.cnt || 0, 10);
+
+    // Pending allocations
+    const pendingAllocRes = await query(
+      `SELECT COUNT(*) AS cnt FROM allocations WHERE status IN ('pending', 'UNASSIGNED', 'CONFLICT')`
+    );
+    let pending_bookings = parseInt(pendingAllocRes.rows[0]?.cnt || 0, 10);
+    if (pending_bookings === 0) {
+      const pendingBkgRes = await query(`SELECT COUNT(*) AS cnt FROM bookings WHERE LOWER(status) = 'pending'`);
+      pending_bookings = parseInt(pendingBkgRes.rows[0]?.cnt || 0, 10);
+    }
+
+    // 2. Trend Bucketing (7 Slots)
     const slots = [];
     const formatLabel = (date) => {
       const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -146,24 +232,22 @@ exports.getAnalyticsDashboard = async (req, res) => {
         slotStart.setHours(8 + i * 2, 0, 0, 0);
         const slotEnd = new Date(startDate);
         slotEnd.setHours(8 + i * 2 + 1, 59, 59, 999);
-        const label = `${String(8 + i * 2).padStart(2, '0')}:00-${String(8 + (i + 1) * 2).padStart(2, '0')}:00`;
+        const label = `${String(8 + i * 2).padStart(2, '0')}:00`;
         slots.push({ slotStart, slotEnd, label });
       }
     } else if (filter === 'week') {
-      const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       for (let i = 0; i < 7; i++) {
         const slotStart = new Date(startDate);
         slotStart.setDate(startDate.getDate() + i);
         slotStart.setHours(0, 0, 0, 0);
         const slotEnd = new Date(slotStart);
         slotEnd.setHours(23, 59, 59, 999);
-        const label = weekdayNames[slotStart.getDay()];
-        slots.push({ slotStart, slotEnd, label });
+        slots.push({ slotStart, slotEnd, label: weekdayNames[i] });
       }
     } else {
-      // month or custom
       const diffMs = endDate.getTime() - startDate.getTime();
-      const stepMs = diffMs / 7;
+      const stepMs = Math.max(diffMs / 7, 86400000);
       for (let i = 0; i < 7; i++) {
         const slotStart = new Date(startDate.getTime() + Math.floor(i * stepMs));
         const slotEnd = new Date(startDate.getTime() + Math.floor((i + 1) * stepMs) - 1);
@@ -171,293 +255,100 @@ exports.getAnalyticsDashboard = async (req, res) => {
       }
     }
 
-    // ── Single-roundtrip bulk fetch ──────────────────────────────────────────
-    // Escape ISO date strings for use in non-parameterized multi-statement SQL.
-    // This is safe because the dates are constructed from validated Date objects,
-    // not from raw user input.
-    const startIso = startDate.toISOString();
-    const endIso = endDate.toISOString();
-
-    const { pool } = require('../config/db');
-    let bulkResults;
-    try {
-      bulkResults = await pool.query(`
-        SELECT COUNT(*) as cnt FROM customers;
-
-        SELECT membership_status, COUNT(*) as cnt
-        FROM customers
-        WHERE join_date >= '${startIso}' AND join_date <= '${endIso}'
-        GROUP BY membership_status;
-
-        SELECT booking_date, status, service_name
-        FROM bookings
-        WHERE booking_date >= '${startIso}' AND booking_date <= '${endIso}';
-
-        SELECT w.date, w.status, w.title, w.price
-        FROM workshops w
-        WHERE w.date >= '${startIso}' AND w.date <= '${endIso}';
-
-        SELECT vp.start_date, vp.status, vp.title, vp.price
-        FROM vedic_programs vp
-        WHERE vp.start_date >= '${startIso}' AND vp.start_date <= '${endIso}';
-
-        SELECT created_at, amount, status
-        FROM transactions
-        WHERE created_at >= '${startIso}' AND created_at <= '${endIso}';
-
-        SELECT LOWER(name) as name, category, base_price::float as price
-        FROM services;
-      `);
-    } catch (bulkErr) {
-      console.warn('[HomeController] Bulk query failed, returning empty sets:', bulkErr.message);
-      bulkResults = Array(7).fill({ rows: [] });
-    }
-
-    // Ensure bulkResults is always an array (pg returns array for multi-statement)
-    if (!Array.isArray(bulkResults)) {
-      bulkResults = [bulkResults];
-    }
-
-    const customersRows    = (bulkResults[0] || { rows: [] }).rows;
-    const membershipRows   = (bulkResults[1] || { rows: [] }).rows;
-    const bookingsRows     = (bulkResults[2] || { rows: [] }).rows;
-    const workshopRows     = (bulkResults[3] || { rows: [] }).rows;
-    const vedicRows        = (bulkResults[4] || { rows: [] }).rows;
-    const transactionRows  = (bulkResults[5] || { rows: [] }).rows;
-    const servicesRows     = (bulkResults[6] || { rows: [] }).rows;
-
-    // ── Stats computation (in-memory) ────────────────────────────────────────
-    const today_bookings =
-      bookingsRows.length +
-      workshopRows.length +
-      vedicRows.length;
-
-    const today_revenue = transactionRows
-      .filter(t => ['COMPLETED', 'PAID'].includes((t.status || '').toUpperCase()))
-      .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
-
-    const active_customers = parseInt(customersRows[0]?.cnt || 0, 10);
-
-    const pending_bookings =
-      bookingsRows.filter(b => (b.status || '').toLowerCase() === 'pending').length +
-      workshopRows.filter(a => (a.status || '').toLowerCase() === 'enrolled').length +
-      vedicRows.filter(va => ['registered', 'confirmed'].includes((va.status || '').toLowerCase())).length;
-
-    // ── Trend computation (in-memory bucketing) ──────────────────────────────
-    const inSlot = (dateVal, slotStart, slotEnd) => {
-      if (!dateVal) return false;
-      const d = new Date(dateVal);
-      return d >= slotStart && d <= slotEnd;
-    };
-
     const bookings_last_7_days = [];
     const revenue_last_7_days = [];
     const daysOfWeek = slots.map(s => s.label);
 
     for (let i = 0; i < 7; i++) {
       const slot = slots[i];
-
-      bookings_last_7_days.push(
-        bookingsRows.filter(b => inSlot(b.booking_date, slot.slotStart, slot.slotEnd)).length +
-        workshopRows.filter(w => inSlot(w.date, slot.slotStart, slot.slotEnd)).length +
-        vedicRows.filter(v => inSlot(v.start_date, slot.slotStart, slot.slotEnd)).length
+      const slotBkgRes = await query(
+        `SELECT COUNT(*) AS cnt 
+         FROM bookings 
+         WHERE booking_date >= $1 AND booking_date <= $2 AND status NOT IN ('CANCELLED')`,
+        [slot.slotStart.toISOString(), slot.slotEnd.toISOString()]
       );
-
-      revenue_last_7_days.push(
-        transactionRows
-          .filter(t =>
-            ['COMPLETED', 'PAID'].includes((t.status || '').toUpperCase()) &&
-            inSlot(t.created_at, slot.slotStart, slot.slotEnd)
-          )
-          .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0)
+      const slotRevRes = await query(
+        `SELECT COALESCE(SUM(amount), 0) AS rev 
+         FROM transactions 
+         WHERE created_at >= $1 AND created_at <= $2 AND UPPER(COALESCE(status, 'COMPLETED')) IN ('COMPLETED', 'PAID')`,
+        [slot.slotStart.toISOString(), slot.slotEnd.toISOString()]
       );
+      bookings_last_7_days.push(parseInt(slotBkgRes.rows[0]?.cnt || 0, 10));
+      revenue_last_7_days.push(parseFloat(slotRevRes.rows[0]?.rev || 0));
     }
 
-    // ── Membership breakdown ─────────────────────────────────────────────────
-    let membership_breakdown = membershipRows.reduce((acc, row) => {
-      const status = (row.membership_status || 'NONE').toUpperCase();
-      acc[status] = parseInt(row.cnt || 0, 10);
-      return acc;
-    }, { NONE: 0, SILVER: 0, GOLD: 0, PLATINUM: 0 });
-
-    const totalNewMembers = Object.values(membership_breakdown).reduce((sum, count) => sum + count, 0);
-    if (totalNewMembers === 0) {
-      try {
-        const lfMembershipRes = await safeQuery(`
-          SELECT membership_status, COUNT(*) as cnt
-          FROM customers
-          GROUP BY membership_status
-        `);
-        membership_breakdown = lfMembershipRes.rows.reduce((acc, row) => {
-          const status = (row.membership_status || 'NONE').toUpperCase();
-          acc[status] = parseInt(row.cnt || 0, 10);
-          return acc;
-        }, { NONE: 0, SILVER: 0, GOLD: 0, PLATINUM: 0 });
-      } catch (e) {
-        console.warn("[HomeController] Membership breakdown fallback failed:", e.message);
-      }
-    }
-
-    // ── Service Demand (in-memory) ───────────────────────────────────────────
-    // Build a lookup map from the services table for category/price metadata
-    const servicesMap = {};
-    servicesRows.forEach(s => {
-      servicesMap[s.name] = { category: s.category, price: s.price };
+    // 3. Membership Breakdown
+    const membershipRes = await query(
+      `SELECT COALESCE(UPPER(membership_status), 'NONE') AS tier, COUNT(*) AS cnt 
+       FROM customers 
+       GROUP BY membership_status`
+    );
+    const membership_breakdown = { NONE: 0, SILVER: 0, GOLD: 0, PLATINUM: 0, DIAMOND: 0 };
+    membershipRes.rows.forEach(r => {
+      const tierKey = (r.tier === 'NULL' || !r.tier) ? 'NONE' : r.tier;
+      membership_breakdown[tierKey] = (membership_breakdown[tierKey] || 0) + parseInt(r.cnt || 0, 10);
     });
 
-    const servicesDemand = {};
-    const workshopsDemand = {};
-    const vedicDemand = {};
-    const combinedDemand = {};
-
-    bookingsRows.forEach(b => {
-      if (!b.service_name) return;
-      const name = b.service_name;
-      const lowerName = name.toLowerCase();
-      const meta = servicesMap[lowerName] || { category: 'Wellness', price: 0 };
-      const item = { count: 1, name, category: meta.category, price: meta.price };
-      if (servicesDemand[name]) {
-        servicesDemand[name].count += 1;
-      } else {
-        servicesDemand[name] = { ...item };
-      }
-      if (combinedDemand[name]) {
-        combinedDemand[name].count += 1;
-      } else {
-        combinedDemand[name] = { ...item };
-      }
+    // 4. Services Demand (From Bookings)
+    const servicesDemandRes = await query(`
+      SELECT b.service_name AS name, COALESCE(MAX(s.category), 'Wellness') AS category, COUNT(*) AS count, COALESCE(MAX(s.base_price::float), 2000) AS price
+      FROM bookings b
+      LEFT JOIN services s ON LOWER(s.name) = LOWER(b.service_name)
+      WHERE b.service_name IS NOT NULL
+      GROUP BY b.service_name
+      ORDER BY count DESC
+      LIMIT 5
+    `);
+    const service_demand_services = {};
+    servicesDemandRes.rows.forEach((r, idx) => {
+      service_demand_services[`SVC-${idx + 1}`] = {
+        count: parseInt(r.count, 10),
+        name: r.name,
+        category: r.category,
+        price: parseFloat(r.price)
+      };
     });
 
-    workshopRows.forEach(w => {
-      if (!w.title) return;
-      const name = w.title;
-      const item = { count: 1, name, category: 'Workshop', price: parseFloat(w.price || 0) };
-      if (workshopsDemand[name]) {
-        workshopsDemand[name].count += 1;
-      } else {
-        workshopsDemand[name] = { ...item };
-      }
-      if (combinedDemand[name]) {
-        combinedDemand[name].count += 1;
-      } else {
-        combinedDemand[name] = { ...item };
-      }
+    // 5. Workshops Demand (From Workshop Attendees)
+    const workshopsDemandRes = await query(`
+      SELECT w.title AS name, COALESCE(MAX(w.category), 'Workshop') AS category, COUNT(a.id) AS count, COALESCE(MAX(w.price::float), 1500) AS price
+      FROM workshops w
+      LEFT JOIN attendees a ON a.workshop_id = w.id
+      GROUP BY w.id, w.title
+      ORDER BY count DESC
+      LIMIT 5
+    `);
+    const service_demand_workshops = {};
+    workshopsDemandRes.rows.forEach((r, idx) => {
+      service_demand_workshops[`WS-${idx + 1}`] = {
+        count: parseInt(r.count, 10),
+        name: r.name,
+        category: r.category,
+        price: parseFloat(r.price)
+      };
     });
 
-    vedicRows.forEach(vp => {
-      if (!vp.title) return;
-      const name = vp.title;
-      const item = { count: 1, name, category: 'Vedic Life', price: parseFloat(vp.price || 0) };
-      if (vedicDemand[name]) {
-        vedicDemand[name].count += 1;
-      } else {
-        vedicDemand[name] = { ...item };
-      }
-      if (combinedDemand[name]) {
-        combinedDemand[name].count += 1;
-      } else {
-        combinedDemand[name] = { ...item };
-      }
+    // 6. Vedic Life Demand (From Vedic Attendees)
+    const vedicDemandRes = await query(`
+      SELECT vp.title AS name, COALESCE(MAX(vp.type), 'Vedic Package') AS category, COUNT(va.id) AS count, COALESCE(MAX(vp.price::float), 5000) AS price
+      FROM vedic_programs vp
+      LEFT JOIN vedic_attendees va ON va.program_id = vp.id
+      GROUP BY vp.id, vp.title
+      ORDER BY count DESC
+      LIMIT 5
+    `);
+    const service_demand_vedic = {};
+    vedicDemandRes.rows.forEach((r, idx) => {
+      service_demand_vedic[`VL-${idx + 1}`] = {
+        count: parseInt(r.count, 10),
+        name: r.name,
+        category: r.category,
+        price: parseFloat(r.price)
+      };
     });
 
-    const getTop5 = (demandObj) => {
-      const sorted = {};
-      Object.entries(demandObj)
-        .sort((a, b) => b[1].count - a[1].count)
-        .slice(0, 5)
-        .forEach(([key, val]) => {
-          sorted[key] = val;
-        });
-      return sorted;
-    };
-
-    let service_demand = getTop5(combinedDemand);
-    let service_demand_services = getTop5(servicesDemand);
-    let service_demand_workshops = getTop5(workshopsDemand);
-    let service_demand_vedic = getTop5(vedicDemand);
-
-    // Fallback: If empty, pull lifetime records for the top 5
-    if (Object.keys(service_demand).length === 0) {
-      try {
-        const [lfServiceRes, lfWorkshopRes, lfVedicRes] = await Promise.all([
-          safeQuery(`
-            SELECT b.service_name as name, COUNT(*) as cnt,
-                   COALESCE(MAX(s.category), 'Wellness') as category,
-                   COALESCE(MAX(s.base_price::float), 0) as price
-            FROM bookings b
-            LEFT JOIN services s ON LOWER(s.name) = LOWER(b.service_name)
-            GROUP BY b.service_name
-          `),
-          safeQuery(`
-            SELECT w.title as name, COUNT(a.id) as cnt,
-                   'Workshop' as category,
-                   COALESCE(w.price::float, 0) as price
-            FROM attendees a
-            JOIN workshops w ON a.workshop_id = w.id
-            GROUP BY w.title, w.price
-          `),
-          safeQuery(`
-            SELECT vp.title as name, COUNT(va.id) as cnt,
-                   'Vedic Life' as category,
-                   COALESCE(vp.price::float, 0) as price
-            FROM vedic_attendees va
-            JOIN vedic_programs vp ON va.program_id = vp.id
-            GROUP BY vp.title, vp.price
-          `)
-        ]);
-
-        const lfCombined = {};
-        const lfServices = {};
-        const lfWorkshops = {};
-        const lfVedic = {};
-
-        for (const row of lfServiceRes.rows) {
-          const item = {
-            count: parseInt(row.cnt || 0, 10),
-            name: row.name,
-            category: row.category,
-            price: parseFloat(row.price || 0)
-          };
-          lfCombined[row.name] = { ...item };
-          lfServices[row.name] = { ...item };
-        }
-        for (const row of lfWorkshopRes.rows) {
-          const item = {
-            count: parseInt(row.cnt || 0, 10),
-            name: row.name,
-            category: row.category,
-            price: parseFloat(row.price || 0)
-          };
-          lfWorkshops[row.name] = { ...item };
-          if (lfCombined[row.name]) {
-            lfCombined[row.name].count += item.count;
-          } else {
-            lfCombined[row.name] = { ...item };
-          }
-        }
-        for (const row of lfVedicRes.rows) {
-          const item = {
-            count: parseInt(row.cnt || 0, 10),
-            name: row.name,
-            category: row.category,
-            price: parseFloat(row.price || 0)
-          };
-          lfVedic[row.name] = { ...item };
-          if (lfCombined[row.name]) {
-            lfCombined[row.name].count += item.count;
-          } else {
-            lfCombined[row.name] = { ...item };
-          }
-        }
-
-        service_demand = getTop5(lfCombined);
-        service_demand_services = getTop5(lfServices);
-        service_demand_workshops = getTop5(lfWorkshops);
-        service_demand_vedic = getTop5(lfVedic);
-      } catch (e) {
-        console.warn("[HomeController] Service demand fallback query failed:", e.message);
-      }
-    }
+    // Overall Demand Combine
+    const service_demand = { ...service_demand_services, ...service_demand_workshops };
 
     res.json({
       success: true,

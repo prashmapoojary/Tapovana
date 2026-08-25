@@ -9,6 +9,7 @@ import { getImageUrl } from "../utils/image";
 import MediaPickerModal from "../components/MediaPickerModal";
 import SearchIcon from "../assets/searchIcon.svg";
 import ActionIcon from "../assets/Button.svg";
+import { formatDateForInput, formatTimeForInput } from "../utils/dateFormatters";
 
 // ─── Status checker ─────────────────────────────────────────────────────
 const getProgramStatus = (program) => {
@@ -1188,7 +1189,9 @@ export default function VedicLifePrograms() {
     const p = selectedProgram;
     setEditForm({
       title: p.title || "", type: p.type || "Retreat", description: p.description || "",
-      duration: p.duration || "7-days", startDate: p.startDate || "", endDate: p.endDate || "",
+      duration: p.duration || "7-days",
+      startDate: formatDateForInput(p.startDate || p.start_date),
+      endDate: formatDateForInput(p.endDate || p.end_date),
       capacity: p.capacity || 20, price: p.price || "",
       accommodations: p.accommodations || "",
       consultant_id: p.lead_consultant_id || p.consultant_id || "", consultant_name: p.consultant_name || p.consultant || "",
@@ -1196,7 +1199,7 @@ export default function VedicLifePrograms() {
       services: p.services ? (Array.isArray(p.services) ? p.services.join(", ") : p.services) : "",
       languages: p.languages ? (Array.isArray(p.languages) ? p.languages.join(", ") : p.languages) : "",
       image_url: p.image_url || p.image || "", image_base64: p.image_base64 || "",
-      registrationDeadline: p.registrationDeadline || "",
+      registrationDeadline: formatDateForInput(p.registrationDeadline || p.registration_deadline),
     });
     setEditError("");
     setIsEditing(true);

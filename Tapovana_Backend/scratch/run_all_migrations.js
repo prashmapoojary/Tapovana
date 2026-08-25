@@ -32,6 +32,7 @@ const migrations = [
   'run_migration_v29_create_vedic_attendees_table.js',
   'run_migration_v30_workshop_certificates.js',
   'run_migration_v31_create_vedic_packages_members.js',
+  'run_migration_v33_fix_allocations_updated_at.js',
 ];
 
 const sqlDir = path.join(__dirname, '../sql');
