@@ -113,26 +113,46 @@ const getAllBlogs = async (req, res) => {
         let params = [];
         let paramIdx = 1;
 
-        // Role-based access
-        if (isAdmin) {
-            if (status) {
-                if (status === 'pending') {
-                    // For pending tab, only include pending blogs (not rejected)
+        const userEmail = req.user?.email || '';
+
+        // Role-based access & status filtering
+        if (req.user) {
+            if (status === 'my_blogs') {
+                where.push(`(b.created_by = $${paramIdx} OR (tm.email IS NOT NULL AND LOWER(tm.email) = LOWER($${paramIdx + 1})))`);
+                params.push(userId, userEmail);
+                paramIdx += 2;
+            } else if (status === 'draft' || status === 'rejected') {
+                where.push(`(b.created_by = $${paramIdx} OR (tm.email IS NOT NULL AND LOWER(tm.email) = LOWER($${paramIdx + 1}))) AND b.status = $${paramIdx + 2}`);
+                params.push(userId, userEmail, status);
+                paramIdx += 3;
+            } else if (status === 'pending') {
+                if (isAdmin) {
                     where.push(`b.status = $${paramIdx++}`);
                     params.push('pending');
                 } else {
-                    where.push(`b.status = $${paramIdx++}`);
-                    params.push(status);
+                    where.push(`(b.created_by = $${paramIdx} OR (tm.email IS NOT NULL AND LOWER(tm.email) = LOWER($${paramIdx + 1}))) AND b.status = $${paramIdx + 2}`);
+                    params.push(userId, userEmail, 'pending');
+                    paramIdx += 3;
                 }
-            }
-        } else if (isStaff) {
-            // Staff see their own blogs (all statuses) + published from others
-            if (status === 'my_blogs') {
-                where.push(`b.created_by = $${paramIdx++}`);
-                params.push(userId);
+            } else if (status === 'published') {
+                where.push(`b.status = $${paramIdx++}`);
+                params.push('published');
+            } else if (status === 'archived') {
+                if (isAdmin) {
+                    where.push(`b.status = $${paramIdx++}`);
+                    params.push('archived');
+                } else {
+                    where.push(`(b.created_by = $${paramIdx} OR (tm.email IS NOT NULL AND LOWER(tm.email) = LOWER($${paramIdx + 1}))) AND b.status = $${paramIdx + 2}`);
+                    params.push(userId, userEmail, 'archived');
+                    paramIdx += 3;
+                }
             } else {
-                where.push(`(b.created_by = $${paramIdx++} OR b.status = 'published')`);
-                params.push(userId);
+                // Default: Admin sees all, Staff sees (their own OR published from others)
+                if (!isAdmin && (isStaff || req.user)) {
+                    where.push(`(b.created_by = $${paramIdx} OR (tm.email IS NOT NULL AND LOWER(tm.email) = LOWER($${paramIdx + 1})) OR b.status = 'published')`);
+                    params.push(userId, userEmail);
+                    paramIdx += 2;
+                }
             }
         } else {
             // Public: only published

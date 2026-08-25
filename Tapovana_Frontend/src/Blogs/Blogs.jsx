@@ -68,7 +68,7 @@ function QuillEditor({ value, onChange }) {
 }
 
 // ─── Blog Card ───────────────────────────────────────────────────────────
-function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove, onReject, onArchive, onRestore }) {
+function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove, onReject, onArchive, onRestore, onSubmitForReview }) {
   const isDraft = blog.status === "draft";
   const isPending = blog.status === "pending";
   const isPublished = blog.status === "published";
@@ -102,7 +102,7 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
           />
           {(isStaff || isAdmin) && (
             <div className={"blog-status-badge " + blog.status} style={{ fontSize: "9px", padding: "2px 6px" }}>
-              {isPublished ? "Published" : isPending ? "Pending" : isDraft ? "Draft" : isRejected ? "Rejected" : "Archived"}
+              {isPublished ? "Published" : isPending ? "Pending Review" : isDraft ? "Draft" : isRejected ? "Rejected" : "Archived"}
             </div>
           )}
         </div>
@@ -118,23 +118,32 @@ function BlogCard({ blog, onClick, isStaff, isAdmin, onEdit, onDelete, onApprove
         </div>
 
         {isRejected && blog.rejection_reason && (
-          <div style={{ marginTop: "4px", padding: "4px 8px", backgroundColor: "#fff5f5", border: "1px solid #feb2b2", borderRadius: "6px", fontSize: "11px", color: "#c53030" }}>
-            <strong>Reason:</strong> {blog.rejection_reason}
+          <div style={{ marginTop: "4px", padding: "6px 8px", backgroundColor: "#fff5f5", border: "1px solid #feb2b2", borderRadius: "6px", fontSize: "11px", color: "#c53030" }}>
+            <strong>Rejection Reason:</strong> {blog.rejection_reason}
           </div>
         )}
 
         {/* Actions Footer */}
         <div className="blog-card-footer" onClick={(e) => e.stopPropagation()} style={{ marginTop: "auto", paddingTop: "6px", borderTop: "1px solid #edf2f7", display: "flex", gap: "4px", flexDirection: "column" }}>
-          {isStaff && (isDraft || isRejected) && (
-            <div className="blog-card-actions" style={{ display: "flex", gap: "6px", width: "100%", marginTop: "2px" }}>
-              <button onClick={() => onEdit(blog)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Edit</button>
-              <button onClick={() => onDelete(blog.id)} style={{ background: "transparent", color: "#cda751", border: "1px solid #cda751", padding: "5px 11px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Delete</button>
+          {(isStaff || isAdmin) && (isDraft || isRejected) && (
+            <div className="blog-card-actions" style={{ display: "flex", gap: "6px", width: "100%", marginTop: "2px", flexWrap: "wrap" }}>
+              <button onClick={() => onEdit(blog)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "6px 10px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Edit</button>
+              {onSubmitForReview && (
+                <button onClick={() => onSubmitForReview(blog.id)} style={{ background: "#2b6cb0", color: "#fff", border: "none", padding: "6px 10px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Submit</button>
+              )}
+              <button onClick={() => onDelete(blog.id)} style={{ background: "transparent", color: "#e53e3e", border: "1px solid #e53e3e", padding: "5px 9px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Delete</button>
             </div>
           )}
           {isAdmin && isPending && (
             <div className="blog-card-actions" style={{ display: "flex", gap: "6px", width: "100%", marginTop: "2px" }}>
               <button onClick={() => onApprove(blog.id)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Approve</button>
               <button onClick={() => onReject(blog.id)} style={{ background: "transparent", color: "#cda751", border: "1px solid #cda751", padding: "5px 11px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Reject</button>
+            </div>
+          )}
+          {isStaff && !isAdmin && isPending && (
+            <div className="blog-card-actions" style={{ display: "flex", gap: "6px", width: "100%", marginTop: "2px" }}>
+              <button onClick={() => onEdit(blog)} style={{ background: "#cda751", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Edit</button>
+              <button onClick={() => onDelete(blog.id)} style={{ background: "transparent", color: "#e53e3e", border: "1px solid #e53e3e", padding: "5px 11px", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontSize: "11px", flex: 1, textAlign: "center" }}>Delete</button>
             </div>
           )}
           {isAdmin && isArchived && (
@@ -426,6 +435,18 @@ export default function Blogs({ mode }) {
       fetchBlogs();
     } catch (err) {
       await triggerAlert(err.message || "Failed to delete blog.");
+    }
+  };
+
+  const handleSubmitForReview = async (blogId) => {
+    const confirmed = await triggerConfirm("Are you sure you want to submit this blog for admin review?");
+    if (!confirmed) return;
+    try {
+      await apiFetch(`/api/blogs/${blogId}/submit`, { method: "POST" });
+      await triggerAlert("Blog submitted for admin approval.", true);
+      fetchBlogs();
+    } catch (err) {
+      await triggerAlert(err.message || "Failed to submit blog.");
     }
   };
 
@@ -1011,30 +1032,42 @@ export default function Blogs({ mode }) {
       {/* Tabs */}
       {isAdmin && (
         <div className="blog-tabs">
-          {["published", "pending", "archived"].map(tab => (
+          {[
+            { id: "published", label: "Published" },
+            { id: "pending", label: "Pending Review" },
+            { id: "draft", label: "Drafts" },
+            { id: "archived", label: "Archived" }
+          ].map(tab => (
             <button
-              key={tab}
-              className={`blog-tab-btn ${activeTab === tab ? "active" : ""}`}
+              key={tab.id}
+              className={`blog-tab-btn ${activeTab === tab.id ? "active" : ""}`}
               onClick={() => {
-                setActiveTab(tab);
-                setSearchParams({ status: tab });
+                setActiveTab(tab.id);
+                setSearchParams({ status: tab.id });
               }}
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab.label}
             </button>
           ))}
         </div>
       )}
 
-      {isStaff && (
+      {isStaff && !isAdmin && (
         <div className="blog-tabs">
-          {["my_blogs", "other_blogs"].map(tab => (
+          {[
+            { id: "my_blogs", label: "All My Blogs" },
+            { id: "draft", label: "Drafts" },
+            { id: "pending", label: "Pending Review" },
+            { id: "published", label: "Published" },
+            { id: "rejected", label: "Rejected" },
+            { id: "other_blogs", label: "Other Blogs" }
+          ].map(tab => (
             <button
-              key={tab}
-              className={`blog-tab-btn ${activeTab === tab ? "active" : ""}`}
-              onClick={() => setActiveTab(tab)}
+              key={tab.id}
+              className={`blog-tab-btn ${activeTab === tab.id ? "active" : ""}`}
+              onClick={() => setActiveTab(tab.id)}
             >
-              {tab === "my_blogs" ? "My Blogs" : "Other Blogs"}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -1080,6 +1113,7 @@ export default function Blogs({ mode }) {
               onReject={handleReject}
               onArchive={handleArchive}
               onRestore={handleRestore}
+              onSubmitForReview={handleSubmitForReview}
             />
           ))}
         </div>
