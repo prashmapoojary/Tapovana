@@ -12,17 +12,31 @@ const ensureUploadsDir = () => {
     }
 };
 
-// ── Ensure blog_audit_log table exists ──────────────────────────────────
+// ── Ensure blog_audit_log table & status_change column exist ────────────
 query(`
     CREATE TABLE IF NOT EXISTS blog_audit_log (
         id SERIAL PRIMARY KEY,
         blog_id INTEGER NOT NULL REFERENCES blogs(id) ON DELETE CASCADE,
-        status_change VARCHAR(100) NOT NULL,
+        status_change VARCHAR(100),
         changed_at TIMESTAMPTZ DEFAULT NOW(),
         changed_by UUID REFERENCES team_members(id) ON DELETE SET NULL
     );
-`).then(() => console.log('✅ blog_audit_log table verified/created'))
-  .catch(err => console.error('Failed to create blog_audit_log table:', err));
+    ALTER TABLE blog_audit_log ADD COLUMN IF NOT EXISTS status_change VARCHAR(100);
+`).then(() => console.log('✅ blog_audit_log table & status_change column verified'))
+  .catch(err => console.error('Failed to verify blog_audit_log table:', err));
+
+// Helper: Safely insert blog audit log without throwing
+const logBlogAudit = async (blogId, statusChange, userId) => {
+    try {
+        const validUserId = isValidUUID(userId) ? userId : null;
+        await query(
+            'INSERT INTO blog_audit_log (blog_id, status_change, changed_by) VALUES ($1, $2, $3)',
+            [blogId, statusChange, validUserId]
+        );
+    } catch (err) {
+        console.warn('[BlogAudit] Warning logging audit:', err.message);
+    }
+};
 
 // ── Helper: save base64 image ──────────────────────────────────────────
 const handleBlogImage = (imageData) => {
@@ -394,7 +408,7 @@ const createBlog = async (req, res) => {
         const blogId = result.rows[0].id;
 
         // Log status change
-        await query('INSERT INTO blog_audit_log (blog_id, status_change, changed_by) VALUES ($1, $2, $3)', [blogId, finalStatus, userId]);
+        await logBlogAudit(blogId, finalStatus, userId);
 
         // Save version 1
         await query(`
@@ -524,7 +538,7 @@ const updateBlog = async (req, res) => {
 
         // Log status change if updated
         if (status !== undefined && status !== blog.status) {
-            await query('INSERT INTO blog_audit_log (blog_id, status_change, changed_by) VALUES ($1, $2, $3)', [id, status, userId]);
+            await logBlogAudit(id, status, userId);
         }
 
         // Save new version
@@ -613,7 +627,7 @@ const submitBlog = async (req, res) => {
         }
 
         await query("UPDATE blogs SET status = 'pending', rejection_reason = NULL, updated_at = NOW() WHERE id = $1", [id]);
-        await query('INSERT INTO blog_audit_log (blog_id, status_change, changed_by) VALUES ($1, $2, $3)', [id, 'pending', userId]);
+        await logBlogAudit(id, 'pending', userId);
 
         // Email admins
         try {
@@ -666,7 +680,7 @@ const approveBlog = async (req, res) => {
                              published_at = NOW(), rejection_reason = NULL, updated_at = NOW()
             WHERE id = $2
         `, [userId, id]);
-        await query('INSERT INTO blog_audit_log (blog_id, status_change, changed_by) VALUES ($1, $2, $3)', [id, 'published', userId]);
+        await logBlogAudit(id, 'published', userId);
 
         // Email author
         try {
@@ -713,7 +727,7 @@ const rejectBlog = async (req, res) => {
         }
 
         await query("UPDATE blogs SET status = 'rejected', rejection_reason = $1, updated_at = NOW() WHERE id = $2", [reason.trim(), id]);
-        await query('INSERT INTO blog_audit_log (blog_id, status_change, changed_by) VALUES ($1, $2, $3)', [id, 'rejected', req.user?.id || null]);
+        await logBlogAudit(id, 'rejected', req.user?.id || null);
 
         // Email author
         try {
@@ -755,7 +769,7 @@ const archiveBlog = async (req, res) => {
         }
 
         await query("UPDATE blogs SET status = 'archived', updated_at = NOW() WHERE id = $1", [id]);
-        await query('INSERT INTO blog_audit_log (blog_id, status_change, changed_by) VALUES ($1, $2, $3)', [id, 'archived', req.user?.id || null]);
+        await logBlogAudit(id, 'archived', req.user?.id || null);
         res.json({ success: true, message: 'Blog archived.' });
     } catch (err) {
         console.error('archiveBlog error:', err);
@@ -780,7 +794,7 @@ const restoreBlog = async (req, res) => {
         }
 
         await query("UPDATE blogs SET status = 'published', updated_at = NOW() WHERE id = $1", [id]);
-        await query('INSERT INTO blog_audit_log (blog_id, status_change, changed_by) VALUES ($1, $2, $3)', [id, 'restored', req.user?.id || null]);
+        await logBlogAudit(id, 'restored', req.user?.id || null);
         res.json({ success: true, message: 'Blog restored to published.' });
     } catch (err) {
         console.error('restoreBlog error:', err);
