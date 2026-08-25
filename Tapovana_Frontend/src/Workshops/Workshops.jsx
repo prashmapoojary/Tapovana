@@ -430,6 +430,34 @@ export default function Workshops() {
   const [manualEnrollSaving, setManualEnrollSaving] = useState(false);
   const [manualEnrollError, setManualEnrollError] = useState("");
   const [phoneError, setPhoneError] = useState("");
+  const [membershipWarning, setMembershipWarning] = useState("");
+  const [membershipInfo, setMembershipInfo] = useState(null);
+
+  useEffect(() => {
+    if (manualEnrollForm.name && manualEnrollForm.email && manualEnrollForm.name.trim() && manualEnrollForm.email.trim()) {
+      const timer = setTimeout(async () => {
+        try {
+          const res = await apiFetch(`/api/memberships/verify?name=${encodeURIComponent(manualEnrollForm.name.trim())}&email=${encodeURIComponent(manualEnrollForm.email.trim())}`);
+          if (res && res.isMismatch) {
+            setMembershipWarning(res.warning || "Membership mismatch: The entered customer name and email do not match the membership record. Please verify the customer details.");
+            setMembershipInfo(null);
+          } else if (res && res.matched) {
+            setMembershipWarning("");
+            setMembershipInfo({ tier: res.tier, discount: res.discount_percentage });
+          } else {
+            setMembershipWarning("");
+            setMembershipInfo(null);
+          }
+        } catch (e) {
+          console.warn("Membership verify error:", e);
+        }
+      }, 350);
+      return () => clearTimeout(timer);
+    } else {
+      setMembershipWarning("");
+      setMembershipInfo(null);
+    }
+  }, [manualEnrollForm.name, manualEnrollForm.email]);
 
   // Fetch attendees for selected workshop
   const fetchAttendees = async (workshopId) => {
@@ -1337,6 +1365,17 @@ export default function Workshops() {
             {showManualEnroll && (
               <div style={{ background: "#f8f9fb", border: "1px solid rgba(205,167,81,0.2)", borderRadius: "8px", padding: "16px", animation: "wsFadeIn 0.2s ease" }}>
                 <h4 style={{ margin: "0 0 12px 0", fontSize: "14px", fontWeight: 700, color: "#2d3748" }}>Enroll User Manually</h4>
+                {membershipWarning && (
+                  <div style={{ background: "#FEF3C7", border: "1px solid #F59E0B", color: "#D97706", padding: "10px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "600", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <span>{membershipWarning}</span>
+                  </div>
+                )}
+                {membershipInfo && (
+                  <div style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.3)", color: "#16a34a", padding: "10px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", marginBottom: "12px" }}>
+                    ✨ Active {membershipInfo.tier} Membership Confirmed ({membershipInfo.discount}% discount applied automatically)
+                  </div>
+                )}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "12px" }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                     <label style={{ fontSize: "11px", fontWeight: 600, color: "#404854" }}>Full Name *</label>
