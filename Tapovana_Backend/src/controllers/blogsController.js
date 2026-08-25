@@ -12,7 +12,7 @@ const ensureUploadsDir = () => {
     }
 };
 
-// ── Ensure blog_audit_log table & blogs columns exist ────────────────
+// ── Ensure blog_audit_log table, blog_likes & blogs columns exist ────────────────
 query(`
     CREATE TABLE IF NOT EXISTS blog_audit_log (
         id SERIAL PRIMARY KEY,
@@ -24,7 +24,8 @@ query(`
     ALTER TABLE blog_audit_log ADD COLUMN IF NOT EXISTS status_change VARCHAR(100);
     ALTER TABLE blogs ADD COLUMN IF NOT EXISTS subtitle TEXT;
     ALTER TABLE blogs ADD COLUMN IF NOT EXISTS read_time VARCHAR(50);
-`).then(() => console.log('✅ blog_audit_log & blogs columns verified'))
+    ALTER TABLE blog_likes ADD COLUMN IF NOT EXISTS user_id UUID;
+`).then(() => console.log('✅ blog_audit_log, blog_likes & blogs columns verified'))
   .catch(err => console.error('Failed to verify blog columns:', err));
 
 // Helper: Safely insert blog audit log without throwing
@@ -226,11 +227,19 @@ const getAllBlogs = async (req, res) => {
         let userLikes = {};
         let userBookmarks = {};
         if (userId && blogIds.length > 0) {
-            const likesRes = await query('SELECT blog_id FROM blog_likes WHERE user_id = $1 AND blog_id = ANY($2)', [userId, blogIds]);
-            for (const l of likesRes.rows) userLikes[l.blog_id] = true;
+            try {
+                const likesRes = await query('SELECT blog_id FROM blog_likes WHERE user_id = $1 AND blog_id = ANY($2)', [userId, blogIds]);
+                for (const l of likesRes.rows) userLikes[l.blog_id] = true;
+            } catch (err) {
+                console.warn('[BlogLikes] Warning querying likes:', err.message);
+            }
 
-            const bookmarksRes = await query('SELECT blog_id FROM blog_bookmarks WHERE user_id = $1 AND blog_id = ANY($2)', [userId, blogIds]);
-            for (const b of bookmarksRes.rows) userBookmarks[b.blog_id] = true;
+            try {
+                const bookmarksRes = await query('SELECT blog_id FROM blog_bookmarks WHERE user_id = $1 AND blog_id = ANY($2)', [userId, blogIds]);
+                for (const b of bookmarksRes.rows) userBookmarks[b.blog_id] = true;
+            } catch (err) {
+                console.warn('[BlogBookmarks] Warning querying bookmarks:', err.message);
+            }
         }
 
         const blogs = result.rows.map(b => ({
