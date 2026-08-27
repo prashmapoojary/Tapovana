@@ -1,5 +1,9 @@
-export const getImageUrl = (url, placeholder = 'https://placehold.co/600x400?text=No+Image') => {
-  if (!url) return placeholder;
+export const UNSPLASH_DEFAULT = 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80';
+
+export const getImageUrl = (url, placeholder = UNSPLASH_DEFAULT) => {
+  if (!url || typeof url !== 'string' || url.includes('placehold.co')) {
+    return placeholder;
+  }
   if (url.startsWith('http') || url.startsWith('data:')) return url;
   
   let formattedUrl = url;

@@ -641,12 +641,12 @@ function EditService({ service, onBack }) {
                                         {galleryImages.map((src, idx) => (
                                             <div key={idx} className="es-media-slot">
                                                 <img
-                                                    src={getImageUrl(src, 'https://placehold.co/1200x800?text=No+Image')}
+                                                    src={getImageUrl(src, 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80')}
                                                     alt={`Gallery ${idx + 1}`}
                                                     className="es-media-img"
                                                     onError={(e) => {
-                                                        if (e.target.src !== 'https://placehold.co/1200x800?text=Error') {
-                                                            e.target.src = 'https://placehold.co/1200x800?text=Error';
+                                                        if (e.target.src !== 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80') {
+                                                            e.target.src = 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80';
                                                         }
                                                     }}
                                                 />

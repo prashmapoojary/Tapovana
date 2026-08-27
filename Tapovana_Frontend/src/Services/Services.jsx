@@ -150,7 +150,7 @@ function Services() {
 
   const handleDelete = async (service) => {
     const { id, name: serviceName, image_url } = service;
-    const imageUrl = getImageUrl(image_url, 'https://placehold.co/150?text=No+Image');
+    const imageUrl = getImageUrl(image_url, 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80');
 
     try {
       const bookingsData = await apiFetch('/api/bookings?limit=100');
@@ -378,12 +378,12 @@ function Services() {
                     <td>
                       <div className="service-name-cell">
                         <img 
-                          src={getImageUrl(service.image_url, 'https://placehold.co/150?text=No+Image')} 
+                          src={getImageUrl(service.image_url, 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80')} 
                           alt={service.name} 
                           className="service-thumbnail" 
                           onError={(e) => { 
-                            if (e.target.src !== 'https://placehold.co/150?text=Error') {
-                              e.target.src = 'https://placehold.co/150?text=Error'; 
+                            if (e.target.src !== 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80') {
+                              e.target.src = 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80'; 
                             }
                           }} 
                         />

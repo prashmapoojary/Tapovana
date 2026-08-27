@@ -570,18 +570,17 @@ function AddService({ onBack }) {
               <p style={{ margin: "0 0 12px 0", fontSize: "11px", color: "#94a3b8" }}>
                 Accepted formats: JPG, PNG, WEBP • Max file size: 5MB
               </p>
-
               {/* Slots rendering */}
               <div className="es-media-grid">
                 {galleryImages.map((src, idx) => (
                   <div key={idx} className="es-media-slot">
                     <img
-                      src={getImageUrl(src, 'https://placehold.co/1200x800?text=No+Image')}
+                      src={getImageUrl(src, 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80')}
                       alt={`Gallery ${idx + 1}`}
                       className="es-media-img"
                       onError={(e) => {
-                        if (e.target.src !== 'https://placehold.co/1200x800?text=Error') {
-                          e.target.src = 'https://placehold.co/1200x800?text=Error';
+                        if (e.target.src !== 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80') {
+                          e.target.src = 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80';
                         }
                       }}
                     />

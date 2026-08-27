@@ -1657,7 +1657,7 @@ export default function Workshops() {
         <div className="ws-modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
           <div className="ws-modal" style={{ width: 400, textAlign: 'center', padding: '32px 24px' }} onClick={e => e.stopPropagation()}>
             <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(205,167,81,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', overflow: 'hidden', border: '2px solid #CDA751' }}>
-              <img src={getImageUrl(selectedWs?.image_url || selectedWs?.image)} alt="Workshop Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/100x100?text=No+Image'; }} />
+              <img src={getImageUrl(selectedWs?.image_url || selectedWs?.image)} alt="Workshop Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80'; }} />
             </div>
             <h2 style={{ fontSize: 20, fontWeight: 700, color: "#2d3748", margin: "0 0 8px 0" }}>Delete Workshop?</h2>
             <p style={{ fontSize: 14, color: "#7b8a9a", margin: "0 0 24px 0", lineHeight: 1.5 }}>

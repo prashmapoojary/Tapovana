@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import './Feedbacks.css';
 import ActionIcon from '../assets/Button.svg';
+import { apiFetch } from '../api/http';
 
 export default function Feedbacks() {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -25,18 +26,11 @@ export default function Feedbacks() {
     const fetchFeedbacks = async () => {
       try {
         setLoading(true);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4500);
+        const data = await apiFetch('/api/reviews');
 
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
-        const response = await fetch(`${baseUrl}/api/reviews`, {
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        const data = await response.json();
-        if (data.success && Array.isArray(data.reviews)) {
-          const mappedFeedbacks = data.reviews.map(item => {
+        if (data && (data.success || Array.isArray(data.reviews))) {
+          const list = Array.isArray(data.reviews) ? data.reviews : (Array.isArray(data) ? data : []);
+          const mappedFeedbacks = list.map(item => {
             // Normalize moduleType capitalization
             let modType = item.module_type || 'Blog';
             if (modType.toLowerCase() === 'vedic life' || modType.toLowerCase() === 'vediclife') {
@@ -47,13 +41,13 @@ export default function Feedbacks() {
 
             return {
               id: item.id,
-              userName: item.username || 'Anonymous',
+              userName: item.username || item.user_name || 'Anonymous',
               email: item.email || 'N/A',
               moduleType: modType,
               title: item.title || 'N/A',
-              feedbackContent: item.feedback || '',
+              feedbackContent: item.feedback || item.comment || '',
               rating: item.rating || 5,
-              dateSubmitted: item.date ? item.date.substring(0, 10) : new Date().toISOString().substring(0, 10),
+              dateSubmitted: item.date ? String(item.date).substring(0, 10) : new Date().toISOString().substring(0, 10),
               status: item.status || 'Pending'
             };
           });
@@ -109,7 +103,7 @@ export default function Feedbacks() {
 
   // Status Badge Class mapper
   const getStatusClass = (status) => {
-    switch (status.toLowerCase()) {
+    switch (String(status).toLowerCase()) {
       case 'pending': return 'fb-status-badge fb-status-pending';
       case 'reviewed': return 'fb-status-badge fb-status-reviewed';
       case 'archived': return 'fb-status-badge fb-status-archived';
@@ -119,7 +113,7 @@ export default function Feedbacks() {
 
   // Convert number to stars
   const renderStars = (rating) => {
-    return '⭐'.repeat(rating);
+    return '⭐'.repeat(rating || 5);
   };
 
   // Actions
@@ -127,45 +121,56 @@ export default function Feedbacks() {
     setSelectedFeedback(feedback);
   };
 
-  const handleArchive = (id) => {
-    setFeedbacks(prev => prev.map(item => {
-      if (item.id === id) {
-        return { ...item, status: 'Archived' };
-      }
-      return item;
-    }));
-    
-    // Update active modal status if it matches
-    if (selectedFeedback && selectedFeedback.id === id) {
-      setSelectedFeedback(prev => ({ ...prev, status: 'Archived' }));
-    }
-
-    showToast('Feedback moved to archived list.');
-  };
-
-  const handleMarkReviewed = (id) => {
-    setFeedbacks(prev => prev.map(item => {
-      if (item.id === id) {
-        return { ...item, status: 'Reviewed' };
-      }
-      return item;
-    }));
-
-    // Update active modal status if it matches
-    if (selectedFeedback && selectedFeedback.id === id) {
-      setSelectedFeedback(prev => ({ ...prev, status: 'Reviewed' }));
-    }
-
-    showToast('Feedback marked as Reviewed.');
-  };
-
-  const handleDelete = (id, name) => {
-    if (window.confirm(`Are you sure you want to permanently delete feedback from ${name}?`)) {
-      setFeedbacks(prev => prev.filter(item => item.id !== id));
+  const handleArchive = async (id) => {
+    try {
+      await apiFetch(`/api/reviews/${id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "Archived" })
+      });
+      setFeedbacks(prev => prev.map(item => item.id === id ? { ...item, status: 'Archived' } : item));
+      
+      // Update active modal status if it matches
       if (selectedFeedback && selectedFeedback.id === id) {
-        setSelectedFeedback(null);
+        setSelectedFeedback(prev => ({ ...prev, status: 'Archived' }));
       }
-      showToast('Feedback permanently deleted.');
+
+      showToast('Feedback moved to archived list.');
+    } catch (err) {
+      console.error("handleArchive error:", err);
+    }
+  };
+
+  const handleMarkReviewed = async (id) => {
+    try {
+      await apiFetch(`/api/reviews/${id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "Reviewed" })
+      });
+      setFeedbacks(prev => prev.map(item => item.id === id ? { ...item, status: 'Reviewed' } : item));
+
+      // Update active modal status if it matches
+      if (selectedFeedback && selectedFeedback.id === id) {
+        setSelectedFeedback(prev => ({ ...prev, status: 'Reviewed' }));
+      }
+
+      showToast('Feedback marked as Reviewed.');
+    } catch (err) {
+      console.error("handleMarkReviewed error:", err);
+    }
+  };
+
+  const handleDelete = async (id, name) => {
+    if (window.confirm(`Are you sure you want to permanently delete feedback from ${name}?`)) {
+      try {
+        await apiFetch(`/api/reviews/${id}`, { method: "DELETE" });
+        setFeedbacks(prev => prev.filter(item => item.id !== id));
+        if (selectedFeedback && selectedFeedback.id === id) {
+          setSelectedFeedback(null);
+        }
+        showToast('Feedback permanently deleted.');
+      } catch (err) {
+        console.error("handleDelete error:", err);
+      }
     }
   };
 
