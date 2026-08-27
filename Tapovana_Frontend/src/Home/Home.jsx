@@ -326,35 +326,46 @@ function Home() {
         apiFetch("/api/vedic-programs")
       ]);
 
+      const isPendingBooking = (b) => {
+        const st = String(b.status || "").toUpperCase();
+        if (st === "CANCELLED" || st === "COMPLETED") return false;
+        const noStaff = !b.therapist_id && (!b.therapist_name || b.therapist_name.toLowerCase() === "unassigned");
+        return st === "PENDING" || st === "PENDING ALLOCATION" || noStaff;
+      };
+
+      const isPendingWorkshop = (w) => {
+        const st = String(w.status || "").toUpperCase();
+        if (st === "CANCELLED" || st === "COMPLETED") return false;
+        const staffArr = Array.isArray(w.assigned_staff_ids) ? w.assigned_staff_ids : [];
+        const noStaff = (!w.instructor_id && (!w.instructor || w.instructor.toLowerCase() === "unassigned")) || staffArr.length === 0;
+        return st === "PENDING" || st === "PENDING ALLOCATION" || noStaff;
+      };
+
+      const isPendingVedic = (p) => {
+        const st = String(p.status || "").toUpperCase();
+        if (st === "CANCELLED" || st === "COMPLETED") return false;
+        const staffArr = Array.isArray(p.assigned_staff_ids) ? p.assigned_staff_ids : [];
+        const noStaff = (!p.consultant_id && (!p.consultant_name || p.consultant_name.toLowerCase() === "unassigned") && !p.lead_consultant_id) || staffArr.length === 0;
+        return st === "PENDING" || st === "PENDING ALLOCATION" || noStaff;
+      };
+
       if (bookingsRes && bookingsRes.success && Array.isArray(bookingsRes.bookings)) {
-        // STRICT RULE 5: Show ONLY records with Pending status
-        const filtered = bookingsRes.bookings.filter(b => 
-          String(b.status).toUpperCase() === "PENDING"
-        );
-        setPendingBookingsList(filtered);
+        setPendingBookingsList(bookingsRes.bookings.filter(isPendingBooking));
+      } else if (Array.isArray(bookingsRes)) {
+        setPendingBookingsList(bookingsRes.filter(isPendingBooking));
       } else {
         setPendingBookingsList([]);
       }
 
-      if (workshopsRes && Array.isArray(workshopsRes)) {
-        const filtered = workshopsRes.filter(w => String(w.status).toUpperCase() === "PENDING");
-        setPendingWorkshopsList(filtered);
-      } else if (workshopsRes && workshopsRes.workshops && Array.isArray(workshopsRes.workshops)) {
-        const filtered = workshopsRes.workshops.filter(w => String(w.status).toUpperCase() === "PENDING");
-        setPendingWorkshopsList(filtered);
-      } else {
-        setPendingWorkshopsList([]);
-      }
+      const rawWorkshops = Array.isArray(workshopsRes) 
+        ? workshopsRes 
+        : (workshopsRes?.workshops && Array.isArray(workshopsRes.workshops) ? workshopsRes.workshops : []);
+      setPendingWorkshopsList(rawWorkshops.filter(isPendingWorkshop));
 
-      if (vedicRes && Array.isArray(vedicRes)) {
-        const filtered = vedicRes.filter(p => String(p.status).toUpperCase() === "PENDING");
-        setPendingVedicList(filtered);
-      } else if (vedicRes && vedicRes.programs && Array.isArray(vedicRes.programs)) {
-        const filtered = vedicRes.programs.filter(p => String(p.status).toUpperCase() === "PENDING");
-        setPendingVedicList(filtered);
-      } else {
-        setPendingVedicList([]);
-      }
+      const rawVedic = Array.isArray(vedicRes)
+        ? vedicRes
+        : (vedicRes?.programs && Array.isArray(vedicRes.programs) ? vedicRes.programs : (vedicRes?.data && Array.isArray(vedicRes.data) ? vedicRes.data : []));
+      setPendingVedicList(rawVedic.filter(isPendingVedic));
     } catch (err) {
       console.error("Error fetching pending details for side drawer:", err);
     } finally {

@@ -215,7 +215,7 @@ exports.getAnalyticsDashboard = async (req, res) => {
 
     try {
       const bkgRes = await query(
-        `SELECT COUNT(*) AS cnt FROM bookings WHERE UPPER(status) = 'PENDING' AND (therapist_id IS NULL OR therapist_name IS NULL OR therapist_name = '' OR LOWER(therapist_name) = 'unassigned')`
+        `SELECT COUNT(*) AS cnt FROM bookings WHERE UPPER(status) IN ('PENDING', 'PENDING ALLOCATION') OR (UPPER(status) NOT IN ('CANCELLED', 'COMPLETED') AND (therapist_id IS NULL OR therapist_name IS NULL OR therapist_name = '' OR LOWER(therapist_name) = 'unassigned'))`
       );
       pending_bookings_cnt = parseInt(bkgRes.rows[0]?.cnt || 0, 10);
     } catch (e) {
@@ -224,7 +224,7 @@ exports.getAnalyticsDashboard = async (req, res) => {
 
     try {
       const wsRes = await query(
-        `SELECT COUNT(*) AS cnt FROM workshops WHERE UPPER(status) = 'PENDING' OR (UPPER(status) = 'UPCOMING' AND (assigned_staff_ids IS NULL OR jsonb_array_length(assigned_staff_ids::jsonb) = 0 OR instructor IS NULL OR instructor = ''))`
+        `SELECT COUNT(*) AS cnt FROM workshops WHERE UPPER(status) IN ('PENDING', 'PENDING ALLOCATION') OR (UPPER(status) NOT IN ('CANCELLED', 'COMPLETED') AND (instructor_id IS NULL OR instructor IS NULL OR instructor = '' OR LOWER(instructor) = 'unassigned'))`
       );
       pending_workshops_cnt = parseInt(wsRes.rows[0]?.cnt || 0, 10);
     } catch (e) {
@@ -233,7 +233,7 @@ exports.getAnalyticsDashboard = async (req, res) => {
 
     try {
       const vedicRes = await query(
-        `SELECT COUNT(*) AS cnt FROM vedic_programs WHERE UPPER(status) = 'PENDING' OR (UPPER(status) = 'ACTIVE' AND (assigned_staff_ids IS NULL OR jsonb_array_length(assigned_staff_ids::jsonb) = 0 OR consultant_name IS NULL OR consultant_name = ''))`
+        `SELECT COUNT(*) AS cnt FROM vedic_programs WHERE UPPER(status) IN ('PENDING', 'PENDING ALLOCATION') OR (UPPER(status) NOT IN ('CANCELLED', 'COMPLETED') AND (consultant_id IS NULL OR consultant_name IS NULL OR consultant_name = '' OR LOWER(consultant_name) = 'unassigned'))`
       );
       pending_vedic_cnt = parseInt(vedicRes.rows[0]?.cnt || 0, 10);
     } catch (e) {
