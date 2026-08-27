@@ -47,8 +47,20 @@ const authenticate = async (req, res, next) => {
     }
 };
 
+const normalizeRole = (roleStr) => {
+    if (!roleStr) return "";
+    return String(roleStr).toUpperCase().trim().replace(/[\s-]+/g, "_");
+};
+
 const requireRole = (...roles) => (req, res, next) => {
-    if (!roles.includes(req.user?.role)) {
+    const userRole = normalizeRole(req.user?.role);
+    const normalizedAllowed = roles.map(normalizeRole);
+
+    if (userRole === "SUPER_ADMIN") {
+        return next();
+    }
+
+    if (!normalizedAllowed.includes(userRole)) {
         return res.status(403).json({ success: false, message: 'Access denied.' });
     }
     next();

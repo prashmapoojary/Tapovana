@@ -471,8 +471,11 @@ const addTeamMemberFrontend = async (req, res) => {
         });
     }
 
+    const normalizeRoleName = (r) => String(r || '').toUpperCase().trim().replace(/[\s-]+/g, '_');
+    const targetRoleNorm = normalizeRoleName(role);
+
     const ALLOWED_ROLES = ['SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR', 'THERAPIST'];
-    if (!ALLOWED_ROLES.includes(role)) {
+    if (!ALLOWED_ROLES.includes(targetRoleNorm)) {
         return res.status(400).json({
             success: false,
             message: `Role must be one of: ${ALLOWED_ROLES.join(', ')}`
@@ -492,7 +495,10 @@ const addTeamMemberFrontend = async (req, res) => {
             return res.status(409).json({ success: false, message: 'Email already registered.' });
         }
 
-        const roleResult = await client.query('SELECT id FROM roles WHERE name = $1', [role]);
+        const roleResult = await client.query(
+            `SELECT id FROM roles WHERE UPPER(REPLACE(REPLACE(name, ' ', '_'), '-', '_')) = $1 OR UPPER(REPLACE(REPLACE(label, ' ', '_'), '-', '_')) = $1 LIMIT 1`,
+            [targetRoleNorm]
+        );
         if (!roleResult.rows.length) {
             await client.query('ROLLBACK');
             return res.status(400).json({ success: false, message: 'Invalid role.' });
@@ -634,7 +640,11 @@ const updateTeamMemberFrontend = async (req, res) => {
         }
 
         if (role !== undefined) {
-            const roleResult = await query('SELECT id FROM roles WHERE name = $1', [role]);
+            const targetRoleNorm = String(role || '').toUpperCase().trim().replace(/[\s-]+/g, '_');
+            const roleResult = await query(
+                `SELECT id FROM roles WHERE UPPER(REPLACE(REPLACE(name, ' ', '_'), '-', '_')) = $1 OR UPPER(REPLACE(REPLACE(label, ' ', '_'), '-', '_')) = $1 LIMIT 1`,
+                [targetRoleNorm]
+            );
             if (!roleResult.rows.length) {
                 return res.status(400).json({ success: false, message: 'Invalid role.' });
             }
