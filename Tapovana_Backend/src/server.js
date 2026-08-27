@@ -87,6 +87,7 @@ app.get("/download/certificate/:id", require("./controllers/certificatesControll
 app.get("/api/download/certificate/:id", require("./controllers/certificatesController").downloadCertificatePdf);
 app.get("/api/certificates/download/:id", require("./controllers/certificatesController").downloadCertificatePdf);
 app.get("/api/analytics/dashboard", require("./middleware/auth").authenticate, require("./controllers/homeController").getAnalyticsDashboard);
+app.use("/api/reviews", require("./routes/reviews"));
 
 app.use("/api/customer", customerRoutes);
 app.use("/api/customers", customerRoutes);
