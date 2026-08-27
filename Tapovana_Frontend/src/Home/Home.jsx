@@ -290,12 +290,8 @@ function Home() {
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [activeDemandTab, setActiveDemandTab] = useState("overall");
 
-  // Pending Allocations Side Drawer State
-  const [showPendingDrawer, setShowPendingDrawer] = useState(false);
-  const [drawerLoading, setDrawerLoading] = useState(false);
-  const [pendingBookingsList, setPendingBookingsList] = useState([]);
-  const [pendingWorkshopsList, setPendingWorkshopsList] = useState([]);
-  const [pendingVedicList, setPendingVedicList] = useState([]);
+  // Selected Single Record Detail Modal State
+  const [selectedRecordDetail, setSelectedRecordDetail] = useState(null);
 
   const fetchPendingDetails = async () => {
     try {
@@ -307,28 +303,31 @@ function Home() {
       ]);
 
       if (bookingsRes && bookingsRes.success && Array.isArray(bookingsRes.bookings)) {
+        // STRICT RULE 5: Show ONLY records with Pending status
         const filtered = bookingsRes.bookings.filter(b => 
-          b.status === "PENDING" || b.status === "UNASSIGNED" || !b.therapist_id || !b.assigned_staff
+          String(b.status).toUpperCase() === "PENDING"
         );
-        setPendingBookingsList(filtered.length > 0 ? filtered : bookingsRes.bookings.slice(0, 5));
+        setPendingBookingsList(filtered);
       } else {
         setPendingBookingsList([]);
       }
 
       if (workshopsRes && Array.isArray(workshopsRes)) {
-        const filtered = workshopsRes.filter(w => w.status === "upcoming" || !w.assigned_staff_ids || w.assigned_staff_ids.length === 0);
-        setPendingWorkshopsList(filtered.length > 0 ? filtered : workshopsRes.slice(0, 5));
+        const filtered = workshopsRes.filter(w => String(w.status).toUpperCase() === "PENDING");
+        setPendingWorkshopsList(filtered);
       } else if (workshopsRes && workshopsRes.workshops && Array.isArray(workshopsRes.workshops)) {
-        const filtered = workshopsRes.workshops.filter(w => w.status === "upcoming" || !w.assigned_staff_ids || w.assigned_staff_ids.length === 0);
-        setPendingWorkshopsList(filtered.length > 0 ? filtered : workshopsRes.workshops.slice(0, 5));
+        const filtered = workshopsRes.workshops.filter(w => String(w.status).toUpperCase() === "PENDING");
+        setPendingWorkshopsList(filtered);
       } else {
         setPendingWorkshopsList([]);
       }
 
       if (vedicRes && Array.isArray(vedicRes)) {
-        setPendingVedicList(vedicRes);
+        const filtered = vedicRes.filter(p => String(p.status).toUpperCase() === "PENDING");
+        setPendingVedicList(filtered);
       } else if (vedicRes && vedicRes.programs && Array.isArray(vedicRes.programs)) {
-        setPendingVedicList(vedicRes.programs);
+        const filtered = vedicRes.programs.filter(p => String(p.status).toUpperCase() === "PENDING");
+        setPendingVedicList(filtered);
       } else {
         setPendingVedicList([]);
       }
@@ -1292,8 +1291,7 @@ function Home() {
                             key={item.id || item.booking_id || idx} 
                             className="pending-item-card"
                             onClick={() => {
-                              setShowPendingDrawer(false);
-                              navigate("/dashboard/bookings");
+                              setSelectedRecordDetail({ type: 'booking', data: item });
                             }}
                           >
                             <div className="pending-item-main">
@@ -1332,8 +1330,7 @@ function Home() {
                             key={item.id || idx} 
                             className="pending-item-card"
                             onClick={() => {
-                              setShowPendingDrawer(false);
-                              navigate("/dashboard/workshops");
+                              setSelectedRecordDetail({ type: 'workshop', data: item });
                             }}
                           >
                             <div className="pending-item-main">
@@ -1372,8 +1369,7 @@ function Home() {
                             key={item.id || idx} 
                             className="pending-item-card"
                             onClick={() => {
-                              setShowPendingDrawer(false);
-                              navigate("/dashboard/vedic-life-programs");
+                              setSelectedRecordDetail({ type: 'vedic', data: item });
                             }}
                           >
                             <div className="pending-item-main">
@@ -1403,6 +1399,110 @@ function Home() {
                 onClick={() => setShowPendingDrawer(false)}
               >
                 Close Window
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* In-Page Single Record Detail Modal (Rule 8 & 9) */}
+      {selectedRecordDetail && (
+        <div 
+          className="pending-drawer-overlay" 
+          onClick={() => setSelectedRecordDetail(null)}
+          style={{ zIndex: 10000 }}
+        >
+          <div 
+            className="pending-drawer" 
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "520px", background: "#ffffff" }}
+          >
+            <div className="pending-drawer-header" style={{ background: "#f8fafc" }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#0f172a" }}>
+                  Record Detail (#{selectedRecordDetail.data.id || selectedRecordDetail.data.booking_id})
+                </h3>
+                <span style={{ fontSize: "12px", color: "#64748b" }}>
+                  Type: {selectedRecordDetail.type.toUpperCase()}
+                </span>
+              </div>
+              <button 
+                className="pending-drawer-close" 
+                onClick={() => setSelectedRecordDetail(null)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="pending-drawer-body" style={{ gap: "16px" }}>
+              <div style={{ background: "#fffdfa", border: "1px solid #fcd34d", borderRadius: "10px", padding: "12px 16px", fontSize: "12px", color: "#92400e" }}>
+                ⚠️ <strong>Staff Allocation Required:</strong> Record status is currently <strong>PENDING</strong>. A staff member must be assigned before this record can be confirmed or completed.
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", background: "#f8fafc", padding: "16px", borderRadius: "10px" }}>
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Title / Service</div>
+                  <div style={{ fontSize: "14px", fontWeight: 700, color: "#0f172a", marginTop: "2px" }}>
+                    {selectedRecordDetail.data.service_name || selectedRecordDetail.data.title || "N/A"}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Current Status</div>
+                  <div style={{ marginTop: "2px" }}>
+                    <span style={{ background: "#fef3c7", color: "#b45309", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 700 }}>
+                      {String(selectedRecordDetail.data.status || "PENDING").toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Customer / Client</div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "#334155", marginTop: "2px" }}>
+                    {selectedRecordDetail.data.customer_name || selectedRecordDetail.data.user_name || "N/A"}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Date</div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "#334155", marginTop: "2px" }}>
+                    {selectedRecordDetail.data.booking_date || selectedRecordDetail.data.date || selectedRecordDetail.data.startDate || "N/A"}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Assigned Staff</div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: selectedRecordDetail.data.therapist_name || selectedRecordDetail.data.instructor_name ? "#059669" : "#dc2626", marginTop: "2px" }}>
+                    {selectedRecordDetail.data.therapist_name || selectedRecordDetail.data.instructor_name || "Unassigned"}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Price / Amount</div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#cda751", marginTop: "2px" }}>
+                    ₹{selectedRecordDetail.data.total_amount || selectedRecordDetail.data.price || 0}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pending-drawer-footer" style={{ justifyContent: "space-between" }}>
+              <button 
+                onClick={() => {
+                  const target = selectedRecordDetail.type === 'booking' ? '/dashboard/bookings' : selectedRecordDetail.type === 'workshop' ? '/dashboard/workshops' : '/dashboard/vedic-life-programs';
+                  setSelectedRecordDetail(null);
+                  setShowPendingDrawer(false);
+                  navigate(target);
+                }}
+                style={{ background: "#ffffff", border: "1px solid #cbd5e1", color: "#475569", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+              >
+                Go to Module Page
+              </button>
+              <button 
+                className="pending-btn-close"
+                onClick={() => setSelectedRecordDetail(null)}
+              >
+                Close Details
               </button>
             </div>
           </div>

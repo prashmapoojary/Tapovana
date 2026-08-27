@@ -1,4 +1,5 @@
 const { query } = require('../config/db');
+const { getValidCustomerMembership } = require('../utils/membershipHelper');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
@@ -565,36 +566,16 @@ const verifyCustomerMembership = async (req, res) => {
     }
 
     try {
-        // Strict match: BOTH email AND name must match
-        const memRes = await query(
-            `SELECT m.id, m.name, m.email, m.tier, m.status, mt.discount_percentage
-             FROM memberships m
-             LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
-             WHERE LOWER(m.email) = $1 
-               AND (LOWER(m.name) = $2 OR LOWER(m.name) LIKE $3 OR $2 LIKE '%' || LOWER(m.name) || '%')
-               AND (m.status IS NULL OR LOWER(m.status) = 'active')
-             LIMIT 1`,
-            [emailStr, nameStr, `%${nameStr}%`]
-        );
+        const memResult = await getValidCustomerMembership(emailStr, nameStr);
 
-        if (memRes.rows.length > 0) {
-            const m = memRes.rows[0];
-            const tier = (m.tier || 'Standard').toUpperCase();
-            let discountPct = 0;
-            if (m.discount_percentage !== null && m.discount_percentage !== undefined) {
-                discountPct = parseFloat(m.discount_percentage) || 0;
-            } else {
-                const defaultDiscounts = { 'SILVER': 15, 'GOLD': 25, 'PLATINUM': 40 };
-                discountPct = defaultDiscounts[tier] || 0;
-            }
+        if (memResult.active) {
             return res.json({
                 success: true,
                 matched: true,
                 isMismatch: false,
-                tier: tier,
-                discount_percentage: discountPct,
-                membership: m,
-                message: `Active ${tier} membership confirmed.`
+                tier: memResult.tier,
+                discount_percentage: memResult.discountRate * 100,
+                message: `Active ${memResult.tier} membership confirmed.`
             });
         }
 
@@ -638,47 +619,9 @@ const getMemberTierAndDiscount = async (email = null, name = null) => {
     }
 
     try {
-        const emailStr = email ? String(email).trim().toLowerCase() : '';
-        const nameStr = name ? String(name).trim().toLowerCase() : '';
-
-        let memRes = { rows: [] };
-
-        // 1. Try by Email
-        if (emailStr) {
-            memRes = await query(
-                `SELECT m.tier, m.status, mt.discount_percentage
-                 FROM memberships m
-                 LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
-                 WHERE LOWER(m.email) = $1 
-                   AND (m.status IS NULL OR LOWER(m.status) = 'active')
-                 LIMIT 1`,
-                [emailStr]
-            );
-        }
-
-        // 2. Try by Name if email yields no result
-        if (memRes.rows.length === 0 && nameStr) {
-            memRes = await query(
-                `SELECT m.tier, m.status, mt.discount_percentage
-                 FROM memberships m
-                 LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
-                 WHERE LOWER(m.name) = $1 
-                   AND (m.status IS NULL OR LOWER(m.status) = 'active')
-                 LIMIT 1`,
-                [nameStr]
-            );
-        }
-
-        if (memRes.rows.length && memRes.rows[0].tier) {
-            const m = memRes.rows[0];
-            tier = m.tier.toUpperCase();
-            if (m.discount_percentage !== null && m.discount_percentage !== undefined) {
-                discountPercentage = parseFloat(m.discount_percentage) || 0;
-            } else {
-                const defaultDiscounts = { 'SILVER': 15, 'GOLD': 25, 'PLATINUM': 40, 'DIAMOND': 40 };
-                discountPercentage = defaultDiscounts[tier] || 0;
-            }
-            return { tier, discountPercentage, isMatch: true };
+        const memResult = await getValidCustomerMembership(email, name);
+        if (memResult.active) {
+            return { tier: memResult.tier, discountPercentage: memResult.discountRate * 100, isMatch: true };
         }
     } catch (err) {
         console.warn('getMemberTierAndDiscount error:', err.message);

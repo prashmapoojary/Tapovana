@@ -282,9 +282,9 @@ function Bookings() {
       return;
     }
 
-    // Require at least one staff when confirming
-    if (newStatus === 'CONFIRMED' && assignedStaffIds.length === 0) {
-      triggerAlert("Please select at least one staff member to confirm the booking.");
+    // Rule 6: Require staff allocation before confirming or completing
+    if ((newStatus === 'CONFIRMED' || newStatus === 'COMPLETED') && assignedStaffIds.length === 0 && !selectedBooking.therapist_id) {
+      triggerAlert("Staff allocation required before confirming or completing. Booking status must remain Pending.");
       return;
     }
 

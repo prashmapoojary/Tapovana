@@ -1,4 +1,5 @@
 const { query } = require('../config/db');
+const { getValidCustomerMembership } = require('../utils/membershipHelper');
 const {
     sendBookingStatusEmail,
     sendBookingAllocationEmail,
@@ -10,42 +11,21 @@ const { checkStaffAllocationConflict, syncStaffMemberStatus } = require('../util
 const https = require('https');
 
 // Helper: Apply Membership Discount automatically
-const applyMembershipDiscount = async (emailOrId, serviceName, currentAmountStr, userName = null) => {
+const applyMembershipDiscount = async (emailOrId, serviceName, currentAmountStr, userName = null, bookingDate = new Date()) => {
     const ident = emailOrId ? String(emailOrId).trim() : '';
     const nameVal = userName ? String(userName).trim() : '';
 
-    if (!ident || !nameVal) return currentAmountStr;
+    if (!ident && !nameVal) return currentAmountStr;
 
     try {
-        const memRes = await query(
-            `SELECT m.tier, m.status, mt.discount_percentage
-             FROM memberships m
-             LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
-             WHERE LOWER(m.email) = LOWER($1) 
-               AND (LOWER(m.name) = LOWER($2) OR LOWER(m.name) LIKE $3 OR $2 LIKE '%' || LOWER(m.name) || '%')
-               AND (m.status IS NULL OR LOWER(m.status) = 'active')`,
-            [ident.toLowerCase(), nameVal.toLowerCase(), `%${nameVal.toLowerCase()}%`]
-        );
-
-        if (memRes.rows.length === 0) {
+        const memResult = await getValidCustomerMembership(ident, nameVal, bookingDate);
+        
+        if (!memResult.active || memResult.discountRate <= 0) {
             return currentAmountStr;
         }
 
-        const membership = memRes.rows[0];
-        const tier = (membership.tier || 'SILVER').toUpperCase();
-
-        let discountRate = 0;
-        if (membership.discount_percentage !== null && membership.discount_percentage !== undefined) {
-            discountRate = (parseFloat(membership.discount_percentage) || 0) / 100;
-        } else {
-            const defaultDiscounts = { 'SILVER': 0.15, 'GOLD': 0.25, 'PLATINUM': 0.40 };
-            discountRate = defaultDiscounts[tier] || 0;
-        }
-
-        const passLabel = `${tier.charAt(0) + tier.slice(1).toLowerCase()} Tier`;
-        if (discountRate <= 0) {
-            return currentAmountStr;
-        }
+        const discountRate = memResult.discountRate;
+        const passLabel = memResult.passDetails || `${memResult.tier} Tier`;
 
         // Determine base price
         let basePrice = null;
@@ -395,19 +375,19 @@ const validateBookingTransitionAndAllocations = async (booking, newStatus, incom
         }
     }
 
-    // 7. Allocation Rules (CONFIRMED status)
-    if (newStatus === 'CONFIRMED') {
+    // 7. Allocation Rules (CONFIRMED & COMPLETED status require staff allocation)
+    if (newStatus === 'CONFIRMED' || newStatus === 'COMPLETED') {
         if (incomingStaffIds === null) {
             const existingAllocs = await query(
                 `SELECT staff_id FROM allocations WHERE session_id = $1 AND type = 'service'`,
                 [String(booking.id)]
             );
-            if (existingAllocs.rows.length === 0) {
-                return { valid: false, message: 'Please select a staff member to confirm the booking.' };
+            if (existingAllocs.rows.length === 0 && !booking.therapist_id) {
+                return { valid: false, message: 'Staff allocation required before confirmation or completion. Booking status must remain Pending.' };
             }
         } else {
-            if (incomingStaffIds.length === 0) {
-                return { valid: false, message: 'Please select a staff member to confirm the booking.' };
+            if (incomingStaffIds.length === 0 && !booking.therapist_id) {
+                return { valid: false, message: 'Staff allocation required before confirmation or completion. Booking status must remain Pending.' };
             }
             if (incomingStaffIds.length > 3) {
                 return { valid: false, message: 'Maximum of 3 staff allocations possible per service.' };
