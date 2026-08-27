@@ -244,13 +244,16 @@ function Bookings() {
     );
   }, [bookings, search, canEdit]);
 
-  // ─── Format date ───
+  // ─── Format date to standard DD/MM/YYYY ───
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     try {
-      return new Date(dateStr).toLocaleDateString("en-IN", {
-        day: "numeric", month: "short", year: "numeric"
-      });
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
     } catch { return dateStr; }
   };
 
@@ -720,12 +723,16 @@ function Bookings() {
                           >
                             <option value="">-- Select Staff Member --</option>
                             {staffList
-                              .filter(staff => (staff.role === "DOCTOR" || staff.role === "THERAPIST") && staff.availability_status !== "On Leave")
+                              .filter(staff => {
+                                const rUpper = String(staff.role || "").toUpperCase();
+                                return rUpper === "DOCTOR" || rUpper === "THERAPIST";
+                              })
                               .map(staff => {
                                 const staffId = staff.id || staff.user_id;
+                                const isOnLeave = staff.availability_status === "On Leave";
                                 return (
-                                  <option key={staffId} value={staffId}>
-                                    {`${staff.first_name || ''} ${staff.last_name || ''} (${staff.role === 'DOCTOR' ? 'Doctor' : 'Therapist'})`.trim()}
+                                  <option key={staffId} value={staffId} disabled={isOnLeave}>
+                                    {`${staff.first_name || ''} ${staff.last_name || ''} (${staff.role === 'DOCTOR' ? 'Doctor' : 'Therapist'})${isOnLeave ? ' (ON LEAVE)' : ''}`.trim()}
                                   </option>
                                 );
                               })}

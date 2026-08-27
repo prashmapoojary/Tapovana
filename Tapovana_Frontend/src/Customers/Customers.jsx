@@ -251,6 +251,14 @@ function Customers() {
       return;
     }
 
+    if (editFormData.phone && editFormData.phone.trim()) {
+      const cleanPhone = editFormData.phone.replace(/\D/g, "");
+      if (cleanPhone.length !== 10) {
+        triggerAlert("Phone number must contain exactly 10 digits.");
+        return;
+      }
+    }
+
     try {
       setActionLoading(true);
       const targetId = editCustomer.id || editCustomer.customer_id || editCustomer.email;
@@ -922,10 +930,19 @@ function Customers() {
       {/* ── Filters ── */}
       <div className="cust-team-card">
         <div className="cust-team-filters">
-          <div className="search-box">
+          <div className="search-box" style={{ position: "relative" }}>
             <img src={SearchIcon} className="search-icon" alt="" />
             <input type="text" placeholder="Search by ID, name, phone or email..."
               value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+            {search && (
+              <button 
+                type="button"
+                onClick={() => setSearch("")}
+                style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: "14px", fontWeight: "bold" }}
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           <div className="cust-filter-dropdown" style={{ padding: 0, overflow: "hidden" }}>

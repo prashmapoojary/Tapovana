@@ -1021,6 +1021,13 @@ export default function VedicLifePrograms() {
   };
 
   const handleUpdateAttendeeField = async (attendeeId, field, value) => {
+    // Doctor Allocation Guard before confirming enrollments
+    if (field === 'status' && ['CONFIRMED', 'CHECKED_IN', 'COMPLETED'].includes(String(value).toUpperCase())) {
+      if (!selectedProgram?.lead_consultant_id && !selectedProgram?.consultant_name && (!selectedProgram?.assigned_staff_ids || selectedProgram.assigned_staff_ids.length === 0)) {
+        triggerAlert("Doctor/Consultant allocation required before confirming or checking in program enrollments.", false);
+        return;
+      }
+    }
     try {
       const att = attendees.find(a => a.id === attendeeId);
       if (!att) return;

@@ -695,7 +695,12 @@ export default function Membership() {
                       return (
                         <tr key={m.id} className={"mem-row " + (selectedMember?.id === m.id ? "selected" : "")}>
                           <td onClick={() => { setSelectedMember(m); setNewTier(m.tier); setUpgradeSuccess(false); }} style={{ cursor: "pointer" }}>
-                            <div className="mem-name" style={{ fontWeight: 600 }}>{m.name || "Unknown"}</div>
+                            <div className="mem-name" style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
+                              {m.name || "Unknown"}
+                              {(m.source === "mobile" || m.source === "mobile_app" || m.is_mobile) && (
+                                <span style={{ fontSize: "10px", background: "#e0f2fe", color: "#0369a1", padding: "1px 6px", borderRadius: "4px", fontWeight: 600 }}>Mobile App Member</span>
+                              )}
+                            </div>
                           </td>
                           <td onClick={() => { setSelectedMember(m); setNewTier(m.tier); setUpgradeSuccess(false); }} style={{ cursor: "pointer" }}>
                             <div className="mem-email">{m.email || "-"}</div>

@@ -409,9 +409,18 @@ function Home() {
 
   useEffect(() => {
     fetchDashboardData();
+    fetchPendingDetails();
     if (role === "SUPER_ADMIN" || role === "CO_ADMIN") {
       fetchConflicts();
     }
+
+    // Auto-Refresh Polling every 30 seconds for live updates
+    const pollInterval = setInterval(() => {
+      fetchDashboardData();
+      fetchPendingDetails();
+    }, 30000);
+
+    return () => clearInterval(pollInterval);
   }, [role, fetchConflicts, dateFilter, customFrom, customTo]);
 
   // Formatted date string for the subtitle

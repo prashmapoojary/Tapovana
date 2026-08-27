@@ -185,7 +185,14 @@ function WorkshopCard({ w, onClick }) {
         ) : (
           <div style={{ background: `linear-gradient(135deg, ${cat.color}15, ${cat.color}35)`, width: "100%", height: "100%", position: "absolute", top: 0, left: 0, zIndex: 1 }} />
         )}
-        <div className="ws-card-category-badge" style={{ background: cat.color, color: "white", zIndex: 2 }}>{w.category}</div>
+        <div style={{ display: "flex", gap: "6px", zIndex: 2, alignItems: "center" }}>
+          {(!w.instructor_name && !w.instructor) && (
+            <span style={{ background: "#fef3c7", color: "#b45309", border: "1px solid #fcd34d", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: "700" }}>
+              Pending Instructor
+            </span>
+          )}
+          <div className="ws-card-category-badge" style={{ background: cat.color, color: "white" }}>{w.category}</div>
+        </div>
         <div className="ws-card-status-badge" style={{
           background: liveStatus === "live" ? "#e74c3c" : "#ffffff", color: liveStatus === "live" ? "#ffffff" : st.color,
           border: `1px solid ${liveStatus === "live" ? "#e74c3c" : st.color}`, fontWeight: 700, zIndex: 2,
@@ -483,6 +490,17 @@ export default function Workshops() {
 
   const handleManualEnroll = async () => {
     setManualEnrollError("");
+    
+    // Seat Capacity Guard
+    const activeWorkshop = workshops.find(w => w.id === selectedWorkshopId);
+    if (activeWorkshop) {
+      const maxCap = parseInt(activeWorkshop.capacity || activeWorkshop.max_seats || 0, 10);
+      const currEnrolled = attendees ? attendees.length : 0;
+      if (maxCap > 0 && currEnrolled >= maxCap) {
+        setManualEnrollError(`Workshop is fully booked (${currEnrolled}/${maxCap} seats filled). Cannot enroll more attendees.`);
+        return;
+      }
+    }
     const ws = workshops.find(w => w.id === selectedWs?.id) || selectedWs;
     const status = getLiveStatus(ws);
     const dbStatus = String(ws.status || "").toLowerCase();

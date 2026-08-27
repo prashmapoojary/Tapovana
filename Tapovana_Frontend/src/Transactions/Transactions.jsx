@@ -86,13 +86,44 @@ function Transactions() {
     );
   }, [transactions, search]);
 
+  const handleExportCSV = () => {
+    if (!filteredTransactions || filteredTransactions.length === 0) {
+      alert("No transaction records to export.");
+      return;
+    }
+    const headers = ["Transaction ID", "Customer Name", "Amount", "Status", "Payment Method", "Date", "Notes"];
+    const rows = filteredTransactions.map(t => [
+      `"${t.transaction_id || t.id || ''}"`,
+      `"${t.customer_name || t.user_name || ''}"`,
+      `"${t.amount || 0}"`,
+      `"${t.status || 'COMPLETED'}"`,
+      `"${t.payment_method || 'Online'}"`,
+      `"${t.created_at ? new Date(t.created_at).toLocaleDateString("en-IN") : ''}"`,
+      `"${(t.notes || '').replace(/"/g, '""')}"`
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Tapovana_Transactions_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="transactions-container">
-      <header className="transactions-header">
+      <header className="transactions-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div className="header-left">
           <h1>Financial Ledger & Transactions</h1>
           <p>Real-time settlement tracking, payment reconciliation, and audit logs.</p>
         </div>
+        <button 
+          onClick={handleExportCSV}
+          style={{ background: "#cda751", color: "#ffffff", border: "none", padding: "10px 18px", borderRadius: "8px", fontSize: "13px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
+        >
+          📥 Export CSV
+        </button>
       </header>
 
       <section className="revenue-cards-grid">
