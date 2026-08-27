@@ -310,6 +310,13 @@ function Home() {
   // Selected Single Record Detail Modal State
   const [selectedRecordDetail, setSelectedRecordDetail] = useState(null);
 
+  // Pending Allocations Side Drawer States
+  const [showPendingDrawer, setShowPendingDrawer] = useState(false);
+  const [drawerLoading, setDrawerLoading] = useState(false);
+  const [pendingBookingsList, setPendingBookingsList] = useState([]);
+  const [pendingWorkshopsList, setPendingWorkshopsList] = useState([]);
+  const [pendingVedicList, setPendingVedicList] = useState([]);
+
   const fetchPendingDetails = async () => {
     try {
       setDrawerLoading(true);

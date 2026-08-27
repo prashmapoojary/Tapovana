@@ -115,7 +115,7 @@ app.listen(PORT, () => {
     const SELF_URL = process.env.RENDER_EXTERNAL_URL || process.env.SELF_URL;
 
     if (SELF_URL) {
-        const pingInterval = 4 * 60 * 1000; // 4 minutes
+        const pingInterval = 10 * 60 * 1000; // 10 minutes (conserves Render + Neon free tier)
 
         const selfPing = () => {
             const url = `${SELF_URL}/health`;
@@ -263,7 +263,7 @@ app.listen(PORT, () => {
         .then(() => console.log("[Workshop Scheduler] Initial status check complete."))
         .catch(err => console.error("[Workshop Scheduler] Initial status check failed:", err));
 
-    // Run every 60 seconds (with overlap guard to prevent Neon pool starvation)
+    // Run every 5 minutes (with overlap guard — conserves Neon free tier compute hours)
     setInterval(async () => {
         if (workshopUpdateRunning) {
             console.warn("[Workshop Scheduler] Previous run still in progress, skipping...");
@@ -282,7 +282,7 @@ app.listen(PORT, () => {
         } finally {
             workshopUpdateRunning = false;
         }
-    }, 60000);
+    }, 5 * 60 * 1000);
 
     // ── Background Vedic Program status check & allocations sync scheduler ──
     const { autoUpdateVedicProgramStatuses, sendVedicProgramReminders } = require("./controllers/vedicProgramsController");
@@ -296,7 +296,7 @@ app.listen(PORT, () => {
         .then(() => console.log("[Vedic Program Scheduler] Initial reminders check complete."))
         .catch(err => console.error("[Vedic Program Scheduler] Initial Vedic Program checks failed:", err));
 
-    // Run every 60 seconds (with overlap guard)
+    // Run every 5 minutes (with overlap guard — conserves Neon free tier compute hours)
     setInterval(async () => {
         if (vedicUpdateRunning) {
             console.warn("[Vedic Program Scheduler] Previous run still in progress, skipping...");
@@ -315,7 +315,7 @@ app.listen(PORT, () => {
         } finally {
             vedicUpdateRunning = false;
         }
-    }, 60000);
+    }, 5 * 60 * 1000);
 
     // Run reminders check every 2 hours
     let lastRemindersSentDate = "";
