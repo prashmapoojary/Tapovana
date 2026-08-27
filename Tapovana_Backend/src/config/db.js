@@ -10,8 +10,8 @@ const pool = new Pool({
     rejectUnauthorized: false          // Neon requires SSL but the cert may not be in your local CA store
   },
   max: 10,                             // max connections (Neon free tier allows ~100 pooled)
-  idleTimeoutMillis: 20000,            // close idle clients after 20 seconds (Neon may kill them at ~30s)
-  connectionTimeoutMillis: 20000,      // wait up to 20 seconds — allows Neon cold starts to wake up cleanly
+  idleTimeoutMillis: 10000,            // close idle clients after 10 seconds to purge stale connections
+  connectionTimeoutMillis: 30000,      // wait up to 30 seconds — allows Neon cold starts to wake up cleanly
   keepAlive: true,                     // send TCP keep-alive packets
   keepAliveInitialDelayMillis: 10000,  // delay before first keep-alive packet
   allowExitOnIdle: false,              // keep pool alive for background jobs
@@ -65,14 +65,14 @@ const isTransientError = (err) => {
 };
 
 // ── Query wrapper with exponential backoff retry for Neon cold starts ─────
-const query = async (text, params, retries = 3) => {
+const query = async (text, params, retries = 4) => {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       return await pool.query(text, params);
     } catch (err) {
       if (isTransientError(err) && attempt < retries - 1) {
-        // Exponential backoff: 1s, 2s, 4s (capped)
-        const delay = Math.min(1000 * Math.pow(2, attempt), 4000);
+        // Exponential backoff: 1s, 2s, 3s, 5s (capped)
+        const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
         console.warn(`[DB] Query failed (attempt ${attempt + 1}/${retries}): ${err.message} — retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {

@@ -179,7 +179,12 @@ const autoUpdateVedicProgramStatuses = async () => {
             await syncStaffMemberStatus(staffId);
         }
     } catch (err) {
-        console.error('Error in autoUpdateVedicProgramStatuses:', err);
+        const { isTransientError } = require('../config/db');
+        if (isTransientError(err)) {
+            console.warn('[Vedic Program Scheduler] Transient database connection timeout/termination (Neon cold-start). Retrying next cycle...');
+        } else {
+            console.error('Error in autoUpdateVedicProgramStatuses:', err);
+        }
     }
 };
 
