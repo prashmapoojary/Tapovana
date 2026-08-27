@@ -453,6 +453,14 @@ function Home() {
   // Real stats from database analytics endpoint
   const stats = data?.stats || { today_bookings: 0, today_revenue: 0, active_customers: 0, pending_bookings: 0 };
   
+  // Total Pending Allocations unified sum (Bookings + Workshops + Vedic Life)
+  const totalPendingAllocations = useMemo(() => {
+    const listTotal = pendingBookingsList.length + pendingWorkshopsList.length + pendingVedicList.length;
+    if (listTotal > 0) return listTotal;
+    if (stats.pending_allocations !== undefined && stats.pending_allocations > 0) return stats.pending_allocations;
+    return stats.pending_bookings || 0;
+  }, [pendingBookingsList, pendingWorkshopsList, pendingVedicList, stats]);
+  
   // Real trends from database analytics endpoint
   const bookingTrend = data?.trends?.bookings_last_7_days || [0, 0, 0, 0, 0, 0, 0];
   const revenueTrend = data?.trends?.revenue_last_7_days || [0, 0, 0, 0, 0, 0, 0];
@@ -861,7 +869,7 @@ function Home() {
             </div>
           </div>
           <div>
-            <AnimatedNumber value={stats.pending_allocations !== undefined ? stats.pending_allocations : stats.pending_bookings} className="stat-card-value" />
+            <AnimatedNumber value={totalPendingAllocations} className="stat-card-value" />
             <div className="stat-card-trend trend-down">
               <span>↓ 15.0%</span> <span style={{ color: "#a0aec0" }}>outstanding tasks</span>
             </div>
@@ -1299,7 +1307,7 @@ function Home() {
               <div className="pending-drawer-title-group">
                 <h3 className="pending-drawer-title">Pending Allocations</h3>
                 <span className="pending-drawer-badge">
-                  {stats.pending_allocations !== undefined ? stats.pending_allocations : (pendingBookingsList.length + pendingWorkshopsList.length + pendingVedicList.length)} Total Pending
+                  {totalPendingAllocations} Total Pending
                 </span>
               </div>
               <button 
