@@ -1278,7 +1278,7 @@ function Home() {
                   <div className="pending-section">
                     <div className="pending-section-header">
                       <span className="pending-section-title">
-                        <span>📅</span> 1. Bookings Pending Allocation
+                        1) Bookings Pending Allocation
                       </span>
                       <span className="pending-section-count">{pendingBookingsList.length}</span>
                     </div>
@@ -1318,7 +1318,7 @@ function Home() {
                   <div className="pending-section">
                     <div className="pending-section-header">
                       <span className="pending-section-title">
-                        <span>🧘</span> 2. Workshops Pending Staff
+                        2) Workshops Pending Staff
                       </span>
                       <span className="pending-section-count">{pendingWorkshopsList.length}</span>
                     </div>
@@ -1358,7 +1358,7 @@ function Home() {
                   <div className="pending-section">
                     <div className="pending-section-header">
                       <span className="pending-section-title">
-                        <span>🌿</span> 3. Vedic Life Program Allocations
+                        3) Vedic Life Program Allocations
                       </span>
                       <span className="pending-section-count">{pendingVedicList.length}</span>
                     </div>
