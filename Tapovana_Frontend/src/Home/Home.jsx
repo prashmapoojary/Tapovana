@@ -740,12 +740,27 @@ function Home() {
                       <label style={{ fontSize: "11px", fontWeight: 700, color: "#7b8a9a", textTransform: "uppercase", letterSpacing: "0.5px" }}>To</label>
                       <input type="date" className="home-date-input" value={customTo} onChange={e => setCustomTo(e.target.value)} />
                     </div>
-                    <button
-                      className="home-date-apply-btn"
-                      onClick={() => setShowCustomPicker(false)}
-                    >
-                      Apply Range
-                    </button>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        className="home-date-apply-btn"
+                        style={{ flex: 1 }}
+                        onClick={() => setShowCustomPicker(false)}
+                      >
+                        Apply Range
+                      </button>
+                      <button
+                        type="button"
+                        style={{ background: "#ffffff", border: "1px solid #cbd5e1", color: "#64748b", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                        onClick={() => {
+                          setCustomFrom("");
+                          setCustomTo("");
+                          setDateFilter("today");
+                          setShowCustomPicker(false);
+                        }}
+                      >
+                        Reset
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -864,7 +879,11 @@ function Home() {
                 conflict={conflict}
                 getSuggestions={getSuggestions}
                 triggerAlert={triggerAlert}
-                onReassignSuccess={fetchConflicts}
+                onReassignSuccess={() => {
+                  fetchConflicts();
+                  fetchDashboardData(true);
+                  fetchPendingDetails();
+                }}
               />
             ))}
           </div>
