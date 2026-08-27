@@ -880,25 +880,33 @@ const getAllAllocations = async (req, res) => {
              FROM allocations a
              JOIN team_members tm ON tm.id = a.staff_id
              JOIN roles r ON r.id = tm.role_id
-             LEFT JOIN deleted_booking_ids d ON d.booking_id = CASE WHEN a.session_id ~ '^[0-9]+$' THEN CAST(a.session_id AS INTEGER) ELSE NULL END
-             WHERE d.booking_id IS NULL
              ORDER BY a.start_date DESC`
         );
 
-        const allocations = result.rows.map(a => ({
-            id: a.id,
-            type: a.type,
-            staffId: a.staff_id,
-            staffName: `${a.first_name || ''} ${a.last_name || ''}`.trim(),
-            staffRole: a.role,
-            sessionTitle: a.session_title,
-            sessionId: a.session_id,
-            startDate: a.start_date,
-            bookingTime: a.booking_time,
-            endDate: a.end_date,
-            status: a.status === 'active' ? 'active' : 'expired',
-            createdAt: a.created_at
-        }));
+        let deletedSet = new Set();
+        try {
+            const delRes = await query(`SELECT booking_id FROM deleted_booking_ids`);
+            delRes.rows.forEach(r => deletedSet.add(String(r.booking_id)));
+        } catch (e) {
+            // ignore if deleted_booking_ids table empty
+        }
+
+        const allocations = result.rows
+            .filter(a => !a.session_id || !deletedSet.has(String(a.session_id)))
+            .map(a => ({
+                id: a.id,
+                type: a.type,
+                staffId: a.staff_id,
+                staffName: `${a.first_name || ''} ${a.last_name || ''}`.trim(),
+                staffRole: a.role,
+                sessionTitle: a.session_title,
+                sessionId: a.session_id,
+                startDate: a.start_date,
+                bookingTime: a.booking_time,
+                endDate: a.end_date,
+                status: a.status === 'active' ? 'active' : 'expired',
+                createdAt: a.created_at
+            }));
 
         return res.json({ success: true, allocations });
     } catch (err) {

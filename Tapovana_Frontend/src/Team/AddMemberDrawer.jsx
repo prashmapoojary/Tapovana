@@ -125,13 +125,12 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
   };
 
   const validate = () => {
-    if (photoSource === "default" && !photoUrl && !photoBase64) return "Profile photo is required";
     if (!formData.firstName.trim()) return "First name is required";
     if (!/^[a-zA-Z\s'-]+$/.test(formData.firstName.trim())) return "First name must contain letters only";
     if (!formData.lastName.trim()) return "Last name is required";
     if (!/^[a-zA-Z\s'-]+$/.test(formData.lastName.trim())) return "Last name must contain letters only";
     if (!formData.email.trim()) return "Work email is required";
-    if (!/\S+@\S+\.com$/.test(formData.email.trim())) return "Work email must end with .com";
+    if (!/\S+@\S+\.\S+$/.test(formData.email.trim())) return "Please enter a valid email address";
     if (!formData.phone || !/^\d{10}$/.test(formData.phone.trim())) return "Phone number must be exactly 10 digits";
     if (!formData.role) return "Please select a role";
     if ((formData.role === "DOCTOR" || formData.role === "THERAPIST") && !formData.specialization?.trim()) {
@@ -149,6 +148,9 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
       return;
     }
 
+    const effectivePhotoSource = photoSource === "default" && !photoUrl && !photoBase64 ? "local" : photoSource;
+    const effectivePhotoUrl = photoSource === "default" && !photoUrl && !photoBase64 ? "avatar1.svg" : photoUrl;
+
     const payload = {
       email: formData.email.trim().toLowerCase(),
       role: formData.role,
@@ -157,8 +159,8 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
       phone: formData.phone?.trim() || null,
       specialization: formData.specialization?.trim() || null,
 
-      profile_photo_source: photoSource,
-      profile_photo_url: photoUrl,
+      profile_photo_source: effectivePhotoSource,
+      profile_photo_url: effectivePhotoUrl,
       profile_photo_base64: photoBase64,
 
       auto_generate_password: Boolean(formData.autoGeneratePassword),
@@ -173,8 +175,8 @@ const AddMemberDrawer = ({ isOpen, onClose, onSaved, onShowToast }) => {
         body: JSON.stringify(payload)
       });
       
-      if (!res || res.error) {
-         throw new Error(res?.error || "Failed to save user. Please check inputs.");
+      if (!res || res.success === false) {
+         throw new Error(res?.message || res?.error || "Failed to save user. Please check inputs.");
       }
 
       if (onShowToast) {
