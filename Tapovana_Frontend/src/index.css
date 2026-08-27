@@ -45,3 +45,42 @@ img {
   align-items: center;
   justify-content: center;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   GLOBAL GOLDEN TAPOVANA THEME FOR ALL SELECT & DROPDOWN ELEMENTS
+   ───────────────────────────────────────────────────────────── */
+
+/* Standardize native select element styling */
+select {
+  accent-color: #cda751 !important;
+  color-scheme: light !important;
+  border-color: rgba(205, 167, 81, 0.4);
+  background-color: #ffffff;
+  color: #1a202c;
+}
+
+/* Golden Focus state */
+select:focus,
+select:focus-visible,
+select:focus-within {
+  border-color: #cda751 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(205, 167, 81, 0.25) !important;
+}
+
+/* Option dropdown menu items styling */
+select option {
+  background-color: #ffffff !important;
+  color: #1a202c !important;
+  padding: 8px 12px !important;
+}
+
+/* Option highlight/hover state */
+select option:hover,
+select option:focus,
+select option:active,
+select option:checked {
+  background-color: #cda751 !important;
+  background: #cda751 !important;
+  color: #ffffff !important;
+}
