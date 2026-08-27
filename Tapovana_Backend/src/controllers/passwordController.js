@@ -160,8 +160,13 @@ const changePassword = async (req, res) => {
         }
 
         const cred = credResult.rows[0];
-        const currentHash = cred.password_hash || cred.temp_password_hash;
-        const valid = await bcrypt.compare(current_password, currentHash);
+        let valid = false;
+        if (cred.temp_password_hash) {
+            valid = await bcrypt.compare(current_password, cred.temp_password_hash);
+        }
+        if (!valid && cred.password_hash) {
+            valid = await bcrypt.compare(current_password, cred.password_hash);
+        }
 
         if (!valid) {
             return res.status(401).json({ success: false, message: "Current password is incorrect." });

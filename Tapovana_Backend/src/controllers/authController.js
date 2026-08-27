@@ -39,12 +39,18 @@ const loginPassword = async (req, res) => {
             return res.status(403).json({ success: false, message: "Account is inactive. Contact admin." });
         }
 
-        const hashToCheck = member.password_hash || member.temp_password_hash;
-        if (!hashToCheck) {
+        if (!member.password_hash && !member.temp_password_hash) {
             return res.status(401).json({ success: false, message: "Password not set. Contact admin." });
         }
 
-        const valid = await bcrypt.compare(password, hashToCheck);
+        let valid = false;
+        if (member.temp_password_hash) {
+            valid = await bcrypt.compare(password, member.temp_password_hash);
+        }
+        if (!valid && member.password_hash) {
+            valid = await bcrypt.compare(password, member.password_hash);
+        }
+
         if (!valid) {
             return res.status(401).json({ success: false, message: "Invalid credentials." });
         }
