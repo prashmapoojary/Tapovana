@@ -208,15 +208,40 @@ exports.getAnalyticsDashboard = async (req, res) => {
     );
     const active_customers = parseInt(activeCustRes.rows[0]?.cnt || 0, 10);
 
-    // Pending allocations
-    const pendingAllocRes = await query(
-      `SELECT COUNT(*) AS cnt FROM allocations WHERE status IN ('pending', 'UNASSIGNED', 'CONFLICT')`
-    );
-    let pending_bookings = parseInt(pendingAllocRes.rows[0]?.cnt || 0, 10);
-    if (pending_bookings === 0) {
-      const pendingBkgRes = await query(`SELECT COUNT(*) AS cnt FROM bookings WHERE LOWER(status) = 'pending'`);
-      pending_bookings = parseInt(pendingBkgRes.rows[0]?.cnt || 0, 10);
+    // Pending allocations across ALL modules: Service Bookings + Workshops + Vedic Life Programs
+    let pending_bookings_cnt = 0;
+    let pending_workshops_cnt = 0;
+    let pending_vedic_cnt = 0;
+
+    try {
+      const bkgRes = await query(
+        `SELECT COUNT(*) AS cnt FROM bookings WHERE UPPER(status) = 'PENDING' AND (therapist_id IS NULL OR therapist_name IS NULL OR therapist_name = '' OR LOWER(therapist_name) = 'unassigned')`
+      );
+      pending_bookings_cnt = parseInt(bkgRes.rows[0]?.cnt || 0, 10);
+    } catch (e) {
+      console.warn("[HomeController] Pending bookings query failed:", e.message);
     }
+
+    try {
+      const wsRes = await query(
+        `SELECT COUNT(*) AS cnt FROM workshops WHERE UPPER(status) = 'PENDING' OR (UPPER(status) = 'UPCOMING' AND (assigned_staff_ids IS NULL OR jsonb_array_length(assigned_staff_ids::jsonb) = 0 OR instructor IS NULL OR instructor = ''))`
+      );
+      pending_workshops_cnt = parseInt(wsRes.rows[0]?.cnt || 0, 10);
+    } catch (e) {
+      console.warn("[HomeController] Pending workshops query failed:", e.message);
+    }
+
+    try {
+      const vedicRes = await query(
+        `SELECT COUNT(*) AS cnt FROM vedic_programs WHERE UPPER(status) = 'PENDING' OR (UPPER(status) = 'ACTIVE' AND (assigned_staff_ids IS NULL OR jsonb_array_length(assigned_staff_ids::jsonb) = 0 OR consultant_name IS NULL OR consultant_name = ''))`
+      );
+      pending_vedic_cnt = parseInt(vedicRes.rows[0]?.cnt || 0, 10);
+    } catch (e) {
+      console.warn("[HomeController] Pending vedic programs query failed:", e.message);
+    }
+
+    const pending_allocations_total = pending_bookings_cnt + pending_workshops_cnt + pending_vedic_cnt;
+    const pending_bookings = pending_allocations_total;
 
     // 2. Trend Bucketing (7 Slots)
     const slots = [];
@@ -356,7 +381,8 @@ exports.getAnalyticsDashboard = async (req, res) => {
         today_bookings,
         today_revenue,
         active_customers,
-        pending_bookings
+        pending_bookings,
+        pending_allocations: pending_bookings
       },
       trends: {
         bookings_last_7_days,

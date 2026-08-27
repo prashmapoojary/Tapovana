@@ -665,7 +665,10 @@ export default function VedicLifePrograms() {
     try {
       const res = await apiFetch("/api/teams/users?page=1&limit=100");
       if (res.success && res.users) {
-        setInstructors(res.users.filter(u => (u.role === 'DOCTOR' || u.role === 'THERAPIST') && u.availability_status !== "On Leave"));
+        setInstructors(res.users.filter(u => {
+          const rUpper = String(u.role || '').toUpperCase();
+          return (rUpper === 'DOCTOR' || rUpper === 'THERAPIST') && u.availability_status !== "On Leave";
+        }));
       } else {
         setInstructors([]);
       }

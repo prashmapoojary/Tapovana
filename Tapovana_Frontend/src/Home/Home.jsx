@@ -820,7 +820,7 @@ function Home() {
             </div>
           </div>
           <div>
-            <AnimatedNumber value={stats.pending_bookings} className="stat-card-value" />
+            <AnimatedNumber value={stats.pending_allocations !== undefined ? stats.pending_allocations : stats.pending_bookings} className="stat-card-value" />
             <div className="stat-card-trend trend-down">
               <span>↓ 15.0%</span> <span style={{ color: "#a0aec0" }}>outstanding tasks</span>
             </div>

@@ -393,6 +393,20 @@ const validateBookingTransitionAndAllocations = async (booking, newStatus, incom
                 return { valid: false, message: 'Maximum of 3 staff allocations possible per service.' };
             }
 
+            const rolesRes = await query(
+                `SELECT tm.id, r.name AS role_name 
+                 FROM team_members tm 
+                 JOIN roles r ON r.id = tm.role_id 
+                 WHERE tm.id = ANY($1::uuid[])`,
+                [incomingStaffIds]
+            );
+            const invalidStaff = rolesRes.rows.filter(s => 
+                !['DOCTOR', 'THERAPIST'].includes(String(s.role_name).toUpperCase())
+            );
+            if (invalidStaff.length > 0) {
+                return { valid: false, message: 'Invalid staff allocation: Only staff with Doctor or Therapist roles can be allocated.' };
+            }
+
             for (const staffId of incomingStaffIds) {
                 const conflictCheck = await checkStaffAllocationConflict({
                     staffId: staffId,
