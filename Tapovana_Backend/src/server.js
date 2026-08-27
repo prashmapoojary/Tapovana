@@ -89,10 +89,20 @@ app.get("/api/certificates/download/:id", require("./controllers/certificatesCon
 app.get("/api/analytics/dashboard", require("./middleware/auth").authenticate, require("./controllers/homeController").getAnalyticsDashboard);
 app.use("/api/reviews", require("./routes/reviews"));
 
+// Mobile & Web API Endpoint Aliases
 app.use("/api/customer", customerRoutes);
 app.use("/api/customers", customerRoutes);
+app.use("/api/users", customerRoutes);
+
+app.use("/api/membership", membershipRoutes);
+
 app.use("/api/transaction", transactionRoutes);
 app.use("/api/transactions", transactionRoutes);
+app.use("/api/payment/transaction", transactionRoutes);
+app.use("/api/payment/transactions", transactionRoutes);
+
+app.get("/api/vedic-packages/members", require("./controllers/vedicProgramsController").getVedicPackageMembers);
+
 app.use("/api/home", homeRoutes);
 
 app.use((_req, res) => {

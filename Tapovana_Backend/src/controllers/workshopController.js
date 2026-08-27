@@ -1982,6 +1982,26 @@ const downloadCertificate = async (req, res) => {
     return downloadCertificatePdf(req, res);
 };
 
+const getAllWorkshopEnrollments = async (req, res) => {
+    try {
+        const result = await query(
+            `SELECT a.*, w.title AS workshop_title 
+             FROM attendees a 
+             LEFT JOIN workshops w ON w.id = a.workshop_id 
+             ORDER BY a.created_at DESC`
+        );
+        return res.json({
+            success: true,
+            status: 'success',
+            enrollments: result.rows,
+            attendees: result.rows
+        });
+    } catch (err) {
+        console.error("getAllWorkshopEnrollments error:", err);
+        return res.status(500).json({ success: false, message: "Server error." });
+    }
+};
+
 module.exports = {
     getAllWorkshops, getWorkshopById, createWorkshop,
     updateWorkshop, deleteWorkshop,
@@ -1989,5 +2009,6 @@ module.exports = {
     enrollUserInWorkshop, getWorkshopAttendees,
     updateAttendeeAttendance, exportWorkshopAttendees,
     deleteWorkshopAttendee, uploadVideoChunk, streamWorkshopVideo,
-    autoUpdateWorkshopStatuses, downloadCertificate, getWorkshopImage
+    autoUpdateWorkshopStatuses, downloadCertificate, getWorkshopImage,
+    getAllWorkshopEnrollments
 };
