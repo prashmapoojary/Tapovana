@@ -91,17 +91,27 @@ function Transactions() {
       alert("No transaction records to export.");
       return;
     }
+
+    const fmtCurr = (val) => `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    const summaryHeader = [
+      `"Tapovana Financial Ledger Report — Generated: ${new Date().toLocaleDateString("en-IN")}"`,
+      `"Total Collected: ${fmtCurr(summary.total_collected)} | Pending: ${fmtCurr(summary.pending_amount)} | Refunds: ${fmtCurr(summary.refunded_amount)} | Failed: ${fmtCurr(summary.failed_amount)}"`,
+      ""
+    ];
+
     const headers = ["Transaction ID", "Customer Name", "Amount", "Status", "Payment Method", "Date", "Notes"];
     const rows = filteredTransactions.map(t => [
       `"${t.transaction_id || t.id || ''}"`,
       `"${t.customer_name || t.user_name || ''}"`,
-      `"${t.amount || 0}"`,
+      `"${fmtCurr(t.amount)}"`,
       `"${t.status || 'COMPLETED'}"`,
       `"${t.payment_method || 'Online'}"`,
       `"${t.created_at ? new Date(t.created_at).toLocaleDateString("en-IN") : ''}"`,
       `"${(t.notes || '').replace(/"/g, '""')}"`
     ]);
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+
+    const csvContent = "data:text/csv;charset=utf-8," + [...summaryHeader, headers.join(","), ...rows.map(r => r.join(","))].join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -155,14 +165,36 @@ function Transactions() {
 
       <section className="filters-card">
         <div className="txn-filters-row">
-          <div className="txn-search-box">
+          <div className="txn-search-box" style={{ position: "relative" }}>
             <img src={SearchIcon} className="search-icon" alt="" />
             <input 
               type="text" 
               placeholder="Search by transaction ID, booking reference, customer..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              style={{ paddingRight: search ? "30px" : "12px" }}
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                style={{
+                  position: "absolute",
+                  right: "10px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  color: "#94a3b8",
+                  fontSize: "14px",
+                  cursor: "pointer",
+                  padding: 0
+                }}
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           <div className="txn-filter-group">
@@ -216,6 +248,26 @@ function Transactions() {
               onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
             />
           </div>
+
+          <div className="txn-filter-group">
+            <label>To</label>
+            <input 
+              type="date" 
+              className="txn-date-input" 
+              value={dateTo}
+              onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+            />
+          </div>
+
+          {(dateFrom || dateTo) && (
+            <button
+              type="button"
+              onClick={() => { setDateFrom(""); setDateTo(""); setPage(1); }}
+              style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", color: "#64748b", borderRadius: "8px", padding: "8px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer", alignSelf: "flex-end", height: "38px" }}
+            >
+              Clear Dates
+            </button>
+          )}
 
           <div className="txn-filter-group">
             <label>To</label>

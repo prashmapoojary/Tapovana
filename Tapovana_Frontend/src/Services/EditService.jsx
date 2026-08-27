@@ -583,6 +583,9 @@ function EditService({ service, onBack }) {
                                                 <span className="es-prefix">₹</span>
                                                 <input
                                                     className="es-input es-input-prefixed"
+                                                    type="number"
+                                                    min="1"
+                                                    step="1"
                                                     value={basePrice}
                                                     onChange={e => setBasePrice(e.target.value)}
                                                 />
@@ -593,6 +596,9 @@ function EditService({ service, onBack }) {
                                             <div className="es-input-suffix-wrap">
                                                 <input
                                                     className="es-input es-input-suffixed"
+                                                    type="number"
+                                                    min="1"
+                                                    step="1"
                                                     value={duration}
                                                     onChange={e => setDuration(e.target.value)}
                                                 />
@@ -612,13 +618,13 @@ function EditService({ service, onBack }) {
                                     <input
                                         ref={fileInputRef}
                                         type="file"
-                                        accept="image/jpeg,image/png"
+                                        accept="image/jpeg,image/png,image/webp"
                                         multiple
                                         style={{ display: 'none' }}
                                         onChange={handleImageUpload}
                                     />
 
-                                    <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                                         <button type="button" className="es-add-benefit-btn" style={{ margin: 0, padding: '8px 12px', fontSize: '12px' }} onClick={openFilePicker}>
                                             📁 Upload Local Image
                                         </button>
@@ -626,6 +632,9 @@ function EditService({ service, onBack }) {
                                             📷 Choose from Pexels
                                         </button>
                                     </div>
+                                    <p style={{ margin: "0 0 12px 0", fontSize: "11px", color: "#94a3b8" }}>
+                                        Accepted formats: JPG, PNG, WEBP • Max file size: 5MB
+                                    </p>
 
                                     {/* Slots rendering */}
                                     <div className="es-media-grid">

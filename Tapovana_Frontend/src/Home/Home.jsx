@@ -189,18 +189,35 @@ function ConflictRow({ conflict, getSuggestions, onReassignSuccess, triggerAlert
             style={{
               padding: "8px 12px",
               borderRadius: "8px",
-              border: "1px solid #cbd5e0",
+              border: "1px solid rgba(205,167,81,0.4)",
               fontSize: "13px",
-              backgroundColor: "white",
+              backgroundColor: "#fffdfa",
+              color: "#334155",
               outline: "none",
               cursor: "pointer",
-              fontFamily: "inherit"
+              fontFamily: "inherit",
+              accentColor: "#cda751",
+              boxShadow: "0 1px 3px rgba(205,167,81,0.1)",
+              transition: "border-color 0.2s, box-shadow 0.2s"
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = "#cda751";
+              e.target.style.boxShadow = "0 0 0 3px rgba(205,167,81,0.2)";
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = "rgba(205,167,81,0.4)";
+              e.target.style.boxShadow = "0 1px 3px rgba(205,167,81,0.1)";
             }}
           >
             <option value="">Select replacement staff...</option>
-            {suggestions.map(s => (
-              <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
-            ))}
+            {suggestions
+              .filter(s => ['DOCTOR', 'THERAPIST'].includes(String(s.role || '').toUpperCase()))
+              .map(s => {
+                const rClean = String(s.role || '').toUpperCase() === 'DOCTOR' ? 'Doctor' : 'Therapist';
+                return (
+                  <option key={s.id} value={s.id}>{s.name} ({rClean})</option>
+                );
+              })}
           </select>
         )}
 
@@ -1281,7 +1298,7 @@ function Home() {
               <div className="pending-drawer-title-group">
                 <h3 className="pending-drawer-title">Pending Allocations</h3>
                 <span className="pending-drawer-badge">
-                  {(pendingBookingsList.length + pendingWorkshopsList.length + pendingVedicList.length)} Tasks
+                  {stats.pending_allocations !== undefined ? stats.pending_allocations : (pendingBookingsList.length + pendingWorkshopsList.length + pendingVedicList.length)} Total Pending
                 </span>
               </div>
               <button 

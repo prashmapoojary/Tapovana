@@ -134,6 +134,10 @@ function Services() {
     setCurrentPage(1);
   };
 
+  useEffect(() => {
+    setSelectedSubCategory('All');
+  }, [selectedCategory, activeTab]);
+
   const getStatusClass = (status) => {
     switch (status?.toUpperCase()) {
       case 'ACTIVE': return 'status-active';
@@ -298,7 +302,7 @@ function Services() {
                 )}
               </div>
 
-              <div className="search-container">
+              <div className="search-container" style={{ position: "relative" }}>
                 <SearchIcon />
                 <input
                   type="text"
@@ -308,7 +312,29 @@ function Services() {
                     setSearchQuery(e.target.value);
                     setCurrentPage(1);
                   }}
+                  style={{ paddingRight: searchQuery ? "30px" : "12px" }}
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearchQuery(""); setCurrentPage(1); }}
+                    style={{
+                      position: "absolute",
+                      right: "10px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      color: "#94a3b8",
+                      fontSize: "14px",
+                      cursor: "pointer",
+                      padding: 0
+                    }}
+                    title="Clear search"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             </div>
           </div>

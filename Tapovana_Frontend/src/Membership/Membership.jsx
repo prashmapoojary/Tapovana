@@ -562,7 +562,7 @@ export default function Membership() {
             <div className="mem-detail-body" style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 8 }}>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "#7b8a9a", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginBottom: 8 }}>Annual Price (Rs)</label>
-                <input type="number" value={tierEditPrice} onChange={e => setTierEditPrice(e.target.value)} style={inputStyle} min={0} />
+                <input type="number" value={tierEditPrice} onChange={e => setTierEditPrice(e.target.value)} style={inputStyle} min={1} step={1} />
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "#7b8a9a", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginBottom: 8 }}>Benefits List</label>
@@ -673,6 +673,27 @@ export default function Membership() {
         )}
 
         <div className="mem-table-panel">
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", display: "flex", gap: "12px", alignItems: "center" }}>
+            <div style={{ position: "relative", flex: 1 }}>
+              <input
+                type="text"
+                placeholder="Search member name, email, or ID..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ width: "100%", padding: "8px 32px 8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", outline: "none" }}
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#94a3b8", fontSize: "14px", cursor: "pointer", padding: 0 }}
+                  title="Clear search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
           <div className="mem-table-wrap">
             <div className="table-scroll">
               {dataLoading ? (
@@ -712,7 +733,7 @@ export default function Membership() {
                             <span style={{ fontSize: "14px", color: "#4a5568" }}>{formatValidity(m.joinDate, m.expiryDate)}</span>
                           </td>
                           <td onClick={() => { setSelectedMember(m); setNewTier(m.tier); setUpgradeSuccess(false); }} style={{ cursor: "pointer" }}>
-                            <span className={"mem-status-pill " + (m.status || "").toLowerCase()}>{m.status}</span>
+                            <span className={"mem-status-pill " + (m.status || "").toLowerCase()} style={{ backgroundColor: (m.status === "expired" || m.status === "inactive") ? "#94a3b8" : undefined, color: (m.status === "expired" || m.status === "inactive") ? "#ffffff" : undefined }}>{m.status}</span>
                           </td>
                           <td style={{ position: "relative" }}>
                             <div style={{ position: "relative", display: "inline-block" }}>

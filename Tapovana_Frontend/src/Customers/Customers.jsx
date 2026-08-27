@@ -445,7 +445,7 @@ function Customers() {
         
         return (
           <>
-            <div className="drawer-overlay open" onClick={() => setSelectedCustomer(null)} style={{ zIndex: 9999 }} />
+            <div className="drawer-overlay open" onClick={() => { setSelectedCustomer(null); loadCustomers(); }} style={{ zIndex: 9999 }} />
             <div className="drawer-panel open" onClick={(e) => e.stopPropagation()} style={{ zIndex: 10000, width: "500px", maxWidth: "100%", overflowY: "auto" }}>
               <div className="drawer-header">
                 <div>
@@ -976,6 +976,15 @@ function Customers() {
             <label>To</label>
             <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} />
           </div>
+          {(dateFrom || dateTo) && (
+            <button
+              type="button"
+              onClick={() => { setDateFrom(""); setDateTo(""); setPage(1); }}
+              style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", color: "#64748b", borderRadius: "8px", padding: "8px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer", alignSelf: "center" }}
+            >
+              Clear Dates
+            </button>
+          )}
         </div>
       </div>
 

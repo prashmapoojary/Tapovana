@@ -382,7 +382,7 @@ exports.getAnalyticsDashboard = async (req, res) => {
         today_revenue,
         active_customers,
         pending_bookings,
-        pending_allocations: pending_bookings
+        pending_allocations: pending_allocations_total
       },
       trends: {
         bookings_last_7_days,
