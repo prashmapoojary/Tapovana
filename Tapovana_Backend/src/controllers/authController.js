@@ -7,8 +7,24 @@ require("dotenv").config();
 
 const generateOtp = () => String(crypto.randomInt(100000, 1000000));
 
-const buildAccessMap = (accessArray = []) =>
-    accessArray.reduce((acc, key) => ({ ...acc, [key]: true }), {});
+const buildAccessMap = (accessData) => {
+    if (!accessData) return {};
+    if (Array.isArray(accessData)) {
+        return accessData.reduce((acc, key) => ({ ...acc, [key]: true }), {});
+    }
+    if (typeof accessData === "object") {
+        return accessData;
+    }
+    if (typeof accessData === "string") {
+        try {
+            const parsed = JSON.parse(accessData);
+            return buildAccessMap(parsed);
+        } catch {
+            return {};
+        }
+    }
+    return {};
+};
 
 const loginPassword = async (req, res) => {
     const { email, password } = req.body;
