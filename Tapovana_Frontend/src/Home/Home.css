@@ -680,3 +680,286 @@
   .topbar, .sidebar, .home-date-filter, .home-header button { display: none !important; }
   .home-container { height: auto !important; overflow: visible !important; }
 }
+
+/* ── Pending Allocations Clickable Card ── */
+.stat-card.pending.clickable {
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+}
+
+.stat-card.pending.clickable:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(205, 167, 81, 0.22);
+  border-color: #cda751 !important;
+}
+
+.stat-card.pending.clickable::after {
+  content: 'Click to view details →';
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #cda751;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.stat-card.pending.clickable:hover::after {
+  opacity: 1;
+}
+
+/* ── Pending Allocations Side Drawer ── */
+.pending-drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  justify-content: flex-end;
+  animation: fadeInOverlay 0.25s ease-out;
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.pending-drawer {
+  width: 480px;
+  max-width: 90vw;
+  height: 100vh;
+  background: #ffffff;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  animation: slideInRight 0.3s ease-out;
+  position: relative;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.pending-drawer-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.pending-drawer-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pending-drawer-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  font-family: 'Poppins', sans-serif;
+}
+
+.pending-drawer-badge {
+  background: #fef3c7;
+  color: #d97706;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 12px;
+  border: 1px solid #fcd34d;
+}
+
+.pending-drawer-close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: #64748b;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.pending-drawer-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.pending-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.pending-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pending-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+.pending-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pending-section-count {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.pending-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pending-item-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+.pending-item-card:hover {
+  border-color: #cda751;
+  background: #fffdf9;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(205, 167, 81, 0.12);
+}
+
+.pending-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pending-item-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.pending-item-meta {
+  font-size: 12px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pending-item-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.pending-tag-booking {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.pending-tag-workshop {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.pending-tag-vedic {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.pending-item-arrow {
+  color: #cda751;
+  font-size: 16px;
+  font-weight: bold;
+  transition: transform 0.2s ease;
+}
+
+.pending-item-card:hover .pending-item-arrow {
+  transform: translateX(3px);
+}
+
+.pending-empty-state {
+  font-size: 12.5px;
+  color: #94a3b8;
+  font-style: italic;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  text-align: center;
+  border: 1px dashed #cbd5e1;
+}
+
+/* Fixed Sticky Drawer Footer */
+.pending-drawer-footer {
+  padding: 16px 24px;
+  background: #f8f7f6;
+  border-top: 1px solid #e2e8f0;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pending-btn-close {
+  background: #cda751;
+  color: #ffffff;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.pending-btn-close:hover {
+  background: #b89442;
+}
+

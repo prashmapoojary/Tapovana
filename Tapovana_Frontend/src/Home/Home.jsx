@@ -290,6 +290,55 @@ function Home() {
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [activeDemandTab, setActiveDemandTab] = useState("overall");
 
+  // Pending Allocations Side Drawer State
+  const [showPendingDrawer, setShowPendingDrawer] = useState(false);
+  const [drawerLoading, setDrawerLoading] = useState(false);
+  const [pendingBookingsList, setPendingBookingsList] = useState([]);
+  const [pendingWorkshopsList, setPendingWorkshopsList] = useState([]);
+  const [pendingVedicList, setPendingVedicList] = useState([]);
+
+  const fetchPendingDetails = async () => {
+    try {
+      setDrawerLoading(true);
+      const [bookingsRes, workshopsRes, vedicRes] = await Promise.all([
+        apiFetch("/api/bookings"),
+        apiFetch("/api/workshops"),
+        apiFetch("/api/vedic-programs")
+      ]);
+
+      if (bookingsRes && bookingsRes.success && Array.isArray(bookingsRes.bookings)) {
+        const filtered = bookingsRes.bookings.filter(b => 
+          b.status === "PENDING" || b.status === "UNASSIGNED" || !b.therapist_id || !b.assigned_staff
+        );
+        setPendingBookingsList(filtered.length > 0 ? filtered : bookingsRes.bookings.slice(0, 5));
+      } else {
+        setPendingBookingsList([]);
+      }
+
+      if (workshopsRes && Array.isArray(workshopsRes)) {
+        const filtered = workshopsRes.filter(w => w.status === "upcoming" || !w.assigned_staff_ids || w.assigned_staff_ids.length === 0);
+        setPendingWorkshopsList(filtered.length > 0 ? filtered : workshopsRes.slice(0, 5));
+      } else if (workshopsRes && workshopsRes.workshops && Array.isArray(workshopsRes.workshops)) {
+        const filtered = workshopsRes.workshops.filter(w => w.status === "upcoming" || !w.assigned_staff_ids || w.assigned_staff_ids.length === 0);
+        setPendingWorkshopsList(filtered.length > 0 ? filtered : workshopsRes.workshops.slice(0, 5));
+      } else {
+        setPendingWorkshopsList([]);
+      }
+
+      if (vedicRes && Array.isArray(vedicRes)) {
+        setPendingVedicList(vedicRes);
+      } else if (vedicRes && vedicRes.programs && Array.isArray(vedicRes.programs)) {
+        setPendingVedicList(vedicRes.programs);
+      } else {
+        setPendingVedicList([]);
+      }
+    } catch (err) {
+      console.error("Error fetching pending details for side drawer:", err);
+    } finally {
+      setDrawerLoading(false);
+    }
+  };
+
   useEffect(() => {
     localStorage.setItem("tapovana_home_date_filter", dateFilter);
   }, [dateFilter]);
@@ -757,7 +806,14 @@ function Home() {
           </div>
         </div>
 
-        <div className="stat-card pending">
+        <div 
+          className="stat-card pending clickable" 
+          onClick={() => {
+            setShowPendingDrawer(true);
+            fetchPendingDetails();
+          }}
+          title="Click to view pending allocation details"
+        >
           <div className="stat-card-header">
             <span className="stat-card-title">Pending Allocations</span>
             <div className="stat-card-icon">
@@ -1189,6 +1245,169 @@ function Home() {
           Daily Healing Vibe
         </span>
       </section>
+
+      {/* Pending Allocations Side Drawer */}
+      {showPendingDrawer && (
+        <div className="pending-drawer-overlay" onClick={() => setShowPendingDrawer(false)}>
+          <div className="pending-drawer" onClick={(e) => e.stopPropagation()}>
+            <div className="pending-drawer-header">
+              <div className="pending-drawer-title-group">
+                <h3 className="pending-drawer-title">Pending Allocations</h3>
+                <span className="pending-drawer-badge">
+                  {(pendingBookingsList.length + pendingWorkshopsList.length + pendingVedicList.length)} Tasks
+                </span>
+              </div>
+              <button 
+                className="pending-drawer-close" 
+                onClick={() => setShowPendingDrawer(false)}
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="pending-drawer-body">
+              {drawerLoading ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: "#64748b" }}>
+                  <div style={{ border: "3px solid #f3f3f3", borderTop: "3px solid #cda751", borderRadius: "50%", width: "32px", height: "32px", animation: "spin 1s linear infinite", margin: "0 auto 12px auto" }} />
+                  <span>Loading pending allocation details...</span>
+                </div>
+              ) : (
+                <>
+                  {/* Section 1: Bookings */}
+                  <div className="pending-section">
+                    <div className="pending-section-header">
+                      <span className="pending-section-title">
+                        <span>📅</span> 1. Bookings Pending Allocation
+                      </span>
+                      <span className="pending-section-count">{pendingBookingsList.length}</span>
+                    </div>
+
+                    <div className="pending-items-list">
+                      {pendingBookingsList.length === 0 ? (
+                        <div className="pending-empty-state">No pending booking allocations found.</div>
+                      ) : (
+                        pendingBookingsList.map((item, idx) => (
+                          <div 
+                            key={item.id || item.booking_id || idx} 
+                            className="pending-item-card"
+                            onClick={() => {
+                              setShowPendingDrawer(false);
+                              navigate("/dashboard/bookings");
+                            }}
+                          >
+                            <div className="pending-item-main">
+                              <div className="pending-item-title">
+                                {item.service_name || item.title || `Booking #${item.booking_id || item.id}`}
+                              </div>
+                              <div className="pending-item-meta">
+                                <span className="pending-item-tag pending-tag-booking">Booking</span>
+                                <span>{item.customer_name || item.user_name || "Client"}</span>
+                                <span>•</span>
+                                <span>{item.date || item.booking_date || "Upcoming"}</span>
+                              </div>
+                            </div>
+                            <span className="pending-item-arrow">→</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Section 2: Workshops */}
+                  <div className="pending-section">
+                    <div className="pending-section-header">
+                      <span className="pending-section-title">
+                        <span>🧘</span> 2. Workshops Pending Staff
+                      </span>
+                      <span className="pending-section-count">{pendingWorkshopsList.length}</span>
+                    </div>
+
+                    <div className="pending-items-list">
+                      {pendingWorkshopsList.length === 0 ? (
+                        <div className="pending-empty-state">No pending workshop allocations found.</div>
+                      ) : (
+                        pendingWorkshopsList.map((item, idx) => (
+                          <div 
+                            key={item.id || idx} 
+                            className="pending-item-card"
+                            onClick={() => {
+                              setShowPendingDrawer(false);
+                              navigate("/dashboard/workshops");
+                            }}
+                          >
+                            <div className="pending-item-main">
+                              <div className="pending-item-title">
+                                {item.title || `Workshop #${item.id}`}
+                              </div>
+                              <div className="pending-item-meta">
+                                <span className="pending-item-tag pending-tag-workshop">{item.category || "Workshop"}</span>
+                                <span>{item.date || "Scheduled"}</span>
+                                <span>•</span>
+                                <span>{item.instructor_name ? `Staff: ${item.instructor_name}` : "Unassigned Staff"}</span>
+                              </div>
+                            </div>
+                            <span className="pending-item-arrow">→</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Section 3: Vedic Life Programs */}
+                  <div className="pending-section">
+                    <div className="pending-section-header">
+                      <span className="pending-section-title">
+                        <span>🌿</span> 3. Vedic Life Program Allocations
+                      </span>
+                      <span className="pending-section-count">{pendingVedicList.length}</span>
+                    </div>
+
+                    <div className="pending-items-list">
+                      {pendingVedicList.length === 0 ? (
+                        <div className="pending-empty-state">No pending Vedic Life program allocations found.</div>
+                      ) : (
+                        pendingVedicList.map((item, idx) => (
+                          <div 
+                            key={item.id || idx} 
+                            className="pending-item-card"
+                            onClick={() => {
+                              setShowPendingDrawer(false);
+                              navigate("/dashboard/vedic-life-programs");
+                            }}
+                          >
+                            <div className="pending-item-main">
+                              <div className="pending-item-title">
+                                {item.title || `Program #${item.id}`}
+                              </div>
+                              <div className="pending-item-meta">
+                                <span className="pending-item-tag pending-tag-vedic">{item.type || "Program"}</span>
+                                <span>{item.duration || "Multi-day"}</span>
+                                <span>•</span>
+                                <span>{item.consultant_name ? `Consultant: ${item.consultant_name}` : "Needs Doctor/Therapist"}</span>
+                              </div>
+                            </div>
+                            <span className="pending-item-arrow">→</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="pending-drawer-footer">
+              <button 
+                className="pending-btn-close"
+                onClick={() => setShowPendingDrawer(false)}
+              >
+                Close Window
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
