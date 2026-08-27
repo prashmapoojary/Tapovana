@@ -497,20 +497,20 @@ function Home() {
   // Custom SVG bar chart calculations (Revenue trend)
   const barChartData = useMemo(() => {
     const maxVal = Math.max(...revenueTrend, 1000);
-    const width = 500;
+    const width = 520;
     const height = 230;
-    const paddingLeft = 60; // extra padding for currency text
-    const paddingRight = 20;
+    const paddingLeft = 65; // sufficient gap between Y-axis labels and first bar
+    const paddingRight = 25;
     const paddingTop = 20;
     const paddingBottom = 30;
 
     const chartWidth = width - paddingLeft - paddingRight;
     const chartHeight = height - paddingTop - paddingBottom;
 
-    const barWidth = Math.min(30, (chartWidth / 7) * 0.6);
-    const step = chartWidth / 6;
+    const step = chartWidth / 7;
+    const barWidth = Math.min(26, step * 0.55);
 
-    const xCoords = revenueTrend.map((_, i) => paddingLeft + i * step);
+    const xCoords = revenueTrend.map((_, i) => paddingLeft + (i + 0.5) * step);
     const barHeights = revenueTrend.map(val => (val / maxVal) * chartHeight);
     const yCoords = barHeights.map(h => height - paddingBottom - h);
 
@@ -1073,7 +1073,7 @@ function Home() {
                 return (
                   <g key={idx}>
                     <line x1={barChartData.paddingLeft} y1={y} x2={barChartData.width - barChartData.paddingRight} y2={y} className="chart-gridline" />
-                    <text x={barChartData.paddingLeft - 8} y={y + 4} textAnchor="end" className="chart-axis-text">
+                    <text x={barChartData.paddingLeft - 10} y={y + 4} textAnchor="end" className="chart-axis-text">
                       ₹{value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}
                     </text>
                   </g>
@@ -1097,6 +1097,7 @@ function Home() {
                 const y = barChartData.yCoords[i];
                 const w = barChartData.barWidth;
                 const isHovered = revenueHoverIdx === i;
+                const slotW = barChartData.chartWidth / 7;
                 return (
                   <g key={i}>
                     <rect
@@ -1115,9 +1116,9 @@ function Home() {
                     />
                     {/* Transparent pointer hover capture zone */}
                     <rect
-                      x={x - 25}
+                      x={x - slotW / 2}
                       y={barChartData.paddingTop}
-                      width="50"
+                      width={slotW}
                       height={barChartData.chartHeight}
                       fill="transparent"
                       cursor="pointer"
