@@ -2,54 +2,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import './Feedbacks.css';
 import ActionIcon from '../assets/Button.svg';
 
-// Initial dummy feedbacks
-const INITIAL_FEEDBACKS = [
-  {
-    id: 1,
-    userName: 'John Doe',
-    email: 'john@example.com',
-    moduleType: 'Blog',
-    title: 'Mindfulness in Daily Life',
-    feedbackContent: 'Great insights, very useful.',
-    rating: 4,
-    dateSubmitted: '2026-06-15',
-    status: 'Pending'
-  },
-  {
-    id: 2,
-    userName: 'Sarah Lee',
-    email: 'sarah@example.com',
-    moduleType: 'Workshop',
-    title: 'Breathing Techniques',
-    feedbackContent: 'Instructor was clear and helpful.',
-    rating: 5,
-    dateSubmitted: '2026-06-16',
-    status: 'Reviewed'
-  },
-  {
-    id: 3,
-    userName: 'Raj Kumar',
-    email: 'raj@example.com',
-    moduleType: 'Service',
-    title: 'Ayurvedic Consultation',
-    feedbackContent: 'Doctor explained everything well.',
-    rating: 4,
-    dateSubmitted: '2026-06-17',
-    status: 'Pending'
-  },
-  {
-    id: 4,
-    userName: 'Anita Rao',
-    email: 'anita@example.com',
-    moduleType: 'Vedic Life',
-    title: 'Rejuvenation Retreat',
-    feedbackContent: 'Loved the holistic approach.',
-    rating: 5,
-    dateSubmitted: '2026-06-18',
-    status: 'Archived'
-  }
-];
-
 export default function Feedbacks() {
   const [feedbacks, setFeedbacks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +28,8 @@ export default function Feedbacks() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4500);
 
-        const response = await fetch('https://tapovana.onrender.com/api/reviews', {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
+        const response = await fetch(`${baseUrl}/api/reviews`, {
           signal: controller.signal
         });
         clearTimeout(timeoutId);
@@ -106,11 +59,11 @@ export default function Feedbacks() {
           });
           setFeedbacks(mappedFeedbacks);
         } else {
-          setFeedbacks(INITIAL_FEEDBACKS);
+          setFeedbacks([]);
         }
       } catch (err) {
-        console.error('Error fetching feedbacks, using INITIAL_FEEDBACKS fallback:', err);
-        setFeedbacks(INITIAL_FEEDBACKS);
+        console.error('Error fetching feedbacks:', err);
+        setFeedbacks([]);
       } finally {
         setLoading(false);
       }

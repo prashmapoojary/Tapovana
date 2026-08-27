@@ -809,6 +809,9 @@
   display: flex;
   gap: 10px;
   flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
 }
 
 /* Gold Primary Button */

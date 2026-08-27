@@ -89,10 +89,7 @@ const STATUS_CONFIG = {
   completed: { label: "Completed", color: "#a0aec0", bg: "rgba(160,174,192,0.1)" },
 };
 
-const DUMMY_WORKSHOPS = [
-  { id: "WS-001", title: "Morning Vinyasa Flow", category: "Yoga", date: "2026-06-15", time: "07:00 AM", duration: 90, capacity: 20, price: 1500, status: "upcoming", image_url: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800", description: "A dynamic yoga session focused on breath-synchronized movement to energize the body and calm the mind." },
-  { id: "WS-005", title: "Pranayama Intensive", category: "Yoga", date: "2026-06-14", time: "07:00 AM", duration: 60, capacity: 20, price: 1200, status: "ongoing", image_url: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&q=80&w=800", description: "An intensive breathwork program covering all major pranayama techniques for vitality and longevity." },
-];
+const DUMMY_WORKSHOPS = [];
 
 const BLANK_FORM = {
   title: "", category: "Yoga", instructor_id: "", instructor_name: "",

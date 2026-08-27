@@ -24,11 +24,8 @@ const API_BASE = (() => {
   return import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
 })();
 
-const DUMMY_CUSTOMERS = [
-  { id: "1", customer_id: "CUST-001", first_name: "Karthik", last_name: "Rao", email: "karthikrao608@gmail.com", phone: "+91 98765 43210", status: "ACTIVE", membership_status: "SILVER", total_bookings: 12, total_spent: 24500, join_date: "2026-06-08", last_activity: "2026-06-08", admin_notes: "Mobile App Registered User", avatar_url: "/uploads/unsplash_106.jpg" },
-  { id: "2", customer_id: "CUST-002", first_name: "Karthik", last_name: "User", email: "h59896411@gmail.com", phone: "+91 87654 32109", status: "ACTIVE", membership_status: "PLATINUM", total_bookings: 2, total_spent: 3500, join_date: "2026-06-08", last_activity: "2026-06-08", admin_notes: "Mobile App Registered User", avatar_url: "/uploads/unsplash_108.jpg" },
-  { id: "3", customer_id: "CUST-003", first_name: "Test", last_name: "User", email: "test@example.com", phone: "+91 12345 67890", status: "ACTIVE", membership_status: "GOLD", total_bookings: 5, total_spent: 8900, join_date: "2026-06-08", last_activity: "2026-06-08", admin_notes: "Mobile App Registered User", avatar_url: "/uploads/unsplash_109.jpg" }
-];
+// Fallback empty array
+const DUMMY_CUSTOMERS = [];
 
 // ─── Bulletproof Customer Avatar Component ───
 function CustomerAvatar({ customer, size = 32, className = "" }) {
@@ -168,10 +165,10 @@ function Customers() {
       if (res.success) {
         setCustomers(res.customers || []);
       } else {
-        setCustomers(DUMMY_CUSTOMERS);
+        setCustomers([]);
       }
     } catch {
-      setCustomers(DUMMY_CUSTOMERS);
+      setCustomers([]);
     } finally {
       setLoading(false);
     }

@@ -6,25 +6,6 @@ import SearchIcon from "../assets/searchIcon.svg";
 import DropdownIcon from "../assets/dropdownIcon.svg";
 import { useAllocations } from "../utils/AllocationContext";
 
-const DUMMY_TRANSACTIONS = [
-  { id: "1", transaction_id: "TXN-10001", booking_id: "BK-1001", customer_name: "Rahul Sharma",    amount: 2500,  currency: "INR", status: "COMPLETED", payment_method: "UPI",        payment_gateway: "RAZORPAY", gateway_transaction_id: "pay_Ox9aAbCd123", created_at: "2026-06-15T10:00:00Z" },
-  { id: "2", transaction_id: "TXN-10002", booking_id: "BK-1002", customer_name: "Priya Desai",     amount: 1200,  currency: "INR", status: "PENDING",   payment_method: "CARD",       payment_gateway: "RAZORPAY", gateway_transaction_id: "pay_3Px7YqGH456",  created_at: "2026-06-16T07:00:00Z" },
-  { id: "3", transaction_id: "TXN-10003", booking_id: "BK-1003", customer_name: "Vikram Singh",    amount: 5000,  currency: "INR", status: "COMPLETED", payment_method: "NETBANKING", payment_gateway: "RAZORPAY", gateway_transaction_id: "pay_Qr8bCdEf789", created_at: "2026-06-18T09:00:00Z" },
-  { id: "4", transaction_id: "TXN-10004", booking_id: "BK-1004", customer_name: "Anita Nair",      amount: 800,   currency: "INR", status: "COMPLETED", payment_method: "UPI",        payment_gateway: "RAZORPAY", gateway_transaction_id: "pay_Ss1cDeFg012", created_at: "2026-06-15T17:00:00Z" },
-  { id: "5", transaction_id: "TXN-10005", booking_id: "BK-1005", customer_name: "Sanjay Kumar",    amount: 1500,  currency: "INR", status: "FAILED",    payment_method: "CARD",       payment_gateway: "RAZORPAY", gateway_transaction_id: "pay_4Rx9YsHI345",  created_at: "2026-06-20T11:00:00Z" },
-  { id: "6", transaction_id: "TXN-10006", booking_id: "BK-1006", customer_name: "Deepika Menon",   amount: 3500,  currency: "INR", status: "REFUNDED",  payment_method: "UPI",        payment_gateway: "RAZORPAY", gateway_transaction_id: "pay_Tt2dEfGh678", created_at: "2026-06-12T14:00:00Z" },
-  { id: "7", transaction_id: "TXN-10007", booking_id: "BK-1007", customer_name: "Mohan Pillai",    amount: 4200,  currency: "INR", status: "COMPLETED", payment_method: "UPI",        payment_gateway: "RAZORPAY", gateway_transaction_id: "pay_Uu3eFgHi901", created_at: "2026-06-22T08:00:00Z" },
-  { id: "8", transaction_id: "TXN-10008", booking_id: "BK-1008", customer_name: "Kavitha Iyer",    amount: 7999,  currency: "INR", status: "COMPLETED", payment_method: "CARD",       payment_gateway: "RAZORPAY", gateway_transaction_id: "pay_5Sy0ZtIJ234",  created_at: "2026-06-25T10:30:00Z" },
-];
-
-const DUMMY_SUMMARY = {
-  total_collected: 24200,
-  pending_amount:  1200,
-  failed_amount:   1500,
-  refunded_amount: 3500,
-  discounts_applied: 4800
-};
-
 function Transactions() {
   const { triggerAlert } = useAllocations();
   const [transactions, setTransactions] = useState([]);
@@ -59,13 +40,13 @@ function Transactions() {
         if (res.summary) setSummary(res.summary);
         if (res.pagination) setPagination(res.pagination);
       } else {
-        setTransactions(DUMMY_TRANSACTIONS);
-        setSummary(DUMMY_SUMMARY);
+        setTransactions([]);
+        setSummary({ total_collected: 0, pending_amount: 0, failed_amount: 0, refunded_amount: 0, discounts_applied: 0 });
       }
     } catch (err) {
-      console.warn("Using fallback transactions:", err);
-      setTransactions(DUMMY_TRANSACTIONS);
-      setSummary(DUMMY_SUMMARY);
+      console.warn("Fetch transactions error:", err);
+      setTransactions([]);
+      setSummary({ total_collected: 0, pending_amount: 0, failed_amount: 0, refunded_amount: 0, discounts_applied: 0 });
     } finally {
       setLoading(false);
     }

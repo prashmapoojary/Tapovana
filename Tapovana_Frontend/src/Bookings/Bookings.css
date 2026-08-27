@@ -355,6 +355,9 @@
   font-size: 14px;
   color: #64748B;
   border-radius: 0 0 8px 8px;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
 }
 
 .pagination-controls {
@@ -642,6 +645,9 @@
   background: #fafbfc;
   display: flex;
   flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
 }
 
 .bk-btn-gold {

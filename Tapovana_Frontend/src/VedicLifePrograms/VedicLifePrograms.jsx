@@ -42,45 +42,8 @@ const PROGRAM_COLORS = {
 
 const DURATION_MAP = { "7-days": 7, "14-days": 14, "30-days": 30, "custom": null };
 
-const DUMMY_PROGRAMS = [
-  {
-    id: "VP-001", title: "Ayurveda Wellness Retreat", type: "Retreat",
-    description: "7-day comprehensive Ayurveda retreat with personalized consultations and treatments.",
-    duration: "7-days", startDate: "2026-07-01", endDate: "2026-07-07",
-    capacity: 30, enrolled: 24, price: 35000,
-    accommodations: "3-star Resort", consultant_id: "", consultant_name: "Dr. Priya Krishnan",
-    services: ["Consultation", "Massage", "Yoga", "Nutrition"],
-    languages: ["English", "Hindi", "Malayalam"],
-    image: "https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&q=80&w=800",
-  },
-  {
-    id: "VP-002", title: "International Ayurveda Treatment Program", type: "Treatment",
-    description: "30-day specialized Ayurvedic treatment for chronic conditions.",
-    duration: "30-days", startDate: "2026-08-01", endDate: "2026-08-30",
-    capacity: 20, enrolled: 12, price: 85000,
-    accommodations: "4-star Hotel", consultant_id: "", consultant_name: "Dr. Kavitha Rao",
-    services: ["Panchakarma", "Abhyanga", "Dietary Management"],
-    languages: ["English", "Spanish", "French"],
-    image: "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&q=80&w=800",
-  },
-  {
-    id: "VP-003", title: "Yoga & Meditation Immersion", type: "Retreat",
-    description: "14-day intensive yoga and meditation program.",
-    duration: "14-days", startDate: "2026-06-15", endDate: "2026-06-28",
-    capacity: 40, enrolled: 35, price: 28000,
-    accommodations: "Ashram Accommodation", consultant_id: "", consultant_name: "Swami Anandamaya",
-    services: ["Yoga", "Meditation", "Pranayama", "Philosophy"],
-    languages: ["English", "Italian", "German"],
-    image: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&q=80&w=800",
-  },
-];
-
-const DUMMY_STAFF = [
-  { user_id: "DR001", first_name: "Dr. Priya", last_name: "Krishnan", role: "DOCTOR", specialization: "Ayurveda" },
-  { user_id: "DR002", first_name: "Dr. Kavitha", last_name: "Rao", role: "DOCTOR", specialization: "Panchakarma" },
-  { user_id: "TH001", first_name: "Swami", last_name: "Anandamaya", role: "THERAPIST", specialization: "Yoga" },
-  { user_id: "TH002", first_name: "Dr. Sanjay", last_name: "Bhat", role: "THERAPIST", specialization: "Nutrition" },
-];
+const DUMMY_PROGRAMS = [];
+const DUMMY_STAFF = [];
 
 const BLANK_FORM = {
   title: "", type: "Retreat", description: "", duration: "7-days",
@@ -704,9 +667,9 @@ export default function VedicLifePrograms() {
       if (res.success && res.users) {
         setInstructors(res.users.filter(u => (u.role === 'DOCTOR' || u.role === 'THERAPIST') && u.availability_status !== "On Leave"));
       } else {
-        setInstructors(DUMMY_STAFF.filter(u => u.availability_status !== "On Leave"));
+        setInstructors([]);
       }
-    } catch { setInstructors(DUMMY_STAFF.filter(u => u.availability_status !== "On Leave")); }
+    } catch { setInstructors([]); }
   };
 
   useEffect(() => { fetchInstructors(); }, []);
