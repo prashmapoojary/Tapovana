@@ -50,9 +50,17 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use("/assets/Profile_Images", express.static(path.join(__dirname, "assets/Profile_Images")));
 app.use("/assets/profile-images", express.static(path.join(__dirname, "assets/Profile_Images")));
 
+process.on('uncaughtException', (err) => {
+    console.error('[Process Guard] Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[Process Guard] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 app.use(rateLimit({
     windowMs: 60 * 1000,
-    max: process.env.NODE_ENV === 'production' ? 120 : 999999, // Disabled for dev to avoid 429
+    max: process.env.NODE_ENV === 'production' ? 120 : 999999,
+    message: { success: false, message: "Too many requests. Please try again later." }
 }));
 
 app.get("/health", async (_req, res) => {

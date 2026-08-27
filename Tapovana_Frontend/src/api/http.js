@@ -36,9 +36,17 @@ export async function apiFetch(path, options = {}) {
     throw new Error("Session expired. Please login again.");
   }
 
-  const data = await res.json().catch(() => ({}));
+  const rawText = await res.text().catch(() => "");
+  let data = {};
+  try {
+    data = rawText ? JSON.parse(rawText) : {};
+  } catch {
+    data = { success: false, message: rawText || "Response parse error" };
+  }
 
-  if (!res.ok) throw new Error(data.message || data.error || "Request failed");
+  if (!res.ok) {
+    throw new Error(data.message || data.error || `Request failed with status ${res.status}`);
+  }
 
   return data;
 }
