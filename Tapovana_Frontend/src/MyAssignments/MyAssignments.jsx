@@ -40,27 +40,23 @@ const InfoIcon = () => (
   </svg>
 );
 
-const STATUS_CONFIG = {
-  Upcoming: { label: "Upcoming", color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
-  Live: { label: "🔴 LIVE", color: "#e74c3c", bg: "rgba(231,76,60,0.15)" },
-  active: { label: "Active", color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
-  pending: { label: "Pending", color: "#f39c12", bg: "rgba(243,156,18,0.1)" },
-  expired: { label: "Completed", color: "#a0aec0", bg: "rgba(160,174,192,0.1)" },
-  cancelled: { label: "Cancelled", color: "#e74c3c", bg: "rgba(231,76,60,0.1)" },
+const formatCleanDate = (dateVal) => {
+  if (!dateVal) return '-';
+  try {
+    const dateStr = String(dateVal).split('T')[0];
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    return dateStr;
+  } catch {
+    return String(dateVal).split('T')[0];
+  }
 };
 
 function AssignmentCard({ a, onClick }) {
   const st = STATUS_CONFIG[a.status] || STATUS_CONFIG.active;
-
-  const getFormatDate = (dateStr) => {
-    if (!dateStr) return '';
-    try {
-      const options = { year: 'numeric', month: 'short', day: 'numeric' };
-      return new Date(dateStr).toLocaleDateString(undefined, options);
-    } catch {
-      return dateStr;
-    }
-  };
 
   if (a.status === 'removed') return null;
 
@@ -69,68 +65,66 @@ function AssignmentCard({ a, onClick }) {
       className="ws-card" 
       onClick={() => onClick(a)}
       style={{
-        background: "#F9F9F9",
-        borderRadius: "10px",
+        background: "#FFFFFF",
+        borderRadius: "12px",
         padding: "20px",
-        border: "1px solid #CDA751",
+        border: "1px solid #E2E8F0",
         cursor: "pointer",
-        transition: "transform 0.2s, box-shadow 0.2s"
+        transition: "all 0.2s ease-in-out",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
       }}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "12px" }}>
-        <div>
-          <span style={{ fontSize: "11px", fontWeight: "700", color: "#CDA751", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-            {a.displayRecordId || (a.type === 'service' ? 'Service' : a.type === 'workshop' ? 'Workshop' : 'Vedic Package')}
-          </span>
-          <h3 style={{ margin: "2px 0 0 0", color: "#1E1E1E", fontSize: "16px", fontWeight: 600 }}>{a.sessionTitle}</h3>
-        </div>
+      {/* 1. Header Badges: Type & Record ID (First) */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+        <span style={{ fontSize: "11px", fontWeight: "700", color: "#CDA751", textTransform: "uppercase", letterSpacing: "0.6px", background: "rgba(205,167,81,0.1)", padding: "4px 10px", borderRadius: "12px" }}>
+          {a.displayRecordId || (a.type === 'service' ? 'Service Booking' : a.type === 'workshop' ? 'Workshop' : 'Vedic Life Package')}
+        </span>
         <div style={{
           background: st.color || "#CDA751",
           color: "white",
-          fontWeight: 600,
+          fontWeight: 700,
           padding: "4px 12px",
-          borderRadius: "4px",
-          fontSize: "12px"
+          borderRadius: "12px",
+          fontSize: "11px",
+          letterSpacing: "0.4px"
         }}>
           {st.label}
         </div>
       </div>
 
-      {/* Customer Info */}
-      <div style={{ marginBottom: "12px", background: "#fff", padding: "8px 12px", borderRadius: "6px", border: "1px solid #edf2f7" }}>
-        <p style={{ margin: 0, color: "#718096", fontSize: "12px", fontWeight: 600 }}>Customer / Participant:</p>
-        <p style={{ margin: 0, color: "#1A202C", fontSize: "14px", fontWeight: 600 }}>
+      {/* 2. Session Title (Second) */}
+      <h3 style={{ margin: "0 0 12px 0", color: "#1A202C", fontSize: "17px", fontWeight: 700, lineHeight: 1.3 }}>
+        {a.sessionTitle}
+      </h3>
+
+      {/* 3. Customer / Participant (Third) */}
+      <div style={{ marginBottom: "14px", background: "#F8FAFC", padding: "10px 14px", borderRadius: "8px", border: "1px solid #EDF2F7" }}>
+        <p style={{ margin: "0 0 2px 0", color: "#718096", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.4px" }}>
+          Customer / Participant
+        </p>
+        <p style={{ margin: 0, color: "#2D3748", fontSize: "14px", fontWeight: 600 }}>
           {a.customerName || "Assigned Customer"}
         </p>
       </div>
 
-      {/* Staff Info */}
-      <div style={{ marginBottom: "16px" }}>
-        <p style={{ margin: 0, color: "#555555", fontSize: "13px", marginBottom: "2px" }}>
-          <strong>Assigned Specialist:</strong> {a.staffName} ({a.staffCode || 'STAFF'})
-        </p>
-        <p style={{ margin: 0, color: "#1E1E1E", fontSize: "13px", fontWeight: 500 }}>
-          <strong>Role:</strong> {a.staffRole}
-        </p>
-      </div>
-
-      <div style={{ display: "flex", gap: "20px", borderTop: "1px solid #E2E8F0", paddingTop: "12px" }}>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <p style={{ margin: 0, color: "#555555", fontSize: "12px", marginBottom: "2px" }}>Date</p>
-          <p style={{ margin: 0, color: "#1E1E1E", fontSize: "13px", fontWeight: 600 }}>
-            {getFormatDate(a.startDate)}
+      {/* 4. Schedule & Time Info (Fourth) */}
+      <div style={{ display: "flex", gap: "24px", borderTop: "1px solid #EDF2F7", paddingTop: "12px" }}>
+        <div>
+          <p style={{ margin: "0 0 2px 0", color: "#718096", fontSize: "11px", fontWeight: 600 }}>Date</p>
+          <p style={{ margin: 0, color: "#1A202C", fontSize: "13px", fontWeight: 700 }}>
+            {formatCleanDate(a.startDate)}
           </p>
         </div>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <p style={{ margin: 0, color: "#555555", fontSize: "12px", marginBottom: "2px" }}>Time</p>
-          <p style={{ margin: 0, color: "#1E1E1E", fontSize: "13px", fontWeight: 600 }}>
-            {formatDisplayTime(a.bookingTime || a.time) || '-'}
+        <div>
+          <p style={{ margin: "0 0 2px 0", color: "#718096", fontSize: "11px", fontWeight: 600 }}>Time</p>
+          <p style={{ margin: 0, color: "#1A202C", fontSize: "13px", fontWeight: 700 }}>
+            {formatDisplayTime(a.bookingTime || a.time) || 'Flexible'}
           </p>
         </div>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <p style={{ margin: 0, color: "#555555", fontSize: "12px", marginBottom: "2px" }}>Duration</p>
-          <p style={{ margin: 0, color: "#1E1E1E", fontSize: "13px", fontWeight: 600 }}>
-            {a.duration || a.duration_minutes || 30} mins
+        <div>
+          <p style={{ margin: "0 0 2px 0", color: "#718096", fontSize: "11px", fontWeight: 600 }}>Duration</p>
+          <p style={{ margin: 0, color: "#1A202C", fontSize: "13px", fontWeight: 700 }}>
+            {a.duration || a.duration_minutes || 60} mins
           </p>
         </div>
       </div>
@@ -144,57 +138,50 @@ function AssignmentDetailModal({ assignment, onClose }) {
 
   return (
     <div className="blog-editor-modal-overlay" style={{ zIndex: 1100 }}>
-      <div className="blog-editor-modal" style={{ maxWidth: "550px", padding: "24px", borderRadius: "12px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid #edf2f7", paddingBottom: "12px" }}>
+      <div className="blog-editor-modal" style={{ maxWidth: "520px", padding: "24px", borderRadius: "14px" }}>
+        {/* Header (First) */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", borderBottom: "1px solid #EDF2F7", paddingBottom: "14px" }}>
           <div>
-            <span style={{ fontSize: "11px", fontWeight: "700", color: "#CDA751", textTransform: "uppercase" }}>
+            <span style={{ fontSize: "11px", fontWeight: "700", color: "#CDA751", textTransform: "uppercase", letterSpacing: "0.5px" }}>
               {assignment.type === 'service' ? 'Service Booking' : assignment.type === 'workshop' ? 'Workshop' : 'Vedic Life Program'}
             </span>
-            <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700", color: "#1a202c" }}>{assignment.sessionTitle}</h2>
+            <h2 style={{ margin: "4px 0 0 0", fontSize: "18px", fontWeight: "700", color: "#1A202C" }}>{assignment.sessionTitle}</h2>
           </div>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", fontSize: "24px", cursor: "pointer", color: "#a0aec0" }}>×</button>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", fontSize: "24px", cursor: "pointer", color: "#A0AEC0", lineHeight: 1 }}>×</button>
         </div>
 
-        {/* Staff Information Section */}
-        <div style={{ background: "#fcf8ef", padding: "14px", borderRadius: "8px", border: "1px solid rgba(205,167,81,0.3)", marginBottom: "16px" }}>
-          <h4 style={{ margin: "0 0 8px 0", color: "#cda751", fontSize: "13px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Assigned Doctor / Therapist</h4>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "14px", color: "#2d3748" }}>
-            <div><strong>Staff Name:</strong> {assignment.staffName}</div>
-            <div><strong>Staff ID:</strong> {assignment.staffCode || 'STAFF'}</div>
-            <div><strong>Email:</strong> {assignment.staffEmail || 'N/A'}</div>
-            <div><strong>Role:</strong> {assignment.staffRole}</div>
-          </div>
-        </div>
-
-        {/* Customer / Participant Information Section */}
-        <div style={{ background: "#f8fafc", padding: "14px", borderRadius: "8px", border: "1px solid #e2e8f0", marginBottom: "16px" }}>
-          <h4 style={{ margin: "0 0 8px 0", color: "#475569", fontSize: "13px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Customer / Participant Details</h4>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "14px", color: "#2d3748" }}>
-            <div><strong>Customer Name:</strong> {assignment.customerName || "Assigned Customer"}</div>
-            <div><strong>Record ID:</strong> {assignment.displayRecordId || assignment.sessionId}</div>
-            {assignment.customerEmail && <div><strong>Customer Email:</strong> {assignment.customerEmail}</div>}
-            <div><strong>Status:</strong> {assignment.status?.toUpperCase()}</div>
-          </div>
-        </div>
-
-        {/* Session Schedule Section */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", background: "#edf2f7", padding: "12px", borderRadius: "8px", textAlign: "center", marginBottom: "20px" }}>
+        {/* 1. Schedule Box (Date, Time, Duration) */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", background: "#FCF8EF", padding: "14px", borderRadius: "10px", border: "1px solid rgba(205,167,81,0.3)", textAlign: "center", marginBottom: "16px" }}>
           <div>
-            <div style={{ fontSize: "11px", color: "#718096" }}>Date</div>
-            <div style={{ fontWeight: "700", color: "#1a202c" }}>{assignment.startDate || '-'}</div>
+            <div style={{ fontSize: "11px", color: "#718096", fontWeight: 600 }}>Date</div>
+            <div style={{ fontWeight: "700", color: "#1A202C", fontSize: "14px" }}>{formatCleanDate(assignment.startDate)}</div>
           </div>
           <div>
-            <div style={{ fontSize: "11px", color: "#718096" }}>Time</div>
-            <div style={{ fontWeight: "700", color: "#1a202c" }}>{assignment.bookingTime || '-'}</div>
+            <div style={{ fontSize: "11px", color: "#718096", fontWeight: 600 }}>Time</div>
+            <div style={{ fontWeight: "700", color: "#1A202C", fontSize: "14px" }}>{formatDisplayTime(assignment.bookingTime || assignment.time) || 'Flexible'}</div>
           </div>
           <div>
-            <div style={{ fontSize: "11px", color: "#718096" }}>Duration</div>
-            <div style={{ fontWeight: "700", color: "#1a202c" }}>{assignment.duration || 30} mins</div>
+            <div style={{ fontSize: "11px", color: "#718096", fontWeight: 600 }}>Duration</div>
+            <div style={{ fontWeight: "700", color: "#1A202C", fontSize: "14px" }}>{assignment.duration || 60} mins</div>
           </div>
         </div>
 
+        {/* 2. Customer / Participant Details */}
+        <div style={{ background: "#F8FAFC", padding: "16px", borderRadius: "10px", border: "1px solid #E2E8F0", marginBottom: "20px" }}>
+          <h4 style={{ margin: "0 0 10px 0", color: "#475569", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 700 }}>
+            Customer / Participant Details
+          </h4>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "13px", color: "#2D3748" }}>
+            <div><strong>Customer Name:</strong><br />{assignment.customerName || "Assigned Customer"}</div>
+            <div><strong>Record ID:</strong><br />{assignment.displayRecordId || assignment.sessionId}</div>
+            {assignment.customerEmail && <div><strong>Email:</strong><br />{assignment.customerEmail}</div>}
+            <div><strong>Status:</strong><br /><span style={{ color: "#CDA751", fontWeight: 700 }}>{assignment.status?.toUpperCase()}</span></div>
+          </div>
+        </div>
+
+        {/* Action Button */}
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ background: "#cda751", color: "#fff", border: "none", padding: "8px 20px", borderRadius: "6px", cursor: "pointer", fontWeight: "700" }}>
+          <button onClick={onClose} style={{ background: "#CDA751", color: "#FFF", border: "none", padding: "10px 24px", borderRadius: "8px", cursor: "pointer", fontWeight: "700", fontSize: "14px" }}>
             Close
           </button>
         </div>
