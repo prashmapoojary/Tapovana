@@ -597,12 +597,15 @@ const getMyAssignments = async (req, res) => {
         const staffCode = `STAFF-${String(staffUuid).slice(0, 6).toUpperCase()}`;
         const staffName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
 
-        // Auto-sync direct workshop allocations into allocations table
+        // Auto-sync direct workshop, booking, and Vedic Life Program allocations into allocations table
         try {
+            // 1. Sync Workshops matching staff ID, instructor name, or email
             const directWs = await query(`
                 SELECT id, title, date, time, duration FROM workshops 
-                WHERE instructor_id = $1 OR assigned_staff_ids @> jsonb_build_array($1::text)
-            `, [staffUuid]);
+                WHERE instructor_id = $1 
+                   OR (instructor_name IS NOT NULL AND (LOWER(instructor_name) LIKE $2 OR LOWER(instructor_name) LIKE $3))
+                   OR assigned_staff_ids @> jsonb_build_array($1::text)
+            `, [staffUuid, `%${user.email.toLowerCase()}%`, `%${staffName.toLowerCase()}%`]);
 
             for (const ws of directWs.rows) {
                 const allocId = `ws-alloc-${ws.id}-${staffUuid}`;
@@ -625,11 +628,12 @@ const getMyAssignments = async (req, res) => {
                 );
             }
 
-            // Auto-sync direct booking allocations into allocations table
+            // 2. Sync Bookings matching staff ID, therapist name, or email
             const directBk = await query(`
                 SELECT id, service_name, booking_date, booking_time, status FROM bookings 
-                WHERE therapist_id = $1 AND status != 'CANCELLED'
-            `, [staffUuid]);
+                WHERE (therapist_id = $1 OR (therapist_name IS NOT NULL AND (LOWER(therapist_name) LIKE $2 OR LOWER(therapist_name) LIKE $3)))
+                  AND status != 'CANCELLED'
+            `, [staffUuid, `%${user.email.toLowerCase()}%`, `%${staffName.toLowerCase()}%`]);
 
             for (const bk of directBk.rows) {
                 const allocId = `bk-alloc-${bk.id}-${staffUuid}`;
@@ -649,6 +653,39 @@ const getMyAssignments = async (req, res) => {
                        duration_minutes = EXCLUDED.duration_minutes,
                        status = EXCLUDED.status`,
                     [allocId, staffUuid, bk.service_name || 'Service Session', String(bk.id), dateVal, dateVal, bk.booking_time || '10:00 AM', 60, bk.status ? bk.status.toLowerCase() : 'assigned']
+                );
+            }
+
+            // 3. Sync Vedic Life Programs matching staff ID, instructor name, or email
+            const directVedic = await query(`
+                SELECT id, title, start_date, end_date, schedule FROM vedic_programs 
+                WHERE instructor_id = $1 
+                   OR (instructor_name IS NOT NULL AND (LOWER(instructor_name) LIKE $2 OR LOWER(instructor_name) LIKE $3))
+                   OR assigned_staff_ids @> jsonb_build_array($1::text)
+            `, [staffUuid, `%${user.email.toLowerCase()}%`, `%${staffName.toLowerCase()}%`]);
+
+            for (const vp of directVedic.rows) {
+                const allocId = `vp-alloc-${vp.id}-${staffUuid}`;
+                let startDateVal = new Date().toISOString().split('T')[0];
+                let endDateVal = startDateVal;
+                if (vp.start_date) {
+                    startDateVal = vp.start_date instanceof Date ? vp.start_date.toISOString().split('T')[0] : String(vp.start_date).split('T')[0];
+                }
+                if (vp.end_date) {
+                    endDateVal = vp.end_date instanceof Date ? vp.end_date.toISOString().split('T')[0] : String(vp.end_date).split('T')[0];
+                }
+                await query(
+                    `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes, status, created_at)
+                     VALUES ($1, $2, 'vedic', $3, $4, $5, $6, $7, $8, 'assigned', NOW())
+                     ON CONFLICT (id) DO UPDATE SET 
+                       staff_id = EXCLUDED.staff_id,
+                       session_title = EXCLUDED.session_title,
+                       start_date = EXCLUDED.start_date,
+                       end_date = EXCLUDED.end_date,
+                       booking_time = EXCLUDED.booking_time,
+                       duration_minutes = EXCLUDED.duration_minutes,
+                       status = 'assigned'`,
+                    [allocId, staffUuid, vp.title, String(vp.id), startDateVal, endDateVal, vp.schedule || '09:00 AM', 120]
                 );
             }
         } catch (syncErr) {
