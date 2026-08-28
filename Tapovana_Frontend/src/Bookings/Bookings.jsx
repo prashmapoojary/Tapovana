@@ -23,30 +23,26 @@ const LOCAL_API_BASE = (() => {
   return import.meta.env.VITE_API_BASE_URL || "https://tapovana.onrender.com";
 })();
 
-/**
- * Resolve a service image_url fetched from the local backend.
- * - Absolute http(s) URLs → used as-is.
- * - Windows absolute paths (C:\...) → extract filename, prefix with LOCAL_API_BASE/uploads/
- * - Relative paths (/uploads/...) → prefix with LOCAL_API_BASE
- * - Null/empty → return null (caller shows placeholder)
- */
 function getServiceImageUrl(imageUrl) {
   if (!imageUrl) return null;
   if (imageUrl.startsWith("http") || imageUrl.startsWith("data:")) return imageUrl;
-  // Windows absolute path stored in DB
   if (/^[A-Za-z]:[/\\]/i.test(imageUrl)) {
     const filename = imageUrl.replace(/\\/g, "/").split("/").pop();
     return `${LOCAL_API_BASE}/uploads/${filename}`;
   }
-  // Relative path like /uploads/image.jpg
   const sep = imageUrl.startsWith("/") ? "" : "/";
   return `${LOCAL_API_BASE}${sep}${imageUrl}`;
 }
 
-
 function Bookings() {
   const { triggerAlert, triggerConfirm, conflicts, fetchConflicts, deallocateFromSession, allocateStaff } = useAllocations();
-  const userRole = useMemo(() => getUser()?.role, []);
+  const loggedUser = useMemo(() => getUser(), []);
+  const rawRole = loggedUser?.role || loggedUser?.role_name || "";
+  const roleStr = typeof rawRole === "object" ? (rawRole?.name || rawRole?.role || "") : String(rawRole);
+  const normRole = roleStr.toUpperCase().replace(/[\s_-]+/g, "");
+
+  // Super Admin & Co-Admin ONLY can allocate staff, confirm/cancel bookings, and save changes
+  const canEdit = ["SUPERADMIN", "COADMIN", "ADMIN"].includes(normRole);
 
   useEffect(() => {
     fetchConflicts();
@@ -55,8 +51,6 @@ function Bookings() {
   const isBookingConflicted = (bookingId) => {
     return (conflicts || []).some(c => String(c.session_id) === String(bookingId));
   };
-  const normRole = (userRole || "").toUpperCase().replace(/[\s_-]+/g, "");
-  const canEdit = ["SUPERADMIN", "COADMIN", "ADMIN", "DOCTOR"].includes(normRole);
 
   const [bookings, setBookings] = useState([]);
   const [staffList, setStaffList] = useState([]);
@@ -78,10 +72,7 @@ function Bookings() {
   const [openActionMenu, setOpenActionMenu] = useState(null);
 
   // Ref to track which booking we've already pre-filled staff for
-  // Prevents staffList async updates from overwriting the user's checkbox selections
   const staffPrefilledForRef = React.useRef(null);
-
-  // ─── Fetch staff from backend ───
   useEffect(() => {
     const fetchStaff = async () => {
       try {
