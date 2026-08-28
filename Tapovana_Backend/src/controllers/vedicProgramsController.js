@@ -1256,23 +1256,20 @@ const getVedicProgramAttendees = async (req, res) => {
             }
 
             const result = await query('SELECT * FROM vedic_attendees WHERE program_id = $1 ORDER BY created_at DESC', [progId]);
-            const { getMemberTierAndDiscount } = require('./membershipController');
+            const { getValidCustomerMembership } = require('../utils/membershipHelper');
 
             const enrichedAttendees = await Promise.all(result.rows.map(async (att) => {
-                let tier = att.membership_tier;
+                const resolved = await getValidCustomerMembership(att.email, att.name);
+                let tier = 'REGULAR';
                 let discountPct = 0;
-                if (!tier || tier === 'Standard' || tier === 'NONE' || tier === 'N/A') {
-                    const resolved = await getMemberTierAndDiscount(att.email, att.name);
+
+                if (resolved.active) {
                     tier = resolved.tier;
-                    discountPct = resolved.discountPercentage;
-                } else {
-                    const tierRes = await query('SELECT discount_percentage FROM membership_tiers WHERE UPPER(name) = UPPER($1) LIMIT 1', [tier]);
-                    if (tierRes.rows.length && tierRes.rows[0].discount_percentage !== undefined) {
-                        discountPct = parseFloat(tierRes.rows[0].discount_percentage) || 0;
-                    } else {
-                        const defaultDiscounts = { 'SILVER': 15, 'GOLD': 25, 'PLATINUM': 40 };
-                        discountPct = defaultDiscounts[tier.toUpperCase()] || 0;
-                    }
+                    discountPct = Math.round(resolved.discountRate * 100);
+                } else if (att.membership_tier && !['STANDARD', 'REGULAR', 'NONE', 'N/A'].includes(String(att.membership_tier).toUpperCase())) {
+                    tier = String(att.membership_tier).toUpperCase();
+                    const defaultDiscounts = { 'SILVER': 15, 'GOLD': 25, 'PLATINUM': 40 };
+                    discountPct = defaultDiscounts[tier] || 0;
                 }
 
                 let origNum = progPrice;
@@ -1289,10 +1286,10 @@ const getVedicProgramAttendees = async (req, res) => {
 
                 return {
                     ...att,
-                    original_price: att.original_price || origStr,
-                    membership_tier: tier || 'Standard',
-                    discount_amount: att.discount_amount || discStr,
-                    final_price: att.final_price || finalStr
+                    original_price: origStr,
+                    membership_tier: tier.toUpperCase(),
+                    discount_amount: discStr,
+                    final_price: finalStr
                 };
             }));
 
