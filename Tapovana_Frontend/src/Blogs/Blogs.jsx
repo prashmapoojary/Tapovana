@@ -1074,8 +1074,7 @@ export default function Blogs({ mode }) {
           <div className="blog-tabs">
             {[
               { id: "published", label: "Published Blogs", count: adminCounts.published, badgeBg: "#2ecc71" },
-              { id: "pending", label: "Pending Review", count: adminCounts.pending, badgeBg: "#e67e22" },
-              { id: "archived", label: "Archived Blogs", count: adminCounts.archived, badgeBg: "#7f8c8d" }
+              { id: "pending", label: "Pending Review", count: adminCounts.pending, badgeBg: "#e67e22" }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -1106,14 +1105,12 @@ export default function Blogs({ mode }) {
           <div className="blog-section-banner" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", background: "white", borderRadius: "10px", border: "1px solid rgba(205,167,81,0.2)", marginTop: "-8px" }}>
             <div>
               <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#1a202c", margin: 0 }}>
-                {activeTab === "published" && "🟢 Published Blogs"}
-                {activeTab === "pending" && "⏳ Pending Review"}
-                {activeTab === "archived" && "📦 Archived Blogs"}
+                {activeTab === "pending" ? "⏳ Pending Review" : "🟢 Published Blogs"}
               </h2>
               <p style={{ fontSize: "13px", color: "#718096", margin: "3px 0 0 0" }}>
-                {activeTab === "published" && "Approved articles currently live and accessible to users."}
-                {activeTab === "pending" && "Articles submitted by Doctors and Therapists awaiting admin approval."}
-                {activeTab === "archived" && "Archived articles removed from public display."}
+                {activeTab === "pending" 
+                  ? "Articles submitted by Doctors and Therapists awaiting admin approval."
+                  : "Approved articles currently live and accessible to users."}
               </p>
             </div>
             <span style={{ fontSize: "12px", fontWeight: "700", color: "#cda751", background: "rgba(205,167,81,0.12)", padding: "5px 12px", borderRadius: "20px" }}>
