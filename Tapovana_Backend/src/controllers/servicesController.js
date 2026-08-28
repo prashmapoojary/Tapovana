@@ -603,7 +603,7 @@ const getMyAssignments = async (req, res) => {
             const directWs = await query(`
                 SELECT id, title, date, time, duration FROM workshops 
                 WHERE instructor_id = $1 
-                   OR (instructor_name IS NOT NULL AND (LOWER(instructor_name) LIKE $2 OR LOWER(instructor_name) LIKE $3))
+                   OR (instructor IS NOT NULL AND (LOWER(instructor) LIKE $2 OR LOWER(instructor) LIKE $3))
                    OR assigned_staff_ids @> jsonb_build_array($1::text)
             `, [staffUuid, `%${user.email.toLowerCase()}%`, `%${staffName.toLowerCase()}%`]);
 
@@ -656,13 +656,13 @@ const getMyAssignments = async (req, res) => {
                 );
             }
 
-            // 3. Sync Vedic Life Programs matching staff ID, instructor name, or email
+            // 3. Sync Vedic Life Programs matching consultant_id, lead_consultant_id, or assigned_staff_ids
             const directVedic = await query(`
-                SELECT id, title, start_date, end_date, schedule FROM vedic_programs 
-                WHERE instructor_id = $1 
-                   OR (instructor_name IS NOT NULL AND (LOWER(instructor_name) LIKE $2 OR LOWER(instructor_name) LIKE $3))
+                SELECT id, title, start_date, end_date FROM vedic_programs 
+                WHERE consultant_id = $1 
+                   OR lead_consultant_id = $1
                    OR assigned_staff_ids @> jsonb_build_array($1::text)
-            `, [staffUuid, `%${user.email.toLowerCase()}%`, `%${staffName.toLowerCase()}%`]);
+            `, [staffUuid]);
 
             for (const vp of directVedic.rows) {
                 const allocId = `vp-alloc-${vp.id}-${staffUuid}`;
@@ -676,7 +676,7 @@ const getMyAssignments = async (req, res) => {
                 }
                 await query(
                     `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes, status, created_at)
-                     VALUES ($1, $2, 'vedic', $3, $4, $5, $6, $7, $8, 'assigned', NOW())
+                     VALUES ($1, $2, 'vedic_program', $3, $4, $5, $6, $7, $8, 'assigned', NOW())
                      ON CONFLICT (id) DO UPDATE SET 
                        staff_id = EXCLUDED.staff_id,
                        session_title = EXCLUDED.session_title,
@@ -685,7 +685,7 @@ const getMyAssignments = async (req, res) => {
                        booking_time = EXCLUDED.booking_time,
                        duration_minutes = EXCLUDED.duration_minutes,
                        status = 'assigned'`,
-                    [allocId, staffUuid, vp.title, String(vp.id), startDateVal, endDateVal, vp.schedule || '09:00 AM', 120]
+                    [allocId, staffUuid, vp.title, String(vp.id), startDateVal, endDateVal, '09:00 AM', 120]
                 );
             }
         } catch (syncErr) {
