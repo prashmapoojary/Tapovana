@@ -53,7 +53,7 @@ export default function MediaPickerModal({
         }
     }, [isOpen, page_type, category, subcategory]);
 
-    // Handle stock search from backend (Pexels)
+    // Handle stock search from backend (Unsplash)
     const handleSearch = async (searchQuery = query, type = searchType) => {
         const q = searchQuery.trim() || 'wellness';
         setLoading(true);
@@ -69,7 +69,7 @@ export default function MediaPickerModal({
                 const items = type === 'image' ? (res.images || []) : (res.videos || []);
                 setResults(items);
             } else {
-                throw new Error(res.message || "Failed to fetch stock media from Pexels.");
+                throw new Error(res.message || "Failed to fetch stock media from Unsplash.");
             }
         } catch (err) {
             console.error("[Media Search Error]", err.message);
@@ -238,7 +238,7 @@ export default function MediaPickerModal({
                     {loading && (
                         <div className="mp-loading-state">
                             <div className="mp-spinner" />
-                            <p>Searching Pexels stock media...</p>
+                            <p>Searching Unsplash stock media...</p>
                         </div>
                     )}
 
@@ -338,10 +338,10 @@ export default function MediaPickerModal({
                                         )}
                                         <div className="mp-media-info">
                                             <p className="mp-media-desc" title={item.description}>
-                                                {item.description || 'Pexels Media'}
+                                                {item.description || 'Unsplash Media'}
                                             </p>
                                             <p className="mp-media-author">
-                                                by {item.author || 'Pexels Creator'}
+                                                by {item.author || 'Unsplash Creator'}
                                             </p>
                                         </div>
                                     </div>
@@ -354,7 +354,7 @@ export default function MediaPickerModal({
                     {!loading && (backendDown || (!error && results.length === 0)) && (
                         <div className="mp-empty-state" style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>
                             <div style={{ color: '#718096' }}>
-                                <p style={{ fontSize: '16px', fontWeight: 'bold', margin: '0 0 4px' }}>No stock media found on Pexels.</p>
+                                <p style={{ fontSize: '16px', fontWeight: 'bold', margin: '0 0 4px' }}>No stock media found on Unsplash.</p>
                                 <p style={{ fontSize: '13px', margin: 0 }}>Try adjusting your search terms or upload a file directly below.</p>
                             </div>
 
@@ -414,7 +414,7 @@ export default function MediaPickerModal({
                         {selectedItem ? (
                             <span>Selected: <strong style={{ color: '#CDA751' }}>{selectedItem.type === 'video' ? '🎥 Video' : '📷 Image'}</strong> (Double-click to quick-save)</span>
                         ) : (
-                            <span>Select an item from Pexels or use upload fallback.</span>
+                            <span>Select an item from Unsplash or use upload fallback.</span>
                         )}
                     </div>
                     <div style={{ display: 'flex', gap: '12px' }}>

@@ -1806,7 +1806,7 @@ export default function Workshops() {
         onClose={() => setMediaModalOpen(false)}
         onSelect={handleSelectStockMedia}
         allowVideos={mediaPickerType === 'video'}
-        title={mediaPickerType === 'image' ? "Select Pexels Photo" : "Select Stock Video"}
+        title={mediaPickerType === 'image' ? "Select Unsplash Photo" : "Select Unsplash Video"}
         page_type="workshops"
         category={((mediaTarget === 'add_image' || mediaTarget === 'add_video') ? addForm : editForm)?.category || 'Yoga'}
         subcategory="All"

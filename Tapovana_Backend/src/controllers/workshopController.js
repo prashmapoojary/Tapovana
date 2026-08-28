@@ -1703,8 +1703,9 @@ const autoUpdateWorkshopStatuses = async () => {
 
                 // Send general completion email to staff only during the initial transition
                 if (isInitialCompletion) {
-                    const staffIds = w.assigned_staff_ids || [];
-                    const validStaffIds = staffIds.filter(id => isValidUUID(id));
+                    const rawStaff = w.assigned_staff_ids || [];
+                    const staffIds = Array.isArray(rawStaff) ? rawStaff : (typeof rawStaff === 'string' ? JSON.parse(rawStaff || '[]') : []);
+                    const validStaffIds = Array.isArray(staffIds) ? staffIds.filter(id => isValidUUID(id)) : [];
                     for (const staffId of validStaffIds) {
                         const staffRes = await query('SELECT email, first_name, last_name FROM team_members WHERE id = $1', [staffId]);
                         if (staffRes.rows.length) {
