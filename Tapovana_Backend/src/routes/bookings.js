@@ -11,8 +11,8 @@ const {
     createBooking
 } = require('../controllers/bookingsController');
 
-const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'ADMIN')];
-const staffOrAdmin = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'ADMIN', 'DOCTOR', 'THERAPIST')];
+const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'SUPER ADMIN', 'CO_ADMIN', 'CO ADMIN', 'ADMIN', 'DOCTOR')];
+const staffOrAdmin = [authenticate, requireRole('SUPER_ADMIN', 'SUPER ADMIN', 'CO_ADMIN', 'CO ADMIN', 'ADMIN', 'DOCTOR', 'THERAPIST')];
 
 // Read routes — accessible by all staff and admins
 router.get('/', getAllBookings);
