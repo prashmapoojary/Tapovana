@@ -322,26 +322,30 @@ exports.getAnalyticsDashboard = async (req, res) => {
     });
 
     const service_demand_workshops = {};
-    workshopsDemandRes.forEach ? workshopsDemandRes.rows.forEach((r, idx) => {
-      service_demand_workshops[`WS-${idx + 1}`] = {
-        count: parseInt(r.count, 10),
-        name: r.name,
-        category: r.category,
-        price: parseFloat(r.price)
-      };
-    }) : null;
+    if (workshopsDemandRes && Array.isArray(workshopsDemandRes.rows)) {
+      workshopsDemandRes.rows.forEach((r, idx) => {
+        service_demand_workshops[`WS-${idx + 1}`] = {
+          count: parseInt(r.count, 10),
+          name: r.name,
+          category: r.category,
+          price: parseFloat(r.price)
+        };
+      });
+    }
 
     const service_demand_vedic = {};
-    vedicDemandRes.forEach ? vedicDemandRes.rows.forEach((r, idx) => {
-      service_demand_vedic[`VL-${idx + 1}`] = {
-        count: parseInt(r.count, 10),
-        name: r.name,
-        category: r.category,
-        price: parseFloat(r.price)
-      };
-    }) : null;
+    if (vedicDemandRes && Array.isArray(vedicDemandRes.rows)) {
+      vedicDemandRes.rows.forEach((r, idx) => {
+        service_demand_vedic[`VL-${idx + 1}`] = {
+          count: parseInt(r.count, 10),
+          name: r.name,
+          category: r.category,
+          price: parseFloat(r.price)
+        };
+      });
+    }
 
-    const service_demand = { ...service_demand_services, ...service_demand_workshops };
+    const service_demand = { ...service_demand_services, ...service_demand_workshops, ...service_demand_vedic };
 
     res.json({
       success: true,

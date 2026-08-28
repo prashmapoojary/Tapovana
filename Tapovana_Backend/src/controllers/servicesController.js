@@ -574,13 +574,18 @@ const getMyAssignments = async (req, res) => {
             return res.status(401).json({ success: false, message: 'User ID not found.' });
         }
 
+        const trimmedId = String(userId).trim();
         const userResult = await query(
             `SELECT tm.id, tm.first_name, tm.last_name, tm.email, tm.phone, tm.availability_status, tm.allocation_details, r.name AS role 
              FROM team_members tm 
              JOIN roles r ON r.id = tm.role_id 
-             WHERE tm.id::text = $1 OR tm.email ILIKE $1 
+             WHERE tm.id::text = $1 
+                OR tm.email ILIKE $1 
+                OR LOWER(CONCAT(tm.first_name, ' ', tm.last_name)) ILIKE $2 
+                OR LOWER(tm.first_name) ILIKE $2 
+                OR LOWER(tm.last_name) ILIKE $2
              LIMIT 1`,
-            [userId]
+            [trimmedId, `%${trimmedId}%`]
         );
 
         if (!userResult.rows.length) {
@@ -591,6 +596,64 @@ const getMyAssignments = async (req, res) => {
         const staffUuid = user.id;
         const staffCode = `STAFF-${String(staffUuid).slice(0, 6).toUpperCase()}`;
         const staffName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+
+        // Auto-sync direct workshop allocations into allocations table
+        try {
+            const directWs = await query(`
+                SELECT id, title, date, time, duration FROM workshops 
+                WHERE instructor_id = $1 OR assigned_staff_ids @> jsonb_build_array($1::text)
+            `, [staffUuid]);
+
+            for (const ws of directWs.rows) {
+                const allocId = `ws-alloc-${ws.id}-${staffUuid}`;
+                let dateVal = new Date().toISOString().split('T')[0];
+                if (ws.date) {
+                    dateVal = ws.date instanceof Date ? ws.date.toISOString().split('T')[0] : String(ws.date).split('T')[0];
+                }
+                await query(
+                    `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes, status, created_at)
+                     VALUES ($1, $2, 'workshop', $3, $4, $5, $6, $7, $8, 'assigned', NOW())
+                     ON CONFLICT (id) DO UPDATE SET 
+                       staff_id = EXCLUDED.staff_id,
+                       session_title = EXCLUDED.session_title,
+                       start_date = EXCLUDED.start_date,
+                       end_date = EXCLUDED.end_date,
+                       booking_time = EXCLUDED.booking_time,
+                       duration_minutes = EXCLUDED.duration_minutes,
+                       status = 'assigned'`,
+                    [allocId, staffUuid, ws.title, String(ws.id), dateVal, dateVal, ws.time || '10:00 AM', ws.duration || 60]
+                );
+            }
+
+            // Auto-sync direct booking allocations into allocations table
+            const directBk = await query(`
+                SELECT id, service_name, booking_date, booking_time, status FROM bookings 
+                WHERE therapist_id = $1 AND status != 'CANCELLED'
+            `, [staffUuid]);
+
+            for (const bk of directBk.rows) {
+                const allocId = `bk-alloc-${bk.id}-${staffUuid}`;
+                let dateVal = new Date().toISOString().split('T')[0];
+                if (bk.booking_date) {
+                    dateVal = bk.booking_date instanceof Date ? bk.booking_date.toISOString().split('T')[0] : String(bk.booking_date).split('T')[0];
+                }
+                await query(
+                    `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes, status, created_at)
+                     VALUES ($1, $2, 'service', $3, $4, $5, $6, $7, $8, $9, NOW())
+                     ON CONFLICT (id) DO UPDATE SET 
+                       staff_id = EXCLUDED.staff_id,
+                       session_title = EXCLUDED.session_title,
+                       start_date = EXCLUDED.start_date,
+                       end_date = EXCLUDED.end_date,
+                       booking_time = EXCLUDED.booking_time,
+                       duration_minutes = EXCLUDED.duration_minutes,
+                       status = EXCLUDED.status`,
+                    [allocId, staffUuid, bk.service_name || 'Service Session', String(bk.id), dateVal, dateVal, bk.booking_time || '10:00 AM', 60, bk.status ? bk.status.toLowerCase() : 'assigned']
+                );
+            }
+        } catch (syncErr) {
+            console.warn('[getMyAssignments] Auto-sync allocations warning:', syncErr.message);
+        }
 
         const assignments = [];
 

@@ -7,8 +7,8 @@ const pool = new Pool({
 });
 
 async function checkCols() {
-  const cols = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'login_credentials'");
-  console.log("login_credentials columns:", cols.rows.map(r => r.column_name));
+  const cols = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'bookings'");
+  console.log("bookings columns:", cols.rows.map(r => r.column_name));
   await pool.end();
 }
 

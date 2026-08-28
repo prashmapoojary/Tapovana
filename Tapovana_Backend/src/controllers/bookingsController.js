@@ -879,20 +879,21 @@ const updateBookingStatus = async (req, res) => {
                 for (const removedId of allocDiff.removedIds) {
                     const staffInfo = staffMap[removedId];
                     if (!staffInfo) {
-                        const removedRes = await query(
-                            'SELECT first_name, last_name, email FROM team_members WHERE id = $1', [removedId]
-                        );
-                        if (removedRes.rows.length) {
-                            const r = removedRes.rows[0];
-                            await sendBookingRemovalEmail({
-                                to: r.email,
-                                staffName: `${r.first_name} ${r.last_name}`.trim(),
-                                bookingId: booking.id,
-                                details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time, customer: booking.user_name }
-                            }).catch(e => console.error('[RemovalEmail] Error:', e));
-                        }
+                        query('SELECT first_name, last_name, email FROM team_members WHERE id = $1', [removedId])
+                            .then(removedRes => {
+                                if (removedRes.rows.length) {
+                                    const r = removedRes.rows[0];
+                                    sendBookingRemovalEmail({
+                                        to: r.email,
+                                        staffName: `${r.first_name} ${r.last_name}`.trim(),
+                                        bookingId: booking.id,
+                                        details: { service: booking.service_name, date: booking.booking_date, time: booking.booking_time, customer: booking.user_name }
+                                    }).catch(e => console.error('[RemovalEmail] Error:', e));
+                                }
+                            })
+                            .catch(e => console.error('[RemovalEmail] Query error:', e));
                     } else {
-                        await sendBookingRemovalEmail({
+                        sendBookingRemovalEmail({
                             to: staffInfo.email,
                             staffName: staffInfo.name,
                             bookingId: booking.id,
@@ -907,7 +908,7 @@ const updateBookingStatus = async (req, res) => {
                 for (const addedId of allocDiff.addedIds) {
                     const staffInfo = staffMap[addedId];
                     if (staffInfo) {
-                        await sendBookingAllocationEmail({
+                        sendBookingAllocationEmail({
                             to: staffInfo.email,
                             staffName: staffInfo.name,
                             bookingId: booking.id,
@@ -1047,9 +1048,9 @@ const assignTherapist = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Booking not found.' });
         }
         const booking = bookingRes.rows[0];
-        if (booking.status !== 'CONFIRMED') {
-            await logBookingAudit(booking.id, 'ERROR', therapist_id, therapist_name, 'Staff allocation is only available for confirmed bookings.');
-            return res.status(400).json({ success: false, message: 'Staff allocation is only available for confirmed bookings.' });
+        if (booking.status === 'COMPLETED' || booking.status === 'CANCELLED') {
+            await logBookingAudit(booking.id, 'ERROR', therapist_id, therapist_name, 'Staff allocation cannot be changed for completed or cancelled bookings.');
+            return res.status(400).json({ success: false, message: 'Staff allocation cannot be changed for completed or cancelled bookings.' });
         }
         const oldTherapistId = booking.therapist_id;
 

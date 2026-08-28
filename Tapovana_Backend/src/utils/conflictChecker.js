@@ -56,6 +56,18 @@ const checkStaffAllocationConflict = async ({
     const serviceCount = serviceAllocations.length;
     const workshopCount = workshopAllocations.length;
 
+    // Fetch staff name for detailed error message
+    let staffName = '';
+    try {
+        const staffRes = await query(`SELECT first_name, last_name FROM team_members WHERE id = $1`, [staffId]);
+        if (staffRes.rows.length) {
+            staffName = `${staffRes.rows[0].first_name || ''} ${staffRes.rows[0].last_name || ''}`.trim();
+        }
+    } catch (e) { }
+
+    const sName = staffName ? `"${staffName}"` : 'the staff member';
+    const sNamePrefix = staffName ? `Staff member "${staffName}"` : 'This staff member';
+
     // ── Rule 4: Vedic Life active check (Enforcement Priority 1) ──
     if (vedicAlloc) {
         const startStr = new Date(vedicAlloc.start_date).toISOString().split('T')[0];
@@ -63,7 +75,7 @@ const checkStaffAllocationConflict = async ({
         return {
             conflict: true,
             reasonCode: 'VEDIC_LIFE_ACTIVE',
-            message: `This staff member is currently assigned to an active Vedic Life package from ${startStr} to ${endStr}. They cannot be allocated to any service or workshop until this package ends.`
+            message: `${sNamePrefix} is currently assigned to an active Vedic Life package from ${startStr} to ${endStr}. They cannot be allocated to any service or workshop until this package ends.`
         };
     }
 
@@ -72,7 +84,7 @@ const checkStaffAllocationConflict = async ({
             return {
                 conflict: true,
                 reasonCode: 'TIME_CONFLICT',
-                message: 'Cannot allocate a Vedic Life Program when the staff already has services or workshops assigned on overlapping dates.'
+                message: `Cannot allocate a Vedic Life Program to ${sName} because ${sName} already has services or workshops assigned on overlapping dates.`
             };
         }
     }
@@ -89,7 +101,7 @@ const checkStaffAllocationConflict = async ({
             return {
                 conflict: true,
                 reasonCode: 'TIME_CONFLICT',
-                message: `This staff member is already booked for another ${existingType} during this time slot on ${date}. Please choose a different time or staff member.`
+                message: `${sNamePrefix} is already booked for another ${existingType} during this time slot on ${date}. Please choose a different time or staff member.`
             };
         }
     }
@@ -99,7 +111,7 @@ const checkStaffAllocationConflict = async ({
         return {
             conflict: true,
             reasonCode: 'DAILY_SERVICE_CAP_REACHED',
-            message: 'This staff member has already reached the maximum of 3 services for the selected day. No further service, workshop, or Vedic Life package can be assigned to them on this date.'
+            message: `${sNamePrefix} has already reached the maximum of 3 services for the selected day. No further service, workshop, or Vedic Life package can be assigned to them on this date.`
         };
     }
 
@@ -109,7 +121,7 @@ const checkStaffAllocationConflict = async ({
             return {
                 conflict: true,
                 reasonCode: 'SERVICE_BLOCKED_BY_WORKSHOP',
-                message: 'This staff member already has 2 services and 1 workshop for this day, so a 3rd service cannot be added. Maximum daily capacity reached.'
+                message: `${sNamePrefix} already has 2 services and 1 workshop for this day, so a 3rd service cannot be added. Maximum daily capacity reached.`
             };
         }
     } else if (type === 'workshop') {
@@ -118,13 +130,13 @@ const checkStaffAllocationConflict = async ({
                 return {
                     conflict: true,
                     reasonCode: 'WORKSHOP_LIMIT_REACHED',
-                    message: 'This staff member already has 2 services and 1 workshop allocated for this day. No additional workshop can be added.'
+                    message: `${sNamePrefix} already has 2 services and 1 workshop allocated for this day. No additional workshop can be added.`
                 };
             } else {
                 return {
                     conflict: true,
                     reasonCode: 'WORKSHOP_LIMIT_REACHED',
-                    message: 'This staff member is already allocated to a workshop on this day. No additional workshop can be added.'
+                    message: `${sNamePrefix} is already allocated to a workshop on this day. No additional workshop can be added.`
                 };
             }
         }

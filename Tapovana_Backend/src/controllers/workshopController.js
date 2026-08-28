@@ -420,7 +420,7 @@ const getWorkshopById = async (req, res) => {
 
 // CREATE WORKSHOP
 const createWorkshop = async (req, res) => {
-    const { title, category, instructor, date, time, duration, capacity, price, status, description, image_url, video_url, assigned_staff_ids, customer_email } = req.body;
+    let { title, category, instructor, date, time, duration, capacity, price, status, description, image_url, video_url, assigned_staff_ids, customer_email } = req.body;
 
     if (!title) {
         return res.status(400).json({ success: false, message: 'Workshop title is required.' });
@@ -621,7 +621,7 @@ const createWorkshop = async (req, res) => {
 
 // UPDATE WORKSHOP
 const updateWorkshop = async (req, res) => {
-    const { title, category, instructor, date, time, duration, capacity, price, status, description, image_url, video_url, assigned_staff_ids, customer_email } = req.body;
+    let { title, category, instructor, date, time, duration, capacity, price, status, description, image_url, video_url, assigned_staff_ids, customer_email } = req.body;
 
     // Verify time format if updated
     if (time !== undefined && time !== null) {

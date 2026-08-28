@@ -8,8 +8,8 @@ const validateVedicAttendee = (data, isNew = true) => {
         if (!name || typeof name !== 'string' || !/^[A-Za-z\s]+$/.test(name) || name.trim().length < 2) {
             return 'Name is required, must contain alphabets only, and be at least 2 characters.';
         }
-        if (!email || typeof email !== 'string' || !email.trim().toLowerCase().endsWith('.com') || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-            return 'Valid email format ending with .com is required.';
+        if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            return 'Valid email format is required.';
         }
         if (!phone || typeof phone !== 'string' || !/^\d{10}$/.test(phone.trim())) {
             return 'Phone number must be exactly 10 digits and numeric only.';
@@ -21,8 +21,8 @@ const validateVedicAttendee = (data, isNew = true) => {
             }
         }
         if (email !== undefined) {
-            if (typeof email !== 'string' || !email.trim().toLowerCase().endsWith('.com') || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-                return 'Valid email format ending with .com is required.';
+            if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+                return 'Valid email format is required.';
             }
         }
         if (phone !== undefined) {
@@ -40,13 +40,13 @@ const validateVedicAttendee = (data, isNew = true) => {
     }
 
     if (accommodation_type) {
-        if (typeof accommodation_type !== 'string' || !/^[A-Za-z\s0-9-]+$/.test(accommodation_type)) {
-            return 'Accommodation type must be text only.';
+        if (typeof accommodation_type !== 'string' || !/^[A-Za-z0-9\s\-_,().]+$/.test(accommodation_type)) {
+            return 'Accommodation type must be valid text.';
         }
     }
 
     if (payment_status) {
-        const validPayment = ['PAID','PENDING','PARTIALLY_PAID'];
+        const validPayment = ['PAID','PENDING','PARTIALLY_PAID','CONFIRMED','COMPLETED','UNPAID'];
         if (!validPayment.includes(payment_status.toUpperCase())) {
             return `Payment Status must be one of: ${validPayment.join(', ')}.`;
         }
@@ -332,8 +332,9 @@ const createVedicProgram = async (req, res) => {
                 return res.status(400).json({ success: false, message: 'Selected lead consultant is not active.' });
             }
             const roleLower = consultant.role_name.toLowerCase();
-            if (roleLower !== 'doctor' && roleLower !== 'therapist') {
-                return res.status(400).json({ success: false, message: 'Selected lead consultant must have a doctor or therapist role.' });
+            const validRoles = ['doctor', 'therapist', 'super admin', 'co admin', 'admin'];
+            if (!validRoles.includes(roleLower)) {
+                return res.status(400).json({ success: false, message: 'Selected lead consultant must have a doctor, therapist, or admin role.' });
             }
 
             const start = new Date(startDate);
@@ -383,8 +384,9 @@ const createVedicProgram = async (req, res) => {
                 return res.status(400).json({ success: false, message: `Specialist ${s.first_name} ${s.last_name} is not active.` });
             }
             const roleLower = s.role_name.toLowerCase();
-            if (roleLower !== 'doctor' && roleLower !== 'therapist') {
-                return res.status(400).json({ success: false, message: `Specialist ${s.first_name} ${s.last_name} must have a doctor or therapist role.` });
+            const validRoles = ['doctor', 'therapist', 'super admin', 'co admin', 'admin'];
+            if (!validRoles.includes(roleLower)) {
+                return res.status(400).json({ success: false, message: `Specialist ${s.first_name} ${s.last_name} must have a doctor, therapist, or admin role.` });
             }
 
             const start = new Date(startDate);
@@ -431,10 +433,9 @@ const createVedicProgram = async (req, res) => {
 
         const { sendVedicStaffAssignmentEmail } = require('../services/emailService');
         if (finalLeadId) {
-            const leadRes = await query("SELECT first_name, last_name, email FROM team_members WHERE id = $1", [finalLeadId]);
-            if (leadRes.rows.length && leadRes.rows[0].email) {
-                try {
-                    await sendVedicStaffAssignmentEmail({
+            query("SELECT first_name, last_name, email FROM team_members WHERE id = $1", [finalLeadId]).then(leadRes => {
+                if (leadRes.rows.length && leadRes.rows[0].email) {
+                    sendVedicStaffAssignmentEmail({
                         to: leadRes.rows[0].email,
                         staffName: `${leadRes.rows[0].first_name} ${leadRes.rows[0].last_name}`,
                         programTitle: newProgram.title,
@@ -442,18 +443,15 @@ const createVedicProgram = async (req, res) => {
                         startDate: newProgram.start_date,
                         endDate: newProgram.end_date,
                         time: newProgram.time
-                    });
-                } catch (err) {
-                    console.error('Failed to send assignment email to lead consultant:', err);
+                    }).catch(err => console.error('Failed to send assignment email to lead consultant:', err));
                 }
-            }
+            }).catch(err => console.error('Error fetching lead consultant for email:', err));
         }
 
         for (const staffId of staffIds) {
-            const staffRes = await query("SELECT first_name, last_name, email FROM team_members WHERE id = $1", [staffId]);
-            if (staffRes.rows.length && staffRes.rows[0].email) {
-                try {
-                    await sendVedicStaffAssignmentEmail({
+            query("SELECT first_name, last_name, email FROM team_members WHERE id = $1", [staffId]).then(staffRes => {
+                if (staffRes.rows.length && staffRes.rows[0].email) {
+                    sendVedicStaffAssignmentEmail({
                         to: staffRes.rows[0].email,
                         staffName: `${staffRes.rows[0].first_name} ${staffRes.rows[0].last_name}`,
                         programTitle: newProgram.title,
@@ -461,11 +459,9 @@ const createVedicProgram = async (req, res) => {
                         startDate: newProgram.start_date,
                         endDate: newProgram.end_date,
                         time: newProgram.time
-                    });
-                } catch (err) {
-                    console.error('Failed to send assignment email to specialist:', err);
+                    }).catch(err => console.error('Failed to send assignment email to specialist:', err));
                 }
-            }
+            }).catch(err => console.error('Error fetching specialist for email:', err));
         }
 
         await autoUpdateVedicProgramStatuses();
@@ -558,8 +554,9 @@ const updateVedicProgram = async (req, res) => {
                 return res.status(400).json({ success: false, message: 'Selected lead consultant is not active.' });
             }
             const roleLower = consultant.role_name.toLowerCase();
-            if (roleLower !== 'doctor' && roleLower !== 'therapist') {
-                return res.status(400).json({ success: false, message: 'Selected lead consultant must have a doctor or therapist role.' });
+            const validRoles = ['doctor', 'therapist', 'super admin', 'co admin', 'admin'];
+            if (!validRoles.includes(roleLower)) {
+                return res.status(400).json({ success: false, message: 'Selected lead consultant must have a doctor, therapist, or admin role.' });
             }
         }
 
@@ -614,8 +611,9 @@ const updateVedicProgram = async (req, res) => {
                     return res.status(400).json({ success: false, message: `Specialist ${s.first_name} ${s.last_name} is not active.` });
                 }
                 const roleLower = s.role_name.toLowerCase();
-                if (roleLower !== 'doctor' && roleLower !== 'therapist') {
-                    return res.status(400).json({ success: false, message: `Specialist ${s.first_name} ${s.last_name} must have a doctor or therapist role.` });
+                const validRoles = ['doctor', 'therapist', 'super admin', 'co admin', 'admin'];
+                if (!validRoles.includes(roleLower)) {
+                    return res.status(400).json({ success: false, message: `Specialist ${s.first_name} ${s.last_name} must have a doctor, therapist, or admin role.` });
                 }
 
                 const start = new Date(finalStartDate);
@@ -715,59 +713,50 @@ const updateVedicProgram = async (req, res) => {
                 changesStr += `Dates updated to: ${new Date(updatedProgram.start_date).toLocaleDateString()} to ${new Date(updatedProgram.end_date).toLocaleDateString()}\n`;
             }
 
-            const attendeesRes = await query('SELECT name, email FROM vedic_attendees WHERE program_id = $1 AND status NOT IN (\'CANCELLED\')', [programId]);
-            for (const a of attendeesRes.rows) {
-                if (a.email) {
-                    try {
-                        await sendVedicUpdateEmail({
+            query('SELECT name, email FROM vedic_attendees WHERE program_id = $1 AND status NOT IN (\'CANCELLED\')', [programId]).then(attendeesRes => {
+                for (const a of attendeesRes.rows) {
+                    if (a.email) {
+                        sendVedicUpdateEmail({
                             to: a.email,
                             userName: a.name,
                             programTitle: updatedProgram.title,
                             changes: changesStr
-                        });
-                    } catch (err) {
-                        console.error('Failed to send update email to attendee:', err);
+                        }).catch(err => console.error('Failed to send update email to attendee:', err));
                     }
                 }
-            }
+            }).catch(err => console.error('Error fetching attendees for update email:', err));
 
             if (updatedProgram.lead_consultant_id) {
-                const leadRes = await query('SELECT first_name, last_name, email FROM team_members WHERE id = $1', [updatedProgram.lead_consultant_id]);
-                if (leadRes.rows.length && leadRes.rows[0].email) {
-                    try {
-                        await sendVedicUpdateEmail({
+                query('SELECT first_name, last_name, email FROM team_members WHERE id = $1', [updatedProgram.lead_consultant_id]).then(leadRes => {
+                    if (leadRes.rows.length && leadRes.rows[0].email) {
+                        sendVedicUpdateEmail({
                             to: leadRes.rows[0].email,
                             userName: `${leadRes.rows[0].first_name} ${leadRes.rows[0].last_name}`,
                             programTitle: updatedProgram.title,
                             changes: changesStr
-                        });
-                    } catch (err) {
-                        console.error('Failed to send update email to lead:', err);
+                        }).catch(err => console.error('Failed to send update email to lead:', err));
                     }
-                }
+                }).catch(err => console.error('Error fetching lead for update email:', err));
             }
 
-            const specialistsRes = await query(
+            query(
                 `SELECT tm.first_name, tm.last_name, tm.email 
                  FROM vedic_program_staff vps
                  JOIN team_members tm ON tm.id = vps.staff_id
                  WHERE vps.program_id = $1`,
                 [programId]
-            );
-            for (const staff of specialistsRes.rows) {
-                if (staff.email) {
-                    try {
-                        await sendVedicUpdateEmail({
+            ).then(specialistsRes => {
+                for (const staff of specialistsRes.rows) {
+                    if (staff.email) {
+                        sendVedicUpdateEmail({
                             to: staff.email,
                             userName: `${staff.first_name} ${staff.last_name}`,
                             programTitle: updatedProgram.title,
                             changes: changesStr
-                        });
-                    } catch (err) {
-                        console.error('Failed to send update email to staff:', err);
+                        }).catch(err => console.error('Failed to send update email to staff:', err));
                     }
                 }
-            }
+            }).catch(err => console.error('Error fetching staff for update email:', err));
         }
 
         await autoUpdateVedicProgramStatuses();
@@ -843,8 +832,9 @@ const updateVedicProgramStaff = async (req, res) => {
                 return res.status(400).json({ success: false, message: `Staff member ${staff.first_name} ${staff.last_name} is not active.` });
             }
             const roleLower = staff.role_name.toLowerCase();
-            if (roleLower !== 'doctor' && roleLower !== 'therapist') {
-                return res.status(400).json({ success: false, message: `Staff member ${staff.first_name} ${staff.last_name} must have a doctor or therapist role.` });
+            const validRoles = ['doctor', 'therapist', 'super admin', 'co admin', 'admin'];
+            if (!validRoles.includes(roleLower)) {
+                return res.status(400).json({ success: false, message: `Staff member ${staff.first_name} ${staff.last_name} must have a doctor, therapist, or admin role.` });
             }
 
             const start = new Date(program.start_date);
@@ -1026,33 +1016,25 @@ const registerAttendee = async (req, res) => {
         }
 
         const { sendVedicRegistrationEmail, sendVedicAdminRegistrationNotification } = require('../services/emailService');
-        try {
-            await sendVedicRegistrationEmail({
-                to: email.toLowerCase().trim(),
-                userName: name.trim(),
-                programTitle: program.title,
-                startDate: program.start_date,
-                endDate: program.end_date,
-                time: program.time,
-                status: 'registered',
-                assignedStaff: assignedStaffStr
-            });
-        } catch (err) {
-            console.error('Failed to send registration confirmation email:', err);
-        }
+        sendVedicRegistrationEmail({
+            to: email.toLowerCase().trim(),
+            userName: name.trim(),
+            programTitle: program.title,
+            startDate: program.start_date,
+            endDate: program.end_date,
+            time: program.time,
+            status: 'registered',
+            assignedStaff: assignedStaffStr
+        }).catch(err => console.error('Failed to send registration confirmation email:', err));
 
-        try {
-            const adminEmail = process.env.ADMIN_EMAIL || 'prashmapoojary@gmail.com';
-            await sendVedicAdminRegistrationNotification({
-                to: adminEmail,
-                participantName: name.trim(),
-                participantEmail: email.toLowerCase().trim(),
-                participantPhone: phone ? phone.trim() : null,
-                programTitle: program.title
-            });
-        } catch (err) {
-            console.error('Failed to send admin notification email:', err);
-        }
+        const adminEmail = process.env.ADMIN_EMAIL || 'prashmapoojary@gmail.com';
+        sendVedicAdminRegistrationNotification({
+            to: adminEmail,
+            participantName: name.trim(),
+            participantEmail: email.toLowerCase().trim(),
+            participantPhone: phone ? phone.trim() : null,
+            programTitle: program.title
+        }).catch(err => console.error('Failed to send admin notification email:', err));
 
         const attendee = result.rows[0];
         return res.status(201).json({
@@ -1169,20 +1151,16 @@ const enrollUserInVedicProgram = async (req, res) => {
         }
 
         const { sendVedicRegistrationEmail } = require('../services/emailService');
-        try {
-            await sendVedicRegistrationEmail({
-                to: email.toLowerCase().trim(),
-                userName: name.trim(),
-                programTitle: program.title,
-                startDate: program.start_date,
-                endDate: program.end_date,
-                time: program.time,
-                status: 'confirmed',
-                assignedStaff: assignedStaffStr
-            });
-        } catch (err) {
-            console.error('Failed to send enrollment email to manually added user:', err);
-        }
+        sendVedicRegistrationEmail({
+            to: email.toLowerCase().trim(),
+            userName: name.trim(),
+            programTitle: program.title,
+            startDate: program.start_date,
+            endDate: program.end_date,
+            time: program.time,
+            status: 'confirmed',
+            assignedStaff: assignedStaffStr
+        }).catch(err => console.error('Failed to send enrollment confirmation email:', err));
 
         const attendee = result.rows[0];
         return res.status(201).json({
@@ -1201,7 +1179,7 @@ const enrollUserInVedicProgram = async (req, res) => {
 // Helper: Sync mobile Vedic Life members into DB
 const syncMobileVedicMembers = async (programId = null) => {
     try {
-        const response = await fetch('https://tapoclg.onrender.com/api/vedic-packages/members', { signal: AbortSignal.timeout(8000) });
+        const response = await fetch('https://tapoclg.onrender.com/api/vedic-packages/members', { signal: AbortSignal.timeout(3000) });
         if (response.ok) {
             const data = await response.json();
             const remoteMembers = data.success ? (data.members || []) : [];

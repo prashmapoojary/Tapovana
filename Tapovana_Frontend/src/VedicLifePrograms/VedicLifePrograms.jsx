@@ -935,8 +935,8 @@ export default function VedicLifePrograms() {
       return;
     }
     const emailLower = manualEnrollForm.email.trim().toLowerCase();
-    if (!emailLower.endsWith(".com") || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailLower)) {
-      setManualEnrollError("Valid email format ending with .com is required.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailLower)) {
+      setManualEnrollError("Valid email format is required.");
       return;
     }
 
@@ -950,8 +950,8 @@ export default function VedicLifePrograms() {
     }
 
     if (manualEnrollForm.accommodationType && manualEnrollForm.accommodationType.trim()) {
-      if (!/^[A-Za-z\s0-9-]+$/.test(manualEnrollForm.accommodationType.trim())) {
-        setManualEnrollError("Accommodation type must be text only.");
+      if (!/^[A-Za-z0-9\s\-_,().]+$/.test(manualEnrollForm.accommodationType.trim())) {
+        setManualEnrollError("Accommodation type must be valid text.");
         return;
       }
     }
@@ -1440,7 +1440,7 @@ export default function VedicLifePrograms() {
                 <>
                   <button className="vedic-btn-cancel" style={{ flex: 1 }} onClick={handleStartEdit}>Edit Program</button>
                   <button className="vedic-btn-allocate" style={{ flex: 1.5 }} onClick={handleAllocateInstructor}>
-                    {p.consultant_id ? "Re-allocate Instructor" : "Allocate Consultant"}
+                    Reallocate Consultant
                   </button>
                   <button className="vedic-btn-cancel" style={{ flex: 1, borderColor: "#e74c3c", color: "#e74c3c" }} onClick={handleCancelProgram}>
                     Cancel Program
@@ -1458,7 +1458,7 @@ export default function VedicLifePrograms() {
                   </span>
                   <div style={{ display: "flex", gap: 12 }}>
                     <button className="vedic-btn-allocate" style={{ flex: 1 }} onClick={handleAllocateInstructor}>
-                      {p.consultant_id ? "Re-allocate Instructor" : "Allocate Consultant"}
+                      Reallocate Consultant
                     </button>
                   </div>
                 </div>

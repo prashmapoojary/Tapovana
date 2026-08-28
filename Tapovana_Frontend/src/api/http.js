@@ -1,5 +1,7 @@
 import { getToken } from "../utils/session";
 
+export const PROD_API_BASE = "https://tapovana.onrender.com";
+
 export const getApiBase = () => {
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
@@ -16,7 +18,7 @@ export const getApiBase = () => {
   const envUrl = (import.meta && import.meta.env) ? (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL) : null;
   if (envUrl && !envUrl.includes("tapovana.onrender.com")) return envUrl;
 
-  return "https://tapovana.onrender.com";
+  return PROD_API_BASE;
 };
 
 export const API_BASE = getApiBase();
@@ -30,8 +32,20 @@ export async function apiFetch(path, options = {}) {
 
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const url = path.startsWith("http://") || path.startsWith("https://") ? path : `${API_BASE}${path}`;
-  const res = await fetch(url, { ...options, headers });
+  let url = path.startsWith("http://") || path.startsWith("https://") ? path : `${API_BASE}${path}`;
+  
+  let res;
+  try {
+    res = await fetch(url, { ...options, headers });
+  } catch (netErr) {
+    if (url.includes("localhost:5000") || url.includes("127.0.0.1:5000")) {
+      console.warn("[http.js] Local connection failed. Falling back to production backend:", PROD_API_BASE);
+      const fallbackUrl = path.startsWith("http://") || path.startsWith("https://") ? path.replace(/http:\/\/(localhost|127\.0\.0\.1):5000/, PROD_API_BASE) : `${PROD_API_BASE}${path}`;
+      res = await fetch(fallbackUrl, { ...options, headers });
+    } else {
+      throw netErr;
+    }
+  }
 
   if (res.status === 401) {
     sessionStorage.clear();

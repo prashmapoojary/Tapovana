@@ -301,7 +301,7 @@ export default function Blogs({ mode }) {
       if (categoryFilter !== "ALL") params.set("category", categoryFilter);
       if (search) params.set("search", search);
 
-      if (activeTab) {
+      if (!isAdmin && activeTab) {
         params.set("status", activeTab);
       }
 
@@ -314,7 +314,7 @@ export default function Blogs({ mode }) {
     } finally {
       setLoading(false);
     }
-  }, [categoryFilter, search, activeTab]);
+  }, [categoryFilter, search, activeTab, isAdmin]);
 
   useEffect(() => {
     if (!id && !mode) fetchBlogs();
@@ -342,10 +342,19 @@ export default function Blogs({ mode }) {
     else setDetailBlog(null);
   }, [id, fetchBlogDetail]);
 
+  // ─── Admin Tab Counts ──────────────────────────────────────────────
+  const adminCounts = useMemo(() => {
+    return {
+      published: blogs.filter(b => b.status === "published").length,
+      pending: blogs.filter(b => b.status === "pending" || b.status === "pending_review").length,
+      archived: blogs.filter(b => b.status === "archived").length,
+    };
+  }, [blogs]);
+
   // ─── Filtered blogs for display ────────────────────────────────────
   const filteredBlogs = useMemo(() => {
     return blogs.filter((blog) => {
-      if (isStaff && activeTab === "other_blogs") {
+      if (isStaff && !isAdmin && activeTab === "other_blogs") {
         const myUserId = currentUser?.user_id || currentUser?.id;
         const myEmail = currentUser?.email?.toLowerCase();
         
@@ -357,13 +366,13 @@ export default function Blogs({ mode }) {
         return blog.status === "published";
       }
       if (activeTab === "draft" && blog.status !== "draft") return false;
-      if (activeTab === "pending" && blog.status !== "pending") return false;
+      if (activeTab === "pending" && blog.status !== "pending" && blog.status !== "pending_review") return false;
       if (activeTab === "published" && blog.status !== "published") return false;
       if (activeTab === "rejected" && blog.status !== "rejected") return false;
       if (activeTab === "archived" && blog.status !== "archived") return false;
       return true;
     });
-  }, [blogs, activeTab, currentUser, isStaff]);
+  }, [blogs, activeTab, currentUser, isStaff, isAdmin]);
 
   // ─── Handlers ──────────────────────────────────────────────────────
   const handleCardClick = (blogId) => {
@@ -1061,24 +1070,57 @@ export default function Blogs({ mode }) {
 
       {/* Tabs */}
       {isAdmin && (
-        <div className="blog-tabs">
-          {[
-            { id: "published", label: "Published" },
-            { id: "pending", label: "Pending Review" },
-            { id: "archived", label: "Archived" }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              className={`blog-tab-btn ${activeTab === tab.id ? "active" : ""}`}
-              onClick={() => {
-                setActiveTab(tab.id);
-                setSearchParams({ status: tab.id });
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="blog-tabs">
+            {[
+              { id: "published", label: "Published Blogs", count: adminCounts.published, badgeBg: "#2ecc71" },
+              { id: "pending", label: "Pending Review", count: adminCounts.pending, badgeBg: "#e67e22" },
+              { id: "archived", label: "Archived Blogs", count: adminCounts.archived, badgeBg: "#7f8c8d" }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                className={`blog-tab-btn ${activeTab === tab.id ? "active" : ""}`}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setSearchParams({ status: tab.id });
+                }}
+              >
+                <span>{tab.label}</span>
+                <span 
+                  className="blog-tab-badge"
+                  style={{
+                    background: activeTab === tab.id ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.06)",
+                    color: activeTab === tab.id ? "#ffffff" : "#4a5568",
+                    padding: "2px 8px",
+                    borderRadius: "12px",
+                    fontSize: "11px",
+                    fontWeight: "700"
+                  }}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="blog-section-banner" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", background: "white", borderRadius: "10px", border: "1px solid rgba(205,167,81,0.2)", marginTop: "-8px" }}>
+            <div>
+              <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#1a202c", margin: 0 }}>
+                {activeTab === "published" && "🟢 Published Blogs"}
+                {activeTab === "pending" && "⏳ Pending Review"}
+                {activeTab === "archived" && "📦 Archived Blogs"}
+              </h2>
+              <p style={{ fontSize: "13px", color: "#718096", margin: "3px 0 0 0" }}>
+                {activeTab === "published" && "Approved articles currently live and accessible to users."}
+                {activeTab === "pending" && "Articles submitted by Doctors and Therapists awaiting admin approval."}
+                {activeTab === "archived" && "Archived articles removed from public display."}
+              </p>
+            </div>
+            <span style={{ fontSize: "12px", fontWeight: "700", color: "#cda751", background: "rgba(205,167,81,0.12)", padding: "5px 12px", borderRadius: "20px" }}>
+              {filteredBlogs.length} {filteredBlogs.length === 1 ? "Article" : "Articles"}
+            </span>
+          </div>
+        </>
       )}
 
       {isStaff && !isAdmin && (

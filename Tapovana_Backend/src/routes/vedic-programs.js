@@ -39,18 +39,14 @@ router.patch('/:id/cancel', ...adminOnly, cancelVedicProgram);
 
 router.delete('/:id', ...adminOnly, deleteVedicProgram);
 
-// Public Registration
+// Public & User-side Registration / Enrollment
+router.post('/register', registerAttendee);
 router.post('/:id/register', registerAttendee);
+router.post('/enroll', enrollUserInVedicProgram);
+router.post('/:id/enroll', enrollUserInVedicProgram);
 
 // Attendee Management (Admin Side)
 router.post('/attendees', ...adminOnly, enrollUserInVedicProgram);
-router.patch('/attendees/:id/status', ...adminOnly, updateVedicAttendeeAttendance);
-router.patch('/attendees/:id/checkin', ...adminOnly, checkinAttendee);
-router.patch('/attendees/:id', ...adminOnly, updateVedicAttendeeAttendance);
-router.delete('/attendees/:id', ...adminOnly, deleteVedicProgramAttendee);
-
-router.post('/enroll', ...adminOnly, enrollUserInVedicProgram);
-router.post('/:id/enroll', ...adminOnly, enrollUserInVedicProgram);
 router.get('/:id/attendees', ...adminOnly, getVedicProgramAttendees);
 router.patch('/:id/attendees/:attendeeId/checkin', ...adminOnly, checkinAttendee);
 router.patch('/:id/attendees/:attendeeId', ...adminOnly, updateVedicAttendeeAttendance);
