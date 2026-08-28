@@ -27,6 +27,7 @@ query(`
         changed_by UUID REFERENCES team_members(id) ON DELETE SET NULL
     );
     ALTER TABLE blog_audit_log ADD COLUMN IF NOT EXISTS status_change VARCHAR(100);
+    ALTER TABLE blog_audit_log ADD COLUMN IF NOT EXISTS changed_by UUID;
     ALTER TABLE blogs ADD COLUMN IF NOT EXISTS subtitle TEXT;
     ALTER TABLE blogs ADD COLUMN IF NOT EXISTS read_time VARCHAR(50);
     ALTER TABLE blog_likes ADD COLUMN IF NOT EXISTS user_id UUID;
@@ -39,9 +40,14 @@ const logBlogAudit = async (blogId, statusChange, userId) => {
     try {
         const validUserId = isValidUUID(userId) ? userId : null;
         await query(
-            'INSERT INTO blog_audit_log (blog_id, status_change, changed_by) VALUES ($1, $2, $3)',
-            [blogId, statusChange, validUserId]
-        );
+            'INSERT INTO blog_audit_log (blog_id, status_change, action, changed_by) VALUES ($1, $2, $3, $4)',
+            [blogId, statusChange, statusChange, validUserId]
+        ).catch(async () => {
+            await query(
+                'INSERT INTO blog_audit_log (blog_id, status_change, changed_by) VALUES ($1, $2, $3)',
+                [blogId, statusChange, validUserId]
+            );
+        });
     } catch (err) {
         console.warn('[BlogAudit] Warning logging audit:', err.message);
     }

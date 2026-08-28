@@ -62,6 +62,17 @@ const fileToBase64 = (file) => new Promise((resolve, reject) => {
   reader.readAsDataURL(file);
 });
 
+// ─── Render Safe String Helper ───────────────────────────────────────────
+const renderSafeString = (val, fallback = "") => {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === "string" || typeof val === "number") return String(val);
+  if (Array.isArray(val)) return val.map(x => renderSafeString(x)).join(", ");
+  if (typeof val === "object") {
+    return val.name || val.label || val.title || val.first_name || fallback;
+  }
+  return fallback;
+};
+
 // ─── Status style helper ──────────────────────────────────────────────────
 const getAttendeeStatusStyles = (status) => {
   if (!status) return { bg: "rgba(205,167,81,0.12)", color: "#CDA751" };
@@ -96,7 +107,7 @@ function ProgramCard({ program, onClick }) {
     <div className="vedic-card" onClick={() => onClick({ ...program, _status: status })}>
       <div className="vedic-card-banner" style={{ overflow: "hidden", position: "relative", height: 180, display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: 14 }}>
         {!imgFailed && displayImage ? (
-          <img src={getImageUrl(displayImage)} alt={program.title} onError={() => setImgFailed(true)}
+          <img src={getImageUrl(displayImage)} alt={renderSafeString(program.title)} onError={() => setImgFailed(true)}
             style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 1 }} />
         ) : (
           <div style={{ background: `linear-gradient(135deg, ${typeColor.color}15, ${typeColor.color}35)`, width: "100%", height: "100%", position: "absolute", top: 0, left: 0, zIndex: 1 }} />
@@ -109,10 +120,10 @@ function ProgramCard({ program, onClick }) {
         }}>{st.label}</div>
       </div>
       <div className="vedic-card-body">
-        <h3 className="vedic-card-title">{program.title}</h3>
+        <h3 className="vedic-card-title">{renderSafeString(program.title)}</h3>
         <div className="vedic-card-instructor" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#7b8a9a" }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-          {program.consultant_name || program.consultant || "Not assigned"}
+          {renderSafeString(program.consultant_name || program.consultant, "Not assigned")}
         </div>
         <div className="vedic-card-meta">
           <div className="vedic-card-meta-item" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#7b8a9a" }}>
@@ -248,11 +259,15 @@ function ProgramForm({ form, onChange, instructors, mode, onSearchPexels }) {
             onChange({ target: { name: "assigned_staff_ids", value: filteredStaff } });
           }} style={inputStyle}>
             <option value="">Select Consultant...</option>
-            {instructors.map(i => (
-              <option key={i.user_id || i.id} value={i.user_id || i.id}>
-                {i.first_name} {i.last_name} ({i.role === 'DOCTOR' ? 'Dr.' : 'Therapist'})
-              </option>
-            ))}
+            {instructors.map(i => {
+              const isDoc = String(i.role || '').toUpperCase() === 'DOCTOR' || String(i.role || '').includes('Doctor');
+              const roleTag = isDoc ? 'Doctor' : 'Therapist';
+              return (
+                <option key={i.user_id || i.id} value={i.user_id || i.id}>
+                  {i.first_name} {i.last_name} ({roleTag})
+                </option>
+              );
+            })}
           </select>
           {form.consultant_name && <span style={{ fontSize: 11, color: "#cda751", marginTop: 2 }}>Selected: {form.consultant_name}</span>}
         </FormField>
@@ -269,6 +284,8 @@ function ProgramForm({ form, onChange, instructors, mode, onSearchPexels }) {
             {instructors.filter(i => (i.user_id || i.id) !== form.consultant_id).map(i => {
               const staffId = i.user_id || i.id;
               const isChecked = (form.assigned_staff_ids || []).includes(staffId);
+              const isDoc = String(i.role || '').toUpperCase() === 'DOCTOR' || String(i.role || '').includes('Doctor');
+              const roleTag = isDoc ? 'Doctor' : 'Therapist';
               return (
                 <label key={staffId} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginBottom: 4, color: "#333", cursor: "pointer" }}>
                   <input 
@@ -288,7 +305,7 @@ function ProgramForm({ form, onChange, instructors, mode, onSearchPexels }) {
                       onChange({ target: { name: "assigned_staff_ids", value: list } });
                     }} 
                   />
-                  {i.first_name} {i.last_name} ({i.role === 'DOCTOR' ? 'Dr.' : 'Therapist'})
+                  {i.first_name} {i.last_name} ({roleTag})
                 </label>
               );
             })}
@@ -325,7 +342,7 @@ function ProgramForm({ form, onChange, instructors, mode, onSearchPexels }) {
           </button>
           <button type="button" className="vedic-btn-cancel" style={{ padding: "6px 12px", fontSize: 12, borderColor: '#CDA751', color: '#CDA751' }}
             onClick={onSearchPexels}>
-            Stock Image
+            📷 Search Unsplash
           </button>
           <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
           <input name="image_url" value={form.image_url} onChange={onChange} style={{ ...inputStyle, flex: 1 }} placeholder="https://..." />
@@ -631,7 +648,7 @@ export default function VedicLifePrograms() {
   }, [manualEnrollForm.name, manualEnrollForm.email]);
 
   const currentUser = useMemo(() => getUser(), []);
-  const isAdmin = !currentUser || currentUser.role === "SUPER_ADMIN" || currentUser.role === "CO_ADMIN";
+  const isAdmin = !currentUser || ["SUPER_ADMIN", "MASTER_ADMIN", "CO_ADMIN", "ADMIN"].includes(String(currentUser.role || '').toUpperCase());
 
   // Fetch memberships for discount check
   const fetchMemberships = async () => {
@@ -1330,7 +1347,7 @@ export default function VedicLifePrograms() {
 
         <p style={{ fontSize: 13, color: "#7b8a9a", margin: "0 0 4px 0" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7b8a9a" strokeWidth="2" style={{ marginRight: 4, verticalAlign: "middle" }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-          Lead Consultant: {p.consultant_name || p.consultant || "Not assigned"}
+          Lead Consultant: {renderSafeString(p.consultant_name || p.consultant, "Not assigned")}
         </p>
 
         {/* Tabs Bar */}
@@ -1420,26 +1437,44 @@ export default function VedicLifePrograms() {
               </div>
             </div>
 
-            <div className="vedic-modal-actions" style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 20 }}>
-              {status !== "Cancelled" && status !== "completed" ? (
+            <div className="vedic-modal-actions" style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 20, flexWrap: "wrap" }}>
+              {status === "upcoming" && (
                 <>
-                  {status === "upcoming" && <button className="vedic-btn-cancel" style={{ flex: 1 }} onClick={handleStartEdit}>Edit Program</button>}
+                  <button className="vedic-btn-cancel" style={{ flex: 1 }} onClick={handleStartEdit}>Edit Program</button>
                   <button className="vedic-btn-allocate" style={{ flex: 1.5 }} onClick={handleAllocateInstructor}>
                     {p.consultant_id ? "Re-allocate Instructor" : "Allocate Consultant"}
                   </button>
                   <button className="vedic-btn-cancel" style={{ flex: 1, borderColor: "#e74c3c", color: "#e74c3c" }} onClick={handleCancelProgram}>
                     Cancel Program
                   </button>
-                  {status === "upcoming" && (
-                    <button className="vedic-btn-cancel" style={{ flex: 1, borderColor: "#e74c3c", color: "#e74c3c", background: "#fdf2f2" }} onClick={handleDeleteProgram}>
-                      Delete Program
-                    </button>
-                  )}
+                  <button className="vedic-btn-cancel" style={{ flex: 1, borderColor: "#e74c3c", color: "#e74c3c", background: "#fdf2f2" }} onClick={handleDeleteProgram}>
+                    Delete Program
+                  </button>
                 </>
-              ) : (
-                <span style={{ fontSize: 13, color: "#718096", fontStyle: "italic" }}>
-                  This program is completed or cancelled and cannot be edited, cancelled, or allocated.
-                </span>
+              )}
+
+              {status === "ongoing" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+                  <span style={{ fontSize: 13, color: "#2563EB", fontWeight: 500, background: "#EFF6FF", padding: "8px 12px", borderRadius: 6, border: "1px solid #BFDBFE" }}>
+                    ℹ️ Program is currently Live (Ongoing). Details can be viewed, but editing or cancelling is disabled during active sessions.
+                  </span>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <button className="vedic-btn-allocate" style={{ flex: 1 }} onClick={handleAllocateInstructor}>
+                      {p.consultant_id ? "Re-allocate Instructor" : "Allocate Consultant"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(status === "completed" || status === "Cancelled" || status === "cancelled") && (
+                <div style={{ display: "flex", gap: 12, alignItems: "center", width: "100%" }}>
+                  <span style={{ fontSize: 13, color: "#718096", fontStyle: "italic", flex: 1 }}>
+                    This program is {status.toLowerCase()} and cannot be edited or cancelled.
+                  </span>
+                  <button className="vedic-btn-cancel" style={{ borderColor: "#e74c3c", color: "#e74c3c", background: "#fdf2f2" }} onClick={handleDeleteProgram}>
+                    Delete Program
+                  </button>
+                </div>
               )}
             </div>
           </>
@@ -1888,7 +1923,7 @@ export default function VedicLifePrograms() {
             </div>
             {isAdmin && (
               <button className="vedic-add-btn" onClick={() => { setAddForm(BLANK_FORM); setAddError(""); setShowCreateModal(true); }}>
-                + Create Package
+                + Create Vedic Life Program
               </button>
             )}
           </div>
@@ -1993,7 +2028,7 @@ export default function VedicLifePrograms() {
         onClose={() => setMediaModalOpen(false)}
         onSelect={handleSelectStockImage}
         allowVideos={false}
-        title="Select Pexels Image"
+        title="Select Unsplash Image"
         page_type="vedic_packages"
         category={(mediaTarget === 'add' ? addForm : editForm)?.type || 'Ayurveda'}
         subcategory="All"

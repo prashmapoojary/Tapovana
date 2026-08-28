@@ -614,22 +614,11 @@ exports.getCustomerBookings = async (req, res) => {
     let bookingsList = [];
     try {
       let bRes = { rows: [] };
-      if (customerEmail) {
+      if (fullName) {
         bRes = await query(`
           SELECT b.id, b.service_name, b.therapist_name, b.booking_date, b.booking_time, b.status,
                  b.total_amount, b.original_price, b.membership_tier, b.discount_amount, b.final_price,
-                 s.price AS service_price
-          FROM bookings b
-          LEFT JOIN services s ON LOWER(b.service_name) = LOWER(s.name)
-          WHERE LOWER(b.user_email) = $1
-          ORDER BY b.booking_date DESC
-        `, [customerEmail]);
-      }
-      if (bRes.rows.length === 0 && fullName) {
-        bRes = await query(`
-          SELECT b.id, b.service_name, b.therapist_name, b.booking_date, b.booking_time, b.status,
-                 b.total_amount, b.original_price, b.membership_tier, b.discount_amount, b.final_price,
-                 s.price AS service_price
+                 s.base_price AS service_price
           FROM bookings b
           LEFT JOIN services s ON LOWER(b.service_name) = LOWER(s.name)
           WHERE LOWER(b.user_name) = LOWER($1)

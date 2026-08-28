@@ -1774,6 +1774,32 @@ const registerAttendeeFromMobile = async (req, res) => {
             [programId, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, status, accommodation_type, payment_status, checkin_date, checkout_date]
         );
 
+        // Also sync into vedic_attendees table so Mobile and Admin enrollments merge into the single source of truth
+        try {
+            const attCheck = await query('SELECT 1 FROM vedic_attendees WHERE program_id = $1 AND email = $2', [programId, email.toLowerCase().trim()]);
+            if (!attCheck.rows.length) {
+                const { getMemberTierAndDiscount } = require('./membershipController');
+                const { tier, discountPercentage } = await getMemberTierAndDiscount(email.toLowerCase().trim(), name.trim());
+                const vpPriceRaw = program.price || 14000;
+                const origNum = typeof vpPriceRaw === 'number' ? vpPriceRaw : (parseFloat(String(vpPriceRaw).replace(/[^0-9.]/g, '')) || 14000);
+                const discountNum = Math.round((origNum * discountPercentage) / 100);
+                const finalNum = Math.max(0, origNum - discountNum);
+
+                const origStr = `₹${origNum.toLocaleString('en-IN')}`;
+                const tierStr = tier || 'Standard';
+                const discStr = discountNum > 0 ? `₹${discountNum.toLocaleString('en-IN')} (${discountPercentage}%)` : `₹0 (0%)`;
+                const finalStr = `₹${finalNum.toLocaleString('en-IN')}`;
+
+                await query(
+                    "INSERT INTO vedic_attendees (program_id, name, email, phone, status, source, accommodation_type, payment_status, check_in_date, check_out_date, original_price, membership_tier, discount_amount, final_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
+                    [programId, name.trim(), email.toLowerCase().trim(), phone ? phone.trim() : null, status, 'mobile', accommodation_type, payment_status, checkin_date, checkout_date, origStr, tierStr, discStr, finalStr]
+                );
+                await query('UPDATE vedic_programs SET enrolled = enrolled + 1 WHERE id = $1', [programId]);
+            }
+        } catch (syncErr) {
+            console.warn('[registerAttendeeFromMobile] vedic_attendees sync warning:', syncErr.message);
+        }
+
         let assignedStaffStr = "None assigned";
         try {
             const staffList = [];

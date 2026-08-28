@@ -29,7 +29,7 @@ const isTransientError = (err) => {
   
   const transientCodes = [
     'ENOTFOUND', 'ECONNREFUSED', 'ETIMEDOUT', 'ECONNRESET',
-    'EPIPE', 'EAI_AGAIN', 'EHOSTUNREACH', '57P01', '57P02', '57P03'
+    'EPIPE', 'EAI_AGAIN', 'EHOSTUNREACH', '57P01', '57P02', '57P03', '08P01'
   ];
 
   const checkMessage = (msg) => {
@@ -44,6 +44,7 @@ const isTransientError = (err) => {
       msgLower.includes('getaddrinfo') ||
       msgLower.includes('socket hang up') ||
       msgLower.includes('timeout') ||
+      msgLower.includes('authentication timed out') ||
       msgLower.includes('terminated due to connection timeout') ||
       msgLower.includes('unexpectedly')
     );

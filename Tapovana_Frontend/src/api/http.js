@@ -1,6 +1,9 @@
 import { getToken } from "../utils/session";
 
 export const getApiBase = () => {
+  const envUrl = (import.meta && import.meta.env) ? (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL) : null;
+  if (envUrl) return envUrl;
+
   if (typeof window === "undefined") {
     return "https://tapovana.onrender.com";
   }
@@ -42,6 +45,10 @@ export async function apiFetch(path, options = {}) {
     data = rawText ? JSON.parse(rawText) : {};
   } catch {
     data = { success: false, message: rawText || "Response parse error" };
+  }
+
+  if (res.status === 429) {
+    throw new Error(data.message || "Too many requests. Please wait a moment and try again.");
   }
 
   if (!res.ok) {

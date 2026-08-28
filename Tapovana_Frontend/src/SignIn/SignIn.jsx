@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "./SignIn.css";
 import { useNavigate } from "react-router-dom";
+import PasswordInput from "../utils/PasswordInput";
 
 const API_BASE = (() => {
   if (typeof window === "undefined") return "https://tapovana.onrender.com";
@@ -113,8 +114,6 @@ function SignIn() {
     }
   };
 
-
-
   return (
     <div className="container">
       <div className="left-section" />
@@ -131,13 +130,13 @@ function SignIn() {
             className="input-field"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            placeholder="name@tapovana.com"
           />
           <label>Password</label>
-          <input
-            type="password"
-            className="input-field"
+          <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter password"
           />
           <div className="checkbox-container">
             <input

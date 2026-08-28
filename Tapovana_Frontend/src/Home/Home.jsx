@@ -62,16 +62,9 @@ function ConflictRow({ conflict, getSuggestions, onReassignSuccess, triggerAlert
     if (conflict.type === 'service' && conflict.session_id) {
       const fetchClientEmail = async () => {
         try {
-          const response = await fetch(`https://tapovana.onrender.com/api/bookings/${conflict.session_id}`, {
-            headers: {
-              "Content-Type": "application/json"
-            }
-          });
-          if (response.ok) {
-            const data = await response.json();
-            if (active && data.success && data.booking) {
-              setClientEmail(data.booking.user_email || data.booking.email || "");
-            }
+          const data = await apiFetch(`/api/bookings/${conflict.session_id}`);
+          if (active && data.success && data.booking) {
+            setClientEmail(data.booking.user_email || data.booking.email || "");
           }
         } catch (err) {
           console.error("Error fetching client email:", err);

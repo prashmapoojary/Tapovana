@@ -59,7 +59,8 @@ process.on('unhandledRejection', (reason, promise) => {
 
 app.use(rateLimit({
     windowMs: 60 * 1000,
-    max: process.env.NODE_ENV === 'production' ? 120 : 999999,
+    max: 10000,
+    skip: (req) => req.path === '/health',
     message: { success: false, message: "Too many requests. Please try again later." }
 }));
 

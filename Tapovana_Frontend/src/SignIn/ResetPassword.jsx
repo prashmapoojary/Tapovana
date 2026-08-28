@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import "./ResetPassword.css";
 import { useNavigate } from "react-router-dom";
+import PasswordInput from "../utils/PasswordInput";
 
 const API_BASE = (() => {
   if (typeof window === "undefined") return "https://tapovana.onrender.com";
@@ -186,22 +187,18 @@ function ResetPassword() {
               </div>
 
               <label htmlFor="reset_new_password">New Password</label>
-              <input
-                type="password"
+              <PasswordInput
                 id="reset_new_password"
                 name="reset_new_password"
-                className="input-field"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Min. 8 characters"
               />
 
               <label htmlFor="reset_confirm_password">Confirm New Password</label>
-              <input
-                type="password"
+              <PasswordInput
                 id="reset_confirm_password"
                 name="reset_confirm_password"
-                className="input-field"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Re-enter password"

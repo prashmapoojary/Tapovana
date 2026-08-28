@@ -56,7 +56,7 @@ const requireRole = (...roles) => (req, res, next) => {
     const userRole = normalizeRole(req.user?.role);
     const normalizedAllowed = roles.map(normalizeRole);
 
-    if (userRole === "SUPER_ADMIN") {
+    if (["SUPER_ADMIN", "MASTER_ADMIN", "CO_ADMIN", "ADMIN"].includes(userRole)) {
         return next();
     }
 

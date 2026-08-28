@@ -227,7 +227,7 @@ function Services() {
     return (
       <EditService
         service={editingService}
-        onBack={() => setEditingService(null)}
+        onBack={() => { setEditingService(null); fetchServices(); }}
       />
     );
   }

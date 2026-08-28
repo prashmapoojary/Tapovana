@@ -35,41 +35,48 @@ const searchPexels = async (req, res) => {
         const pexelsKey = process.env.PEXELS_KEY || process.env.PEXELS_API_KEY;
 
         // Try Unsplash API first if configured
-        if (type === 'image' && unsplashKey) {
-            const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(queryStr)}&per_page=30&client_id=${unsplashKey}`;
-            https.get(url, { timeout: 6000 }, (apiRes) => {
-                let data = '';
-                apiRes.on('data', chunk => data += chunk);
-                apiRes.on('end', () => {
-                    try {
-                        const result = JSON.parse(data);
-                        const images = (result.results || []).map(img => ({
-                            id: img.id,
-                            url: img.urls.regular || img.urls.full,
-                            thumbnail_url: img.urls.small || img.urls.thumb,
-                            description: img.alt_description || img.description || 'Unsplash Photo',
-                            author: img.user?.name || 'Unsplash Photographer',
-                            source: 'unsplash',
-                            type: 'image'
-                        }));
-                        return res.json({ success: true, images });
-                    } catch (err) {
-                        console.error('Unsplash parsing error:', err);
-                    }
-                });
-            }).on('error', err => console.error('Unsplash connection error:', err));
-        }
+        if (type === 'image') {
+            if (unsplashKey) {
+                const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(queryStr)}&per_page=30&client_id=${unsplashKey}`;
+                https.get(url, { timeout: 6000 }, (apiRes) => {
+                    let data = '';
+                    apiRes.on('data', chunk => data += chunk);
+                    apiRes.on('end', () => {
+                        try {
+                            const result = JSON.parse(data);
+                            const images = (result.results || []).map(img => ({
+                                id: img.id,
+                                url: img.urls.regular || img.urls.full,
+                                thumbnail_url: img.urls.small || img.urls.thumb,
+                                description: img.alt_description || img.description || 'Unsplash Photo',
+                                author: img.user?.name || 'Unsplash Photographer',
+                                source: 'unsplash',
+                                type: 'image'
+                            }));
+                            if (images.length > 0) {
+                                return res.json({ success: true, images });
+                            }
+                        } catch (err) {
+                            console.error('Unsplash parsing error:', err);
+                        }
+                    });
+                }).on('error', err => console.error('Unsplash connection error:', err));
+            }
 
-        if (!pexelsKey) {
-            // Unsplash Curated Fallback Images
-            const unsplashFallback = [
-                { id: 'u1', url: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=300&q=80', description: 'Ayurveda Herbal Wellness', author: 'Unsplash', source: 'unsplash', type: 'image' },
-                { id: 'u2', url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=300&q=80', description: 'Yoga & Meditation', author: 'Unsplash', source: 'unsplash', type: 'image' },
-                { id: 'u3', url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=300&q=80', description: 'Ayurvedic Treatment & Spa', author: 'Unsplash', source: 'unsplash', type: 'image' },
-                { id: 'u4', url: 'https://images.unsplash.com/photo-1512290900673-8a39529b4703?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1512290900673-8a39529b4703?auto=format&fit=crop&w=300&q=80', description: 'Healthy Herbal Tea & Spices', author: 'Unsplash', source: 'unsplash', type: 'image' },
-                { id: 'u5', url: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=300&q=80', description: 'Healthy Organic Nutrition', author: 'Unsplash', source: 'unsplash', type: 'image' }
+            // Rich Unsplash Curated Library for Wellness, Massages, Facials, Skincare, Haircare, Spa, Ayurveda
+            const unsplashCurated = [
+                { id: 'u1', url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=300&q=80', description: 'Ayurvedic Massage & Spa Therapy', author: 'Unsplash', source: 'unsplash', type: 'image' },
+                { id: 'u2', url: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=300&q=80', description: 'Relaxing Body Care Therapy', author: 'Unsplash', source: 'unsplash', type: 'image' },
+                { id: 'u3', url: 'https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&w=300&q=80', description: 'Herbal Essential Oils & Aromatherapy', author: 'Unsplash', source: 'unsplash', type: 'image' },
+                { id: 'u4', url: 'https://images.unsplash.com/photo-1512290900673-8a39529b4703?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1512290900673-8a39529b4703?auto=format&fit=crop&w=300&q=80', description: 'Herbal Tea & Ayurvedic Spices', author: 'Unsplash', source: 'unsplash', type: 'image' },
+                { id: 'u5', url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=300&q=80', description: 'Facial Treatment & Skin Care', author: 'Unsplash', source: 'unsplash', type: 'image' },
+                { id: 'u6', url: 'https://images.unsplash.com/photo-1560750588-73207b1ef5b8?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1560750588-73207b1ef5b8?auto=format&fit=crop&w=300&q=80', description: 'Natural Skin Hydration & Scrub', author: 'Unsplash', source: 'unsplash', type: 'image' },
+                { id: 'u7', url: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=300&q=80', description: 'Hair Spa & Scalp Treatment', author: 'Unsplash', source: 'unsplash', type: 'image' },
+                { id: 'u8', url: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=300&q=80', description: 'Luxury Manicure & Nail Care', author: 'Unsplash', source: 'unsplash', type: 'image' },
+                { id: 'u9', url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=300&q=80', description: 'Mindful Meditation & Yoga', author: 'Unsplash', source: 'unsplash', type: 'image' },
+                { id: 'u10', url: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=300&q=80', description: 'Ayurvedic Healing Oils', author: 'Unsplash', source: 'unsplash', type: 'image' }
             ];
-            return res.json({ success: true, images: unsplashFallback });
+            return res.json({ success: true, images: unsplashCurated });
         }
 
         let url = '';

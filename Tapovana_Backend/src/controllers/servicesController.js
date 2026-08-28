@@ -84,6 +84,21 @@ const handleServiceImage = (imageData) => {
     return imageData;
 };
 
+const ensureArray = (val) => {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+        try {
+            const parsed = JSON.parse(val);
+            if (Array.isArray(parsed)) return parsed;
+            if (parsed) return [parsed];
+        } catch {
+            return val.split(',').map(s => s.trim()).filter(Boolean);
+        }
+    }
+    if (val !== undefined && val !== null && val !== '') return [val];
+    return [];
+};
+
 // Helper: Make image URL absolute for mobile clients
 const getFullImageUrl = (req, imageUrl) => {
     if (!imageUrl || typeof imageUrl !== 'string') return imageUrl;
@@ -260,7 +275,7 @@ const createService = async (req, res) => {
 
     try {
         const savedImageUrl = handleServiceImage(image_url);
-        const staffIds = assigned_staff_ids || [];
+        const staffIds = ensureArray(assigned_staff_ids);
 
         let staffDetails = [];
         const validStaffIds = staffIds.filter(isValidUUID);
@@ -273,6 +288,16 @@ const createService = async (req, res) => {
             }));
         }
 
+        let creatorId = req.user?.id || null;
+        if (creatorId && isValidUUID(creatorId)) {
+            const userExists = await query('SELECT id FROM team_members WHERE id = $1', [creatorId]);
+            if (!userExists.rows.length) {
+                creatorId = null;
+            }
+        } else {
+            creatorId = null;
+        }
+
         const result = await query(
             'INSERT INTO services (name, category, subcategory, description, base_price, duration_minutes, benefits, required_certification, experience_level, tools, image_url, status, assigned_staff_ids, assigned_staff_details, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *',
             [
@@ -280,7 +305,7 @@ const createService = async (req, res) => {
                 base_price || null, duration_minutes || null, benefits || null,
                 required_certification || null, experience_level || null, tools || null,
                 savedImageUrl, (status || 'ACTIVE').toUpperCase(),
-                JSON.stringify(staffIds), JSON.stringify(staffDetails), req.user?.id || null
+                JSON.stringify(validStaffIds), JSON.stringify(staffDetails), creatorId
             ]
         );
 
@@ -313,7 +338,7 @@ const updateService = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Service not found.' });
         }
         const existingService = existingResult.rows[0];
-        const oldStaffIds = existingService.assigned_staff_ids || [];
+        const oldStaffIds = ensureArray(existingService.assigned_staff_ids);
 
         let savedImageUrl = undefined;
         if (image_url !== undefined) {
@@ -350,10 +375,11 @@ const updateService = async (req, res) => {
         }
 
         if (assigned_staff_ids !== undefined) {
+            const staffIdsArr = ensureArray(assigned_staff_ids);
             fields.push('assigned_staff_ids = $' + idx++);
-            values.push(JSON.stringify(assigned_staff_ids));
+            values.push(JSON.stringify(staffIdsArr));
 
-            const validAssignedStaffIds = assigned_staff_ids.filter(isValidUUID);
+            const validAssignedStaffIds = staffIdsArr.filter(isValidUUID);
             let staffDetails = [];
             if (validAssignedStaffIds.length > 0) {
                 const staffResult = await query('SELECT id, first_name, last_name, email FROM team_members WHERE id = ANY($1::uuid[])', [validAssignedStaffIds]);
@@ -391,8 +417,8 @@ const updateService = async (req, res) => {
         const updatedService = result.rows[0];
 
         if (isPublishingDraft) {
-            const finalStaffIds = updatedService.assigned_staff_ids || [];
-            const addedStaff = assigned_staff_ids !== undefined ? assigned_staff_ids.filter(id => !oldStaffIds.includes(id)) : [];
+            const finalStaffIds = ensureArray(updatedService.assigned_staff_ids);
+            const addedStaff = assigned_staff_ids !== undefined ? ensureArray(assigned_staff_ids).filter(id => !oldStaffIds.includes(id)) : [];
             const staffToEmail = finalStaffIds.filter(id => !addedStaff.includes(id));
             for (const staffId of staffToEmail) {
                 await sendEmailForAllocation(staffId, updatedService);
@@ -413,7 +439,7 @@ const deleteService = async (req, res) => {
     try {
         const service = await query('SELECT assigned_staff_ids FROM services WHERE id = $1', [req.params.id]);
         if (service.rows.length && service.rows[0].assigned_staff_ids) {
-            const staffIds = service.rows[0].assigned_staff_ids;
+            const staffIds = ensureArray(service.rows[0].assigned_staff_ids);
             const validStaffIds = staffIds.filter(isValidUUID);
             for (const staffId of validStaffIds) {
                 await deallocateStaffMember(staffId);
@@ -433,10 +459,7 @@ const deleteService = async (req, res) => {
 
 // UPDATE SERVICE STAFF
 const updateServiceStaff = async (req, res) => {
-    const { assigned_staff_ids } = req.body;
-    if (!Array.isArray(assigned_staff_ids)) {
-        return res.status(400).json({ success: false, message: 'assigned_staff_ids must be an array.' });
-    }
+    const assigned_staff_ids = ensureArray(req.body.assigned_staff_ids);
 
     try {
         const serviceResult = await query('SELECT * FROM services WHERE id = $1', [req.params.id]);
@@ -445,7 +468,7 @@ const updateServiceStaff = async (req, res) => {
         }
 
         const service = serviceResult.rows[0];
-        const oldStaffIds = service.assigned_staff_ids || [];
+        const oldStaffIds = ensureArray(service.assigned_staff_ids);
 
         const validAssignedStaffIds = assigned_staff_ids.filter(isValidUUID);
         const removedStaff = oldStaffIds.filter(id => !validAssignedStaffIds.includes(id));
@@ -550,88 +573,190 @@ const getServiceAllocations = async (req, res) => {
 // GET MY ASSIGNMENTS — returns services, workshops, and Vedic programs from central allocations table
 const getMyAssignments = async (req, res) => {
     try {
-        const userId = req.user?.id || req.user?.user_id || req.user?._id;
+        let userId = req.query.staff_id || req.user?.id || req.user?.user_id || req.user?._id;
 
         if (!userId) {
-            return res.status(401).json({ success: false, message: 'User ID not found in token.' });
+            return res.status(401).json({ success: false, message: 'User ID not found.' });
         }
 
         const userResult = await query(
-            'SELECT tm.id, tm.first_name, tm.last_name, tm.email, tm.availability_status, tm.allocation_details, r.name AS role FROM team_members tm JOIN roles r ON r.id = tm.role_id WHERE tm.id = $1',
+            `SELECT tm.id, tm.first_name, tm.last_name, tm.email, tm.phone, tm.availability_status, tm.allocation_details, r.name AS role 
+             FROM team_members tm 
+             JOIN roles r ON r.id = tm.role_id 
+             WHERE tm.id::text = $1 OR tm.email ILIKE $1 
+             LIMIT 1`,
             [userId]
         );
 
         if (!userResult.rows.length) {
-            return res.status(404).json({ success: false, message: 'User not found.' });
+            return res.status(404).json({ success: false, message: 'Staff member not found.' });
         }
 
         const user = userResult.rows[0];
+        const staffUuid = user.id;
+        const staffCode = `STAFF-${String(staffUuid).slice(0, 6).toUpperCase()}`;
+        const staffName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
 
         const assignments = [];
 
         // Fetch all assignments from unified allocations table
         const allocationsResult = await query(
             `SELECT a.id, a.type, a.session_title, a.session_id, a.start_date, a.end_date, a.booking_time, a.duration_minutes, a.status, a.created_at,
-                    tm.first_name, tm.last_name, r.name AS role
+                    tm.id AS staff_uuid, tm.first_name, tm.last_name, tm.email AS staff_email, tm.phone AS staff_phone, r.name AS role
              FROM allocations a
              JOIN team_members tm ON tm.id = a.staff_id
              JOIN roles r ON r.id = tm.role_id
              LEFT JOIN deleted_booking_ids d ON d.booking_id = CASE WHEN a.type = 'service' AND a.session_id ~ '^[0-9]+$' THEN CAST(a.session_id AS INTEGER) ELSE NULL END
              WHERE a.staff_id = $1 AND d.booking_id IS NULL
              ORDER BY a.start_date DESC, a.created_at DESC`,
-            [userId]
+            [staffUuid]
         );
 
         for (const alloc of allocationsResult.rows) {
             const assignment = {
                 id: alloc.id,
                 type: alloc.type,
-                staffId: userId,
-                staffName: `${alloc.first_name || ''} ${alloc.last_name || ''}`.trim(),
-                staffRole: alloc.role,
+                staffId: staffUuid,
+                staffCode: staffCode,
+                staffName: staffName,
+                staffEmail: user.email,
+                staffRole: user.role,
+                staffPhone: user.phone || null,
                 sessionTitle: alloc.session_title,
                 sessionId: alloc.session_id,
+                displayRecordId: alloc.session_id,
                 startDate: alloc.start_date,
                 bookingTime: alloc.booking_time,
                 endDate: alloc.end_date,
+                duration: alloc.duration_minutes || 30,
                 status: alloc.status,
-                createdAt: alloc.created_at
+                createdAt: alloc.created_at,
+                customerName: "Assigned Customer",
+                customerEmail: null,
+                recordDetails: null
             };
 
-            // Fetch image based on type
-            if (alloc.type === 'service' && isValidUUID(alloc.session_id)) {
+            // 1. Service Booking details
+            if (alloc.type === 'service') {
                 try {
-                    const serviceResult = await query('SELECT image_url FROM services WHERE id = $1', [alloc.session_id]);
-                    if (serviceResult.rows.length) {
-                        assignment.service_image_name = serviceResult.rows[0].image_url;
+                    let bRes = { rows: [] };
+                    if (/^\d+$/.test(String(alloc.session_id))) {
+                        bRes = await query(`SELECT * FROM bookings WHERE id = $1 LIMIT 1`, [parseInt(alloc.session_id, 10)]);
+                    } else if (isValidUUID(alloc.session_id)) {
+                        bRes = await query(`SELECT * FROM bookings WHERE id::text = $1 LIMIT 1`, [alloc.session_id]);
                     }
-                } catch (e) {
-                    console.error('Error fetching service image:', e);
+                    if (bRes.rows.length > 0) {
+                        const b = bRes.rows[0];
+                        assignment.displayRecordId = `BKG-${String(b.id).padStart(3, '0')}`;
+                        assignment.customerName = b.user_name || b.customer_name || "Valued Customer";
+                        assignment.customerEmail = b.user_email || b.customer_email || b.email || null;
+                        assignment.sessionTitle = b.service_name || alloc.session_title;
+                        assignment.bookingTime = b.booking_time || alloc.booking_time;
+                        assignment.recordDetails = {
+                            booking_id: assignment.displayRecordId,
+                            service_name: b.service_name,
+                            customer_name: assignment.customerName,
+                            customer_email: assignment.customerEmail,
+                            booking_date: b.booking_date,
+                            booking_time: b.booking_time,
+                            status: b.status
+                        };
+                    }
+                } catch (bErr) {
+                    console.warn(`[MyAssignments] Error fetching service details for ${alloc.session_id}:`, bErr.message);
                 }
-            } else if (alloc.type === 'workshop' && isValidUUID(alloc.session_id)) {
+            }
+
+            // 2. Workshop details
+            else if (alloc.type === 'workshop') {
                 try {
-                    const workshopResult = await query('SELECT image_url FROM workshops WHERE id = $1', [alloc.session_id]);
-                    if (workshopResult.rows.length) {
-                        assignment.workshop_image_name = workshopResult.rows[0].image_url;
+                    let wsRes = { rows: [] };
+                    if (/^\d+$/.test(String(alloc.session_id))) {
+                        wsRes = await query(`SELECT * FROM workshops WHERE id = $1 LIMIT 1`, [parseInt(alloc.session_id, 10)]);
+                    } else if (isValidUUID(alloc.session_id)) {
+                        wsRes = await query(`SELECT * FROM workshops WHERE id::text = $1 LIMIT 1`, [alloc.session_id]);
                     }
-                } catch (e) {
-                    console.error('Error fetching workshop image:', e);
+                    if (wsRes.rows.length > 0) {
+                        const ws = wsRes.rows[0];
+                        assignment.displayRecordId = `WS-${String(ws.id).padStart(3, '0')}`;
+                        assignment.sessionTitle = ws.title || alloc.session_title;
+                        assignment.workshop_image_name = ws.image_url;
+
+                        const attRes = await query(`SELECT name, email FROM attendees WHERE workshop_id = $1 LIMIT 5`, [ws.id]);
+                        if (attRes.rows.length > 0) {
+                            assignment.customerName = attRes.rows.map(a => a.name).join(", ");
+                            assignment.customerEmail = attRes.rows[0].email;
+                        } else {
+                            assignment.customerName = "Workshop Participants";
+                        }
+                        assignment.recordDetails = {
+                            workshop_id: assignment.displayRecordId,
+                            workshop_title: ws.title,
+                            category: ws.category,
+                            date: ws.date,
+                            time: ws.time,
+                            capacity: ws.capacity,
+                            attendees_count: attRes.rows.length,
+                            attendees: attRes.rows
+                        };
+                    }
+                } catch (wsErr) {
+                    console.warn(`[MyAssignments] Error fetching workshop details for ${alloc.session_id}:`, wsErr.message);
                 }
-            } else if (alloc.type === 'vedic_program' && isValidUUID(alloc.session_id)) {
+            }
+
+            // 3. Vedic Life Program details
+            else if (alloc.type === 'vedic_program') {
                 try {
-                    const vedicResult = await query('SELECT image_url FROM vedic_programs WHERE id = $1', [alloc.session_id]);
-                    if (vedicResult.rows.length) {
-                        assignment.vediclife_image_name = vedicResult.rows[0].image_url;
+                    let vpRes = { rows: [] };
+                    if (/^\d+$/.test(String(alloc.session_id))) {
+                        vpRes = await query(`SELECT * FROM vedic_programs WHERE id = $1 LIMIT 1`, [parseInt(alloc.session_id, 10)]);
+                    } else if (isValidUUID(alloc.session_id)) {
+                        vpRes = await query(`SELECT * FROM vedic_programs WHERE id::text = $1 LIMIT 1`, [alloc.session_id]);
                     }
-                } catch (e) {
-                    console.error('Error fetching vedic program image:', e);
+                    if (vpRes.rows.length > 0) {
+                        const vp = vpRes.rows[0];
+                        assignment.displayRecordId = `VP-${String(vp.id).padStart(3, '0')}`;
+                        assignment.sessionTitle = vp.title || alloc.session_title;
+                        assignment.vediclife_image_name = vp.image_url;
+
+                        const vattRes = await query(`SELECT name, email FROM vedic_attendees WHERE program_id = $1 LIMIT 5`, [vp.id]);
+                        if (vattRes.rows.length > 0) {
+                            assignment.customerName = vattRes.rows.map(v => v.name).join(", ");
+                            assignment.customerEmail = vattRes.rows[0].email;
+                        } else {
+                            assignment.customerName = "Program Participants";
+                        }
+                        assignment.recordDetails = {
+                            program_id: assignment.displayRecordId,
+                            program_title: vp.title,
+                            type: vp.type,
+                            start_date: vp.start_date,
+                            end_date: vp.end_date,
+                            services: vp.services,
+                            attendees_count: vattRes.rows.length,
+                            attendees: vattRes.rows
+                        };
+                    }
+                } catch (vpErr) {
+                    console.warn(`[MyAssignments] Error fetching vedic program details for ${alloc.session_id}:`, vpErr.message);
                 }
             }
 
             assignments.push(assignment);
         }
 
-        return res.json({ success: true, assignments });
+        return res.json({
+            success: true,
+            staff: {
+                staffId: staffUuid,
+                staffCode: staffCode,
+                name: staffName,
+                email: user.email,
+                role: user.role
+            },
+            assignments
+        });
     } catch (err) {
         console.error('getMyAssignments error:', err);
         return res.status(500).json({ success: false, message: 'Server error.', detail: err.message });

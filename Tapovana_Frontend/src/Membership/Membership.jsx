@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import "./Membership.css";
-import { apiFetch } from "../api/http";
+import { apiFetch, API_BASE } from "../api/http";
 import AnimatedNumber from "../utils/AnimatedNumber";
 import ActionIcon from "../assets/Button.svg";
 import DefaultAvatar from "../assets/profileIconDefault.png";
@@ -68,13 +68,13 @@ function getPageNumbers(current, total) {
 
 const BLANK_ENROLL = { name: "", email: "", phone: "", tier: "SILVER" };
 
-const RENDER_MEMBERSHIP_API = "https://tapovana.onrender.com/api/membership";
+const RENDER_MEMBERSHIP_API = `${API_BASE}/api/membership`;
 
 const getMemberAvatarUrl = (profilePhoto, url, source) => {
   if (profilePhoto) return profilePhoto;
   if (!url) return DefaultAvatar;
   if (url.startsWith("http") || url.startsWith("data:")) return url;
-  const base = source === "mobile" ? "https://tapovana.onrender.com" : API_BASE;
+  const base = API_BASE;
 
   if (url.includes("uploads/")) {
     const idx = url.indexOf("uploads/");

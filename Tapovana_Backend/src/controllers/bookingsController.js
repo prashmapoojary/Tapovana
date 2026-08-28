@@ -457,12 +457,12 @@ const createBooking = async (req, res) => {
         const finalAmount = await applyMembershipDiscount(emailAddressForDiscount, service_name, total_amount, user_name);
 
         const insertRes = await query(
-            'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES (COALESCE($1, nextval(\'bookings_id_seq\')), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, $13) RETURNING *',
+            'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, profile_pic) VALUES (COALESCE($1, nextval(\'bookings_id_seq\')), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12) RETURNING *',
             [
                 bookingId, user_name, service_name,
                 booking_date, booking_time, null,
                 note || null, finalAmount || null, pass_details || null,
-                paymentStatus, status, emailAddressForDiscount,
+                paymentStatus, status,
                 profile_pic || null
             ]
         );

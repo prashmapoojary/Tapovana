@@ -845,11 +845,14 @@ const updateWorkshop = async (req, res) => {
             fields.push('allocation_count = $' + idx++);
             values.push(finalAllocationCount);
 
-            fields.push('instructor_id = $' + idx++);
-            values.push(assigned_staff_ids && assigned_staff_ids.length > 0 ? assigned_staff_ids[0] : null);
+            const safeAssignedStaffIds = Array.isArray(assigned_staff_ids) ? assigned_staff_ids : (assigned_staff_ids ? [assigned_staff_ids] : []);
+            const safeOldStaffIds = Array.isArray(oldStaffIds) ? oldStaffIds : [];
 
-            const removedStaff = oldStaffIds.filter(id => !assigned_staff_ids.includes(id));
-            const addedStaff = assigned_staff_ids.filter(id => !oldStaffIds.includes(id));
+            fields.push('instructor_id = $' + idx++);
+            values.push(safeAssignedStaffIds.length > 0 ? safeAssignedStaffIds[0] : null);
+
+            const removedStaff = safeOldStaffIds.filter(id => !safeAssignedStaffIds.includes(id));
+            const addedStaff = safeAssignedStaffIds.filter(id => !safeOldStaffIds.includes(id));
 
             for (const staffId of removedStaff) {
                 await deallocateStaffMember(staffId);
@@ -1027,8 +1030,11 @@ const updateWorkshopStaff = async (req, res) => {
             }
         }
 
-        const removedStaff = oldStaffIds.filter(id => !assigned_staff_ids.includes(id));
-        const addedStaff = assigned_staff_ids.filter(id => !oldStaffIds.includes(id));
+        const safeAssignedStaffIds = Array.isArray(assigned_staff_ids) ? assigned_staff_ids : (assigned_staff_ids ? [assigned_staff_ids] : []);
+        const safeOldStaffIds = Array.isArray(oldStaffIds) ? oldStaffIds : [];
+
+        const removedStaff = safeOldStaffIds.filter(id => !safeAssignedStaffIds.includes(id));
+        const addedStaff = safeAssignedStaffIds.filter(id => !safeOldStaffIds.includes(id));
 
         await query('UPDATE workshops SET assigned_staff_ids = $1, allocation_count = $2 WHERE id = $3', [JSON.stringify(assigned_staff_ids), finalAllocationCount, req.params.id]);
 

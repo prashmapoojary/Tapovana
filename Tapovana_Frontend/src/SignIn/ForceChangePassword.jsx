@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import "./ResetPassword.css";
 import logoImg from "../assets/logo.png";
 import { useNavigate } from "react-router-dom";
+import PasswordInput from "../utils/PasswordInput";
 
 const API_BASE = (() => {
   if (typeof window === "undefined") return "https://tapovana.onrender.com";
@@ -140,11 +141,9 @@ export default function ForceChangePassword() {
         
         <div className="form-container">
           <label htmlFor="force_new_password">New Password</label>
-          <input
-            type="password"
+          <PasswordInput
             id="force_new_password"
             name="force_new_password"
-            className="input-field"
             value={newPassword}
             disabled={otpSent}
             onChange={(e) => setNewPassword(e.target.value)}
@@ -152,11 +151,9 @@ export default function ForceChangePassword() {
           />
 
           <label htmlFor="force_confirm_password">Confirm New Password</label>
-          <input
-            type="password"
+          <PasswordInput
             id="force_confirm_password"
             name="force_confirm_password"
-            className="input-field"
             value={confirmPassword}
             disabled={otpSent}
             onChange={(e) => setConfirmPassword(e.target.value)}
@@ -178,13 +175,15 @@ export default function ForceChangePassword() {
                 >
                   Logout
                 </button>
+
                 <button 
+                  type="button"
                   className="btn" 
                   style={{ flex: 2 }}
                   onClick={handleGenerateOtp} 
                   disabled={loading}
                 >
-                  {loading ? "Generating..." : "Generate OTP"}
+                  {loading ? "Sending OTP..." : "Get OTP to Confirm"}
                 </button>
               </div>
             </>
@@ -192,51 +191,70 @@ export default function ForceChangePassword() {
 
           {otpSent && (
             <>
-              <label htmlFor="force_otp">Enter OTP Code</label>
-              <input
-                type="text"
-                id="force_otp"
-                name="force_otp"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                className="input-field"
-                value={otp}
-                maxLength={6}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, "");
-                  setOtp(value);
-                }}
-                placeholder="6-digit code"
-              />
-              <div style={{ textAlign: "right", marginTop: "-8px", marginBottom: "10px" }}>
-                <button
-                  type="button"
-                  onClick={handleGenerateOtp}
-                  disabled={loading}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#caa24a",
-                    cursor: loading ? "not-allowed" : "pointer",
-                    fontSize: "12px",
-                    fontWeight: "600",
-                    textDecoration: "underline",
-                    padding: 0
+              <div style={{ marginTop: "15px" }}>
+                <label htmlFor="force_otp">Enter 6-digit OTP sent to your Email</label>
+                <input
+                  type="text"
+                  id="force_otp"
+                  name="force_otp"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  className="input-field"
+                  value={otp}
+                  maxLength={6}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, "");
+                    setOtp(value);
                   }}
-                >
-                  {loading ? "Sending..." : "Resend OTP"}
-                </button>
+                  placeholder="6-digit code"
+                />
+                <div style={{ textAlign: "right", marginTop: "-8px", marginBottom: "10px" }}>
+                  <button
+                    type="button"
+                    onClick={handleGenerateOtp}
+                    disabled={loading}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#caa24a",
+                      cursor: loading ? "not-allowed" : "pointer",
+                      fontSize: "12px",
+                      fontWeight: "600",
+                      textDecoration: "underline",
+                      padding: 0
+                    }}
+                  >
+                    {loading ? "Sending..." : "Resend OTP"}
+                  </button>
+                </div>
               </div>
 
               {error && <p className="error-message" style={{ fontSize: "11px" }}>{error}</p>}
               {successMsg && <p className="success-message" style={{ color: "green", textAlign: "center", fontSize: "11px" }}>{successMsg}</p>}
-              
-              <button className="btn" onClick={handleVerifyOtpAndSave} disabled={loading}>
-                {loading ? "Verifying..." : "Verify and Save"}
-              </button>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ background: 'transparent', border: '1px solid #4a5568', color: '#a0aec0', flex: 1 }}
+                  onClick={() => { setOtpSent(false); setError(""); setSuccessMsg(""); }}
+                  disabled={loading}
+                >
+                  Edit Password
+                </button>
+
+                <button 
+                  type="button"
+                  className="btn" 
+                  style={{ flex: 2 }}
+                  onClick={handleVerifyOtpAndSave} 
+                  disabled={loading}
+                >
+                  {loading ? "Saving..." : "Verify & Save Password"}
+                </button>
+              </div>
             </>
           )}
-
         </div>
       </div>
     </div>

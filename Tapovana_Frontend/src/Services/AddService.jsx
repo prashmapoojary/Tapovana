@@ -564,7 +564,7 @@ function AddService({ onBack }) {
                   📁 Upload Local Image
                 </button>
                 <button type="button" className="es-add-benefit-btn" style={{ margin: 0, padding: '8px 12px', fontSize: '12px', borderColor: '#CDA751', color: '#CDA751' }} onClick={() => setMediaModalOpen(true)}>
-                  📷 Choose from Pexels
+                  📷 Choose from Unsplash
                 </button>
               </div>
               <p style={{ margin: "0 0 12px 0", fontSize: "11px", color: "#94a3b8" }}>
@@ -711,7 +711,7 @@ function AddService({ onBack }) {
           setMediaModalOpen(false);
         }}
         allowVideos={false}
-        title="Search Pexels Images"
+        title="Search Unsplash Images"
         page_type="services"
         category={category}
         subcategory={subCategory}

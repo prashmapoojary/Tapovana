@@ -6,7 +6,6 @@ import { getUser } from '../utils/session';
 import { apiFetch } from '../api/http';
 
 import AnimatedNumber from '../utils/AnimatedNumber';
-import DefaultAvatar from '../assets/profileIconDefault.png';
 
 // Icons
 const CalendarIcon = () => (
@@ -25,13 +24,6 @@ const UserIcon = () => (
   </svg>
 );
 
-const TagIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-    <line x1="7" y1="7" x2="7.01" y2="7" />
-  </svg>
-);
-
 const SearchIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="11" cy="11" r="8" />
@@ -47,12 +39,6 @@ const InfoIcon = () => (
   </svg>
 );
 
-const CATEGORY_COLORS = {
-  "Service": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
-  "Workshop": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
-  "Vedic Program": { color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
-};
-
 const STATUS_CONFIG = {
   Upcoming: { label: "Upcoming", color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
   Live: { label: "🔴 LIVE", color: "#e74c3c", bg: "rgba(231,76,60,0.15)" },
@@ -62,16 +48,7 @@ const STATUS_CONFIG = {
   cancelled: { label: "Cancelled", color: "#e74c3c", bg: "rgba(231,76,60,0.1)" },
 };
 
-function AssignmentCard({ a }) {
-  let categoryLabel = '';
-  if (a.type === 'service') {
-    categoryLabel = 'Service';
-  } else if (a.type === 'workshop') {
-    categoryLabel = 'Workshop';
-  } else if (a.type === 'vedic_program') {
-    categoryLabel = 'Vedic Program';
-  }
-  const cat = CATEGORY_COLORS[categoryLabel] || CATEGORY_COLORS["Service"];
+function AssignmentCard({ a, onClick }) {
   const st = STATUS_CONFIG[a.status] || STATUS_CONFIG.active;
 
   const getFormatDate = (dateStr) => {
@@ -84,20 +61,30 @@ function AssignmentCard({ a }) {
     }
   };
 
-  // If status is removed, don't render the card at all!
   if (a.status === 'removed') return null;
 
   return (
-    <div className="ws-card" style={{
-      background: "#F9F9F9",
-      borderRadius: "8px",
-      padding: "20px",
-      border: "1px solid #CDA751"
-    }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "16px" }}>
-        <h3 style={{ margin: 0, color: "#1E1E1E", fontSize: "16px", fontWeight: 600 }}>{a.sessionTitle}</h3>
+    <div 
+      className="ws-card" 
+      onClick={() => onClick(a)}
+      style={{
+        background: "#F9F9F9",
+        borderRadius: "10px",
+        padding: "20px",
+        border: "1px solid #CDA751",
+        cursor: "pointer",
+        transition: "transform 0.2s, box-shadow 0.2s"
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "12px" }}>
+        <div>
+          <span style={{ fontSize: "11px", fontWeight: "700", color: "#CDA751", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            {a.displayRecordId || (a.type === 'service' ? 'Service' : a.type === 'workshop' ? 'Workshop' : 'Vedic Package')}
+          </span>
+          <h3 style={{ margin: "2px 0 0 0", color: "#1E1E1E", fontSize: "16px", fontWeight: 600 }}>{a.sessionTitle}</h3>
+        </div>
         <div style={{
-          background: "#CDA751",
+          background: st.color || "#CDA751",
           color: "white",
           fontWeight: 600,
           padding: "4px 12px",
@@ -107,36 +94,108 @@ function AssignmentCard({ a }) {
           {st.label}
         </div>
       </div>
-      
-      <div style={{ marginBottom: "16px" }}>
-        <p style={{ margin: 0, color: "#555555", fontSize: "14px", marginBottom: "4px" }}>
-          {a.type === 'service' ? 'Assigned Staff' : a.type === 'workshop' ? 'Instructor' : 'Lead Consultant'}: {a.staffName}
-        </p>
-        <p style={{ margin: 0, color: "#1E1E1E", fontSize: "14px", fontWeight: 500 }}>
-          Role: {a.staffRole}
+
+      {/* Customer Info */}
+      <div style={{ marginBottom: "12px", background: "#fff", padding: "8px 12px", borderRadius: "6px", border: "1px solid #edf2f7" }}>
+        <p style={{ margin: 0, color: "#718096", fontSize: "12px", fontWeight: 600 }}>Customer / Participant:</p>
+        <p style={{ margin: 0, color: "#1A202C", fontSize: "14px", fontWeight: 600 }}>
+          {a.customerName || "Assigned Customer"}
         </p>
       </div>
-      
-      <div style={{ marginBottom: "12px" }}>
-        <div style={{ display: "flex", gap: "24px" }}>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <p style={{ margin: 0, color: "#555555", fontSize: "14px", marginBottom: "4px" }}>Date</p>
-            <p style={{ margin: 0, color: "#1E1E1E", fontSize: "14px", fontWeight: 500 }}>
-              {getFormatDate(a.startDate)}
-            </p>
+
+      {/* Staff Info */}
+      <div style={{ marginBottom: "16px" }}>
+        <p style={{ margin: 0, color: "#555555", fontSize: "13px", marginBottom: "2px" }}>
+          <strong>Assigned Specialist:</strong> {a.staffName} ({a.staffCode || 'STAFF'})
+        </p>
+        <p style={{ margin: 0, color: "#1E1E1E", fontSize: "13px", fontWeight: 500 }}>
+          <strong>Role:</strong> {a.staffRole}
+        </p>
+      </div>
+
+      <div style={{ display: "flex", gap: "20px", borderTop: "1px solid #E2E8F0", paddingTop: "12px" }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <p style={{ margin: 0, color: "#555555", fontSize: "12px", marginBottom: "2px" }}>Date</p>
+          <p style={{ margin: 0, color: "#1E1E1E", fontSize: "13px", fontWeight: 600 }}>
+            {getFormatDate(a.startDate)}
+          </p>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <p style={{ margin: 0, color: "#555555", fontSize: "12px", marginBottom: "2px" }}>Time</p>
+          <p style={{ margin: 0, color: "#1E1E1E", fontSize: "13px", fontWeight: 600 }}>
+            {a.bookingTime || a.time || '-'}
+          </p>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <p style={{ margin: 0, color: "#555555", fontSize: "12px", marginBottom: "2px" }}>Duration</p>
+          <p style={{ margin: 0, color: "#1E1E1E", fontSize: "13px", fontWeight: 600 }}>
+            {a.duration || a.duration_minutes || 30} mins
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Detail Modal ────────────────────────────────────────────────────────
+function AssignmentDetailModal({ assignment, onClose }) {
+  if (!assignment) return null;
+
+  return (
+    <div className="blog-editor-modal-overlay" style={{ zIndex: 1100 }}>
+      <div className="blog-editor-modal" style={{ maxWidth: "550px", padding: "24px", borderRadius: "12px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid #edf2f7", paddingBottom: "12px" }}>
+          <div>
+            <span style={{ fontSize: "11px", fontWeight: "700", color: "#CDA751", textTransform: "uppercase" }}>
+              {assignment.type === 'service' ? 'Service Booking' : assignment.type === 'workshop' ? 'Workshop' : 'Vedic Life Program'}
+            </span>
+            <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700", color: "#1a202c" }}>{assignment.sessionTitle}</h2>
           </div>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <p style={{ margin: 0, color: "#555555", fontSize: "14px", marginBottom: "4px" }}>Time</p>
-            <p style={{ margin: 0, color: "#1E1E1E", fontSize: "14px", fontWeight: 500 }}>
-              {a.bookingTime || a.time || ''}
-            </p>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", fontSize: "24px", cursor: "pointer", color: "#a0aec0" }}>×</button>
+        </div>
+
+        {/* Staff Information Section */}
+        <div style={{ background: "#fcf8ef", padding: "14px", borderRadius: "8px", border: "1px solid rgba(205,167,81,0.3)", marginBottom: "16px" }}>
+          <h4 style={{ margin: "0 0 8px 0", color: "#cda751", fontSize: "13px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Assigned Doctor / Therapist</h4>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "14px", color: "#2d3748" }}>
+            <div><strong>Staff Name:</strong> {assignment.staffName}</div>
+            <div><strong>Staff ID:</strong> {assignment.staffCode || 'STAFF'}</div>
+            <div><strong>Email:</strong> {assignment.staffEmail || 'N/A'}</div>
+            <div><strong>Role:</strong> {assignment.staffRole}</div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <p style={{ margin: 0, color: "#555555", fontSize: "14px", marginBottom: "4px" }}>Duration</p>
-            <p style={{ margin: 0, color: "#1E1E1E", fontSize: "14px", fontWeight: 500 }}>
-              {a.duration || a.duration_minutes || 30} mins
-            </p>
+        </div>
+
+        {/* Customer / Participant Information Section */}
+        <div style={{ background: "#f8fafc", padding: "14px", borderRadius: "8px", border: "1px solid #e2e8f0", marginBottom: "16px" }}>
+          <h4 style={{ margin: "0 0 8px 0", color: "#475569", fontSize: "13px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Customer / Participant Details</h4>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "14px", color: "#2d3748" }}>
+            <div><strong>Customer Name:</strong> {assignment.customerName || "Assigned Customer"}</div>
+            <div><strong>Record ID:</strong> {assignment.displayRecordId || assignment.sessionId}</div>
+            {assignment.customerEmail && <div><strong>Customer Email:</strong> {assignment.customerEmail}</div>}
+            <div><strong>Status:</strong> {assignment.status?.toUpperCase()}</div>
           </div>
+        </div>
+
+        {/* Session Schedule Section */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", background: "#edf2f7", padding: "12px", borderRadius: "8px", textAlign: "center", marginBottom: "20px" }}>
+          <div>
+            <div style={{ fontSize: "11px", color: "#718096" }}>Date</div>
+            <div style={{ fontWeight: "700", color: "#1a202c" }}>{assignment.startDate || '-'}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: "11px", color: "#718096" }}>Time</div>
+            <div style={{ fontWeight: "700", color: "#1a202c" }}>{assignment.bookingTime || '-'}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: "11px", color: "#718096" }}>Duration</div>
+            <div style={{ fontWeight: "700", color: "#1a202c" }}>{assignment.duration || 30} mins</div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={{ background: "#cda751", color: "#fff", border: "none", padding: "8px 20px", borderRadius: "6px", cursor: "pointer", fontWeight: "700" }}>
+            Close
+          </button>
         </div>
       </div>
     </div>
@@ -149,32 +208,16 @@ function MyAssignments() {
 
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [staffList, setStaffList] = useState([]);
+  const [staffInfo, setStaffInfo] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [backendAssignments, setBackendAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
 
   const isStaffUser = loggedInUser?.role === 'DOCTOR' || loggedInUser?.role === 'THERAPIST';
-
-  // ─── Fetch real assignments from backend API ───
-  useEffect(() => {
-    const fetchAssignments = async () => {
-      try {
-        setLoading(true);
-        const data = await apiFetch('/api/services/my/assignments');
-        if (data.success && data.assignments) {
-          setBackendAssignments(data.assignments);
-        }
-      } catch (err) {
-        console.error("Failed to fetch assignments:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAssignments();
-  }, []);
-
 
   // Determine active staff ID
   const activeStaffId = useMemo(() => {
@@ -184,26 +227,66 @@ function MyAssignments() {
     return selectedStaffId;
   }, [isStaffUser, loggedInUser, selectedStaffId]);
 
-  // Fetch staff list for admin view
+  // ─── 1. Fetch Staff List (Admins only - run once) ───
   useEffect(() => {
     if (!isStaffUser) {
+      let isMounted = true;
       const fetchStaff = async () => {
         try {
           const res = await apiFetch('/api/teams/users?page=1&limit=100');
-          if (res.success && res.users) {
+          if (isMounted && res.success && res.users) {
+            // Strictly Doctor & Therapist roles only
             const list = res.users.filter(u => u.role === 'DOCTOR' || u.role === 'THERAPIST');
             setStaffList(list);
-            if (list.length > 0) {
+            if (list.length > 0 && !selectedStaffId) {
               setSelectedStaffId(list[0].user_id || list[0].id || '');
             }
           }
         } catch (err) {
-          console.error("Failed to load staff list:", err);
+          console.error("Failed to load staff list:", err.message);
         }
       };
       fetchStaff();
+      return () => { isMounted = false; };
     }
   }, [isStaffUser]);
+
+  // ─── 2. Fetch Assignments for activeStaffId ───
+  useEffect(() => {
+    if (!activeStaffId) return;
+
+    let isMounted = true;
+    const fetchAssignments = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const endpoint = isStaffUser 
+          ? '/api/services/my/assignments' 
+          : `/api/services/my/assignments?staff_id=${encodeURIComponent(activeStaffId)}`;
+
+        const data = await apiFetch(endpoint);
+        if (isMounted) {
+          if (data.success && data.assignments) {
+            setBackendAssignments(data.assignments);
+          }
+          if (data.staff) {
+            setStaffInfo(data.staff);
+          }
+        }
+      } catch (err) {
+        if (isMounted) {
+          console.error("Failed to fetch assignments:", err);
+          setError(err.message || "Failed to load assignments.");
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchAssignments();
+    return () => { isMounted = false; };
+  }, [activeStaffId, isStaffUser]);
 
   const getAssignmentEndTime = (a) => {
     if (!a.startDate) return null;
@@ -258,7 +341,7 @@ function MyAssignments() {
     return new Date(startDateTime.getTime() + addedMinutes * 60 * 1000);
   };
 
-  // Merge backend + context allocations - prioritize context!
+  // Merge backend + context allocations strictly matching activeStaffId
   const allAssignments = useMemo(() => {
     const now = new Date();
     const mapAssignment = (a) => {
@@ -271,7 +354,6 @@ function MyAssignments() {
       else if (sLower === 'upcoming') mappedStatus = 'Upcoming';
       else if (sLower === 'live') mappedStatus = 'Live';
 
-      // Automatically treat as expired if time + 30 minutes has passed
       if (mappedStatus === 'active' || mappedStatus === 'Upcoming' || mappedStatus === 'Live') {
         const endTime = getAssignmentEndTime(a);
         if (endTime && now > endTime) {
@@ -293,15 +375,9 @@ function MyAssignments() {
       .filter(a => a.staffId === activeStaffId)
       .map(mapAssignment);
 
-    // Create a map of sessionId to context allocation for quick lookup!
     const contextAllocMap = new Map(fromContext.map(a => [a.sessionId, a]));
 
-    const merged = [];
-    
-    // Add all context allocations first!
-    merged.push(...fromContext);
-
-    // Now check backend allocations: if no context allocation for sessionId, add it!
+    const merged = [...fromContext];
     for (const b of fromBackend) {
       if (!contextAllocMap.has(b.sessionId)) {
         merged.push(b);
@@ -320,7 +396,7 @@ function MyAssignments() {
     return { total, active, pending, expired };
   }, [allAssignments]);
 
-  // Filtered assignments (exclude removed ones entirely)
+  // Filtered assignments
   const filteredAssignments = useMemo(() => {
     return allAssignments.filter(a => {
       if (a.status === 'removed') return false;
@@ -337,33 +413,33 @@ function MyAssignments() {
       
       const matchesQuery = !searchQuery ||
         a.sessionTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (a.sessionId || '').toLowerCase().includes(searchQuery.toLowerCase());
+        (a.sessionId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (a.displayRecordId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (a.customerName || '').toLowerCase().includes(searchQuery.toLowerCase());
       return matchesType && matchesStatus && matchesQuery;
     });
   }, [allAssignments, filterType, filterStatus, searchQuery]);
 
-
-
-  const getFormatDate = (dateStr) => {
-    if (!dateStr) return '';
-    try {
-      const options = { year: 'numeric', month: 'short', day: 'numeric' };
-      return new Date(dateStr).toLocaleDateString(undefined, options);
-    } catch {
-      return dateStr;
-    }
-  };
-
   const currentViewingName = useMemo(() => {
+    if (staffInfo) {
+      return `${staffInfo.name} (${staffInfo.staffCode || 'STAFF'})`;
+    }
     if (isStaffUser) {
       return `${loggedInUser?.first_name || ''} ${loggedInUser?.last_name || ''}`.trim();
     }
     const currentStaffObj = staffList.find(s => s.user_id === activeStaffId || s.id === activeStaffId);
     return currentStaffObj ? `${currentStaffObj.first_name || ''} ${currentStaffObj.last_name || ''}`.trim() : 'Specialist';
-  }, [isStaffUser, loggedInUser, activeStaffId, staffList]);
+  }, [staffInfo, isStaffUser, loggedInUser, activeStaffId, staffList]);
 
   return (
     <div className="my-assignments-container">
+
+      {selectedAssignment && (
+        <AssignmentDetailModal
+          assignment={selectedAssignment}
+          onClose={() => setSelectedAssignment(null)}
+        />
+      )}
 
       {/* Header */}
       <div className="ma-header">
@@ -394,6 +470,21 @@ function MyAssignments() {
           </div>
         )}
       </div>
+
+      {/* Staff Information Banner */}
+      {staffInfo && (
+        <div style={{ background: "#fff", border: "1px solid rgba(205,167,81,0.3)", borderRadius: "10px", padding: "16px 20px", marginBottom: "24px", display: "flex", gap: "24px", alignItems: "center", boxShadow: "0 2px 10px rgba(205,167,81,0.05)" }}>
+          <div style={{ background: "#cda751", color: "#fff", width: "48px", height: "48px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", fontSize: "18px" }}>
+            {staffInfo.name ? staffInfo.name[0].toUpperCase() : 'S'}
+          </div>
+          <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "12px", fontSize: "14px", color: "#2d3748" }}>
+            <div><span style={{ color: "#718096", fontSize: "12px", display: "block" }}>Staff Name</span><strong>{staffInfo.name}</strong></div>
+            <div><span style={{ color: "#718096", fontSize: "12px", display: "block" }}>Staff ID</span><strong style={{ color: "#cda751" }}>{staffInfo.staffCode}</strong></div>
+            <div><span style={{ color: "#718096", fontSize: "12px", display: "block" }}>Role</span><strong>{staffInfo.role}</strong></div>
+            <div><span style={{ color: "#718096", fontSize: "12px", display: "block" }}>Email</span><strong>{staffInfo.email || 'N/A'}</strong></div>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="ma-stats-grid">
@@ -426,7 +517,7 @@ function MyAssignments() {
           <SearchIcon />
           <input
             type="text"
-            placeholder="Search by session title or ID..."
+            placeholder="Search by session title, customer, or ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -448,9 +539,13 @@ function MyAssignments() {
         </div>
       </div>
 
-      {/* Loading */}
+      {/* Loading & Errors */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px', color: '#64748B' }}>Loading assignments...</div>
+      ) : error ? (
+        <div style={{ textAlign: 'center', padding: '40px', background: '#FFF5F5', border: '1px solid #FEB2B2', borderRadius: '8px', color: '#C53030' }}>
+          <p style={{ fontWeight: 'bold', fontSize: '16px', margin: '0 0 8px 0' }}>{error}</p>
+        </div>
       ) : (
         <>
           {/* Services Section */}
@@ -465,6 +560,7 @@ function MyAssignments() {
                       <AssignmentCard
                         key={a.id}
                         a={a}
+                        onClick={setSelectedAssignment}
                       />
                     ))}
                   </div>
@@ -486,6 +582,7 @@ function MyAssignments() {
                       <AssignmentCard
                         key={a.id}
                         a={a}
+                        onClick={setSelectedAssignment}
                       />
                     ))}
                   </div>
@@ -507,6 +604,7 @@ function MyAssignments() {
                       <AssignmentCard
                         key={a.id}
                         a={a}
+                        onClick={setSelectedAssignment}
                       />
                     ))}
                   </div>

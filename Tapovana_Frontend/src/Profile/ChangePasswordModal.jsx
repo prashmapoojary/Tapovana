@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import "./ChangePasswordModal.css";
+import PasswordInput from "../utils/PasswordInput";
 
 const API_BASE = (() => {
   if (typeof window === "undefined") return "https://tapovana.onrender.com";
@@ -217,8 +218,7 @@ const ChangePasswordModal = ({ onClose }) => {
 
                   <div className="cp-form-group">
                     <label>New Password</label>
-                    <input
-                      type="password"
+                    <PasswordInput
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Min 8 characters"
@@ -227,8 +227,7 @@ const ChangePasswordModal = ({ onClose }) => {
 
                   <div className="cp-form-group">
                     <label>Confirm New Password</label>
-                    <input
-                      type="password"
+                    <PasswordInput
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Re-enter new password"

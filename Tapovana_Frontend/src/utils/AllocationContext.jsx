@@ -510,7 +510,7 @@ Tapovana Admin Team
     };
     fetchAllAllocations();
     loadConflicts();
-  }, [location.pathname]);
+  }, []);
 
   // ── Auto-cleanup: mark expired allocations on mount ──
   useEffect(() => {
@@ -623,4 +623,4 @@ export const useAllocations = () => {
   return context;
 };
 
-export default AllocationContext;
+export default AllocationProvider;

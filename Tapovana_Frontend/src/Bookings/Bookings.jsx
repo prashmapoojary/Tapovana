@@ -464,7 +464,7 @@ function Bookings() {
                       if (pic.startsWith("http")) {
                         avatarSrc = pic;
                       } else {
-                        avatarSrc = `https://tapovana.onrender.com${pic.startsWith("/") ? "" : "/"}${pic}`;
+                        avatarSrc = `${API_BASE}${pic.startsWith("/") ? "" : "/"}${pic}`;
                       }
                     } else if (membership?.profilePhoto) {
                       avatarSrc = membership.profilePhoto;

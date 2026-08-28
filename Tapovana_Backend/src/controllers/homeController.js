@@ -2,76 +2,62 @@ const { query } = require('../config/db');
 
 exports.getHomeSummary = async (req, res) => {
   try {
-    let total_customers = 5;
-    let total_transactions = 8;
-    let total_services = 5; 
-    let active_bookings = 23;
-    let published_blogs = 12;
+    const [custRes, txnRes, servicesRes, bookingsRes, blogsRes] = await Promise.all([
+      query("SELECT COUNT(*) as cnt FROM customers").catch(e => {
+        console.warn("[HomeController] DB customers count failed, using fallback:", e.message);
+        return { rows: [{ cnt: 5 }] };
+      }),
+      query("SELECT COUNT(*) as cnt FROM transactions").catch(e => {
+        console.warn("[HomeController] DB transactions count failed, using fallback:", e.message);
+        return { rows: [{ cnt: 8 }] };
+      }),
+      query("SELECT COUNT(*) as cnt FROM services").catch(e => {
+        console.warn("[HomeController] DB services count query failed, using fallback:", e.message);
+        return { rows: [{ cnt: 5 }] };
+      }),
+      query("SELECT COUNT(*) as cnt FROM bookings").catch(e => {
+        console.warn("[HomeController] DB bookings count query failed, using fallback:", e.message);
+        return { rows: [{ cnt: 23 }] };
+      }),
+      query("SELECT COUNT(*) as cnt FROM blogs WHERE status = 'published'").catch(e => {
+        console.warn("[HomeController] DB blogs count query failed, using fallback:", e.message);
+        return { rows: [{ cnt: 12 }] };
+      })
+    ]);
 
-    // 1. Fetch live count of customers
-    try {
-      const custRes = await query("SELECT COUNT(*) as cnt FROM customers");
-      total_customers = parseInt(custRes.rows[0]?.cnt || 0, 10);
-    } catch (e) {
-      console.warn("[HomeController] DB customers count failed, using fallback:", e.message);
-    }
+    const total_customers = parseInt(custRes.rows[0]?.cnt || 0, 10);
+    const total_transactions = parseInt(txnRes.rows[0]?.cnt || 0, 10);
+    const total_services = parseInt(servicesRes.rows[0]?.cnt || 0, 10);
+    const active_bookings = parseInt(bookingsRes.rows[0]?.cnt || 0, 10);
+    const published_blogs = parseInt(blogsRes.rows[0]?.cnt || 0, 10);
 
-    // 2. Fetch live count of transactions
-    try {
-      const txnRes = await query("SELECT COUNT(*) as cnt FROM transactions");
-      total_transactions = parseInt(txnRes.rows[0]?.cnt || 0, 10);
-    } catch (e) {
-      console.warn("[HomeController] DB transactions count failed, using fallback:", e.message);
-    }
-
-    // 3. Fetch count of services
-    try {
-      const servicesRes = await query("SELECT COUNT(*) as cnt FROM services");
-      total_services = parseInt(servicesRes.rows[0]?.cnt || 0, 10);
-    } catch (e) {
-      console.warn("[HomeController] DB services count query failed, using fallback:", e.message);
-    }
-
-    // 4. Fetch count of bookings (active/upcoming/all depending on booking status logic)
-    try {
-      const bookingsRes = await query("SELECT COUNT(*) as cnt FROM bookings");
-      active_bookings = parseInt(bookingsRes.rows[0]?.cnt || 0, 10);
-    } catch (e) {
-      console.warn("[HomeController] DB bookings count query failed, using fallback:", e.message);
-    }
-
-    // 5. Fetch count of published blogs
-    try {
-      const blogsRes = await query("SELECT COUNT(*) as cnt FROM blogs WHERE status = 'published'");
-      published_blogs = parseInt(blogsRes.rows[0]?.cnt || 0, 10);
-    } catch (e) {
-      console.warn("[HomeController] DB blogs count query failed, using fallback:", e.message);
-    }
-
-    // Optional: Log a snapshot in home_dashboard_snapshots table
-    try {
-      const revenueRes = await query("SELECT COALESCE(SUM(amount),0) as total FROM transactions WHERE status IN ('COMPLETED','PAID')");
-      const pendingRes = await query("SELECT COALESCE(SUM(amount),0) as total FROM transactions WHERE status = 'PENDING'");
-      const refundedRes = await query("SELECT COALESCE(SUM(amount),0) as total FROM transactions WHERE status = 'REFUNDED'");
-      const failedRes = await query("SELECT COALESCE(SUM(amount),0) as total FROM transactions WHERE status = 'FAILED'");
-
-      await query(`
-        INSERT INTO home_dashboard_snapshots (total_customers, total_transactions, total_revenue, pending_amount, refunded_amount, failed_amount, total_services, active_bookings, published_blogs)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      `, [
-        total_customers,
-        total_transactions,
-        parseFloat(revenueRes.rows[0]?.total || 0),
-        parseFloat(pendingRes.rows[0]?.total || 0),
-        parseFloat(refundedRes.rows[0]?.total || 0),
-        parseFloat(failedRes.rows[0]?.total || 0),
-        total_services,
-        active_bookings,
-        published_blogs
-      ]);
-    } catch (snapshotErr) {
-      console.warn("[HomeController] Failed to write dashboard snapshot:", snapshotErr.message);
-    }
+    // Asynchronously log snapshot without blocking HTTP response
+    (async () => {
+      try {
+        const [revenueRes, pendingRes, refundedRes, failedRes] = await Promise.all([
+          query("SELECT COALESCE(SUM(amount),0) as total FROM transactions WHERE status IN ('COMPLETED','PAID')"),
+          query("SELECT COALESCE(SUM(amount),0) as total FROM transactions WHERE status = 'PENDING'"),
+          query("SELECT COALESCE(SUM(amount),0) as total FROM transactions WHERE status = 'REFUNDED'"),
+          query("SELECT COALESCE(SUM(amount),0) as total FROM transactions WHERE status = 'FAILED'")
+        ]);
+        await query(`
+          INSERT INTO home_dashboard_snapshots (total_customers, total_transactions, total_revenue, pending_amount, refunded_amount, failed_amount, total_services, active_bookings, published_blogs)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `, [
+          total_customers,
+          total_transactions,
+          parseFloat(revenueRes.rows[0]?.total || 0),
+          parseFloat(pendingRes.rows[0]?.total || 0),
+          parseFloat(refundedRes.rows[0]?.total || 0),
+          parseFloat(failedRes.rows[0]?.total || 0),
+          total_services,
+          active_bookings,
+          published_blogs
+        ]);
+      } catch (snapshotErr) {
+        console.warn("[HomeController] Failed to write dashboard snapshot:", snapshotErr.message);
+      }
+    })();
 
     res.json({
       success: true,
@@ -169,81 +155,7 @@ exports.getAnalyticsDashboard = async (req, res) => {
     const startIso = startDate.toISOString();
     const endIso = endDate.toISOString();
 
-    // 1. Card Metrics
-    // Bookings count during period
-    const bookingsCntRes = await query(
-      `SELECT COUNT(*) AS cnt 
-       FROM bookings 
-       WHERE booking_date >= $1 AND booking_date <= $2 AND status NOT IN ('CANCELLED')`,
-      [startIso, endIso]
-    );
-    const today_bookings = parseInt(bookingsCntRes.rows[0]?.cnt || 0, 10);
-
-    // Period Revenue: SUM of realized transaction amounts from transactions table
-    const txnRevRes = await query(
-      `SELECT COALESCE(SUM(amount), 0) AS rev 
-       FROM transactions 
-       WHERE created_at >= $1 AND created_at <= $2 
-         AND UPPER(COALESCE(status, 'COMPLETED')) IN ('COMPLETED', 'PAID')`,
-      [startIso, endIso]
-    );
-    const today_revenue = parseFloat(txnRevRes.rows[0]?.rev || 0);
-
-    // Active customers during selected period (unique customers with transactions or bookings)
-    const activeCustRes = await query(
-      `SELECT COUNT(DISTINCT cust_id) AS cnt FROM (
-         SELECT customer_id::text AS cust_id 
-         FROM transactions 
-         WHERE created_at >= $1 AND created_at <= $2 AND customer_id IS NOT NULL
-         UNION
-         SELECT customer_name AS cust_id 
-         FROM transactions 
-         WHERE created_at >= $1 AND created_at <= $2 AND customer_id IS NULL AND customer_name IS NOT NULL AND customer_name != ''
-         UNION
-         SELECT user_name AS cust_id 
-         FROM bookings 
-         WHERE booking_date >= $1 AND booking_date <= $2 AND user_name IS NOT NULL AND user_name != ''
-       ) active_users`,
-      [startIso, endIso]
-    );
-    const active_customers = parseInt(activeCustRes.rows[0]?.cnt || 0, 10);
-
-    // Pending allocations across ALL modules: Service Bookings + Workshops + Vedic Life Programs
-    let pending_bookings_cnt = 0;
-    let pending_workshops_cnt = 0;
-    let pending_vedic_cnt = 0;
-
-    try {
-      const bkgRes = await query(
-        `SELECT COUNT(*) AS cnt FROM bookings WHERE UPPER(status) IN ('PENDING', 'PENDING ALLOCATION') OR (UPPER(status) NOT IN ('CANCELLED', 'COMPLETED') AND (therapist_id IS NULL OR therapist_name IS NULL OR therapist_name = '' OR LOWER(therapist_name) = 'unassigned'))`
-      );
-      pending_bookings_cnt = parseInt(bkgRes.rows[0]?.cnt || 0, 10);
-    } catch (e) {
-      console.warn("[HomeController] Pending bookings query failed:", e.message);
-    }
-
-    try {
-      const wsRes = await query(
-        `SELECT COUNT(*) AS cnt FROM workshops WHERE UPPER(status) IN ('PENDING', 'PENDING ALLOCATION') OR (UPPER(status) NOT IN ('CANCELLED', 'COMPLETED') AND (instructor_id IS NULL OR instructor IS NULL OR instructor = '' OR LOWER(instructor) = 'unassigned'))`
-      );
-      pending_workshops_cnt = parseInt(wsRes.rows[0]?.cnt || 0, 10);
-    } catch (e) {
-      console.warn("[HomeController] Pending workshops query failed:", e.message);
-    }
-
-    try {
-      const vedicRes = await query(
-        `SELECT COUNT(*) AS cnt FROM vedic_programs WHERE UPPER(status) IN ('PENDING', 'PENDING ALLOCATION') OR (UPPER(status) NOT IN ('CANCELLED', 'COMPLETED') AND (consultant_id IS NULL OR consultant_name IS NULL OR consultant_name = '' OR LOWER(consultant_name) = 'unassigned'))`
-      );
-      pending_vedic_cnt = parseInt(vedicRes.rows[0]?.cnt || 0, 10);
-    } catch (e) {
-      console.warn("[HomeController] Pending vedic programs query failed:", e.message);
-    }
-
-    const pending_allocations_total = pending_bookings_cnt + pending_workshops_cnt + pending_vedic_cnt;
-    const pending_bookings = pending_allocations_total;
-
-    // 2. Trend Bucketing (7 Slots)
+    // Setup 7 trend slots
     const slots = [];
     const formatLabel = (date) => {
       const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -280,50 +192,125 @@ exports.getAnalyticsDashboard = async (req, res) => {
       }
     }
 
-    const bookings_last_7_days = [];
-    const revenue_last_7_days = [];
     const daysOfWeek = slots.map(s => s.label);
 
+    // Run ALL queries concurrently using Promise.all
+    const [
+      bookingsCntRes,
+      txnRevRes,
+      activeCustRes,
+      bkgRes,
+      wsRes,
+      vedicRes,
+      slotQueries,
+      membershipRes,
+      servicesDemandRes,
+      workshopsDemandRes,
+      vedicDemandRes
+    ] = await Promise.all([
+      // 1. Period Bookings count
+      query(
+        `SELECT COUNT(*) AS cnt FROM bookings WHERE booking_date >= $1 AND booking_date <= $2 AND status NOT IN ('CANCELLED')`,
+        [startIso, endIso]
+      ),
+      // 2. Period Revenue
+      query(
+        `SELECT COALESCE(SUM(amount), 0) AS rev FROM transactions WHERE created_at >= $1 AND created_at <= $2 AND UPPER(COALESCE(status, 'COMPLETED')) IN ('COMPLETED', 'PAID')`,
+        [startIso, endIso]
+      ),
+      // 3. Active customers count
+      query(
+        `SELECT COUNT(DISTINCT cust_id) AS cnt FROM (
+           SELECT customer_id::text AS cust_id FROM transactions WHERE created_at >= $1 AND created_at <= $2 AND customer_id IS NOT NULL
+           UNION
+           SELECT customer_name AS cust_id FROM transactions WHERE created_at >= $1 AND created_at <= $2 AND customer_id IS NULL AND customer_name IS NOT NULL AND customer_name != ''
+           UNION
+           SELECT user_name AS cust_id FROM bookings WHERE booking_date >= $1 AND booking_date <= $2 AND user_name IS NOT NULL AND user_name != ''
+         ) active_users`,
+        [startIso, endIso]
+      ),
+      // 4. Pending bookings count
+      query(
+        `SELECT COUNT(*) AS cnt FROM bookings WHERE UPPER(status) IN ('PENDING', 'PENDING ALLOCATION') OR (UPPER(status) NOT IN ('CANCELLED', 'COMPLETED') AND (therapist_id IS NULL OR therapist_name IS NULL OR therapist_name = '' OR LOWER(therapist_name) = 'unassigned'))`
+      ).catch(e => ({ rows: [{ cnt: 0 }] })),
+      // 5. Pending workshops count
+      query(
+        `SELECT COUNT(*) AS cnt FROM workshops WHERE UPPER(status) IN ('PENDING', 'PENDING ALLOCATION') OR (UPPER(status) NOT IN ('CANCELLED', 'COMPLETED') AND (instructor_id IS NULL OR instructor IS NULL OR instructor = '' OR LOWER(instructor) = 'unassigned'))`
+      ).catch(e => ({ rows: [{ cnt: 0 }] })),
+      // 6. Pending vedic programs count
+      query(
+        `SELECT COUNT(*) AS cnt FROM vedic_programs WHERE UPPER(status) IN ('PENDING', 'PENDING ALLOCATION') OR (UPPER(status) NOT IN ('CANCELLED', 'COMPLETED') AND (lead_consultant_id IS NULL OR lead_consultant_id = ''))`
+      ).catch(e => ({ rows: [{ cnt: 0 }] })),
+      // 7. 7-Slot trend queries (concurrently run 14 slot queries)
+      Promise.all(slots.flatMap(slot => [
+        query(
+          `SELECT COUNT(*) AS cnt FROM bookings WHERE booking_date >= $1 AND booking_date <= $2 AND status NOT IN ('CANCELLED')`,
+          [slot.slotStart.toISOString(), slot.slotEnd.toISOString()]
+        ),
+        query(
+          `SELECT COALESCE(SUM(amount), 0) AS rev FROM transactions WHERE created_at >= $1 AND created_at <= $2 AND UPPER(COALESCE(status, 'COMPLETED')) IN ('COMPLETED', 'PAID')`,
+          [slot.slotStart.toISOString(), slot.slotEnd.toISOString()]
+        )
+      ])),
+      // 8. Membership breakdown
+      query(
+        `SELECT COALESCE(UPPER(membership_status), 'NONE') AS tier, COUNT(*) AS cnt FROM customers GROUP BY membership_status`
+      ),
+      // 9. Services demand
+      query(`
+        SELECT b.service_name AS name, COALESCE(MAX(s.category), 'Wellness') AS category, COUNT(*) AS count, COALESCE(MAX(s.base_price::float), 2000) AS price
+        FROM bookings b
+        LEFT JOIN services s ON LOWER(s.name) = LOWER(b.service_name)
+        WHERE b.service_name IS NOT NULL
+        GROUP BY b.service_name
+        ORDER BY count DESC
+        LIMIT 5
+      `),
+      // 10. Workshops demand
+      query(`
+        SELECT w.title AS name, COALESCE(MAX(w.category), 'Workshop') AS category, COUNT(a.id) AS count, COALESCE(MAX(w.price::float), 1500) AS price
+        FROM workshops w
+        LEFT JOIN attendees a ON a.workshop_id = w.id
+        GROUP BY w.id, w.title
+        ORDER BY count DESC
+        LIMIT 5
+      `),
+      // 11. Vedic Life demand
+      query(`
+        SELECT vp.title AS name, COALESCE(MAX(vp.type), 'Vedic Package') AS category, COUNT(va.id) AS count, COALESCE(MAX(vp.price::float), 5000) AS price
+        FROM vedic_programs vp
+        LEFT JOIN vedic_attendees va ON va.program_id = vp.id
+        GROUP BY vp.id, vp.title
+        ORDER BY count DESC
+        LIMIT 5
+      `)
+    ]);
+
+    const today_bookings = parseInt(bookingsCntRes.rows[0]?.cnt || 0, 10);
+    const today_revenue = parseFloat(txnRevRes.rows[0]?.rev || 0);
+    const active_customers = parseInt(activeCustRes.rows[0]?.cnt || 0, 10);
+
+    const pending_bookings_cnt = parseInt(bkgRes.rows[0]?.cnt || 0, 10);
+    const pending_workshops_cnt = parseInt(wsRes.rows[0]?.cnt || 0, 10);
+    const pending_vedic_cnt = parseInt(vedicRes.rows[0]?.cnt || 0, 10);
+    const pending_allocations_total = pending_bookings_cnt + pending_workshops_cnt + pending_vedic_cnt;
+
+    const bookings_last_7_days = [];
+    const revenue_last_7_days = [];
+
     for (let i = 0; i < 7; i++) {
-      const slot = slots[i];
-      const slotBkgRes = await query(
-        `SELECT COUNT(*) AS cnt 
-         FROM bookings 
-         WHERE booking_date >= $1 AND booking_date <= $2 AND status NOT IN ('CANCELLED')`,
-        [slot.slotStart.toISOString(), slot.slotEnd.toISOString()]
-      );
-      const slotRevRes = await query(
-        `SELECT COALESCE(SUM(amount), 0) AS rev 
-         FROM transactions 
-         WHERE created_at >= $1 AND created_at <= $2 AND UPPER(COALESCE(status, 'COMPLETED')) IN ('COMPLETED', 'PAID')`,
-        [slot.slotStart.toISOString(), slot.slotEnd.toISOString()]
-      );
-      bookings_last_7_days.push(parseInt(slotBkgRes.rows[0]?.cnt || 0, 10));
-      revenue_last_7_days.push(parseFloat(slotRevRes.rows[0]?.rev || 0));
+      const bkgResSlot = slotQueries[i * 2];
+      const revResSlot = slotQueries[i * 2 + 1];
+      bookings_last_7_days.push(parseInt(bkgResSlot.rows[0]?.cnt || 0, 10));
+      revenue_last_7_days.push(parseFloat(revResSlot.rows[0]?.rev || 0));
     }
 
-    // 3. Membership Breakdown
-    const membershipRes = await query(
-      `SELECT COALESCE(UPPER(membership_status), 'NONE') AS tier, COUNT(*) AS cnt 
-       FROM customers 
-       GROUP BY membership_status`
-    );
     const membership_breakdown = { NONE: 0, SILVER: 0, GOLD: 0, PLATINUM: 0, DIAMOND: 0 };
     membershipRes.rows.forEach(r => {
       const tierKey = (r.tier === 'NULL' || !r.tier) ? 'NONE' : r.tier;
       membership_breakdown[tierKey] = (membership_breakdown[tierKey] || 0) + parseInt(r.cnt || 0, 10);
     });
 
-    // 4. Services Demand (From Bookings)
-    const servicesDemandRes = await query(`
-      SELECT b.service_name AS name, COALESCE(MAX(s.category), 'Wellness') AS category, COUNT(*) AS count, COALESCE(MAX(s.base_price::float), 2000) AS price
-      FROM bookings b
-      LEFT JOIN services s ON LOWER(s.name) = LOWER(b.service_name)
-      WHERE b.service_name IS NOT NULL
-      GROUP BY b.service_name
-      ORDER BY count DESC
-      LIMIT 5
-    `);
     const service_demand_services = {};
     servicesDemandRes.rows.forEach((r, idx) => {
       service_demand_services[`SVC-${idx + 1}`] = {
@@ -334,45 +321,26 @@ exports.getAnalyticsDashboard = async (req, res) => {
       };
     });
 
-    // 5. Workshops Demand (From Workshop Attendees)
-    const workshopsDemandRes = await query(`
-      SELECT w.title AS name, COALESCE(MAX(w.category), 'Workshop') AS category, COUNT(a.id) AS count, COALESCE(MAX(w.price::float), 1500) AS price
-      FROM workshops w
-      LEFT JOIN attendees a ON a.workshop_id = w.id
-      GROUP BY w.id, w.title
-      ORDER BY count DESC
-      LIMIT 5
-    `);
     const service_demand_workshops = {};
-    workshopsDemandRes.rows.forEach((r, idx) => {
+    workshopsDemandRes.forEach ? workshopsDemandRes.rows.forEach((r, idx) => {
       service_demand_workshops[`WS-${idx + 1}`] = {
         count: parseInt(r.count, 10),
         name: r.name,
         category: r.category,
         price: parseFloat(r.price)
       };
-    });
+    }) : null;
 
-    // 6. Vedic Life Demand (From Vedic Attendees)
-    const vedicDemandRes = await query(`
-      SELECT vp.title AS name, COALESCE(MAX(vp.type), 'Vedic Package') AS category, COUNT(va.id) AS count, COALESCE(MAX(vp.price::float), 5000) AS price
-      FROM vedic_programs vp
-      LEFT JOIN vedic_attendees va ON va.program_id = vp.id
-      GROUP BY vp.id, vp.title
-      ORDER BY count DESC
-      LIMIT 5
-    `);
     const service_demand_vedic = {};
-    vedicDemandRes.rows.forEach((r, idx) => {
+    vedicDemandRes.forEach ? vedicDemandRes.rows.forEach((r, idx) => {
       service_demand_vedic[`VL-${idx + 1}`] = {
         count: parseInt(r.count, 10),
         name: r.name,
         category: r.category,
         price: parseFloat(r.price)
       };
-    });
+    }) : null;
 
-    // Overall Demand Combine
     const service_demand = { ...service_demand_services, ...service_demand_workshops };
 
     res.json({
@@ -381,7 +349,7 @@ exports.getAnalyticsDashboard = async (req, res) => {
         today_bookings,
         today_revenue,
         active_customers,
-        pending_bookings,
+        pending_bookings: pending_allocations_total,
         pending_allocations: pending_allocations_total
       },
       trends: {

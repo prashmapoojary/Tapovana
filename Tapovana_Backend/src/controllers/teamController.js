@@ -474,7 +474,7 @@ const addTeamMemberFrontend = async (req, res) => {
     const normalizeRoleName = (r) => String(r || '').toUpperCase().trim().replace(/[\s-]+/g, '_');
     const targetRoleNorm = normalizeRoleName(role);
 
-    const ALLOWED_ROLES = ['SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR', 'THERAPIST'];
+    const ALLOWED_ROLES = ['SUPER_ADMIN', 'MASTER_ADMIN', 'CO_ADMIN', 'ADMIN', 'DOCTOR', 'THERAPIST', 'CONSULTANT'];
     if (!ALLOWED_ROLES.includes(targetRoleNorm)) {
         return res.status(400).json({
             success: false,
@@ -511,6 +511,12 @@ const addTeamMemberFrontend = async (req, res) => {
             profile_photo_base64
         );
 
+        let creatorId = req.user?.id || null;
+        if (creatorId) {
+            const userCheck = await client.query('SELECT id FROM team_members WHERE id = $1', [creatorId]);
+            if (!userCheck.rows.length) creatorId = null;
+        }
+
         const memberResult = await client.query(
             `INSERT INTO team_members (
                 first_name, last_name, email, phone, role_id, specialization,
@@ -525,7 +531,7 @@ const addTeamMemberFrontend = async (req, res) => {
                 phone?.trim() || null,
                 roleId,
                 specialization?.trim() || null,
-                req.user.id,
+                creatorId,
                 photoResult.url,
                 photoResult.source,
                 photoResult.url
@@ -802,9 +808,15 @@ const deleteTeamMemberFrontend = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Cannot delete your own account.' });
         }
 
+        const staffId = req.params.id;
+        await query('UPDATE services SET created_by = NULL WHERE created_by = $1', [staffId]);
+        await query('UPDATE bookings SET therapist_id = NULL WHERE therapist_id = $1', [staffId]);
+        await query('DELETE FROM allocations WHERE staff_id = $1', [staffId]);
+        await query('DELETE FROM login_credentials WHERE member_id = $1', [staffId]);
+
         const result = await query(
             `DELETE FROM team_members WHERE id = $1 RETURNING id`,
-            [req.params.id]
+            [staffId]
         );
 
         if (!result.rows.length) {
