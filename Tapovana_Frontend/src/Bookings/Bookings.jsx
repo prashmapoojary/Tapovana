@@ -55,7 +55,7 @@ function Bookings() {
   const isBookingConflicted = (bookingId) => {
     return (conflicts || []).some(c => String(c.session_id) === String(bookingId));
   };
-  const canEdit = (userRole || "").toUpperCase() === "DOCTOR";
+  const canEdit = ["SUPER_ADMIN", "CO_ADMIN", "ADMIN"].includes((userRole || "").toUpperCase());
 
   const [bookings, setBookings] = useState([]);
   const [staffList, setStaffList] = useState([]);

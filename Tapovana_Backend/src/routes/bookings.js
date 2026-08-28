@@ -11,21 +11,19 @@ const {
     createBooking
 } = require('../controllers/bookingsController');
 
-const doctorOnly = [authenticate, requireRole('DOCTOR')];
-const adminOrDoctor = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'DOCTOR')];
+const adminOnly = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'ADMIN')];
+const staffOrAdmin = [authenticate, requireRole('SUPER_ADMIN', 'CO_ADMIN', 'ADMIN', 'DOCTOR', 'THERAPIST')];
 
-// Read routes — public, no auth required
+// Read routes — accessible by all staff and admins
 router.get('/', getAllBookings);
 router.get('/:id', getBookingById);
 router.post('/', createBooking);
 
-// Doctor-only actions (staff allocation & booking confirmation)
-router.post('/:id/notify', ...doctorOnly, sendBookingNotificationOnly);
-router.patch('/:id/status', ...doctorOnly, updateBookingStatus);
-router.patch('/:id/therapist', ...doctorOnly, assignTherapist);
-
-// Admin & Doctor deletion & sync
-router.delete('/:id', ...adminOrDoctor, deleteBooking);
-router.post('/sync', ...adminOrDoctor, syncFromRender);
+// CRUD & Allocation actions — Super Admin & Co-Admin ONLY
+router.post('/:id/notify', ...adminOnly, sendBookingNotificationOnly);
+router.patch('/:id/status', ...adminOnly, updateBookingStatus);
+router.patch('/:id/therapist', ...adminOnly, assignTherapist);
+router.delete('/:id', ...adminOnly, deleteBooking);
+router.post('/sync', ...adminOnly, syncFromRender);
 
 module.exports = router;
