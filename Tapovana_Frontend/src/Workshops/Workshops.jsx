@@ -492,7 +492,7 @@ export default function Workshops() {
     setManualEnrollError("");
     
     // Seat Capacity Guard
-    const activeWorkshop = workshops.find(w => w.id === selectedWorkshopId);
+    const activeWorkshop = workshops.find(w => w.id === selectedWs?.id) || selectedWs;
     if (activeWorkshop) {
       const maxCap = parseInt(activeWorkshop.capacity || activeWorkshop.max_seats || 0, 10);
       const currEnrolled = attendees ? attendees.length : 0;
