@@ -471,7 +471,10 @@ export default function Workshops() {
       setAttendeesError("");
       const res = await apiFetch(`/api/workshops/${workshopId}/attendees`);
       if (res.success) {
-        setAttendees(res.attendees || []);
+        const attList = res.attendees || [];
+        setAttendees(attList);
+        setSelectedWs(prev => prev ? ({ ...prev, enrolled: attList.length }) : null);
+        setWorkshops(prev => prev.map(w => String(w.id) === String(workshopId) ? ({ ...w, enrolled: attList.length }) : w));
       } else {
         throw new Error(res.message || "Failed to load attendees.");
       }
@@ -1219,7 +1222,7 @@ export default function Workshops() {
               transition: "all 0.2s"
             }}
           >
-            Attendees ({ws.enrolled || 0})
+            Attendees ({attendees ? attendees.length : (ws.enrolled || 0)})
           </button>
         </div>
 
@@ -1350,7 +1353,7 @@ export default function Workshops() {
                   />
                 </div>
                 <span style={{ fontSize: "13px", color: "#64748B", fontWeight: 500 }}>
-                  {ws.enrolled || 0} enrolled
+                  {attendees ? attendees.length : (ws.enrolled || 0)} enrolled
                 </span>
               </div>
               
