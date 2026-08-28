@@ -656,7 +656,7 @@ const getMyAssignments = async (req, res) => {
                 );
             }
 
-            // 3. Sync Vedic Life Programs matching consultant_id, lead_consultant_id, or assigned_staff_ids
+            // 3. Sync Vedic Life Programs matching consultant_id, lead_consultant_id, assigned_staff_ids, or consultant name
             const directVedic = await query(`
                 SELECT id, title, start_date, end_date FROM vedic_programs 
                 WHERE consultant_id = $1 
