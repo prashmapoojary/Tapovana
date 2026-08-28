@@ -232,59 +232,102 @@ const logBookingAudit = async (bookingId, status, therapistId, therapistName, no
 // Helper: Ingest/Sync bookings from the mobile app endpoint into the local DB
 const syncIncomingBookings = async ({ noEmail = false } = {}) => {
     try {
-        const response = await fetch('https://tapovana.onrender.com/api/bookings?limit=200', { signal: AbortSignal.timeout(8000) });
-        if (response.ok) {
-            const data = await response.json();
-            const remoteBookings = data.success ? (data.bookings || []) : [];
+        let remoteBookings = [];
+        try {
+            const response = await fetch('https://tapoclg.onrender.com/api/bookings?limit=200', { signal: AbortSignal.timeout(8000) });
+            if (response.ok) {
+                const data = await response.json();
+                remoteBookings = data.success ? (data.bookings || []) : (Array.isArray(data) ? data : []);
+            }
+        } catch (e) {
+            // fallback
+        }
+
+        if (remoteBookings.length === 0) {
+            const fallbackRes = await fetch('https://tapovana.onrender.com/api/bookings?limit=200', { signal: AbortSignal.timeout(8000) });
+            if (fallbackRes.ok) {
+                const data = await fallbackRes.json();
+                remoteBookings = data.success ? (data.bookings || []) : [];
+            }
+        }
+
+        if (remoteBookings.length > 0) {
+            // Load membership name -> email mappings
+            const memberEmailMap = new Map();
+            try {
+                const memRes = await query(`SELECT name, email FROM memberships WHERE name IS NOT NULL AND email IS NOT NULL`);
+                for (const row of memRes.rows) {
+                    if (row.name && row.email) {
+                        memberEmailMap.set(String(row.name).trim().toLowerCase(), String(row.email).trim());
+                    }
+                }
+            } catch (e) { }
 
             // Get all deleted booking IDs
             const deletedRes = await query("SELECT booking_id FROM deleted_booking_ids");
             const deletedIds = new Set(deletedRes.rows.map(r => String(r.booking_id)));
 
             for (const rb of remoteBookings) {
-                const bookingId = String(rb.id);
-                if (deletedIds.has(bookingId)) continue;
+                const bookingId = String(rb.id || rb.booking_id);
+                if (!bookingId || deletedIds.has(bookingId)) continue;
+
+                let userName = (rb.user_name || rb.customer_name || rb.name || 'Guest Customer').trim();
+                let userEmail = rb.user_email || rb.email || rb.customer_email || null;
+
+                // Rule 1: Prashma Poojary / Prashma salian -> prashmapoojary@gmail.com
+                if (userName.toLowerCase().includes('prashma') || userName.toLowerCase().includes('poojary')) {
+                    userEmail = 'prashmapoojary@gmail.com';
+                }
+
+                // Rule 2: Match customer name against membership table
+                const lowerName = userName.toLowerCase();
+                if (memberEmailMap.has(lowerName)) {
+                    userEmail = memberEmailMap.get(lowerName);
+                }
+
+                // Rule 3: Default email if missing
+                if (!userEmail || userEmail === 'null' || userEmail === 'undefined') {
+                    const cleanName = userName.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    userEmail = `${cleanName || 'customer'}@gmail.com`;
+                }
+
+                let serviceName = (rb.service_name || rb.service || 'Abhyanga Ayurvedic Massage').trim();
+                let bookingDate = rb.booking_date || rb.date || '2026-09-01';
+                let bookingTime = rb.booking_time || rb.time || '10:00 AM';
+                let totalAmount = rb.total_amount || rb.amount || '₹2,500';
+                let profilePic = rb.profile_pic || rb.profile_photo || null;
+                let note = rb.note || null;
+                let passDetails = rb.pass_details || null;
 
                 const existing = await query("SELECT id, profile_pic FROM bookings WHERE id = $1", [rb.id]);
                 if (existing.rows.length === 0) {
                     const paymentStatus = 'PAID';
-                    // Initial status for all incoming mobile bookings is always PENDING until admin updates it
                     const bookingStatus = 'PENDING';
                     await query(
-                        'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (id) DO NOTHING',
+                        'INSERT INTO bookings (id, user_name, service_name, booking_date, booking_time, therapist_name, note, total_amount, pass_details, payment_status, status, created_at, user_email, profile_pic) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, $13) ON CONFLICT (id) DO NOTHING',
                         [
-                            rb.id, rb.user_name, rb.service_name,
-                            rb.booking_date, rb.booking_time, rb.therapist_name || null,
-                            rb.note, rb.total_amount, rb.pass_details,
-                            paymentStatus, bookingStatus, rb.created_at, rb.user_email || rb.email || null,
-                            rb.profile_pic || null
+                            rb.id, userName, serviceName,
+                            bookingDate, bookingTime, null,
+                            note, totalAmount, passDetails,
+                            paymentStatus, bookingStatus, userEmail,
+                            profilePic
                         ]
                     );
 
-                    // Skip email notifications during bulk sync
-                    if (!noEmail) {
-                        let userEmail = rb.user_email || rb.email || null;
-                        if (userEmail) {
-                            await sendBookingStatusEmail({
-                                to: userEmail,
-                                firstName: rb.user_name || 'Customer',
-                                status: bookingStatus,
-                                details: {
-                                    service: rb.service_name,
-                                    date: rb.booking_date,
-                                    time: rb.booking_time
-                                }
-                            }).catch(e => console.error("Error sending email during auto-sync:", e));
-                        }
+                    if (!noEmail && userEmail) {
+                        await sendBookingStatusEmail({
+                            to: userEmail,
+                            firstName: userName,
+                            status: bookingStatus,
+                            details: { service: serviceName, date: bookingDate, time: bookingTime }
+                        }).catch(e => console.error("Error sending email during auto-sync:", e));
                     }
                 } else {
-                    // Backfill profile_pic if missing
-                    if (rb.profile_pic && !existing.rows[0].profile_pic) {
-                        await query(
-                            "UPDATE bookings SET profile_pic = $1 WHERE id = $2 AND profile_pic IS NULL",
-                            [rb.profile_pic, rb.id]
-                        );
-                    }
+                    // Update user_email and user_name if missing/updated
+                    await query(
+                        "UPDATE bookings SET user_email = $1, user_name = $2, profile_pic = COALESCE(profile_pic, $3) WHERE id = $4",
+                        [userEmail, userName, profilePic, rb.id]
+                    );
                 }
             }
         }
