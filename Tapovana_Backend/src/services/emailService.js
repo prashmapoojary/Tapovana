@@ -73,28 +73,43 @@ const emailWrapper = (content) => `
     </td></tr>
   </table>
 </body>
-</html>`;
+</html>
+`;
 
-const sendWelcomeEmail = async ({ to, firstName, tempPassword }) => {
+const sendWelcomeEmail = async ({ to, firstName, tempPassword, resetUrl }) => {
+  const nameStr = firstName ? firstName.trim() : "Team Member";
+
   const html = emailWrapper(`
-    <h1 style="color:#cda751;text-align:center;">Welcome to Tapovana!</h1>
-    <p style="color:#cccccc;text-align:center;">
-      Hello ${firstName}, your account has been created successfully.
+    <h1 style="color:#cda751;text-align:center;margin-top:0;">Welcome to Tapovana Team!</h1>
+    <p style="color:#cccccc;font-size:15px;line-height:1.6;">
+      Dear <strong>${nameStr}</strong>,
     </p>
-    <div style="background:#1e1a0e;border-left:4px solid #cda751;border-radius:6px;padding:20px 24px;margin:20px 0;">
-      <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#999;">Temporary Password:</p>
-      <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#cda751;letter-spacing:2px;font-family:monospace;">${tempPassword}</p>
-      <p style="margin:0;font-size:12px;color:#777;">Use this temporary password to log in. After login, you must reset your password using email OTP.</p>
+    <p style="color:#cccccc;font-size:15px;line-height:1.6;">
+      You have been added as a team member on the Tapovana Admin Portal. Below are your temporary login credentials:
+    </p>
+    <div style="background:#2a241b;border:1px solid #cda751;border-radius:8px;padding:20px;margin:20px 0;text-align:center;">
+      <p style="margin:0 0 8px;font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:1px;">Temporary Password</p>
+      <p style="margin:0;font-size:24px;font-weight:bold;color:#cda751;letter-spacing:2px;font-family:monospace;">${tempPassword}</p>
     </div>
+    <p style="color:#cccccc;font-size:14px;line-height:1.6;">
+      Please click the button below to set your permanent password and access your account:
+    </p>
+    <p style="text-align:center;margin:30px 0;">
+      <a href="${resetUrl || 'https://tapovana-admin.onrender.com'}" style="background:#cda751;color:#111;font-weight:bold;padding:14px 28px;border-radius:6px;text-decoration:none;display:inline-block;font-size:16px;">Set Your Password</a>
+    </p>
+    <p style="color:#999999;font-size:12px;text-align:center;">
+      If you did not request this invitation, please ignore this email.
+    </p>
   `);
 
   return transporter.sendMail({
-    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    from: `"${process.env.EMAIL_FROM_NAME || 'Tapovana'}" <${process.env.EMAIL_FROM_ADDRESS || 'no-reply@tapovana.com'}>`,
     to,
-    subject: "Welcome to Tapovana - Temporary Login Password",
+    subject: "Welcome to Tapovana — Your Temporary Login Password",
     html,
   });
 };
+
 
 const sendOtpEmail = async ({ to, firstName, otp, purpose = "login" }) => {
   const title = purpose === "password_reset" ? "Password Reset Verification" : "Login Verification";
