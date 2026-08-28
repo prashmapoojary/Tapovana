@@ -146,8 +146,37 @@ function AssignmentDetailModal({ assignment, onClose }) {
   if (!assignment) return null;
 
   return (
-    <div className="blog-editor-modal-overlay" style={{ zIndex: 1100 }}>
-      <div className="blog-editor-modal" style={{ maxWidth: "520px", padding: "24px", borderRadius: "14px" }}>
+    <div 
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 99999,
+        padding: "20px"
+      }}
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        style={{ 
+          maxWidth: "520px", 
+          width: "100%",
+          background: "#FFFFFF",
+          padding: "24px", 
+          borderRadius: "16px",
+          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.1)",
+          maxHeight: "90vh",
+          overflowY: "auto"
+        }}
+      >
         {/* Header (First) */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", borderBottom: "1px solid #EDF2F7", paddingBottom: "14px" }}>
           <div>
