@@ -1,21 +1,21 @@
 import { getToken } from "../utils/session";
 
 export const getApiBase = () => {
-  const envUrl = (import.meta && import.meta.env) ? (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL) : null;
-  if (envUrl) return envUrl;
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      /^192\.168\./.test(hostname) ||
+      /^10\./.test(hostname)
+    ) {
+      return `http://${hostname}:5000`;
+    }
+  }
 
-  if (typeof window === "undefined") {
-    return "https://tapovana.onrender.com";
-  }
-  const hostname = window.location.hostname;
-  if (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    /^192\.168\./.test(hostname) ||
-    /^10\./.test(hostname)
-  ) {
-    return `http://${hostname}:5000`;
-  }
+  const envUrl = (import.meta && import.meta.env) ? (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL) : null;
+  if (envUrl && !envUrl.includes("tapovana.onrender.com")) return envUrl;
+
   return "https://tapovana.onrender.com";
 };
 

@@ -43,7 +43,20 @@ const formatTime24 = (timeStr) => {
 
 const parseDateTime = (dateStr, timeStr) => {
     if (!dateStr) return null;
-    const parts = dateStr.split('T')[0].split('-');
+    let isoDate = "";
+    if (dateStr instanceof Date) {
+        const y = dateStr.getFullYear();
+        const m = String(dateStr.getMonth() + 1).padStart(2, '0');
+        const d = String(dateStr.getDate()).padStart(2, '0');
+        isoDate = `${y}-${m}-${d}`;
+    } else if (typeof dateStr === 'string') {
+        isoDate = dateStr.split('T')[0].split(' ')[0];
+    } else {
+        return null;
+    }
+
+    const parts = isoDate.split('-');
+    if (parts.length < 3) return null;
     const year = parseInt(parts[0], 10);
     const month = parseInt(parts[1], 10);
     const day = parseInt(parts[2], 10);
@@ -646,7 +659,11 @@ const updateWorkshop = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Workshop not found.' });
         }
         const existing = existingResult.rows[0];
-        const oldStaffIds = existing.assigned_staff_ids || [];
+        let oldStaffIds = existing.assigned_staff_ids || [];
+        if (typeof oldStaffIds === 'string') {
+            try { oldStaffIds = JSON.parse(oldStaffIds); } catch { oldStaffIds = []; }
+        }
+        if (!Array.isArray(oldStaffIds)) oldStaffIds = [];
 
         const targetTitle = title !== undefined ? title : existing.title;
         const targetDate = date !== undefined ? date : existing.date;
@@ -656,10 +673,14 @@ const updateWorkshop = async (req, res) => {
 
         // Validate that assigned staff exist, are active, and are doctors or therapists
         if (assigned_staff_ids !== undefined) {
-            if (!Array.isArray(assigned_staff_ids) || assigned_staff_ids.length === 0) {
+            let staffArr = assigned_staff_ids;
+            if (typeof staffArr === 'string') {
+                try { staffArr = JSON.parse(staffArr); } catch { staffArr = []; }
+            }
+            if (!Array.isArray(staffArr) || staffArr.length === 0) {
                 return res.status(400).json({ success: false, message: 'Instructor selection is required.' });
             }
-            for (const staffId of assigned_staff_ids) {
+            for (const staffId of staffArr) {
                 const staffCheck = await query(
                     `SELECT tm.id, tm.status, r.name AS role_name 
                      FROM team_members tm
@@ -766,8 +787,10 @@ const updateWorkshop = async (req, res) => {
 
                 // Deallocate the old staff associated with those deleted duplicates
                 for (const row of duplicateCheck.rows) {
-                    const oldStaff = row.assigned_staff_ids || [];
-                    for (const oldStaffId of oldStaff) {
+                    let dStaff = row.assigned_staff_ids || [];
+                    if (typeof dStaff === 'string') { try { dStaff = JSON.parse(dStaff); } catch { dStaff = []; } }
+                    if (!Array.isArray(dStaff)) dStaff = [];
+                    for (const oldStaffId of dStaff) {
                         await deallocateStaffMember(oldStaffId);
                         await syncStaffMemberStatus(oldStaffId);
                     }
@@ -784,8 +807,16 @@ const updateWorkshop = async (req, res) => {
             } catch (valErr) {
                 return res.status(400).json({ success: false, message: valErr.message });
             }
-            newStaffIds = assigned_staff_ids;
-            const isStaffChanged = JSON.stringify(oldStaffIds.sort()) !== JSON.stringify(newStaffIds.sort());
+            let parsedNew = assigned_staff_ids;
+            if (typeof parsedNew === 'string') {
+                try { parsedNew = JSON.parse(parsedNew); } catch { parsedNew = []; }
+            }
+            if (!Array.isArray(parsedNew)) parsedNew = [];
+            newStaffIds = parsedNew;
+
+            const oldSorted = [...oldStaffIds].sort();
+            const newSorted = [...newStaffIds].sort();
+            const isStaffChanged = JSON.stringify(oldSorted) !== JSON.stringify(newSorted);
 
             if (isStaffChanged && newStaffIds.length > 0) {
                 if (existing.allocation_count >= 2) {
