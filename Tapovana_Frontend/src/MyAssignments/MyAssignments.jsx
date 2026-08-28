@@ -218,53 +218,53 @@ function MyAssignments() {
   const [error, setError] = useState(null);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
 
-  const isStaffUser = loggedInUser?.role === 'DOCTOR' || loggedInUser?.role === 'THERAPIST';
+  const normalizedRole = (loggedInUser?.role || "").toUpperCase().replace(/[\s_-]+/g, "");
+  const isStaffUser = normalizedRole === 'DOCTOR' || normalizedRole === 'THERAPIST';
 
-  // Determine active staff ID
+  // Determine active staff ID with reliable fallbacks
   const activeStaffId = useMemo(() => {
-    if (isStaffUser) {
-      return loggedInUser?.user_id || loggedInUser?.id || '';
-    }
-    return selectedStaffId;
-  }, [isStaffUser, loggedInUser, selectedStaffId]);
+    if (selectedStaffId) return selectedStaffId;
+    return loggedInUser?.user_id || loggedInUser?.id || loggedInUser?.email || '';
+  }, [loggedInUser, selectedStaffId]);
 
-  // ─── 1. Fetch Staff List (Admins only - run once) ───
+  // ─── 1. Fetch Staff List (run once to populate dropdown) ───
   useEffect(() => {
-    if (!isStaffUser) {
-      let isMounted = true;
-      const fetchStaff = async () => {
-        try {
-          const res = await apiFetch('/api/teams/users?page=1&limit=100');
-          if (isMounted && res.success && res.users) {
-            // Strictly Doctor & Therapist roles only
-            const list = res.users.filter(u => u.role === 'DOCTOR' || u.role === 'THERAPIST');
-            setStaffList(list);
-            if (list.length > 0 && !selectedStaffId) {
-              setSelectedStaffId(list[0].user_id || list[0].id || '');
-            }
+    let isMounted = true;
+    const fetchStaff = async () => {
+      try {
+        const res = await apiFetch('/api/teams/users?page=1&limit=100');
+        if (isMounted && res.success && res.users) {
+          const list = res.users.filter(u => {
+            const r = (u.role || '').toUpperCase().replace(/[\s_-]+/g, "");
+            return r === 'DOCTOR' || r === 'THERAPIST' || r === 'SUPERADMIN' || r === 'COADMIN' || r === 'ADMIN';
+          });
+          setStaffList(list);
+          if (list.length > 0 && !selectedStaffId) {
+            const currentMatch = list.find(u => 
+              (u.email && loggedInUser?.email && u.email.toLowerCase() === loggedInUser.email.toLowerCase()) ||
+              (u.id && (u.id === loggedInUser?.id || u.id === loggedInUser?.user_id))
+            );
+            setSelectedStaffId(currentMatch ? (currentMatch.user_id || currentMatch.id) : (loggedInUser?.id || list[0].user_id || list[0].id || ''));
           }
-        } catch (err) {
-          console.error("Failed to load staff list:", err.message);
         }
-      };
-      fetchStaff();
-      return () => { isMounted = false; };
-    }
-  }, [isStaffUser]);
+      } catch (err) {
+        console.error("Failed to load staff list:", err.message);
+      }
+    };
+    fetchStaff();
+    return () => { isMounted = false; };
+  }, [loggedInUser]);
 
   // ─── 2. Fetch Assignments for activeStaffId ───
   useEffect(() => {
-    if (!activeStaffId) return;
-
     let isMounted = true;
     const fetchAssignments = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const endpoint = isStaffUser 
-          ? '/api/services/my/assignments' 
-          : `/api/services/my/assignments?staff_id=${encodeURIComponent(activeStaffId)}`;
+        const targetId = activeStaffId || loggedInUser?.id || loggedInUser?.user_id || loggedInUser?.email || '';
+        const endpoint = `/api/services/my/assignments?staff_id=${encodeURIComponent(targetId)}`;
 
         const data = await apiFetch(endpoint);
         if (isMounted) {
@@ -287,7 +287,7 @@ function MyAssignments() {
 
     fetchAssignments();
     return () => { isMounted = false; };
-  }, [activeStaffId, isStaffUser]);
+  }, [activeStaffId, loggedInUser]);
 
   const getAssignmentEndTime = (a) => {
     if (!a.startDate) return null;
