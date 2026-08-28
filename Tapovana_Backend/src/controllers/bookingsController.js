@@ -601,25 +601,21 @@ const getAllBookings = async (req, res) => {
 // Helper: Compute pricing breakdown (Original Price, Tier, Discount, Final Price)
 const computeBookingPricingBreakdown = async (b) => {
     try {
-        const { getMemberTierAndDiscount } = require('./membershipController');
+        const { getValidCustomerMembership } = require('../utils/membershipHelper');
         const email = b.user_email || b.email || null;
         const name = b.user_name || null;
         
-        let tier = b.membership_tier;
+        let tier = 'REGULAR';
         let discountPct = 0;
 
-        if (!tier || tier === 'Standard' || tier === 'NONE' || tier === 'N/A') {
-            const resolved = await getMemberTierAndDiscount(email, name);
+        const resolved = await getValidCustomerMembership(email, name);
+        if (resolved.active) {
             tier = resolved.tier;
-            discountPct = resolved.discountPercentage;
-        } else {
-            const tierRes = await query('SELECT discount_percentage FROM membership_tiers WHERE UPPER(name) = UPPER($1) LIMIT 1', [tier]);
-            if (tierRes.rows.length && tierRes.rows[0].discount_percentage !== undefined) {
-                discountPct = parseFloat(tierRes.rows[0].discount_percentage) || 0;
-            } else {
-                const defaultDiscounts = { 'SILVER': 15, 'GOLD': 25, 'PLATINUM': 40 };
-                discountPct = defaultDiscounts[tier.toUpperCase()] || 0;
-            }
+            discountPct = Math.round(resolved.discountRate * 100);
+        } else if (b.membership_tier && !['STANDARD', 'REGULAR', 'NONE', 'N/A'].includes(String(b.membership_tier).toUpperCase())) {
+            tier = String(b.membership_tier).toUpperCase();
+            const defaultDiscounts = { 'SILVER': 15, 'GOLD': 25, 'PLATINUM': 40 };
+            discountPct = defaultDiscounts[tier] || 0;
         }
 
         let origNum = 0;
@@ -633,7 +629,8 @@ const computeBookingPricingBreakdown = async (b) => {
             }
         }
         if (!origNum && b.total_amount) {
-            origNum = parseFloat(String(b.total_amount).replace(/[^0-9.]/g, '')) || 0;
+            const cleanAmt = String(b.total_amount).split('(')[0].replace(/[^0-9.]/g, '');
+            origNum = parseFloat(cleanAmt) || 0;
         }
         if (!origNum) origNum = 2500;
 
@@ -641,7 +638,7 @@ const computeBookingPricingBreakdown = async (b) => {
         const finalNum = Math.max(0, origNum - discountNum);
 
         const original_price = `₹${origNum.toLocaleString('en-IN')}`;
-        const membership_tier = tier || 'Standard';
+        const membership_tier = tier.toUpperCase();
         const discount_amount = discountNum > 0 ? `₹${discountNum.toLocaleString('en-IN')} (${discountPct}%)` : `₹0 (0%)`;
         const final_price = `₹${finalNum.toLocaleString('en-IN')}`;
 
@@ -649,10 +646,10 @@ const computeBookingPricingBreakdown = async (b) => {
     } catch (e) {
         console.warn('computeBookingPricingBreakdown error:', e.message);
         return {
-            original_price: b.original_price || b.total_amount || '₹2,500',
-            membership_tier: b.membership_tier || 'Standard',
-            discount_amount: b.discount_amount || '₹0 (0%)',
-            final_price: b.final_price || b.total_amount || '₹2,500'
+            original_price: '₹2,500',
+            membership_tier: 'REGULAR',
+            discount_amount: '₹0 (0%)',
+            final_price: '₹2,500'
         };
     }
 };

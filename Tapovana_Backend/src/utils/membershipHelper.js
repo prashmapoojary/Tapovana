@@ -36,7 +36,9 @@ const getValidCustomerMembership = async (emailOrId, name, targetDate = new Date
       FROM memberships m
       LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
       WHERE (
-        (LOWER(m.email) = $1 AND (LOWER(m.name) = $2 OR LOWER(m.name) LIKE $3 OR $2 LIKE '%' || LOWER(m.name) || '%'))
+        (LOWER(m.email) = $1 AND $1 != '')
+        OR (LOWER(m.name) = $2 AND $2 != '')
+        OR (LOWER(m.name) LIKE $3 AND $2 != '')
         ${custIdVal ? `OR m.id::text = $4` : ''}
       )
       AND (LOWER(m.status) IS NULL OR LOWER(m.status) = 'active')
