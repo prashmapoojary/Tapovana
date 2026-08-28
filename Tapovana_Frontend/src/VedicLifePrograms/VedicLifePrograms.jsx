@@ -1919,11 +1919,9 @@ export default function VedicLifePrograms() {
               <h1>Vedic Life Programs</h1>
               <p>Manage international programs, retreats, and consultation offerings</p>
             </div>
-            {isAdmin && (
-              <button className="vedic-add-btn" onClick={() => { setAddForm(BLANK_FORM); setAddError(""); setShowCreateModal(true); }}>
-                + Create Vedic Life Program
-              </button>
-            )}
+            <button className="vedic-add-btn" onClick={() => { setAddForm(BLANK_FORM); setAddError(""); setShowCreateModal(true); }}>
+              + Create Vedic Life Program
+            </button>
           </div>
 
           <section className="vedic-stats-row">
