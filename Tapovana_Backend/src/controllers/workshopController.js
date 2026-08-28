@@ -194,6 +194,31 @@ const allocateStaffToWorkshop = async (staffId, workshop) => {
         ['Allocated', JSON.stringify(allocationDetails), staffId, 'active']
     );
 
+    // Write / Upsert to allocations table so assignment shows in My Assignments page
+    try {
+        const allocId = `ws-alloc-${workshop.id}-${staffId}`;
+        let dateVal = new Date().toISOString().split('T')[0];
+        if (workshop.date) {
+            dateVal = workshop.date instanceof Date ? workshop.date.toISOString().split('T')[0] : String(workshop.date).split('T')[0];
+        }
+
+        await query(
+            `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes, status, created_at)
+             VALUES ($1, $2, 'workshop', $3, $4, $5, $6, $7, $8, 'assigned', NOW())
+             ON CONFLICT (id) DO UPDATE SET 
+               staff_id = EXCLUDED.staff_id,
+               session_title = EXCLUDED.session_title,
+               start_date = EXCLUDED.start_date,
+               end_date = EXCLUDED.end_date,
+               booking_time = EXCLUDED.booking_time,
+               duration_minutes = EXCLUDED.duration_minutes,
+               status = 'assigned'`,
+            [allocId, staffId, workshop.title, String(workshop.id), dateVal, dateVal, workshop.time || '10:00 AM', workshop.duration || 60]
+        );
+    } catch (allocErr) {
+        console.error('Error inserting into allocations table for workshop:', allocErr.message);
+    }
+
     // Send email
     try {
         const staffRes = await query('SELECT first_name, email FROM team_members WHERE id = $1', [staffId]);
@@ -218,15 +243,26 @@ const allocateStaffToWorkshop = async (staffId, workshop) => {
 };
 
 // Helper: Deallocate staff
-const deallocateStaffMember = async (staffId) => {
+const deallocateStaffMember = async (staffId, workshopId = null) => {
     if (!isValidUUID(staffId)) {
         console.log(`Skipping deallocate for invalid staff_id: ${staffId}`);
         return;
     }
     await query(
-        'UPDATE team_members SET availability_status = $1, allocation_details = NULL WHERE id = $2 AND availability_status = $3',
-        ['Available', staffId, 'Allocated']
+        "UPDATE team_members SET availability_status = 'Available', allocation_details = NULL WHERE id = $1",
+        [staffId]
     );
+
+    try {
+        if (workshopId) {
+            const allocId = `ws-alloc-${workshopId}-${staffId}`;
+            await query("DELETE FROM allocations WHERE id = $1 OR (staff_id = $2 AND session_id = $3 AND type = 'workshop')", [allocId, staffId, String(workshopId)]);
+        } else {
+            await query("DELETE FROM allocations WHERE staff_id = $1 AND type = 'workshop'", [staffId]);
+        }
+    } catch (err) {
+        console.error('Error deleting from allocations table:', err.message);
+    }
 };
 
 // Helper: Synchronize workshop allocations with allocations table and update staff status

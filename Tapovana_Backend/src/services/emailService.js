@@ -490,21 +490,18 @@ const sendWorkshopRemovalEmail = async ({ to, userName, workshopTitle }) => {
       Hello ${userName || 'Valued Guest'},
     </p>
     <p style="color:#cccccc;font-size:14px;line-height:1.6;margin: 0 0 20px 0;">
-      Your enrollment in the workshop <strong style="color:#e74c3c;">${workshopTitle}</strong> has been cancelled/removed by the administrator.
-    </p>
-    <p style="color:#888;font-size:13px;line-height:1.5;margin:24px 0 0 0;">
-      If you did not request this change, please contact the admin team.
+      You may edit and resubmit your article from your Blogs dashboard.
     </p>
     <p style="color:#888;font-size:13px;line-height:1.5;margin:20px 0 0 0;">
       Best regards,<br/>
-      <strong>Workshop Admin Team</strong>
+      <strong>Tapovana Team</strong>
     </p>
   `);
 
   return transporter.sendMail({
     from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
     to,
-    subject: `Tapovana — Workshop Enrollment Cancelled: ${workshopTitle}`,
+    subject: `Tapovana — Blog Rejected: ${blogTitle}`,
     html,
   });
 };
@@ -907,7 +904,6 @@ const sendBlogRejectedEmail = async ({ to, authorName, blogTitle, reason }) => {
 
 const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, workshopTitle, completionDate, downloadUrl, certId, participantId, pdfBuffer }) => {
   const baseUrl = process.env.BASE_URL || process.env.APP_URL || process.env.BACKEND_URL || "https://tapovana.onrender.com";
-  // Force use of the production URL if it resolves to a local address/localhost
   const secureBaseUrl = (!baseUrl || baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1") || baseUrl.includes("10.")) 
     ? "https://tapovana.onrender.com" 
     : baseUrl;
@@ -968,7 +964,7 @@ const sendWorkshopCompletionCertificateEmail = async ({ to, participantName, wor
   return transporter.sendMail(mailOptions);
 };
 
-module.exports = { 
+module.exports = {
   sendWelcomeEmail, 
   sendOtpEmail, 
   sendPasswordChangedEmail, 
