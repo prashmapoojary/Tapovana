@@ -548,25 +548,26 @@ const updateTier = async (req, res) => {
     }
 };
 
-// ─── VERIFY Customer Membership by Name + Email ───────────────────────────
+// ─── VERIFY Customer Membership by Name + Email (ID as 3rd option) ───────────
 const verifyCustomerMembership = async (req, res) => {
-    const { name, email } = req.query.name ? req.query : (req.body || {});
+    const { name, email, customer_id, id } = req.query.name ? req.query : (req.body || {});
 
     const emailStr = email ? String(email).trim().toLowerCase() : '';
     const nameStr = name ? String(name).trim().toLowerCase() : '';
+    const custId = customer_id || id || null;
 
-    if (!emailStr || !nameStr) {
+    if (!emailStr && !nameStr && !custId) {
         return res.json({
             success: true,
             matched: false,
             tier: 'Standard',
             discount_percentage: 0,
-            message: 'Both customer name and email are required to verify membership.'
+            message: 'Both customer name and email are compulsory to verify membership.'
         });
     }
 
     try {
-        const memResult = await getValidCustomerMembership(emailStr, nameStr);
+        const memResult = await getValidCustomerMembership(emailStr, nameStr, new Date(), custId);
 
         if (memResult.active) {
             return res.json({
@@ -590,8 +591,8 @@ const verifyCustomerMembership = async (req, res) => {
                 isMismatch: true,
                 tier: 'Standard',
                 discount_percentage: 0,
-                warning: 'Membership mismatch: The entered customer name and email do not match the membership record. Please verify the customer details.',
-                message: 'Membership mismatch: The entered customer name and email do not match the membership record. Please verify the customer details.'
+                warning: 'Membership mismatch: Customer name and email must both match the active membership record to receive discounts.',
+                message: 'Membership mismatch: Customer name and email must both match the active membership record to receive discounts.'
             });
         }
 
@@ -601,7 +602,7 @@ const verifyCustomerMembership = async (req, res) => {
             isMismatch: false,
             tier: 'Standard',
             discount_percentage: 0,
-            message: 'No membership record found for this customer.'
+            message: 'No active membership record found for this customer.'
         });
     } catch (err) {
         console.error('verifyCustomerMembership error:', err);

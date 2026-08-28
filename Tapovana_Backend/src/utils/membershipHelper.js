@@ -3,21 +3,24 @@ const { query } = require('../config/db');
 /**
  * Validates whether a customer has an active membership on a given target date.
  * 
- * Rules:
- * 1. Membership is ACTIVE only when join_date <= targetDate <= expiry_date.
- * 2. If targetDate > expiry_date, membership is EXPIRED and pricing reverts to REGULAR (0% discount).
- * 3. Does not modify past historical booking records.
+ * Compulsory Matching Rules:
+ * 1. Customer NAME AND Customer EMAIL MUST BOTH match the active membership record.
+ * 2. If Customer/Membership ID (m.id) is provided, matching ID serves as the 3rd option.
+ * 3. Membership is ACTIVE only when join_date <= targetDate <= expiry_date.
+ * 4. If targetDate > expiry_date, membership is EXPIRED and pricing reverts to REGULAR (0% discount).
  * 
  * @param {string} emailOrId Customer email or identifier
  * @param {string} name Customer full name
  * @param {Date|string} targetDate Date to check membership validity against (default: NOW)
+ * @param {string|null} optionalCustomerId Customer UUID or Membership ID (3rd option)
  * @returns {Promise<{active: boolean, tier: string, discountRate: number, passDetails: string|null}>}
  */
-const getValidCustomerMembership = async (emailOrId, name, targetDate = new Date()) => {
-  const ident = emailOrId ? String(emailOrId).trim().toLowerCase() : '';
+const getValidCustomerMembership = async (emailOrId, name, targetDate = new Date(), optionalCustomerId = null) => {
+  const emailVal = emailOrId ? String(emailOrId).trim().toLowerCase() : '';
   const nameVal = name ? String(name).trim().toLowerCase() : '';
+  const custIdVal = optionalCustomerId ? String(optionalCustomerId).trim() : '';
 
-  if (!ident && !nameVal) {
+  if (!emailVal && !nameVal && !custIdVal) {
     return { active: false, tier: 'REGULAR', discountRate: 0, passDetails: null };
   }
 
@@ -25,14 +28,26 @@ const getValidCustomerMembership = async (emailOrId, name, targetDate = new Date
     const checkDate = targetDate ? new Date(targetDate) : new Date();
     const checkTime = checkDate.getTime();
 
-    const memRes = await query(
-      `SELECT m.id, m.name, m.email, m.tier, m.status, m.join_date, m.expiry_date, mt.discount_percentage
-       FROM memberships m
-       LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
-       WHERE (LOWER(m.email) = $1 OR LOWER(m.name) = $2 OR LOWER(m.name) LIKE $3 OR $2 LIKE '%' || LOWER(m.name) || '%')
-         AND (LOWER(m.status) IS NULL OR LOWER(m.status) = 'active')`,
-      [ident, nameVal, `%${nameVal}%`]
-    );
+    // Compulsory matching:
+    // Option 1 & 2: BOTH Name AND Email match
+    // Option 3: Membership ID / Customer ID matches (3rd option)
+    let queryText = `
+      SELECT m.id, m.name, m.email, m.tier, m.status, m.join_date, m.expiry_date, mt.discount_percentage
+      FROM memberships m
+      LEFT JOIN membership_tiers mt ON UPPER(m.tier) = UPPER(mt.name)
+      WHERE (
+        (LOWER(m.email) = $1 AND (LOWER(m.name) = $2 OR LOWER(m.name) LIKE $3 OR $2 LIKE '%' || LOWER(m.name) || '%'))
+        ${custIdVal ? `OR m.id::text = $4` : ''}
+      )
+      AND (LOWER(m.status) IS NULL OR LOWER(m.status) = 'active')
+    `;
+
+    const queryParams = [emailVal, nameVal, `%${nameVal}%`];
+    if (custIdVal) {
+      queryParams.push(custIdVal);
+    }
+
+    const memRes = await query(queryText, queryParams);
 
     if (memRes.rows.length === 0) {
       return { active: false, tier: 'REGULAR', discountRate: 0, passDetails: null };
