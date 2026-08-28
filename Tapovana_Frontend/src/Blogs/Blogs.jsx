@@ -301,7 +301,7 @@ export default function Blogs({ mode }) {
       if (categoryFilter !== "ALL") params.set("category", categoryFilter);
       if (search) params.set("search", search);
 
-      if (!isAdmin && activeTab) {
+      if (activeTab) {
         params.set("status", activeTab);
       }
 
@@ -314,11 +314,27 @@ export default function Blogs({ mode }) {
     } finally {
       setLoading(false);
     }
-  }, [categoryFilter, search, activeTab, isAdmin]);
+  }, [categoryFilter, search, activeTab]);
+
+  const [allAdminBlogs, setAllAdminBlogs] = useState([]);
+
+  const fetchAdminCounts = useCallback(async () => {
+    if (isAdmin) {
+      try {
+        const data = await apiFetch('/api/blogs');
+        setAllAdminBlogs(data.blogs || []);
+      } catch (e) {
+        console.warn("Failed to fetch admin blog counts:", e);
+      }
+    }
+  }, [isAdmin]);
 
   useEffect(() => {
-    if (!id && !mode) fetchBlogs();
-  }, [fetchBlogs, id, mode]);
+    if (!id && !mode) {
+      fetchBlogs();
+      fetchAdminCounts();
+    }
+  }, [fetchBlogs, fetchAdminCounts, id, mode]);
 
   // ─── Fetch single blog detail ──────────────────────────────────────
   const fetchBlogDetail = useCallback(async (blogId) => {
@@ -344,12 +360,13 @@ export default function Blogs({ mode }) {
 
   // ─── Admin Tab Counts ──────────────────────────────────────────────
   const adminCounts = useMemo(() => {
+    const targetList = allAdminBlogs.length > 0 ? allAdminBlogs : blogs;
     return {
-      published: blogs.filter(b => b.status === "published").length,
-      pending: blogs.filter(b => b.status === "pending" || b.status === "pending_review").length,
-      archived: blogs.filter(b => b.status === "archived").length,
+      published: targetList.filter(b => b.status === "published").length,
+      pending: targetList.filter(b => b.status === "pending" || b.status === "pending_review").length,
+      archived: targetList.filter(b => b.status === "archived").length,
     };
-  }, [blogs]);
+  }, [allAdminBlogs, blogs]);
 
   // ─── Filtered blogs for display ────────────────────────────────────
   const filteredBlogs = useMemo(() => {
