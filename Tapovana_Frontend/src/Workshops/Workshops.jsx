@@ -484,6 +484,7 @@ export default function Workshops() {
 
   useEffect(() => {
     if (selectedWs && activeDetailTab === "attendees") {
+      setAttendees([]); // Guarantee strict workshop isolation by clearing state
       fetchAttendees(selectedWs.id);
     }
   }, [selectedWs?.id, activeDetailTab]);

@@ -1197,7 +1197,7 @@ const enrollUserInWorkshop = async (req, res) => {
     }
 };
 
-// Helper: Sync mobile workshop enrollments into DB
+// Helper: Sync mobile workshop enrollments into DB with strict workshop matching
 const syncMobileWorkshopEnrollments = async (workshopId = null) => {
     try {
         const response = await fetch('https://tapoclg.onrender.com/api/workshops/enroll', { signal: AbortSignal.timeout(8000) });
@@ -1209,12 +1209,33 @@ const syncMobileWorkshopEnrollments = async (workshopId = null) => {
                 const name = re.username || re.name || 'Enrolled Participant';
                 if (!email) continue;
 
-                let targetWsId = (workshopId && isValidUUID(workshopId)) ? workshopId : null;
-                if (!targetWsId) {
-                    const wsRes = await query("SELECT id FROM workshops ORDER BY created_at ASC LIMIT 1");
-                    if (wsRes.rows.length) targetWsId = wsRes.rows[0].id;
+                let targetWsId = null;
+
+                // 1. Try to match remote workshop_id or workshop_name with workshops in DB
+                if (re.workshop_id && isValidUUID(re.workshop_id)) {
+                    targetWsId = re.workshop_id;
+                } else if (re.workshop_name && re.workshop_name.trim()) {
+                    const wsNameClean = re.workshop_name.trim().toLowerCase();
+                    const wsMatch = await query(
+                        "SELECT id FROM workshops WHERE LOWER(title) = $1 OR LOWER(title) LIKE $2 LIMIT 1",
+                        [wsNameClean, `%${wsNameClean}%`]
+                    );
+                    if (wsMatch.rows.length) {
+                        targetWsId = wsMatch.rows[0].id;
+                    }
                 }
+
+                // 2. If no specific workshop match found from remote payload, use workshopId ONLY if no specific title was specified
+                if (!targetWsId && workshopId && isValidUUID(workshopId) && !re.workshop_name) {
+                    targetWsId = workshopId;
+                }
+
                 if (!targetWsId) continue;
+
+                // 3. Strict Check: If workshopId parameter was requested, ensure targetWsId matches requested workshopId!
+                if (workshopId && isValidUUID(workshopId) && String(targetWsId) !== String(workshopId)) {
+                    continue; // Skip: This enrollment belongs to a different workshop!
+                }
 
                 const existing = await query("SELECT id FROM attendees WHERE workshop_id = $1 AND LOWER(email) = LOWER($2)", [targetWsId, email]);
                 if (existing.rows.length === 0) {
