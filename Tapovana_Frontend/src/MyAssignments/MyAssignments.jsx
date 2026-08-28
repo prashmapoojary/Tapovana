@@ -40,6 +40,15 @@ const InfoIcon = () => (
   </svg>
 );
 
+const STATUS_CONFIG = {
+  Upcoming: { label: "Upcoming", color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
+  Live: { label: "🔴 LIVE", color: "#e74c3c", bg: "rgba(231,76,60,0.15)" },
+  active: { label: "Active", color: "#CDA751", bg: "rgba(205,167,81,0.1)" },
+  pending: { label: "Pending", color: "#f39c12", bg: "rgba(243,156,18,0.1)" },
+  expired: { label: "Completed", color: "#a0aec0", bg: "rgba(160,174,192,0.1)" },
+  cancelled: { label: "Cancelled", color: "#e74c3c", bg: "rgba(231,76,60,0.1)" },
+};
+
 const formatCleanDate = (dateVal) => {
   if (!dateVal) return '-';
   try {
