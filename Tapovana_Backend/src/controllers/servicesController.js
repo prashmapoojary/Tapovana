@@ -5,45 +5,40 @@ const path = require('path');
 const { sendAllocationEmail } = require('../services/emailService');
 const https = require('https');
 
-const pexelsCache = new Map();
+const unsplashCache = new Map();
 
-const getPexelsFallbackImage = async (queryStr) => {
-    if (!queryStr) return null;
+const getUnsplashFallbackImage = async (queryStr) => {
+    if (!queryStr) return 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80';
     const cleanQuery = queryStr.trim().toLowerCase();
-    if (pexelsCache.has(cleanQuery)) {
-        return pexelsCache.get(cleanQuery);
+    if (unsplashCache.has(cleanQuery)) {
+        return unsplashCache.get(cleanQuery);
     }
-    const pexelsKey = process.env.PEXELS_KEY || process.env.PEXELS_API_KEY || 'ayDlUYgPQDoXz7uZVuztXRKsNILvAitgDiUnKrWR1nwk0VBu2NbLE4v9';
-    if (!pexelsKey) return null;
-    
-    const image = await new Promise((resolve) => {
-        const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(cleanQuery)}&per_page=1`;
-        const req = https.get(url, {
-            headers: { 'Authorization': pexelsKey },
-            timeout: 3000
-        }, (res) => {
-            let data = '';
-            res.on('data', (chunk) => data += chunk);
-            res.on('end', () => {
-                try {
-                    const result = JSON.parse(data);
-                    if (result.photos && result.photos.length > 0) {
-                        resolve(result.photos[0].src.large);
-                    } else {
-                        resolve(null);
-                    }
-                } catch {
-                    resolve(null);
-                }
+    const unsplashKey = process.env.UNSPLASH_ACCESS_KEY || process.env.UNSPLASH_KEY;
+    if (unsplashKey) {
+        try {
+            const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(cleanQuery)}&per_page=1&client_id=${unsplashKey}`;
+            const resData = await new Promise((resolve) => {
+                https.get(url, { timeout: 3000 }, (res) => {
+                    let data = '';
+                    res.on('data', chunk => data += chunk);
+                    res.on('end', () => resolve(data));
+                }).on('error', () => resolve(null));
             });
-        });
-        req.on('error', () => resolve(null));
-    });
-    
-    if (image) {
-        pexelsCache.set(cleanQuery, image);
+            if (resData) {
+                const parsed = JSON.parse(resData);
+                if (parsed.results && parsed.results.length > 0) {
+                    const imgUrl = parsed.results[0].urls.regular;
+                    unsplashCache.set(cleanQuery, imgUrl);
+                    return imgUrl;
+                }
+            }
+        } catch (e) {
+            console.warn("Unsplash API fetch warning:", e.message);
+        }
     }
-    return image;
+    const defaultUrl = 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80';
+    unsplashCache.set(cleanQuery, defaultUrl);
+    return defaultUrl;
 };
 
 
@@ -216,7 +211,7 @@ const getAllServices = async (req, res) => {
         for (const row of result.rows) {
             let image_url = row.image_url;
             if (!image_url) {
-                image_url = await getPexelsFallbackImage(row.name);
+                image_url = await getUnsplashFallbackImage(row.name);
             }
             formattedServices.push({
                 ...row,
@@ -254,7 +249,7 @@ const getServiceById = async (req, res) => {
         const service = result.rows[0];
         let image_url = service.image_url;
         if (!image_url) {
-            image_url = await getPexelsFallbackImage(service.name);
+            image_url = await getUnsplashFallbackImage(service.name);
         }
         service.image_url = getFullImageUrl(req, image_url);
 

@@ -1169,7 +1169,7 @@ export default function Blogs({ mode }) {
           setMediaModalOpen(false);
         }}
         allowVideos={false}
-        title="Select Pexels Image"
+        title="Select Unsplash Image"
         page_type="blogs"
         category={editBlogData?.category || 'Ayurveda'}
         subcategory="All"

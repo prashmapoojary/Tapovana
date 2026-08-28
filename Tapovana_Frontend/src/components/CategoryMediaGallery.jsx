@@ -181,7 +181,7 @@ export default function CategoryMediaGallery({
                         </div>
                         <div className="cmg-lightbox-footer">
                             <h4>{activeLightbox.description || 'Curated Stock Media'}</h4>
-                            <p>Source: {activeLightbox.media_type === 'video' ? 'Pexels' : 'Unsplash'} · Photographer: <strong>{activeLightbox.author || 'Unknown'}</strong></p>
+                            <p>Source: Unsplash · Photographer: <strong>{activeLightbox.author || 'Unknown'}</strong></p>
                         </div>
                     </div>
                 </div>

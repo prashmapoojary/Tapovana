@@ -15,7 +15,22 @@ function normalizeCategory(category) {
     return 'services'; // fallback
 }
 
-// 1. Search Unsplash / Pexels Stock Media
+function getCuratedUnsplashImages() {
+    return [
+        { id: 'u1', url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=300&q=80', description: 'Ayurvedic Massage & Spa Therapy', author: 'Unsplash', source: 'unsplash', type: 'image' },
+        { id: 'u2', url: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=300&q=80', description: 'Relaxing Body Care Therapy', author: 'Unsplash', source: 'unsplash', type: 'image' },
+        { id: 'u3', url: 'https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&w=300&q=80', description: 'Herbal Essential Oils & Aromatherapy', author: 'Unsplash', source: 'unsplash', type: 'image' },
+        { id: 'u4', url: 'https://images.unsplash.com/photo-1512290900673-8a39529b4703?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1512290900673-8a39529b4703?auto=format&fit=crop&w=300&q=80', description: 'Herbal Tea & Ayurvedic Spices', author: 'Unsplash', source: 'unsplash', type: 'image' },
+        { id: 'u5', url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=300&q=80', description: 'Facial Treatment & Skin Care', author: 'Unsplash', source: 'unsplash', type: 'image' },
+        { id: 'u6', url: 'https://images.unsplash.com/photo-1560750588-73207b1ef5b8?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1560750588-73207b1ef5b8?auto=format&fit=crop&w=300&q=80', description: 'Natural Skin Hydration & Scrub', author: 'Unsplash', source: 'unsplash', type: 'image' },
+        { id: 'u7', url: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=300&q=80', description: 'Hair Spa & Scalp Treatment', author: 'Unsplash', source: 'unsplash', type: 'image' },
+        { id: 'u8', url: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=300&q=80', description: 'Luxury Manicure & Nail Care', author: 'Unsplash', source: 'unsplash', type: 'image' },
+        { id: 'u9', url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=300&q=80', description: 'Mindful Meditation & Yoga', author: 'Unsplash', source: 'unsplash', type: 'image' },
+        { id: 'u10', url: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=300&q=80', description: 'Ayurvedic Healing Oils', author: 'Unsplash', source: 'unsplash', type: 'image' }
+    ];
+}
+
+// 1. Search Unsplash Stock Media
 const searchPexels = async (req, res) => {
     try {
         const queryStr = (req.query.query || 'wellness').trim().toLowerCase();
@@ -32,12 +47,11 @@ const searchPexels = async (req, res) => {
         }
 
         const unsplashKey = process.env.UNSPLASH_ACCESS_KEY || process.env.UNSPLASH_KEY;
-        const pexelsKey = process.env.PEXELS_KEY || process.env.PEXELS_API_KEY;
 
-        // Try Unsplash API first if configured
-        if (type === 'image') {
-            if (unsplashKey) {
-                const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(queryStr)}&per_page=30&client_id=${unsplashKey}`;
+        // Fetch from Unsplash API if key available
+        if (type === 'image' && unsplashKey) {
+            const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(queryStr)}&per_page=30&client_id=${unsplashKey}`;
+            return new Promise((resolve) => {
                 https.get(url, { timeout: 6000 }, (apiRes) => {
                     let data = '';
                     apiRes.on('data', chunk => data += chunk);
@@ -59,82 +73,27 @@ const searchPexels = async (req, res) => {
                         } catch (err) {
                             console.error('Unsplash parsing error:', err);
                         }
+                        return res.json({ success: true, images: getCuratedUnsplashImages() });
                     });
-                }).on('error', err => console.error('Unsplash connection error:', err));
-            }
-
-            // Rich Unsplash Curated Library for Wellness, Massages, Facials, Skincare, Haircare, Spa, Ayurveda
-            const unsplashCurated = [
-                { id: 'u1', url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=300&q=80', description: 'Ayurvedic Massage & Spa Therapy', author: 'Unsplash', source: 'unsplash', type: 'image' },
-                { id: 'u2', url: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=300&q=80', description: 'Relaxing Body Care Therapy', author: 'Unsplash', source: 'unsplash', type: 'image' },
-                { id: 'u3', url: 'https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&w=300&q=80', description: 'Herbal Essential Oils & Aromatherapy', author: 'Unsplash', source: 'unsplash', type: 'image' },
-                { id: 'u4', url: 'https://images.unsplash.com/photo-1512290900673-8a39529b4703?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1512290900673-8a39529b4703?auto=format&fit=crop&w=300&q=80', description: 'Herbal Tea & Ayurvedic Spices', author: 'Unsplash', source: 'unsplash', type: 'image' },
-                { id: 'u5', url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=300&q=80', description: 'Facial Treatment & Skin Care', author: 'Unsplash', source: 'unsplash', type: 'image' },
-                { id: 'u6', url: 'https://images.unsplash.com/photo-1560750588-73207b1ef5b8?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1560750588-73207b1ef5b8?auto=format&fit=crop&w=300&q=80', description: 'Natural Skin Hydration & Scrub', author: 'Unsplash', source: 'unsplash', type: 'image' },
-                { id: 'u7', url: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=300&q=80', description: 'Hair Spa & Scalp Treatment', author: 'Unsplash', source: 'unsplash', type: 'image' },
-                { id: 'u8', url: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=300&q=80', description: 'Luxury Manicure & Nail Care', author: 'Unsplash', source: 'unsplash', type: 'image' },
-                { id: 'u9', url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=300&q=80', description: 'Mindful Meditation & Yoga', author: 'Unsplash', source: 'unsplash', type: 'image' },
-                { id: 'u10', url: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=800&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=300&q=80', description: 'Ayurvedic Healing Oils', author: 'Unsplash', source: 'unsplash', type: 'image' }
-            ];
-            return res.json({ success: true, images: unsplashCurated });
-        }
-
-        let url = '';
-        if (type === 'video') {
-            url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(queryStr)}&per_page=30`;
-        } else {
-            url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(queryStr)}&per_page=30`;
-        }
-
-        https.get(url, {
-            headers: {
-                'Authorization': pexelsKey
-            },
-            timeout: 6000
-        }, (apiRes) => {
-            let data = '';
-            apiRes.on('data', (chunk) => data += chunk);
-            apiRes.on('end', () => {
-                try {
-                    const result = JSON.parse(data);
-                    
-                    if (type === 'video') {
-                        const videos = (result.videos || []).map(vid => {
-                            const sdFile = vid.video_files.find(vf => vf.quality === 'sd' || vf.link.includes('sd')) || vid.video_files[0];
-                            return {
-                                id: vid.id,
-                                url: sdFile ? sdFile.link : null,
-                                thumbnail_url: vid.image,
-                                description: `Pexels Video by ${vid.user?.name || 'Creator'}`,
-                                author: vid.user?.name || 'Pexels Author',
-                                source: 'pexels',
-                                type: 'video'
-                            };
-                        }).filter(v => v.url);
-                        
-                        return res.json({ success: true, videos });
-                    } else {
-                        const images = (result.photos || []).map(img => ({
-                            id: img.id,
-                            url: img.src.large,
-                            thumbnail_url: img.src.medium,
-                            description: img.alt || 'Pexels Photo',
-                            author: img.photographer || 'Pexels Photographer',
-                            source: 'pexels',
-                            type: 'image'
-                        }));
-                        
-                        return res.json({ success: true, images });
-                    }
-                } catch (err) {
-                    console.error('Pexels response parsing error:', err);
-                    return res.status(500).json({ success: false, message: 'Failed to parse Pexels response.' });
-                }
+                }).on('error', err => {
+                    console.error('Unsplash connection error:', err);
+                    return res.json({ success: true, images: getCuratedUnsplashImages() });
+                });
             });
-        }).on('error', (err) => {
-            console.error('Pexels API connection error:', err);
-            return res.status(500).json({ success: false, message: 'Failed to connect to Pexels API.' });
-        });
+        }
+
+        if (type === 'video') {
+            const unsplashVideos = [
+                { id: 'uv1', url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1200&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=400&q=80', description: 'Ayurvedic Wellness Workshop Video', author: 'Unsplash', source: 'unsplash', type: 'video' },
+                { id: 'uv2', url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=1200&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=400&q=80', description: 'Yoga & Pranayama Masterclass Video', author: 'Unsplash', source: 'unsplash', type: 'video' },
+                { id: 'uv3', url: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=1200&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=400&q=80', description: 'Meditation & Sound Bath Session Video', author: 'Unsplash', source: 'unsplash', type: 'video' },
+                { id: 'uv4', url: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=80', thumbnail_url: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=400&q=80', description: 'Ayurvedic Diet & Gut Health Workshop', author: 'Unsplash', source: 'unsplash', type: 'video' }
+            ];
+            return res.json({ success: true, videos: unsplashVideos });
+        }
+
+        // Return Curated Unsplash Stock Images
+        return res.json({ success: true, images: getCuratedUnsplashImages() });
 
     } catch (err) {
         console.error('searchPexels error:', err);
@@ -163,7 +122,7 @@ const saveMedia = async (req, res) => {
 
         const result = await query(
             'INSERT INTO media_assets (source, url, type, category) VALUES ($1, $2, $3, $4) RETURNING *',
-            ['pexels', url, type, normalizedCategory]
+            ['unsplash', url, type, normalizedCategory]
         );
 
         return res.status(201).json({ success: true, media: result.rows[0] });

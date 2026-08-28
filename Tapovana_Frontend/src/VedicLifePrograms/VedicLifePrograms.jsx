@@ -174,7 +174,7 @@ const FormField = ({ label, children }) => (
 );
 
 // ─── Reusable Form Component ──────────────────────────────────────────────
-function ProgramForm({ form, onChange, instructors, mode, onSearchPexels }) {
+function ProgramForm({ form, onChange, instructors, mode, onSearchUnsplash }) {
   const handleDurationChange = (duration) => {
     const newForm = { ...form, duration };
     const days = DURATION_MAP[duration];
@@ -341,7 +341,7 @@ function ProgramForm({ form, onChange, instructors, mode, onSearchPexels }) {
             Browse Image
           </button>
           <button type="button" className="vedic-btn-cancel" style={{ padding: "6px 12px", fontSize: 12, borderColor: '#CDA751', color: '#CDA751' }}
-            onClick={onSearchPexels}>
+            onClick={onSearchUnsplash}>
             📷 Search Unsplash
           </button>
           <span style={{ fontSize: 11, color: "#94A3B8" }}>or URL:</span>
@@ -1896,7 +1896,7 @@ export default function VedicLifePrograms() {
   const renderEditForm = () => (
     <div style={{ padding: "24px 28px", overflowY: "auto", maxHeight: "65vh" }}>
       <h2 style={{ fontSize: 20, fontWeight: 700, color: "#2d3748", margin: "0 0 16px 0" }}>Edit Program</h2>
-      <ProgramForm form={editForm} onChange={(e) => setEditForm(p => ({ ...p, [e.target.name]: e.target.value }))} instructors={instructors} mode="edit" onSearchPexels={() => { setMediaTarget('edit'); setMediaModalOpen(true); }} />
+      <ProgramForm form={editForm} onChange={(e) => setEditForm(p => ({ ...p, [e.target.name]: e.target.value }))} instructors={instructors} mode="edit" onSearchUnsplash={() => { setMediaTarget('edit'); setMediaModalOpen(true); }} />
       {editError && <div style={{ color: "#e74c3c", fontSize: 13, fontWeight: 600, marginTop: 8 }}>{editError}</div>}
       <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
         <button className="vedic-btn-cancel" style={{ flex: 1 }} onClick={() => setIsEditing(false)}>Cancel</button>
@@ -2010,7 +2010,7 @@ export default function VedicLifePrograms() {
           <button className="drawer-close-btn" onClick={() => setShowCreateModal(false)}>✕</button>
         </div>
         <div className="drawer-body">
-          <ProgramForm form={addForm} onChange={(e) => setAddForm(p => ({ ...p, [e.target.name]: e.target.value }))} instructors={instructors} mode="add" onSearchPexels={() => { setMediaTarget('add'); setMediaModalOpen(true); }} />
+          <ProgramForm form={addForm} onChange={(e) => setAddForm(p => ({ ...p, [e.target.name]: e.target.value }))} instructors={instructors} mode="add" onSearchUnsplash={() => { setMediaTarget('add'); setMediaModalOpen(true); }} />
           {addError && <div style={{ color: "#e74c3c", fontSize: 13, fontWeight: 600, marginTop: 12 }}>{addError}</div>}
         </div>
         <div className="drawer-footer">
