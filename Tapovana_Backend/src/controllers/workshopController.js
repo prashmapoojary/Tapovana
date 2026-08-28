@@ -463,10 +463,27 @@ const createWorkshop = async (req, res) => {
         }
     }
 
-    // Verify category whitelist
-    const allowedCategories = ['Yoga', 'Meditation', 'Nutrition', 'Ayurveda', 'Holistic'];
-    if (category && !allowedCategories.includes(category)) {
-        return res.status(400).json({ success: false, message: `Invalid category. Must be one of: ${allowedCategories.join(', ')}` });
+    // Verify & normalize category whitelist
+    const allowedCategories = [
+        'Yoga', 'Meditation', 'Nutrition', 'Ayurveda', 'Holistic',
+        'Yoga & Meditation', 'Nutrition & Diet', 'Hatha Yoga', 'Mind & Meditation',
+        'Detox & Healing', 'Spiritual & Yoga', 'Longevity & Rejuvenation', 'Digestive & Immunity',
+        'Wellness', 'Spa'
+    ];
+    if (category !== undefined && category !== null && String(category).trim() !== '') {
+        const catStr = String(category).trim();
+        const matched = allowedCategories.find(c => c.toLowerCase() === catStr.toLowerCase());
+        if (matched) {
+            category = matched;
+        } else {
+            const lower = catStr.toLowerCase();
+            if (lower.includes('yoga')) category = 'Yoga';
+            else if (lower.includes('meditation') || lower.includes('mind')) category = 'Meditation';
+            else if (lower.includes('nutrition') || lower.includes('diet')) category = 'Nutrition';
+            else if (lower.includes('ayurveda') || lower.includes('detox')) category = 'Ayurveda';
+            else if (lower.includes('holistic') || lower.includes('healing')) category = 'Holistic';
+            else category = 'Yoga';
+        }
     }
 
     // Verify customer_email
@@ -639,10 +656,27 @@ const updateWorkshop = async (req, res) => {
         }
     }
 
-    // Verify category whitelist
-    const allowedCategories = ['Yoga', 'Meditation', 'Nutrition', 'Ayurveda', 'Holistic'];
-    if (category !== undefined && category !== null && !allowedCategories.includes(category)) {
-        return res.status(400).json({ success: false, message: `Invalid category. Must be one of: ${allowedCategories.join(', ')}` });
+    // Verify & normalize category whitelist
+    const allowedCategories = [
+        'Yoga', 'Meditation', 'Nutrition', 'Ayurveda', 'Holistic',
+        'Yoga & Meditation', 'Nutrition & Diet', 'Hatha Yoga', 'Mind & Meditation',
+        'Detox & Healing', 'Spiritual & Yoga', 'Longevity & Rejuvenation', 'Digestive & Immunity',
+        'Wellness', 'Spa'
+    ];
+    if (category !== undefined && category !== null && String(category).trim() !== '') {
+        const catStr = String(category).trim();
+        const matched = allowedCategories.find(c => c.toLowerCase() === catStr.toLowerCase());
+        if (matched) {
+            category = matched;
+        } else {
+            const lower = catStr.toLowerCase();
+            if (lower.includes('yoga')) category = 'Yoga';
+            else if (lower.includes('meditation') || lower.includes('mind')) category = 'Meditation';
+            else if (lower.includes('nutrition') || lower.includes('diet')) category = 'Nutrition';
+            else if (lower.includes('ayurveda') || lower.includes('detox')) category = 'Ayurveda';
+            else if (lower.includes('holistic') || lower.includes('healing')) category = 'Holistic';
+            else category = 'Yoga';
+        }
     }
 
     // Verify customer_email
