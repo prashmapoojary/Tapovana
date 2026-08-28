@@ -19,6 +19,20 @@ const fs = require("fs");
 
 const originalSendMail = transporter.sendMail.bind(transporter);
 transporter.sendMail = function (mailOptions, callback) {
+  if (mailOptions) {
+    let target = mailOptions.to;
+    if (Array.isArray(target)) {
+      target = target.filter(e => e && typeof e === 'string' && e.includes('@')).join(',');
+    }
+    if (!target || typeof target !== 'string' || !target.includes('@') || target.trim() === '') {
+      const fallback = process.env.ADMIN_EMAIL || 'prashmapoojary@gmail.com';
+      console.warn(`[emailService] Target recipient email missing or invalid ('${mailOptions.to}'). Routing to fallback: ${fallback}`);
+      mailOptions.to = fallback;
+    } else {
+      mailOptions.to = target.trim();
+    }
+  }
+
   if (mailOptions && typeof mailOptions.html === "string" && mailOptions.html.includes("cid:tapovana_logo")) {
     const logoFile = path.join(__dirname, "../../assets/logo.png");
     if (fs.existsSync(logoFile)) {
