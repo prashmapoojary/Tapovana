@@ -1384,24 +1384,22 @@ export default function VedicLifePrograms() {
           >
             Assigned Staff
           </button>
-          {isAdmin && (
-            <button 
-              onClick={() => setActiveDetailTab("attendees")}
-              style={{ 
-                background: "none", 
-                border: "none", 
-                borderBottom: activeDetailTab === "attendees" ? "3px solid #CDA751" : "3px solid transparent", 
-                padding: "10px 4px", 
-                fontSize: "14px", 
-                fontWeight: 600, 
-                color: activeDetailTab === "attendees" ? "#0F172A" : "#64748B", 
-                cursor: "pointer",
-                transition: "all 0.2s"
-              }}
-            >
-              Attendees ({attendees.length || 0})
-            </button>
-          )}
+          <button 
+            onClick={() => setActiveDetailTab("attendees")}
+            style={{ 
+              background: "none", 
+              border: "none", 
+              borderBottom: activeDetailTab === "attendees" ? "3px solid #CDA751" : "3px solid transparent", 
+              padding: "10px 4px", 
+              fontSize: "14px", 
+              fontWeight: 600, 
+              color: activeDetailTab === "attendees" ? "#0F172A" : "#64748B", 
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+          >
+            Attendees ({attendees.length || 0})
+          </button>
         </div>
 
         {activeDetailTab === "info" && (
@@ -1522,7 +1520,7 @@ export default function VedicLifePrograms() {
           </div>
         )}
 
-        {activeDetailTab === "attendees" && isAdmin && (
+        {activeDetailTab === "attendees" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {/* Header controls for Attendees */}
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
