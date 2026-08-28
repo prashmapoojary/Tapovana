@@ -208,9 +208,9 @@ export default function Blogs({ mode }) {
   const [detailLoading, setDetailLoading] = useState(false);
 
   const currentUser = useMemo(() => getUser(), []);
-  const role = currentUser?.role?.toUpperCase() || "";
-  const isAdmin = role === "SUPER_ADMIN" || role === "CO_ADMIN";
-  const isStaff = role === "DOCTOR" || role === "THERAPIST";
+  const normalizedRole = (currentUser?.role || "").toUpperCase().replace(/[\s_-]+/g, "");
+  const isAdmin = normalizedRole === "SUPERADMIN" || normalizedRole === "COADMIN" || normalizedRole === "ADMIN";
+  const isStaff = normalizedRole === "DOCTOR" || normalizedRole === "THERAPIST";
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
