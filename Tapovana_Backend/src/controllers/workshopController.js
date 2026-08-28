@@ -1442,7 +1442,7 @@ const generateSingleAttendeeCertificate = async (attendeeId, workshopId) => {
             rand += chars.charAt(Math.floor(Math.random() * chars.length));
         }
         const certId = `CERT-${year}-${rand}`;
-        const certUrl = `${backendUrl}/download/certificate/${att.id}`;
+        const certUrl = `${backendUrl}/api/certificates/download/${certId}`;
 
         let dateStr = workshop.date;
         if (workshop.date instanceof Date) {
@@ -1500,7 +1500,8 @@ const generateSingleAttendeeCertificate = async (attendeeId, workshopId) => {
                 completionDate: completionDateStr,
                 downloadUrl: certUrl,
                 certId: certId,
-                participantId: att.id
+                participantId: att.id,
+                pdfBuffer: pdfBuffer
             });
             await query(
                 `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)
@@ -1886,7 +1887,8 @@ const autoUpdateWorkshopStatuses = async () => {
                                     completionDate: completionDateStr,
                                     downloadUrl: certUrl,
                                     certId: certId,
-                                    participantId: att.id
+                                    participantId: att.id,
+                                    pdfBuffer: pdfBuffer
                                 });
                                 await query(
                                     `INSERT INTO email_logs (participant_id, workshop_id, status, sent_at)

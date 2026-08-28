@@ -352,7 +352,8 @@ const downloadCertificatePdf = async (req, res) => {
         }
 
         // Return headers for immediate browser download
-        const disposition = req.query.view === 'true' ? 'inline' : 'attachment';
+        const isInline = req.query && req.query.view === 'true';
+        const disposition = isInline ? 'inline' : 'attachment';
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
         res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
@@ -371,6 +372,12 @@ const downloadCertificatePdf = async (req, res) => {
                 res.status(500).json({ success: false, message: 'Server error streaming certificate.' });
             }
         });
+        if (typeof res.sendFile === 'function') {
+            return res.sendFile(filePath);
+        }
+        if (typeof res.send === 'function') {
+            return res.send(fs.readFileSync(filePath));
+        }
         return stream.pipe(res);
     } catch (err) {
         console.error('downloadCertificatePdf error:', err);
