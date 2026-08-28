@@ -32,40 +32,34 @@ const syncTransactionsFromRemote = async () => {
     }
 
     const serviceCatalog = [
-      { name: "Tapovana Wellness Package", price: 1200, method: "UPI", status: "COMPLETED" },
-      { name: "Abhyanga Body Therapy", price: 2500, method: "CARD", status: "COMPLETED" },
-      { name: "Shirodhara Relaxation Therapy", price: 3500, method: "UPI", status: "COMPLETED" },
-      { name: "Ayurvedic Health Consultation", price: 1500, method: "NETBANKING", status: "COMPLETED" },
-      { name: "Panchakarma Detox Day", price: 4200, method: "UPI", status: "COMPLETED" },
-      { name: "Yoga & Meditation Retreat", price: 7999, method: "CARD", status: "COMPLETED" },
-      { name: "Herbal Rejuvenation Spa", price: 2800, method: "UPI", status: "COMPLETED" }
+      { name: "Tapovana Wellness Package", price: 1200, method: "UPI" },
+      { name: "Abhyanga Body Therapy", price: 2500, method: "CARD" },
+      { name: "Shirodhara Relaxation Therapy", price: 3500, method: "UPI" },
+      { name: "Ayurvedic Health Consultation", price: 1500, method: "NETBANKING" },
+      { name: "Panchakarma Detox Day", price: 4200, method: "UPI" },
+      { name: "Yoga & Meditation Retreat", price: 7999, method: "CARD" },
+      { name: "Herbal Rejuvenation Spa", price: 2800, method: "UPI" }
     ];
 
     const paymentMethods = ["UPI", "CARD", "NETBANKING", "UPI"];
     let countRes = await query("SELECT COUNT(*) as cnt FROM transactions");
     let txCount = parseInt(countRes.rows[0].cnt, 10);
     let insertedCount = 0;
+    let updatedCount = 0;
 
     for (let i = 0; i < remoteTx.length; i++) {
       const t = remoteTx[i];
       const paymentId = t.payment_id || `pay_remote_${i + 1}`;
 
-      // Check if this transaction already exists by gateway_transaction_id
-      const existing = await query(`SELECT id FROM transactions WHERE gateway_transaction_id = $1`, [paymentId]);
-      if (existing.rows.length > 0) {
-        continue;
-      }
-
-      txCount++;
-      const transactionId = `TXN-${10000 + txCount}`;
-      const bookingId = null;
-
-      // Resolve Amount
-      let amt = parseFloat(t.amount);
+      // Check raw remote amount
+      const rawAmt = parseFloat(t.amount);
+      const isPendingValue = isNaN(rawAmt) || rawAmt <= 0 || (t.status && String(t.status).toUpperCase() === 'PENDING');
+      
       const fallbackItem = serviceCatalog[i % serviceCatalog.length];
-      if (!amt || isNaN(amt) || amt <= 0) {
-        amt = fallbackItem.price;
-      }
+      const amt = (isNaN(rawAmt) || rawAmt <= 0) ? fallbackItem.price : rawAmt;
+
+      // Status determined according to value: if pending value (0 / pending flag), status = PENDING, else COMPLETED
+      let status = isPendingValue ? "PENDING" : (t.status ? String(t.status).toUpperCase() : "COMPLETED");
 
       // Resolve Service / Notes
       let notes = t.service_name;
@@ -80,27 +74,31 @@ const syncTransactionsFromRemote = async () => {
       }
 
       // Resolve Customer Link
-      let customerName = "Karthik";
+      let customerName = "Karthik Rao";
       let customerId = null;
       if (availableCusts.length > 0) {
         const matchedCust = availableCusts[i % availableCusts.length];
-        customerName = `${matchedCust.first_name} ${matchedCust.last_name}`.trim();
+        customerName = `${matchedCust.first_name || ''} ${matchedCust.last_name || ''}`.trim() || "Karthik Rao";
         customerId = matchedCust.id;
-      } else {
-        const fallbackNames = ["Karthik", "Karthik Rao", "Test User", "Rahul Sharma", "Priya Desai", "Anita Nair"];
-        customerName = fallbackNames[i % fallbackNames.length];
       }
-
-      // Status
-      let status = "COMPLETED";
-      if (i === 2) status = "PENDING";
-      else if (i === 4) status = "FAILED";
-      else if (i === 5) status = "REFUNDED";
 
       const paymentGateway = "RAZORPAY";
       const createdAt = t.date_and_time_of_payment ? new Date(t.date_and_time_of_payment) : new Date();
 
-      try {
+      // Check if transaction already exists by gateway_transaction_id
+      const existing = await query(`SELECT id, status, amount FROM transactions WHERE gateway_transaction_id = $1`, [paymentId]);
+      
+      if (existing.rows.length > 0) {
+        // Update existing record according to pending status / value
+        await query(`
+          UPDATE transactions 
+          SET amount = $1, status = $2, payment_method = $3, notes = $4, customer_name = COALESCE(customer_name, $5)
+          WHERE gateway_transaction_id = $6
+        `, [amt, status, method, notes, customerName, paymentId]);
+        updatedCount++;
+      } else {
+        txCount++;
+        const transactionId = `TXN-${10000 + txCount}`;
         await query(`
           INSERT INTO transactions (
             transaction_id, booking_id, customer_id, customer_name,
@@ -109,18 +107,16 @@ const syncTransactionsFromRemote = async () => {
           )
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         `, [
-          transactionId, bookingId, customerId, customerName,
+          transactionId, null, customerId, customerName,
           amt, 'INR', status, method, paymentGateway,
           paymentId, null, notes, createdAt
         ]);
         insertedCount++;
-      } catch (insertErr) {
-        console.warn(`[TransactionController] Error inserting transaction ${paymentId}:`, insertErr.message);
       }
     }
 
-    console.log(`[TransactionController] Synced ${insertedCount} new transactions from remote mobile endpoint.`);
-    return { success: true, count: insertedCount };
+    console.log(`[TransactionController] Synced transactions from remote mobile endpoint (Inserted: ${insertedCount}, Updated: ${updatedCount}).`);
+    return { success: true, count: insertedCount + updatedCount };
   } catch (err) {
     console.warn("[TransactionController] Remote sync failed:", err.message);
     return { success: false, error: err.message };
