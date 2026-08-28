@@ -7,14 +7,13 @@ import { getImageUrl } from "../utils/image";
 import { useAllocations } from "../utils/AllocationContext";
 import AnimatedNumber from "../utils/AnimatedNumber";
 import MediaPickerModal from "../components/MediaPickerModal";
-import { formatDateForInput, formatTimeForInput } from "../utils/dateFormatters";
+import { formatDateForInput, formatTimeForInput, formatDisplayTime } from "../utils/dateFormatters";
 
 // ─── Live status checker ─────────────────────────────────────────────
-const getLiveStatus = (ws) => {
+const getLiveStatus = (ws, now = new Date()) => {
   if (!ws) return "unknown";
   const statusLower = String(ws.status || "").toLowerCase();
   if (statusLower === "completed" || statusLower === "cancelled") return "completed";
-  const now = new Date();
   
   // If start_time and end_time are provided, use them directly
   if (ws.start_time && ws.end_time) {
@@ -26,49 +25,68 @@ const getLiveStatus = (ws) => {
     return "completed";
   }
 
-  // Format today's date in local YYYY-MM-DD
+  // Format today's date in local YYYY-MM-DD (laptop timezone)
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   const today = `${year}-${month}-${day}`;
   
-  let wsDateStr = ws.date;
-  if (ws.date && typeof ws.date === 'string') {
-    wsDateStr = ws.date.split('T')[0];
-  } else if (ws.date instanceof Date) {
-    const wYear = ws.date.getFullYear();
-    const wMonth = String(ws.date.getMonth() + 1).padStart(2, '0');
-    const wDay = String(ws.date.getDate()).padStart(2, '0');
-    wsDateStr = `${wYear}-${wMonth}-${wDay}`;
+  let wsDateStr = "";
+  if (ws.date) {
+    if (typeof ws.date === 'string') {
+      const trimmedDate = ws.date.trim();
+      if (trimmedDate.includes('T')) {
+        const dObj = new Date(trimmedDate);
+        if (!isNaN(dObj.getTime())) {
+          const wYear = dObj.getFullYear();
+          const wMonth = String(dObj.getMonth() + 1).padStart(2, '0');
+          const wDay = String(dObj.getDate()).padStart(2, '0');
+          wsDateStr = `${wYear}-${wMonth}-${wDay}`;
+        } else {
+          wsDateStr = trimmedDate.split('T')[0];
+        }
+      } else {
+        wsDateStr = trimmedDate.split(' ')[0];
+      }
+    } else if (ws.date instanceof Date) {
+      const wYear = ws.date.getFullYear();
+      const wMonth = String(ws.date.getMonth() + 1).padStart(2, '0');
+      const wDay = String(ws.date.getDate()).padStart(2, '0');
+      wsDateStr = `${wYear}-${wMonth}-${wDay}`;
+    }
   }
 
-  if (wsDateStr !== today) {
+  if (wsDateStr && wsDateStr !== today) {
     if (wsDateStr > today) return "upcoming";
     if (wsDateStr < today) return "completed";
   }
 
-  const wsTime = ws.time || "";
+  // Same date (Today)! Calculate time window using local hour/minute
+  const wsTime = String(ws.time || "").trim();
   let wsHour = 0, wsMinute = 0;
   if (wsTime) {
-    const match = wsTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
-    if (match) {
-      let h = parseInt(match[1]);
-      const m = parseInt(match[2]);
-      if (match[3].toUpperCase() === "PM" && h !== 12) h += 12;
-      if (match[3].toUpperCase() === "AM" && h === 12) h = 0;
-      wsHour = h; wsMinute = m;
+    const ampmMatch = wsTime.match(/(\d{1,2})[:\.](\d{2})\s*(AM|PM)/i);
+    if (ampmMatch) {
+      let h = parseInt(ampmMatch[1], 10);
+      const m = parseInt(ampmMatch[2], 10);
+      const p = ampmMatch[3].toUpperCase();
+      if (p === "PM" && h < 12) h += 12;
+      if (p === "AM" && h === 12) h = 0;
+      wsHour = h;
+      wsMinute = m;
     } else {
-      const parts = wsTime.split(":");
-      wsHour = parseInt(parts[0]) || 0;
-      wsMinute = parseInt(parts[1]) || 0;
+      const match24 = wsTime.match(/(\d{1,2})[:\.](\d{2})/);
+      if (match24) {
+        wsHour = parseInt(match24[1], 10) || 0;
+        wsMinute = parseInt(match24[2], 10) || 0;
+      }
     }
   }
 
-  // Build Date objects for start and end
+  // Build Date objects for start and end using laptop local date/time
   const wsStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), wsHour, wsMinute, 0, 0);
-  const wsEndMins = wsHour * 60 + wsMinute + (ws.duration || 60);
-  const wsEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
-    Math.floor(wsEndMins / 60), wsEndMins % 60, 0, 0);
+  const durationMins = Number(ws.duration) || 60;
+  const wsEnd = new Date(wsStart.getTime() + durationMins * 60 * 1000);
 
   if (now < wsStart) return "upcoming";
   if (now >= wsStart && now < wsEnd) return "live";
@@ -208,7 +226,7 @@ function WorkshopCard({ w, onClick }) {
         <div className="ws-card-meta">
           <div className="ws-card-meta-item" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#7b8a9a" }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-            {w.date ? new Date(w.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : ""} {w.time}
+            {w.date ? new Date(w.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : ""} {formatDisplayTime(w.time)}
           </div>
           <div className="ws-card-meta-item" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#7b8a9a" }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
@@ -231,7 +249,13 @@ function WorkshopCard({ w, onClick }) {
 export default function Workshops() {
   const { allocateStaff, triggerAlert } = useAllocations();
   const [workshops, setWorkshops] = useState([]);
+  const [nowTick, setNowTick] = useState(Date.now());
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowTick(Date.now()), 10000);
+    return () => clearInterval(timer);
+  }, []);
   const [mediaTarget, setMediaTarget] = useState(null); // 'add_image', 'add_video', 'edit_image', 'edit_video'
   const [mediaPickerType, setMediaPickerType] = useState('image'); // 'image' or 'video'
 
@@ -1305,7 +1329,7 @@ export default function Workshops() {
                 <div>
                   <span style={{ fontSize: 12, color: "#a0aec0" }}>Time</span>
                   <br />
-                  <span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{ws.time || "N/A"} &middot; {ws.duration} mins</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#2d3748" }}>{formatDisplayTime(ws.time) || "N/A"} &middot; {ws.duration} mins</span>
                 </div>
                 <div>
                   <span style={{ fontSize: 12, color: "#a0aec0" }}>Instructor</span>

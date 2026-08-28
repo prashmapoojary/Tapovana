@@ -4,6 +4,7 @@ import '../Workshops/Workshops.css';
 import { useAllocations } from '../utils/AllocationContext';
 import { getUser } from '../utils/session';
 import { apiFetch } from '../api/http';
+import { formatDisplayTime } from '../utils/dateFormatters';
 
 import AnimatedNumber from '../utils/AnimatedNumber';
 
@@ -123,7 +124,7 @@ function AssignmentCard({ a, onClick }) {
         <div style={{ display: "flex", flexDirection: "column" }}>
           <p style={{ margin: 0, color: "#555555", fontSize: "12px", marginBottom: "2px" }}>Time</p>
           <p style={{ margin: 0, color: "#1E1E1E", fontSize: "13px", fontWeight: 600 }}>
-            {a.bookingTime || a.time || '-'}
+            {formatDisplayTime(a.bookingTime || a.time) || '-'}
           </p>
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>

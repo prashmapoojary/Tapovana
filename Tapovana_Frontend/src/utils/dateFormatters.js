@@ -143,19 +143,45 @@ export function formatDisplayDate(dateVal) {
 }
 
 /**
- * Format user-friendly time for display (e.g. "10:00 AM")
+ * Format user-friendly time for display (e.g. "1:14 PM", "10:00 AM")
  */
 export function formatDisplayTime(timeVal) {
-  const time24 = formatTimeForInput(timeVal);
-  if (!time24) return String(timeVal || "");
+  if (!timeVal) return "";
+  const str = String(timeVal).trim();
+  if (!str) return "";
+
+  // 1. If already has AM/PM (e.g. "1:14 PM", "01:14 PM", "1.14 PM")
+  const ampmMatch = str.match(/^(\d{1,2})[:\.](\d{2})(?::\d{2})?\s*(AM|PM)$/i);
+  if (ampmMatch) {
+    let h = parseInt(ampmMatch[1], 10);
+    const m = ampmMatch[2];
+    const period = ampmMatch[3].toUpperCase();
+    if (h > 12) h -= 12;
+    if (h === 0) h = 12;
+    return `${h}:${m} ${period}`;
+  }
+
+  // 2. Handle 24-hour time notation (colon or dot) like "13:14" or "13.14" or "01:14"
+  const dotColonMatch = str.match(/^(\d{1,2})[:\.](\d{2})$/);
+  if (dotColonMatch) {
+    let h = parseInt(dotColonMatch[1], 10);
+    const m = dotColonMatch[2];
+    const period = h >= 12 ? "PM" : "AM";
+    if (h > 12) h -= 12;
+    if (h === 0) h = 12;
+    return `${h}:${m} ${period}`;
+  }
+
+  const time24 = formatTimeForInput(str);
+  if (!time24) return str;
   try {
     const [hStr, mStr] = time24.split(":");
     let h = parseInt(hStr, 10);
     const period = h >= 12 ? "PM" : "AM";
     if (h > 12) h -= 12;
     if (h === 0) h = 12;
-    return `${String(h).padStart(2, "0")}:${mStr} ${period}`;
+    return `${h}:${mStr} ${period}`;
   } catch {
-    return timeVal;
+    return str;
   }
 }
