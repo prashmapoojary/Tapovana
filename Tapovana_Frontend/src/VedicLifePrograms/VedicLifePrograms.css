@@ -49,26 +49,25 @@
 }
 
 .vedic-add-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 18px;
   background: #CDA751;
-  color: white;
+  color: #ffffff;
   border: none;
-  border-radius: 6px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  font-family: 'Manrope', sans-serif;
   transition: all 0.2s ease;
-  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(205, 167, 81, 0.25);
 }
 
 .vedic-add-btn:hover {
-  background: #b8903f;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(205, 167, 81, 0.3);
+  background: #b59243;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(205, 167, 81, 0.35);
 }
 
 /* ── Stats Row ── */
