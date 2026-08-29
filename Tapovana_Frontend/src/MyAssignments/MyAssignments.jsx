@@ -393,12 +393,23 @@ function MyAssignments() {
       };
     };
 
+    const isStaffMatch = (a) => {
+      if (!a) return false;
+      const target = String(activeStaffId || '').toLowerCase();
+      if (!target) return true;
+      return (
+        String(a.staffId || '').toLowerCase() === target ||
+        String(a.staffEmail || '').toLowerCase() === target ||
+        String(a.staffCode || '').toLowerCase() === target
+      );
+    };
+
     const fromContext = contextAllocations
-      .filter(a => a.staffId === activeStaffId)
+      .filter(isStaffMatch)
       .map(mapAssignment);
 
     const fromBackend = backendAssignments
-      .filter(a => a.staffId === activeStaffId)
+      .filter(isStaffMatch)
       .map(mapAssignment);
 
     const contextAllocMap = new Map(fromContext.map(a => [a.sessionId, a]));

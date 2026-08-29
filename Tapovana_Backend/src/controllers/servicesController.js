@@ -575,18 +575,33 @@ const getMyAssignments = async (req, res) => {
         }
 
         const trimmedId = String(userId).trim();
-        const userResult = await query(
-            `SELECT tm.id, tm.first_name, tm.last_name, tm.email, tm.phone, tm.availability_status, tm.allocation_details, r.name AS role 
-             FROM team_members tm 
-             JOIN roles r ON r.id = tm.role_id 
-             WHERE tm.id::text = $1 
-                OR tm.email ILIKE $1 
-                OR LOWER(CONCAT(tm.first_name, ' ', tm.last_name)) ILIKE $2 
-                OR LOWER(tm.first_name) ILIKE $2 
-                OR LOWER(tm.last_name) ILIKE $2
-             LIMIT 1`,
-            [trimmedId, `%${trimmedId}%`]
-        );
+        const lowerId = trimmedId.toLowerCase();
+        let userResult;
+
+        console.time('Step 1: User Lookup');
+        if (isValidUUID(trimmedId)) {
+            userResult = await query(
+                `SELECT tm.id, tm.first_name, tm.last_name, tm.email, tm.phone, tm.availability_status, tm.allocation_details, r.name AS role 
+                 FROM team_members tm 
+                 JOIN roles r ON r.id = tm.role_id 
+                 WHERE tm.id = $1::uuid 
+                 LIMIT 1`,
+                [trimmedId]
+            );
+        } else {
+            userResult = await query(
+                `SELECT tm.id, tm.first_name, tm.last_name, tm.email, tm.phone, tm.availability_status, tm.allocation_details, r.name AS role 
+                 FROM team_members tm 
+                 JOIN roles r ON r.id = tm.role_id 
+                 WHERE LOWER(tm.email) = $1 
+                    OR LOWER(tm.first_name) = $1 
+                    OR LOWER(tm.last_name) = $1 
+                    OR LOWER(CONCAT(tm.first_name, ' ', tm.last_name)) = $1
+                 LIMIT 1`,
+                [lowerId]
+            );
+        }
+        console.timeEnd('Step 1: User Lookup');
 
         if (!userResult.rows.length) {
             return res.status(404).json({ success: false, message: 'Staff member not found.' });
@@ -597,117 +612,172 @@ const getMyAssignments = async (req, res) => {
         const staffCode = `STAFF-${String(staffUuid).slice(0, 6).toUpperCase()}`;
         const staffName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
 
-        // Auto-sync direct workshop, booking, and Vedic Life Program allocations into allocations table
-        try {
-            // 1. Sync Workshops matching staff ID, instructor name, or email
-            const directWs = await query(`
-                SELECT id, title, date, time, duration FROM workshops 
-                WHERE instructor_id = $1 
-                   OR (instructor IS NOT NULL AND (LOWER(instructor) LIKE $2 OR LOWER(instructor) LIKE $3))
-                   OR assigned_staff_ids @> jsonb_build_array($1::text)
-            `, [staffUuid, `%${user.email.toLowerCase()}%`, `%${staffName.toLowerCase()}%`]);
+        // Async auto-sync helper function (runs in background without blocking response)
+        const runAutoSync = async () => {
+            try {
+                const emailLower = (user.email || '').toLowerCase();
+                const nameLower = staffName.toLowerCase();
 
-            for (const ws of directWs.rows) {
-                const allocId = `ws-alloc-${ws.id}-${staffUuid}`;
-                let dateVal = new Date().toISOString().split('T')[0];
-                if (ws.date) {
-                    dateVal = ws.date instanceof Date ? ws.date.toISOString().split('T')[0] : String(ws.date).split('T')[0];
+                const [existingAllocRes, directWs, directBk, directVedic] = await Promise.all([
+                    query(`SELECT session_id, type FROM allocations WHERE staff_id = $1`, [staffUuid]),
+                    query(`
+                        SELECT id, title, date, time, duration FROM workshops 
+                        WHERE instructor_id = $1 
+                           OR (instructor IS NOT NULL AND (LOWER(instructor) = $2 OR LOWER(instructor) = $3))
+                           OR assigned_staff_ids @> jsonb_build_array($1::text)
+                    `, [staffUuid, emailLower, nameLower]),
+                    query(`
+                        SELECT id, service_name, booking_date, booking_time, status FROM bookings 
+                        WHERE (therapist_id = $1 OR (therapist_name IS NOT NULL AND (LOWER(therapist_name) = $2 OR LOWER(therapist_name) = $3)))
+                          AND status != 'CANCELLED'
+                    `, [staffUuid, emailLower, nameLower]),
+                    query(`
+                        SELECT id, title, start_date, end_date FROM vedic_programs 
+                        WHERE consultant_id = $1 
+                           OR lead_consultant_id = $1
+                           OR assigned_staff_ids @> jsonb_build_array($1::text)
+                    `, [staffUuid])
+                ]);
+
+                const existingKeys = new Set(existingAllocRes.rows.map(r => `${r.type}-${r.session_id}`));
+                const syncPromises = [];
+
+                for (const ws of directWs.rows) {
+                    if (!existingKeys.has(`workshop-${ws.id}`)) {
+                        const allocId = `ws-alloc-${ws.id}-${staffUuid}`;
+                        let dateVal = ws.date ? (ws.date instanceof Date ? ws.date.toISOString().split('T')[0] : String(ws.date).split('T')[0]) : new Date().toISOString().split('T')[0];
+                        syncPromises.push(query(
+                            `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes, status, created_at)
+                             VALUES ($1, $2, 'workshop', $3, $4, $5, $6, $7, $8, 'assigned', NOW())
+                             ON CONFLICT (id) DO NOTHING`,
+                            [allocId, staffUuid, ws.title, String(ws.id), dateVal, dateVal, ws.time || '10:00 AM', ws.duration || 60]
+                        ));
+                    }
                 }
-                await query(
-                    `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes, status, created_at)
-                     VALUES ($1, $2, 'workshop', $3, $4, $5, $6, $7, $8, 'assigned', NOW())
-                     ON CONFLICT (id) DO UPDATE SET 
-                       staff_id = EXCLUDED.staff_id,
-                       session_title = EXCLUDED.session_title,
-                       start_date = EXCLUDED.start_date,
-                       end_date = EXCLUDED.end_date,
-                       booking_time = EXCLUDED.booking_time,
-                       duration_minutes = EXCLUDED.duration_minutes,
-                       status = 'assigned'`,
-                    [allocId, staffUuid, ws.title, String(ws.id), dateVal, dateVal, ws.time || '10:00 AM', ws.duration || 60]
-                );
+
+                for (const bk of directBk.rows) {
+                    if (!existingKeys.has(`service-${bk.id}`)) {
+                        const allocId = `bk-alloc-${bk.id}-${staffUuid}`;
+                        let dateVal = bk.booking_date ? (bk.booking_date instanceof Date ? bk.booking_date.toISOString().split('T')[0] : String(bk.booking_date).split('T')[0]) : new Date().toISOString().split('T')[0];
+                        syncPromises.push(query(
+                            `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes, status, created_at)
+                             VALUES ($1, $2, 'service', $3, $4, $5, $6, $7, $8, $9, NOW())
+                             ON CONFLICT (id) DO NOTHING`,
+                            [allocId, staffUuid, bk.service_name || 'Service Session', String(bk.id), dateVal, dateVal, bk.booking_time || '10:00 AM', 60, bk.status ? bk.status.toLowerCase() : 'assigned']
+                        ));
+                    }
+                }
+
+                for (const vp of directVedic.rows) {
+                    if (!existingKeys.has(`vedic_program-${vp.id}`)) {
+                        const allocId = `vp-alloc-${vp.id}-${staffUuid}`;
+                        let startDateVal = vp.start_date ? (vp.start_date instanceof Date ? vp.start_date.toISOString().split('T')[0] : String(vp.start_date).split('T')[0]) : new Date().toISOString().split('T')[0];
+                        let endDateVal = vp.end_date ? (vp.end_date instanceof Date ? vp.end_date.toISOString().split('T')[0] : String(vp.end_date).split('T')[0]) : startDateVal;
+                        syncPromises.push(query(
+                            `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes, status, created_at)
+                             VALUES ($1, $2, 'vedic_program', $3, $4, $5, $6, $7, $8, 'assigned', NOW())
+                             ON CONFLICT (id) DO NOTHING`,
+                            [allocId, staffUuid, vp.title, String(vp.id), startDateVal, endDateVal, '09:00 AM', 120]
+                        ));
+                    }
+                }
+
+                if (syncPromises.length > 0) {
+                    await Promise.all(syncPromises);
+                }
+            } catch (syncErr) {
+                console.warn('[getMyAssignments] Auto-sync warning:', syncErr.message);
             }
+        };
 
-            // 2. Sync Bookings matching staff ID, therapist name, or email
-            const directBk = await query(`
-                SELECT id, service_name, booking_date, booking_time, status FROM bookings 
-                WHERE (therapist_id = $1 OR (therapist_name IS NOT NULL AND (LOWER(therapist_name) LIKE $2 OR LOWER(therapist_name) LIKE $3)))
-                  AND status != 'CANCELLED'
-            `, [staffUuid, `%${user.email.toLowerCase()}%`, `%${staffName.toLowerCase()}%`]);
+        // Fire auto-sync asynchronously in background
+        runAutoSync().catch(() => {});
 
-            for (const bk of directBk.rows) {
-                const allocId = `bk-alloc-${bk.id}-${staffUuid}`;
-                let dateVal = new Date().toISOString().split('T')[0];
-                if (bk.booking_date) {
-                    dateVal = bk.booking_date instanceof Date ? bk.booking_date.toISOString().split('T')[0] : String(bk.booking_date).split('T')[0];
-                }
-                await query(
-                    `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes, status, created_at)
-                     VALUES ($1, $2, 'service', $3, $4, $5, $6, $7, $8, $9, NOW())
-                     ON CONFLICT (id) DO UPDATE SET 
-                       staff_id = EXCLUDED.staff_id,
-                       session_title = EXCLUDED.session_title,
-                       start_date = EXCLUDED.start_date,
-                       end_date = EXCLUDED.end_date,
-                       booking_time = EXCLUDED.booking_time,
-                       duration_minutes = EXCLUDED.duration_minutes,
-                       status = EXCLUDED.status`,
-                    [allocId, staffUuid, bk.service_name || 'Service Session', String(bk.id), dateVal, dateVal, bk.booking_time || '10:00 AM', 60, bk.status ? bk.status.toLowerCase() : 'assigned']
-                );
-            }
+        console.time('Step 3: Allocations query');
+        // Fetch all assignments for this staff member from unified allocations table
+        const [allocationsResult, deletedBookingsResult] = await Promise.all([
+            query(
+                `SELECT id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes, status, created_at
+                 FROM allocations
+                 WHERE staff_id = $1
+                 ORDER BY start_date DESC, created_at DESC`,
+                [staffUuid]
+            ),
+            query(`SELECT booking_id::text FROM deleted_booking_ids`)
+        ]);
+        console.timeEnd('Step 3: Allocations query');
 
-            // 3. Sync Vedic Life Programs matching consultant_id, lead_consultant_id, assigned_staff_ids, or consultant name
-            const directVedic = await query(`
-                SELECT id, title, start_date, end_date FROM vedic_programs 
-                WHERE consultant_id = $1 
-                   OR lead_consultant_id = $1
-                   OR assigned_staff_ids @> jsonb_build_array($1::text)
-            `, [staffUuid]);
+        const deletedBookingIds = new Set(deletedBookingsResult.rows.map(r => String(r.booking_id)));
 
-            for (const vp of directVedic.rows) {
-                const allocId = `vp-alloc-${vp.id}-${staffUuid}`;
-                let startDateVal = new Date().toISOString().split('T')[0];
-                let endDateVal = startDateVal;
-                if (vp.start_date) {
-                    startDateVal = vp.start_date instanceof Date ? vp.start_date.toISOString().split('T')[0] : String(vp.start_date).split('T')[0];
-                }
-                if (vp.end_date) {
-                    endDateVal = vp.end_date instanceof Date ? vp.end_date.toISOString().split('T')[0] : String(vp.end_date).split('T')[0];
-                }
-                await query(
-                    `INSERT INTO allocations (id, staff_id, type, session_title, session_id, start_date, end_date, booking_time, duration_minutes, status, created_at)
-                     VALUES ($1, $2, 'vedic_program', $3, $4, $5, $6, $7, $8, 'assigned', NOW())
-                     ON CONFLICT (id) DO UPDATE SET 
-                       staff_id = EXCLUDED.staff_id,
-                       session_title = EXCLUDED.session_title,
-                       start_date = EXCLUDED.start_date,
-                       end_date = EXCLUDED.end_date,
-                       booking_time = EXCLUDED.booking_time,
-                       duration_minutes = EXCLUDED.duration_minutes,
-                       status = 'assigned'`,
-                    [allocId, staffUuid, vp.title, String(vp.id), startDateVal, endDateVal, '09:00 AM', 120]
-                );
-            }
-        } catch (syncErr) {
-            console.warn('[getMyAssignments] Auto-sync allocations warning:', syncErr.message);
-        }
-
-        const assignments = [];
-
-        // Fetch all assignments from unified allocations table
-        const allocationsResult = await query(
-            `SELECT a.id, a.type, a.session_title, a.session_id, a.start_date, a.end_date, a.booking_time, a.duration_minutes, a.status, a.created_at,
-                    tm.id AS staff_uuid, tm.first_name, tm.last_name, tm.email AS staff_email, tm.phone AS staff_phone, r.name AS role
-             FROM allocations a
-             JOIN team_members tm ON tm.id = a.staff_id
-             JOIN roles r ON r.id = tm.role_id
-             LEFT JOIN deleted_booking_ids d ON d.booking_id = CASE WHEN a.type = 'service' AND a.session_id ~ '^[0-9]+$' THEN CAST(a.session_id AS INTEGER) ELSE NULL END
-             WHERE a.staff_id = $1 AND d.booking_id IS NULL
-             ORDER BY a.start_date DESC, a.created_at DESC`,
-            [staffUuid]
-        );
+        // Collect session IDs by type for batch loading
+        const serviceIds = [];
+        const workshopIds = [];
+        const vedicProgramIds = [];
 
         for (const alloc of allocationsResult.rows) {
+            if (alloc.type === 'service' && deletedBookingIds.has(String(alloc.session_id))) {
+                continue;
+            }
+            const sidStr = String(alloc.session_id);
+            if (/^\d+$/.test(sidStr)) {
+                const numId = parseInt(sidStr, 10);
+                if (alloc.type === 'service') serviceIds.push(numId);
+                else if (alloc.type === 'workshop') workshopIds.push(numId);
+                else if (alloc.type === 'vedic_program') vedicProgramIds.push(numId);
+            }
+        }
+
+        // Batch fetch record details in parallel
+        const [bookingsRes, workshopsRes, vedicProgramsRes] = await Promise.all([
+            serviceIds.length > 0
+                ? query(`SELECT * FROM bookings WHERE id = ANY($1::int[])`, [serviceIds])
+                : Promise.resolve({ rows: [] }),
+            workshopIds.length > 0
+                ? query(`SELECT * FROM workshops WHERE id = ANY($1::int[])`, [workshopIds])
+                : Promise.resolve({ rows: [] }),
+            vedicProgramIds.length > 0
+                ? query(`SELECT * FROM vedic_programs WHERE id = ANY($1::int[])`, [vedicProgramIds])
+                : Promise.resolve({ rows: [] })
+        ]);
+
+        const bookingsMap = new Map(bookingsRes.rows.map(b => [String(b.id), b]));
+        const workshopsMap = new Map(workshopsRes.rows.map(w => [String(w.id), w]));
+        const vedicProgramsMap = new Map(vedicProgramsRes.rows.map(vp => [String(vp.id), vp]));
+
+        // Batch fetch attendees for workshops & vedic programs
+        const validWorkshopIds = Array.from(workshopsMap.keys()).map(id => parseInt(id, 10));
+        const validVedicIds = Array.from(vedicProgramsMap.keys()).map(id => parseInt(id, 10));
+
+        const [attendeesRes, vedicAttendeesRes] = await Promise.all([
+            validWorkshopIds.length > 0
+                ? query(`SELECT workshop_id, name, email FROM attendees WHERE workshop_id = ANY($1::int[])`, [validWorkshopIds])
+                : Promise.resolve({ rows: [] }),
+            validVedicIds.length > 0
+                ? query(`SELECT program_id, name, email FROM vedic_attendees WHERE program_id = ANY($1::int[])`, [validVedicIds])
+                : Promise.resolve({ rows: [] })
+        ]);
+
+        const attendeesMap = new Map();
+        for (const att of attendeesRes.rows) {
+            const key = String(att.workshop_id);
+            if (!attendeesMap.has(key)) attendeesMap.set(key, []);
+            attendeesMap.get(key).push(att);
+        }
+
+        const vedicAttendeesMap = new Map();
+        for (const vatt of vedicAttendeesRes.rows) {
+            const key = String(vatt.program_id);
+            if (!vedicAttendeesMap.has(key)) vedicAttendeesMap.set(key, []);
+            vedicAttendeesMap.get(key).push(vatt);
+        }
+
+        // Build assignments response array in memory
+        const assignments = [];
+
+        for (const alloc of allocationsResult.rows) {
+            if (alloc.type === 'service' && deletedBookingIds.has(String(alloc.session_id))) {
+                continue;
+            }
             const assignment = {
                 id: alloc.id,
                 type: alloc.type,
@@ -716,7 +786,6 @@ const getMyAssignments = async (req, res) => {
                 staffName: staffName,
                 staffEmail: user.email,
                 staffRole: user.role,
-                staffPhone: user.phone || null,
                 sessionTitle: alloc.session_title,
                 sessionId: alloc.session_id,
                 displayRecordId: alloc.session_id,
@@ -731,110 +800,84 @@ const getMyAssignments = async (req, res) => {
                 recordDetails: null
             };
 
+            const sidStr = String(alloc.session_id);
+
             // 1. Service Booking details
             if (alloc.type === 'service') {
-                try {
-                    let bRes = { rows: [] };
-                    if (/^\d+$/.test(String(alloc.session_id))) {
-                        bRes = await query(`SELECT * FROM bookings WHERE id = $1 LIMIT 1`, [parseInt(alloc.session_id, 10)]);
-                    } else if (isValidUUID(alloc.session_id)) {
-                        bRes = await query(`SELECT * FROM bookings WHERE id::text = $1 LIMIT 1`, [alloc.session_id]);
-                    }
-                    if (bRes.rows.length > 0) {
-                        const b = bRes.rows[0];
-                        assignment.displayRecordId = `BKG-${String(b.id).padStart(3, '0')}`;
-                        assignment.customerName = b.user_name || b.customer_name || "Valued Customer";
-                        assignment.customerEmail = b.user_email || b.customer_email || b.email || null;
-                        assignment.sessionTitle = b.service_name || alloc.session_title;
-                        assignment.bookingTime = b.booking_time || alloc.booking_time;
-                        assignment.recordDetails = {
-                            booking_id: assignment.displayRecordId,
-                            service_name: b.service_name,
-                            customer_name: assignment.customerName,
-                            customer_email: assignment.customerEmail,
-                            booking_date: b.booking_date,
-                            booking_time: b.booking_time,
-                            status: b.status
-                        };
-                    }
-                } catch (bErr) {
-                    console.warn(`[MyAssignments] Error fetching service details for ${alloc.session_id}:`, bErr.message);
+                const b = bookingsMap.get(sidStr);
+                if (b) {
+                    assignment.displayRecordId = `BKG-${String(b.id).padStart(3, '0')}`;
+                    assignment.customerName = b.user_name || b.customer_name || "Valued Customer";
+                    assignment.customerEmail = b.user_email || b.customer_email || b.email || null;
+                    assignment.sessionTitle = b.service_name || alloc.session_title;
+                    assignment.bookingTime = b.booking_time || alloc.booking_time;
+                    assignment.recordDetails = {
+                        booking_id: assignment.displayRecordId,
+                        service_name: b.service_name,
+                        customer_name: assignment.customerName,
+                        customer_email: assignment.customerEmail,
+                        booking_date: b.booking_date,
+                        booking_time: b.booking_time,
+                        status: b.status
+                    };
                 }
             }
 
             // 2. Workshop details
             else if (alloc.type === 'workshop') {
-                try {
-                    let wsRes = { rows: [] };
-                    if (/^\d+$/.test(String(alloc.session_id))) {
-                        wsRes = await query(`SELECT * FROM workshops WHERE id = $1 LIMIT 1`, [parseInt(alloc.session_id, 10)]);
-                    } else if (isValidUUID(alloc.session_id)) {
-                        wsRes = await query(`SELECT * FROM workshops WHERE id::text = $1 LIMIT 1`, [alloc.session_id]);
-                    }
-                    if (wsRes.rows.length > 0) {
-                        const ws = wsRes.rows[0];
-                        assignment.displayRecordId = `WS-${String(ws.id).padStart(3, '0')}`;
-                        assignment.sessionTitle = ws.title || alloc.session_title;
-                        assignment.workshop_image_name = ws.image_url;
+                const ws = workshopsMap.get(sidStr);
+                if (ws) {
+                    assignment.displayRecordId = `WS-${String(ws.id).padStart(3, '0')}`;
+                    assignment.sessionTitle = ws.title || alloc.session_title;
+                    assignment.workshop_image_name = ws.image_url;
 
-                        const attRes = await query(`SELECT name, email FROM attendees WHERE workshop_id = $1 LIMIT 5`, [ws.id]);
-                        if (attRes.rows.length > 0) {
-                            assignment.customerName = attRes.rows.map(a => a.name).join(", ");
-                            assignment.customerEmail = attRes.rows[0].email;
-                        } else {
-                            assignment.customerName = "Workshop Participants";
-                        }
-                        assignment.recordDetails = {
-                            workshop_id: assignment.displayRecordId,
-                            workshop_title: ws.title,
-                            category: ws.category,
-                            date: ws.date,
-                            time: ws.time,
-                            capacity: ws.capacity,
-                            attendees_count: attRes.rows.length,
-                            attendees: attRes.rows
-                        };
+                    const attList = attendeesMap.get(sidStr) || [];
+                    if (attList.length > 0) {
+                        assignment.customerName = attList.map(a => a.name).join(", ");
+                        assignment.customerEmail = attList[0].email;
+                    } else {
+                        assignment.customerName = "Workshop Participants";
                     }
-                } catch (wsErr) {
-                    console.warn(`[MyAssignments] Error fetching workshop details for ${alloc.session_id}:`, wsErr.message);
+
+                    assignment.recordDetails = {
+                        workshop_id: assignment.displayRecordId,
+                        workshop_title: ws.title,
+                        category: ws.category,
+                        date: ws.date,
+                        time: ws.time,
+                        capacity: ws.capacity,
+                        attendees_count: attList.length,
+                        attendees: attList.slice(0, 5)
+                    };
                 }
             }
 
             // 3. Vedic Life Program details
             else if (alloc.type === 'vedic_program') {
-                try {
-                    let vpRes = { rows: [] };
-                    if (/^\d+$/.test(String(alloc.session_id))) {
-                        vpRes = await query(`SELECT * FROM vedic_programs WHERE id = $1 LIMIT 1`, [parseInt(alloc.session_id, 10)]);
-                    } else if (isValidUUID(alloc.session_id)) {
-                        vpRes = await query(`SELECT * FROM vedic_programs WHERE id::text = $1 LIMIT 1`, [alloc.session_id]);
-                    }
-                    if (vpRes.rows.length > 0) {
-                        const vp = vpRes.rows[0];
-                        assignment.displayRecordId = `VP-${String(vp.id).padStart(3, '0')}`;
-                        assignment.sessionTitle = vp.title || alloc.session_title;
-                        assignment.vediclife_image_name = vp.image_url;
+                const vp = vedicProgramsMap.get(sidStr);
+                if (vp) {
+                    assignment.displayRecordId = `VP-${String(vp.id).padStart(3, '0')}`;
+                    assignment.sessionTitle = vp.title || alloc.session_title;
+                    assignment.vediclife_image_name = vp.image_url;
 
-                        const vattRes = await query(`SELECT name, email FROM vedic_attendees WHERE program_id = $1 LIMIT 5`, [vp.id]);
-                        if (vattRes.rows.length > 0) {
-                            assignment.customerName = vattRes.rows.map(v => v.name).join(", ");
-                            assignment.customerEmail = vattRes.rows[0].email;
-                        } else {
-                            assignment.customerName = "Program Participants";
-                        }
-                        assignment.recordDetails = {
-                            program_id: assignment.displayRecordId,
-                            program_title: vp.title,
-                            type: vp.type,
-                            start_date: vp.start_date,
-                            end_date: vp.end_date,
-                            services: vp.services,
-                            attendees_count: vattRes.rows.length,
-                            attendees: vattRes.rows
-                        };
+                    const vattList = vedicAttendeesMap.get(sidStr) || [];
+                    if (vattList.length > 0) {
+                        assignment.customerName = vattList.map(v => v.name).join(", ");
+                        assignment.customerEmail = vattList[0].email;
+                    } else {
+                        assignment.customerName = "Program Participants";
                     }
-                } catch (vpErr) {
-                    console.warn(`[MyAssignments] Error fetching vedic program details for ${alloc.session_id}:`, vpErr.message);
+
+                    assignment.recordDetails = {
+                        program_id: assignment.displayRecordId,
+                        program_title: vp.title,
+                        type: vp.type,
+                        start_date: vp.start_date,
+                        end_date: vp.end_date,
+                        services: vp.services,
+                        attendees_count: vattList.length,
+                        attendees: vattList.slice(0, 5)
+                    };
                 }
             }
 
@@ -848,13 +891,16 @@ const getMyAssignments = async (req, res) => {
                 staffCode: staffCode,
                 name: staffName,
                 email: user.email,
-                role: user.role
+                role: user.role,
+                phone: user.phone || null,
+                availabilityStatus: user.availability_status || 'available'
             },
-            assignments
+            count: assignments.length,
+            assignments: assignments
         });
     } catch (err) {
         console.error('getMyAssignments error:', err);
-        return res.status(500).json({ success: false, message: 'Server error.', detail: err.message });
+        return res.status(500).json({ success: false, message: 'Internal server error fetching assignments.' });
     }
 };
 
