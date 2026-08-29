@@ -669,11 +669,11 @@ const computeBookingPricingBreakdown = async (b) => {
 
             return {
                 ...booking,
-                original_price: booking.original_price || pricing.original_price,
-                membership_tier: booking.membership_tier || pricing.membership_tier,
-                discount_amount: booking.discount_amount || pricing.discount_amount,
-                final_price: booking.final_price || pricing.final_price,
-                total_amount: booking.total_amount || pricing.final_price,
+                original_price: pricing.original_price,
+                membership_tier: pricing.membership_tier,
+                discount_amount: pricing.discount_amount,
+                final_price: pricing.final_price,
+                total_amount: pricing.final_price,
                 profilePhoto,
                 serviceImage: serviceImage ? getFullImageUrl(req, serviceImage) : null
             };

@@ -71,8 +71,9 @@ function Bookings() {
   const [newNote, setNewNote] = useState("");
   const [openActionMenu, setOpenActionMenu] = useState(null);
 
-  // Ref to track which booking we've already pre-filled staff for
   const staffPrefilledForRef = React.useRef(null);
+
+  // ─── Fetch staff list ───
   useEffect(() => {
     const fetchStaff = async () => {
       try {
@@ -87,7 +88,7 @@ function Bookings() {
     fetchStaff();
   }, []);
 
-  // ─── Fetch services from local backend (for image lookup by name) ───
+  // ─── Fetch services ───
   useEffect(() => {
     const fetchServices = async () => {
       try {
@@ -96,13 +97,13 @@ function Bookings() {
           setServicesList(data.services);
         }
       } catch {
-        // ignore — image simply won't show if services can't be fetched
+        // ignore
       }
     };
     fetchServices();
   }, []);
 
-  // ─── Fetch membership data for profile photos ───
+  // ─── Fetch memberships for profile photos & tier lookup ───
   useEffect(() => {
     const fetchMemberships = async () => {
       try {
@@ -112,13 +113,16 @@ function Bookings() {
             id: m.id,
             name: m.name,
             email: m.email,
+            tier: m.tier,
+            status: m.status,
+            discount_percentage: m.discount_percentage,
             profilePhoto: m.profilePhoto || m.profile_photo_url || null,
             profile_photo_url: m.profilePhoto || m.profile_photo_url || null
           }));
           setMemberships(mappedMembers);
         }
       } catch (err) {
-        console.warn("Failed to fetch memberships for avatars:", err.message);
+        console.warn("Failed to fetch memberships:", err.message);
       }
     };
     fetchMemberships();
@@ -131,7 +135,7 @@ function Bookings() {
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
-  // ─── Fetch bookings from local backend ───
+  // ─── Load bookings ───
   useEffect(() => {
     const load = async () => {
       try {
@@ -160,7 +164,6 @@ function Bookings() {
   // ─── Pre-fill status and staff when booking selected ───
   useEffect(() => {
     if (!selectedBooking) {
-      // Drawer closed — reset the ref so next open pre-fills fresh
       staffPrefilledForRef.current = null;
       return;
     }
@@ -168,14 +171,11 @@ function Bookings() {
     setNewStatus((selectedBooking.status || "PENDING").toUpperCase());
     setNewNote(selectedBooking.note || "");
 
-    // Only pre-fill staff ONCE per booking open (skip if staffList updates later)
     if (staffPrefilledForRef.current === selectedBooking.id) return;
-    // Wait until staffList has loaded before attempting to match names
     if (staffList.length === 0) return;
 
     staffPrefilledForRef.current = selectedBooking.id;
 
-    // Pre-fill multi-staff: match names from therapist_name against staffList
     const loadAllocatedStaff = async () => {
       if ((selectedBooking.status || 'PENDING').toUpperCase() === 'CONFIRMED') {
         try {
@@ -223,9 +223,6 @@ function Bookings() {
   // ─── Search filter ───
   const filtered = useMemo(() => {
     let result = bookings;
-
-
-
     if (!search) return result;
     const q = search.toLowerCase();
     return result.filter(b =>
@@ -456,7 +453,7 @@ function Bookings() {
                       if (pic.startsWith("http")) {
                         avatarSrc = pic;
                       } else {
-                        avatarSrc = `${API_BASE}${pic.startsWith("/") ? "" : "/"}${pic}`;
+                        avatarSrc = `${LOCAL_API_BASE}${pic.startsWith("/") ? "" : "/"}${pic}`;
                       }
                     } else if (membership?.profilePhoto) {
                       avatarSrc = membership.profilePhoto;
@@ -844,12 +841,51 @@ function Bookings() {
               ) : (
                 filtered.map((b) => {
                   const staffInfo = getStaffDisplay(b.therapist_name);
-                  const tierUpper = (b.membership_tier || 'Standard').toUpperCase();
+
+                  // Match against fetched memberships by email or customer name
+                  const memberMatch = memberships.find((m) => {
+                    const mEmail = (m.email || "").trim().toLowerCase();
+                    const mName = (m.name || "").trim().toLowerCase();
+                    const bEmail = (b.user_email || b.email || "").trim().toLowerCase();
+                    const bName = (b.user_name || "").trim().toLowerCase();
+                    return (mEmail && bEmail && mEmail === bEmail) || (mName && bName && mName === bName);
+                  });
+
+                  const isMemberActive = memberMatch && (!memberMatch.status || memberMatch.status.toLowerCase() === "active");
+                  const effectiveTier = isMemberActive && memberMatch.tier
+                    ? memberMatch.tier.toUpperCase()
+                    : (b.membership_tier || "Regular").toUpperCase();
 
                   let tierClass = "bk-pass-regular";
-                  if (tierUpper.includes("GOLD")) tierClass = "bk-pass-gold";
-                  else if (tierUpper.includes("PLATINUM") || tierUpper.includes("DIAMOND")) tierClass = "bk-pass-diamond";
-                  else if (tierUpper.includes("SILVER")) tierClass = "bk-pass-silver";
+                  if (effectiveTier.includes("GOLD")) tierClass = "bk-pass-gold";
+                  else if (effectiveTier.includes("PLATINUM") || effectiveTier.includes("DIAMOND")) tierClass = "bk-pass-diamond";
+                  else if (effectiveTier.includes("SILVER")) tierClass = "bk-pass-silver";
+
+                  let displayOrigPrice = b.original_price || "₹2,500";
+                  let displayDiscount = b.discount_amount || "₹0 (0%)";
+                  let displayFinalPrice = b.final_price || b.total_amount || "₹2,500";
+
+                  if (isMemberActive) {
+                    const defaultPct = { SILVER: 15, GOLD: 25, PLATINUM: 40, DIAMOND: 40 }[effectiveTier] || 0;
+                    const discountPct = memberMatch.discount_percentage ? parseFloat(memberMatch.discount_percentage) : defaultPct;
+
+                    let origNum = 0;
+                    if (b.original_price) {
+                      origNum = parseFloat(String(b.original_price).replace(/[^0-9.]/g, "")) || 0;
+                    }
+                    if (!origNum && b.total_amount) {
+                      const clean = String(b.total_amount).split("(")[0].replace(/[^0-9.]/g, "");
+                      origNum = parseFloat(clean) || 0;
+                    }
+                    if (!origNum) origNum = 2500;
+
+                    const discNum = Math.round((origNum * discountPct) / 100);
+                    const finalNum = Math.max(0, origNum - discNum);
+
+                    displayOrigPrice = `₹${origNum.toLocaleString("en-IN")}`;
+                    displayDiscount = discNum > 0 ? `₹${discNum.toLocaleString("en-IN")} (${discountPct}%)` : `₹0 (0%)`;
+                    displayFinalPrice = `₹${finalNum.toLocaleString("en-IN")}`;
+                  }
 
                   return (
                     <tr
@@ -894,19 +930,19 @@ function Bookings() {
                         <div className="bk-cell-time" style={{ fontSize: '12px', color: '#64748b' }}>{b.booking_time}</div>
                       </td>
                       <td style={{ fontWeight: 500 }}>
-                        {b.original_price || "₹2,500"}
+                        {displayOrigPrice}
                       </td>
                       <td>
                         <span className={`bk-pass-badge ${tierClass}`}>
-                          {b.membership_tier || "Standard"}
+                          {effectiveTier || "REGULAR"}
                         </span>
                       </td>
                       <td style={{ color: '#0284c7', fontWeight: 600 }}>
-                        {b.discount_amount || "₹0 (0%)"}
+                        {displayDiscount}
                       </td>
                       <td>
                         <strong style={{ color: '#16a34a', fontSize: '14px' }}>
-                          {b.final_price || b.total_amount || "₹2,500"}
+                          {displayFinalPrice}
                         </strong>
                       </td>
                       <td>
