@@ -887,6 +887,10 @@ function Bookings() {
                     displayFinalPrice = `₹${finalNum.toLocaleString("en-IN")}`;
                   }
 
+                  const isPastDate = b.booking_date && new Date(b.booking_date) < new Date("2026-08-29");
+                  const rawStatus = (b.status || "PENDING").toUpperCase();
+                  const effectiveStatus = (isPastDate && rawStatus !== "CANCELLED") ? "COMPLETED" : rawStatus;
+
                   return (
                     <tr
                       key={b.id}
@@ -946,8 +950,8 @@ function Bookings() {
                         </strong>
                       </td>
                       <td>
-                        <span className={"bk-status-badge " + (b.status || "PENDING").toLowerCase()}>
-                          {b.status || "PENDING"}
+                        <span className={"bk-status-badge " + effectiveStatus.toLowerCase()}>
+                          {effectiveStatus}
                         </span>
                       </td>
                       <td style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>

@@ -549,6 +549,9 @@ const getAllBookings = async (req, res) => {
             syncIncomingBookings({ noEmail: true }).catch(e => console.error('Background sync error:', e));
         }
 
+        // Auto-mark bookings prior to 2026-08-29 as COMPLETED
+        await query("UPDATE bookings SET status = 'COMPLETED' WHERE booking_date < '2026-08-29' AND status != 'CANCELLED'").catch(e => console.error('Auto-complete past bookings error:', e));
+
         // 2. Query bookings from local database ONLY
         let dbQuery = "SELECT * FROM bookings WHERE 1=1";
         const queryParams = [];
